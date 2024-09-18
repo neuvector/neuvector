@@ -30,7 +30,7 @@ type PauseResumeStoreWatcherFunc func(ip string, port uint16, req share.CLUSStor
 type ConfigHelper interface {
 	NotifyConfigChange(endpoint string)
 	BackupAll()
-	Restore() (string, bool, error)
+	Restore() (string, bool, bool, string, error)
 	Export(w *bufio.Writer, sections utils.Set) error
 	Import(eps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
 		tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc,
@@ -69,6 +69,8 @@ var cfgHelper *configHelper
 var orchPlatform string
 var orchFlavor string
 
+var evqueue cluster.ObjectQueueInterface
+
 func newConfigHelper(id, version string, persist bool) ConfigHelper {
 	c := new(configHelper)
 	c.id = id
@@ -87,7 +89,10 @@ func GetConfigHelper() ConfigHelper {
 	return cfgHelper
 }
 
-func Init(id, version, platform, flavor string, persist bool, isGroupMember FuncIsGroupMember, getConfigData FuncGetConfigKVData) {
+func Init(id, version, platform, flavor string, persist bool, isGroupMember FuncIsGroupMember, getConfigData FuncGetConfigKVData,
+	evQueue cluster.ObjectQueueInterface) {
+
+	evqueue = evQueue
 	for _, ep := range cfgEndpoints {
 		cfgEndpointMap[ep.name] = ep
 	}
@@ -282,6 +287,11 @@ func (c *configHelper) doBackup() error {
 	if id, restoring := c.isKvRestoring(); restoring {
 		log.WithFields(log.Fields{"id": id}).Debug("Restoring is ongoing")
 		return nil
+	} else {
+		ver := getControlVersion()
+		if ver.CtrlVersion == "" && ver.KVVersion == "" {
+			return nil
+		}
 	}
 
 	// Make a copy of changed sections so we don't hold the lock for too long
@@ -357,7 +367,7 @@ func restoreEPs(eps utils.Set, ch chan error, importInfo *fedRulesRevInfo) error
 	return err
 }
 
-func (c *configHelper) Restore() (string, bool, error) {
+func (c *configHelper) Restore() (string, bool, bool, string, error) {
 	log.Info()
 
 	if !c.persist {
@@ -374,7 +384,7 @@ func (c *configHelper) Restore() (string, bool, error) {
 			clusHelper.PutFedScanRevisions(&scanRevs, &rev)
 		}
 
-		return "", false, nil
+		return "", false, false, "", nil
 	} else {
 		kvRestore := share.CLUSKvRestore{StartAt: time.Now(), CtrlerID: c.id}
 		kvRestoreValue, _ := json.Marshal(&kvRestore)
@@ -394,10 +404,10 @@ func (c *configHelper) Restore() (string, bool, error) {
 			}
 			clusHelper.ReleaseLock(lock)
 			if skipRestore {
-				return "", false, nil
+				return "", false, false, "", nil
 			}
 		} else {
-			return "", false, nil
+			return "", false, false, "", nil
 		}
 	}
 
@@ -435,7 +445,7 @@ func (c *configHelper) Restore() (string, bool, error) {
 	go restoreRegistry(ch, importInfo)
 
 	ver := getBackupVersion()
-	putControlVersion(ver)
+	putControlVersion(&ver)
 	log.WithFields(log.Fields{"version": ver}).Info("Done")
 
 	if len(importInfo.fedRulesRevValue) > 0 {
@@ -448,7 +458,7 @@ func (c *configHelper) Restore() (string, bool, error) {
 
 	cluster.Delete(share.CLUSKvRestoreKey)
 
-	return importInfo.fedRole, importInfo.defAdminRestored, err
+	return importInfo.fedRole, importInfo.defAdminRestored, true, ver.KVVersion, err
 }
 
 type configHeader struct {
@@ -887,17 +897,19 @@ func backupVersionFileName() string {
 	return fmt.Sprintf("%s%s.backup", configBackupDir, "version")
 }
 
-func getBackupVersion() *share.CLUSCtrlVersion {
+func getBackupVersion() share.CLUSCtrlVersion {
+	var ver share.CLUSCtrlVersion
+
 	source := backupVersionFileName()
 	if _, err := os.Stat(source); os.IsNotExist(err) {
 		log.Info("Backup doesn't have a version file")
-		return nil
+		return ver
 	}
 
 	f, err := os.Open(source)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "file": source}).Error("Unable to open version file")
-		return nil
+		return ver
 	}
 
 	defer f.Close()
@@ -907,11 +919,10 @@ func getBackupVersion() *share.CLUSCtrlVersion {
 	value, err := r.ReadString('\n')
 	if err == io.EOF || err != nil {
 		log.WithFields(log.Fields{"error": err, "file": source}).Error("Unable to read file")
-		return nil
+		return ver
 	} else {
-		var ver share.CLUSCtrlVersion
 		json.Unmarshal([]byte(value), &ver)
-		return &ver
+		return ver
 	}
 }
 

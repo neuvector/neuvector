@@ -90,7 +90,7 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 	&api.RESTRolePermitOptionInternal{
 		ID:             share.PERM_SYSTEM_CONFIG_ID,
 		Value:          share.PERM_SYSTEM_CONFIG,
-		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
+		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
@@ -210,7 +210,7 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 	&api.RESTRolePermitOptionInternal{
 		ID:             share.PERMS_COMPLIANCE_ID,
 		Value:          share.PERMS_COMPLIANCE,
-		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
+		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 		ComplexPermits: []*api.RESTRolePermitOptionInternal{
@@ -743,7 +743,7 @@ func CompileUriPermitsMapping() {
 				"v1/session/summary",
 				"v1/file_monitor_file",
 				"v1/system/usage",
-				"v1/system/rbac",
+				"v1/system/alerts",
 			},
 			CONST_API_RT_SCAN: []string{
 				"v1/scan/config",
@@ -1760,15 +1760,20 @@ func (acc *AccessControl) GetAdminDomains(writePermitsRequired uint32) []string 
 		}
 	}
 
-	list := make([]string, 0)
+	domains := utils.NewSet()
 	for domain, role := range acc.roles {
 		_, writePermits := getRolePermitValues(role, domain)
 		if writePermitsRequired == (writePermits & writePermitsRequired) {
-			list = append(list, domain)
+			domains.Add(domain)
 		}
 	}
-	if len(list) > 0 {
-		return list
+	for domain, perms := range acc.extraPermits {
+		if writePermitsRequired == (perms.WriteValue & writePermitsRequired) {
+			domains.Add(domain)
+		}
+	}
+	if domains.Cardinality() > 0 {
+		return domains.ToStringSlice()
 	} else {
 		return nil
 	}

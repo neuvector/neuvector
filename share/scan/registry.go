@@ -31,7 +31,7 @@ func NewRegClient(url, token, username, password, proxy string, trace httptrace.
 	log.WithFields(log.Fields{"url": url}).Debug("")
 
 	// Ignore errors
-	hub, _, _ := registry.NewInsecure(url, token, username, password, proxy, trace)
+	hub, _, _ := registry.New(url, token, username, password, proxy, trace)
 	return &RegClient{Registry: hub}
 }
 
@@ -174,14 +174,18 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		}
 	}
 
+	var v2SchemaError error = nil
 	if !isQuaySpecialCase {
+		if manifestReqType == registry.ManifestRequest_CosignSignature {
+			log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("not quay special case, trying v2")
+		}
 		dg, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
-
 		if err == nil {
 			// check if response is manifest list
 			var ml manifestList.DeserializedManifestList
 			if err = ml.UnmarshalJSON(body); err == nil && len(ml.Manifests) > 0 &&
 				(ml.MediaType == manifestList.MediaTypeManifestList || ml.MediaType == registry.MediaTypeOCIIndex) {
+				log.WithFields(log.Fields{"name": name, "tag": tag}).Debug("manifest request result is manifest list")
 				// prefer to scan linux/amd64 image
 				sort.Slice(ml.Manifests, func(i, j int) bool {
 					if ml.Manifests[i].Platform.OS == "linux" && ml.Manifests[i].Platform.Architecture == "amd64" {
@@ -201,6 +205,8 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 
 				_, body, err = rc.ManifestRequest(ctx, name, tag, 2, manifestReqType)
 			}
+		} else {
+			v2SchemaError = fmt.Errorf("error when requesting v2 manifest, will try v1: %s", err.Error())
 		}
 
 		// get schema v2 first
@@ -210,6 +216,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 
 			parsedSchemaVersion, cfgMediaType, err = rc.buildV2ImageInfo(imageInfo, ctx, name, dg, body)
 			if err != nil {
+				v2SchemaError = fmt.Errorf("could not build v2 image info, will try v1: %s", err.Error())
 				log.WithFields(log.Fields{"error": err, "schema": parsedSchemaVersion}).Debug("Failed to get manifest schema v2")
 			}
 			if cfgMediaType != registry.MediaTypeContainerImage && cfgMediaType != registry.MediaTypeOCIImageConfig && cfgMediaType != "" {
@@ -219,58 +226,61 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 		}
 	}
 
-	// get schema v1
-	manV1, err := rc.Manifest(ctx, name, tag)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("Get Manifest v1 fail")
-	} else {
-		log.WithFields(log.Fields{
-			"mediaType": manV1.SignedManifest.MediaType, "version": manV1.SignedManifest.SchemaVersion, "digest": manV1.Digest,
-			"layers": len(manV1.SignedManifest.FSLayers), "cmds": len(manV1.Cmds), "created": manV1.Created,
-		}).Debug("v1 manifest")
+	if v2SchemaError != nil {
+		log.WithFields(log.Fields{"name": name, "tag": tag, "error": v2SchemaError.Error()}).Error("could not build v2 image info, trying v1")
+		// get schema v1
+		manV1, err := rc.Manifest(ctx, name, tag)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Get Manifest v1 fail")
+		} else {
+			log.WithFields(log.Fields{
+				"mediaType": manV1.SignedManifest.MediaType, "version": manV1.SignedManifest.SchemaVersion, "digest": manV1.Digest,
+				"layers": len(manV1.SignedManifest.FSLayers), "cmds": len(manV1.Cmds), "created": manV1.Created,
+			}).Debug("v1 manifest")
 
-		// Even we send request with accept v1 manifest, we still get v2 format back
-		if manV1.SignedManifest.SchemaVersion <= 1 {
-			if len(manV1.SignedManifest.FSLayers) > 0 {
-				imageInfo.Layers = make([]string, len(manV1.SignedManifest.FSLayers))
-				for i, des := range manV1.SignedManifest.FSLayers {
-					imageInfo.Layers[i] = string(des.BlobSum)
-					// log.WithFields(log.Fields{"i": i, "layer": string(des.BlobSum)}).Debug("v1 manifest")
+			// Even we send request with accept v1 manifest, we still get v2 format back
+			if manV1.SignedManifest.SchemaVersion <= 1 {
+				if len(manV1.SignedManifest.FSLayers) > 0 {
+					imageInfo.Layers = make([]string, len(manV1.SignedManifest.FSLayers))
+					for i, des := range manV1.SignedManifest.FSLayers {
+						imageInfo.Layers[i] = string(des.BlobSum)
+						// log.WithFields(log.Fields{"i": i, "layer": string(des.BlobSum)}).Debug("v1 manifest")
+					}
 				}
-			}
 
-			// no config in v1, use the latest layer id as the repo id
-			if imageInfo.ID == "" {
-				imageInfo.ID = rc.getSchemaV1Id(manV1.SignedManifest)
-				if imageInfo.ID == "" && len(manV1.SignedManifest.FSLayers) > 0 {
-					imageInfo.ID = string(manV1.SignedManifest.FSLayers[0].BlobSum)
+				// no config in v1, use the latest layer id as the repo id
+				if imageInfo.ID == "" {
+					imageInfo.ID = rc.getSchemaV1Id(manV1.SignedManifest)
+					if imageInfo.ID == "" && len(manV1.SignedManifest.FSLayers) > 0 {
+						imageInfo.ID = string(manV1.SignedManifest.FSLayers[0].BlobSum)
+					}
 				}
-			}
-			if imageInfo.Digest == "" {
-				imageInfo.Digest = manV1.Digest
-			}
+				if imageInfo.Digest == "" {
+					imageInfo.Digest = manV1.Digest
+				}
 
-			// comment out because it's not an accurate way to tell it's signed
-			/*if sigs, err := manV1.Signatures(); err == nil && len(sigs) > 0 {
-				signed = true
-			}*/
+				// comment out because it's not an accurate way to tell it's signed
+				/*if sigs, err := manV1.Signatures(); err == nil && len(sigs) > 0 {
+					signed = true
+				}*/
 
-			// Prefer data from manifest v2, in some image, cmds in manV1 has incomplete data
-			if len(imageInfo.Envs) == 0 {
-				imageInfo.Envs = manV1.Envs
-			}
-			if len(imageInfo.Cmds) == 0 {
-				imageInfo.Cmds = manV1.Cmds
-			}
-			if len(imageInfo.Labels) == 0 {
-				imageInfo.Labels = manV1.Labels
-			}
-			// Prefer Author from manifest v1
-			if manV1.Author != "" {
-				imageInfo.Author = manV1.Author
-			}
-			if manV1.Created.After(imageInfo.Created) {
-				imageInfo.Created = manV1.Created
+				// Prefer data from manifest v2, in some image, cmds in manV1 has incomplete data
+				if len(imageInfo.Envs) == 0 {
+					imageInfo.Envs = manV1.Envs
+				}
+				if len(imageInfo.Cmds) == 0 {
+					imageInfo.Cmds = manV1.Cmds
+				}
+				if len(imageInfo.Labels) == 0 {
+					imageInfo.Labels = manV1.Labels
+				}
+				// Prefer Author from manifest v1
+				if manV1.Author != "" {
+					imageInfo.Author = manV1.Author
+				}
+				if manV1.Created.After(imageInfo.Created) {
+					imageInfo.Created = manV1.Created
+				}
 			}
 		}
 	}
@@ -302,7 +312,7 @@ func (rc *RegClient) GetImageInfo(ctx context.Context, name, tag string, manifes
 
 	imageInfo.RawManifest = body
 
-	if manifestReqType != registry.ManifestRequest_CosignSignature {
+	if manifestReqType != registry.ManifestRequest_CosignSignature && !imageInfo.IsSignatureImage {
 		signatureTag := GetCosignSignatureTagFromDigest(imageInfo.Digest)
 		if signatureTag != "" {
 			signatureImageInfo, _ := rc.GetImageInfo(ctx, name, signatureTag, registry.ManifestRequest_CosignSignature)
@@ -338,7 +348,7 @@ func (rc *RegClient) Alive() (uint, error) {
 // GetCosignSignatureTagFromDigest takes an image digest and returns the default tag
 // used by Cosign to store signature data for the given digest.
 //
-// Example transition
+// # Example transition
 //
 // Given Image Digest: sha256:5e9473a466b637e566f32ede17c23d8b2fd7e575765a9ebd5169b9dbc8bb5d16
 //

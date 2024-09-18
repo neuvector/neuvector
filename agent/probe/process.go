@@ -2552,7 +2552,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			}
 		}
 		if pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny {
-			if pp.Uuid != share.CLUSReservedUuidAnchorMode {
+			if pp.Uuid != share.CLUSReservedUuidAnchorMode || svcGroup == share.GroupNVProtect {
 				var bParentHostProc bool
 				if c, ok := p.pidContainerMap[proc.ppid]; ok {
 					bParentHostProc = c.id == ""
@@ -2883,11 +2883,11 @@ func (p *Probe) HandleProcessPolicyChange(id string, pid int, pg *share.CLUSProc
 	}
 }
 
-func (p *Probe) SetMonitorTrace(bEnable bool, syslogLevel string) {
+func (p *Probe) SetMonitorTrace(bEnable bool, logLevel string) {
 	if bEnable {
 		mLog.Level = log.DebugLevel
 	} else {
-		mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
+		mLog.Level = share.CLUSGetLogLevel(logLevel)
 	}
 }
 
@@ -3210,11 +3210,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 			bPass = true
 			ppe.Action = share.PolicyActionAllow
-			if ppe.CfgType != share.Learned {
+			if ppe.CfgType > share.Learned {
 				// user allows the process manually
 			} else {
 				if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
-					if bModified {
+					if bModified || (ppe.CfgType == 0 && !bImageFile) {
 						bPass = false
 						ppe.Action = negativeResByMode(mode)
 						ppe.Uuid = share.CLUSReservedUuidAnchorMode

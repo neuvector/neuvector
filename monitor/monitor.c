@@ -59,7 +59,6 @@
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 #define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
 #define ENV_SET_CUSTOM_BENCH   "CUSTOM_CHECK_CONTROL"
-#define ENV_ENF_SYSLOG_LEVEL   "ENF_SYSLOG_LEVEL"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -209,6 +208,21 @@ static int checkImplicitEnableFlag(char *enable)
     return 0;
 }
 
+static void getLogLevel(char **logLevel) {
+    if ((strcmp(*logLevel, "error") == 0) ||
+        (strcmp(*logLevel, "warn") == 0) ||
+        (strcmp(*logLevel, "info") == 0) ||
+        (strcmp(*logLevel, "debug") == 0)) {
+        return;
+    } else {
+        if (checkImplicitEnableFlag(*logLevel) == 1) {
+            *logLevel = "debug";
+        } else {
+            *logLevel = "info";
+        }
+    }
+}
+
 static pid_t fork_exec(int i)
 {
     pid_t pid;
@@ -217,7 +231,7 @@ static pid_t fork_exec(int i)
     char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
-    char *custom_check_control, *enf_syslog_level;
+    char *custom_check_control, *log_level;
     int a;
 
     switch (i) {
@@ -337,11 +351,13 @@ static pid_t fork_exec(int i)
             args[a ++] = "-b";
         }
 */
-        if ((enable = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
-            if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-d";
+        if ((log_level = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
+            getLogLevel(&log_level);
+            if (strcmp(log_level, "debug") == 0) {
                 g_debugOpa = 1;
             }
+            args[a ++] = "-log_level";
+            args[a ++] = log_level;
         }
         if ((search_regs = getenv(ENV_CTRL_SEARCH_REGS)) != NULL) {
             args[a ++] = "-search_registries";
@@ -492,10 +508,10 @@ static pid_t fork_exec(int i)
             args[a ++] = "-u";
             args[a ++] = url;
         }
-        if ((enable = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
-            if (checkImplicitEnableFlag(enable) == 1) {
-                args[a ++] = "-d";
-            }
+        if ((log_level = getenv(ENV_CTRL_PATH_DEBUG)) != NULL) {
+            getLogLevel(&log_level);
+            args[a ++] = "-log_level";
+            args[a ++] = log_level;
         }
         if ((debug_level = getenv(ENV_DEBUG_LEVEL)) != NULL) {
             args[a ++] = "-v";
@@ -534,10 +550,6 @@ static pid_t fork_exec(int i)
         if ((custom_check_control = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
             args[a++] = "-cbench";
             args[a++] = custom_check_control;
-        }
-        if ((enf_syslog_level = getenv(ENV_ENF_SYSLOG_LEVEL)) != NULL) {
-            args[a ++] = "-enf_syslog_level";
-            args[a ++] = enf_syslog_level;
         }
         args[a] = NULL;
         break;
@@ -633,7 +645,7 @@ static int check_consul_ports(void)
     if (lan_port == NULL) {
         lan_port = DEFAULT_LAN_PORT;
     }
-    sprintf(shbuf,"netstat -lnp|grep '%s\\|%s'",rpc_port, lan_port);
+    sprintf(shbuf,"ss -lnp|grep '%s\\|%s'",rpc_port, lan_port);
 
     fp = popen(shbuf, "r");
     if (fp == NULL) {

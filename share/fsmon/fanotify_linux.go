@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -22,6 +23,7 @@ const procSelfFd = "/proc/self/fd/%d"
 const procRootMountPoint = "/proc/%d/root"
 
 type PidLookupCallback func(pid int) *ProcInfo
+type SendNVrptCallback func(rootPid, ppid int, cid, path, ppath string)
 
 type rootFd struct {
 	accessMonitor bool
@@ -47,8 +49,10 @@ type FaNotify struct {
 	roots      map[int]*rootFd
 	mntRoots   map[uint64]*rootFd
 	pidLookup  PidLookupCallback
+	sendNVrpt  SendNVrptCallback
 	sys        *system.SystemTools
 	endChan    chan bool
+	bNVProtect bool
 }
 
 const faInitFlags = FAN_CLOEXEC | FAN_CLASS_CONTENT | FAN_UNLIMITED_MARKS
@@ -57,22 +61,25 @@ const faMarkDelFlags = FAN_MARK_REMOVE
 const faMarkMask = FAN_CLOSE_WRITE | FAN_MODIFY
 const faMarkMaskDir = FAN_ONDIR | FAN_EVENT_ON_CHILD
 
-func NewFaNotify(endFaChan chan bool, cb PidLookupCallback, sys *system.SystemTools) (*FaNotify, error) {
+func NewFaNotify(endFaChan chan bool, cb PidLookupCallback, nvrpt SendNVrptCallback, sys *system.SystemTools, bNvProtect bool) (*FaNotify, error) {
 	// log.Debug("FMON: ")
 	fa, err := Initialize(faInitFlags, os.O_RDONLY|syscall.O_LARGEFILE)
 	if err != nil {
 		return nil, err
 	}
 	in := FaNotify{
-		fa:        fa,
-		pidLookup: cb,
-		sys:       sys,
-		roots:     make(map[int]*rootFd),
-		mntRoots:  make(map[uint64]*rootFd),
-		agentPid:  os.Getpid(),
-		endChan:   endFaChan,
-		bEnabled:  true,
+		fa:         fa,
+		pidLookup:  cb,
+		sendNVrpt:  nvrpt,
+		sys:        sys,
+		roots:      make(map[int]*rootFd),
+		mntRoots:   make(map[uint64]*rootFd),
+		agentPid:   os.Getpid(),
+		endChan:    endFaChan,
+		bEnabled:   true,
+		bNVProtect: bNvProtect,
 	}
+	log.WithFields(log.Fields{"bNVProtect": in.bNVProtect}).Debug("FMON:")
 	in.configPerm = in.checkConfigPerm()
 	return &in, nil
 }
@@ -558,11 +565,21 @@ func (fn *FaNotify) handleEvents() error {
 			fmask := uint64(ev.Mask)
 			perm := (fmask & (FAN_OPEN_PERM | FAN_ACCESS_PERM)) > 0
 
-			resp, mask, ifile, pInfo := fn.calculateResponse(pid, fd, fmask, perm)
+			resp, mask, nvPod, ifile, pInfo := fn.calculateResponse(pid, fd, fmask, perm)
 			if perm {
 				fn.fa.Response(ev, resp)
 			}
 			ev.File.Close()
+
+			if nvPod {
+				if resp == false && ifile != nil && pInfo != nil {
+					finfo := ifile.params.(*osutil.FileInfoExt)
+					_, path := fn.sys.ParseContainerFilePath(ifile.path)
+					log.WithFields(log.Fields{"path": path, "caller": pInfo.Path, "pid": pid}).Info("FMON: NV Protect")
+					go fn.sendNVrpt(pInfo.RootPid, pid, finfo.ContainerId, path, pInfo.Path)
+				}
+				continue
+			}
 
 			if ifile == nil {
 				continue // nothing to justify
@@ -587,22 +604,22 @@ func (fn *FaNotify) handleEvents() error {
 	return nil
 }
 
-func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (bool, uint32, *IFile, *ProcInfo) {
+func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (bool, uint32, bool, *IFile, *ProcInfo) {
 	// allowed all to avoid blocked calls
 	if !fn.bEnabled {
-		return true, 0, nil, nil
+		return true, 0, false, nil, nil
 	}
 
 	// skip agent's read
 	if pid == fn.agentPid {
-		return true, 0, nil, nil
+		return true, 0, true, nil, nil
 	}
 
 	// get file path
 	linkPath, err := os.Readlink(fmt.Sprintf(procSelfFd, fd))
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("FMON: Read link fail")
-		return true, 0, nil, nil
+		return true, 0, false, nil, nil
 	}
 
 	// log.WithFields(log.Fields{"path": linkPath}).Debug("FMON:")
@@ -611,40 +628,78 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 	if r == nil {
 		// "docker cp agent" case ???
 		log.WithFields(log.Fields{"rootPid": pInfo.RootPid, "path": linkPath, "pid": pid}).Debug("FMON: not found")
-		return true, 0, nil, nil
+		return true, 0, false, nil, nil
 	}
 
 	// skip our containers, host runc, system containers
 	if (pInfo.RootPid == 1 || !r.capBlock) && perm {
-		return true, 0, nil, nil
+		return true, 0, false, nil, pInfo
 	}
 
 	ifile, _, mask := fn.lookupFile(r, linkPath, pInfo)
 	if ifile == nil {
-		return true, mask, nil, nil
+		return true, mask, false, nil, pInfo
 	}
 
 	if r.bNeuVectorSvc {
+		if !fn.bNVProtect {
+			return true, 0, true, ifile, pInfo
+		}
+
+		ppid := pInfo.Pid
+		path := pInfo.Path
+
 		log.WithFields(log.Fields{"linkPath": linkPath}).Debug("FMON:")
-		if strings.HasPrefix(linkPath, "/usr/local/bin/scripts/") {
-			pid := pInfo.Pid
-			path := pInfo.Path
-			for i := 0; i < 5; i++ {
+
+		if linkPath == "/etc/neuvector/certs" || linkPath == "/etc/neuvector/certs/internal" {
+			if info, err := os.Stat(fmt.Sprintf("/proc/%d/root%s", ppid, linkPath)); err == nil && info.IsDir() {
+				return true, 0, true, ifile, pInfo
+			}
+		}
+
+		switch filepath.Base(linkPath) { // allowed external calling cmd
+		case "ps", "cat":
+			return true, 0, true, ifile, pInfo
+		case "bash": // default shell
+			return true, 0, true, ifile, pInfo
+		case "python3.12", "python": // cli and support: manager and allinone only
+			if _, err := os.Stat(fmt.Sprintf("/proc/%d/root/usr/local/bin/cli", ppid)); os.IsNotExist(err) {
+				break
+			}
+			return true, 0, true, ifile, pInfo
+		}
+
+		// a shortcut for agent
+		gid := osutil.GetProcessGroupId(pid)
+		if _, pgid, err := fn.sys.GetProcessName(gid); err == nil {
+			if pgid == fn.agentPid {
+				return true, 0, true, ifile, pInfo
+			}
+		}
+
+		pid := ppid
+		for i := 0; i < 8; i++ { // lookup for 8 callers
+			switch filepath.Base(path) {
+			case "agent", "monitor", "controller", "nstools", "pathWalker", "dp", "upgrader", "opa", "yq", "scanner", "scannerTask", "sigstore-interface", "adapter":
 				if filepath.Dir(path) == "/usr/local/bin" {
-					switch filepath.Base(path) {
-					case "agent", "monitor", "controller", "nstools", "workerlet", "dp":
-						return true, 0, nil, nil
-					}
+					// log.WithFields(log.Fields{"caller": path, "i": i}).Debug("FMON:")
+					return true, 0, true, ifile, pInfo
 				}
-				// find the parent
-				if _, pid, err = fn.sys.GetProcessName(pid); err != nil {
+			case "java": // manager and allinone only
+				if _, err := os.Stat(fmt.Sprintf("/proc/%d/root/usr/local/bin/cli", ppid)); os.IsNotExist(err) {
 					break
 				}
-				path, _ = fn.sys.GetFilePath(pid)
+				// log.WithFields(log.Fields{"caller": path, "i": i}).Debug("FMON:")
+				return true, 0, true, ifile, pInfo
 			}
-			return false, mask, nil, nil
+
+			// find the parent
+			if _, pid, err = fn.sys.GetProcessName(pid); err != nil || pid == 0 {
+				break
+			}
+			path, _ = fn.sys.GetFilePath(pid)
 		}
-		return true, 0, nil, nil
+		return false, mask, true, ifile, pInfo
 	}
 
 	// log.WithFields(log.Fields{"protect": ifile.protect, "perm": perm, "path": linkPath, "ifile": ifile, "evMask": fmt.Sprintf("0x%08x", fmask)}).Debug("FMON:")
@@ -675,7 +730,7 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 		pInfo.Deny = true
 		log.WithFields(log.Fields{"path": linkPath, "app": pInfo.Path}).Debug("FMON: denied")
 	}
-	return resp, mask, ifile, pInfo
+	return resp, mask, false, ifile, pInfo
 }
 
 func (fn *FaNotify) lookupRule(r *rootFd, ifile *IFile, pInfo *ProcInfo, linkPath string) bool {
@@ -754,16 +809,24 @@ func (fn *FaNotify) lookupContainer(pid int) (r *rootFd, pInfo *ProcInfo) {
 		fn.mux.RLock()
 		r, _ = fn.roots[pInfo.RootPid]
 		fn.mux.RUnlock()
-	} else {
+	}
+
+	if r == nil {
 		// TODO: (agent ???) not in probe proc db, use the mnt to lookup
 		pInfo = &ProcInfo{}
 		mntId := fn.sys.GetMntNamespaceId(pid)
 		if mntId == 0 {
+			// log.WithFields(log.Fields{"pid": pid, "pInfo": pInfo}).Debug("FMON: not found")
 			return
 		}
 		fn.mux.RLock()
 		r, _ = fn.mntRoots[mntId]
 		fn.mux.RUnlock()
+
+		if r == nil {
+			// log.WithFields(log.Fields{"pid": pid, "pInfo": pInfo, "mntId": mntId}).Debug("FMON: not found")
+			return
+		}
 		pInfo.Name, pInfo.PPid, _ = fn.sys.GetProcessName(pid)
 		pInfo.Path, _ = fn.sys.GetFilePath(pid)
 		pInfo.PPath, _ = fn.sys.GetFilePath(pInfo.PPid)

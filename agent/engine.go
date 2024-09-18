@@ -20,8 +20,8 @@ import (
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/pipe"
-	"github.com/neuvector/neuvector/agent/probe"
 	"github.com/neuvector/neuvector/agent/policy"
+	"github.com/neuvector/neuvector/agent/probe"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/fsmon"
@@ -84,7 +84,7 @@ type containerData struct {
 	examIntface    bool
 	scanCache      []byte
 	nvRole         string
-	healthCheck    []string			// docker: healthcheck commands
+	healthCheck    []string // docker: healthcheck commands
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -146,7 +146,7 @@ var gInfo localSystemInfo = localSystemInfo{
 	internalSubnets:  make(map[string]share.CLUSSubnet),
 	containerConfig:  make(map[string]*share.CLUSWorkloadConfig),
 	policyMode:       defaultPolicyMode,
-	agentConfig:      share.CLUSAgentConfig{Debug: make([]string, 0), SyslogLevel: "info"},
+	agentConfig:      share.CLUSAgentConfig{Debug: make([]string, 0), LogLevel: "info"},
 	hostIPs:          utils.NewSet(),
 	tapProxymesh:     defaultTapProxymesh,
 	jumboFrameMTU:    false,
@@ -1719,28 +1719,37 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 		// file monitors : protect mode, core-definitions, only modification alerts
 		fileWatcher.ContainerCleanup(info.Pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
-		conf.Profile.Filters = append(conf.Profile.Filters, share.CLUSFileMonitorFilter{
-			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
-		})
 
-		var filters []share.CLUSFileMonitorFilter
-		if role ==  "enforcer" || role == "controller+enforcer+manager" || role == "controller+enforcer" || role == "allinone" {
+		switch role {
+		case "enforcer", "controller+enforcer+manager", "controller+enforcer", "allinone", "controller", "manager":
+			var filters []share.CLUSFileMonitorFilter
 			for _, fltr := range conf.Profile.Filters {
 				switch fltr.Path {
-				case "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin" : // skipped
+				case "/bin", "/sbin", "/usr/bin", "/usr/sbin": // apply blocking controls
+				/*	filters = append(filters, share.CLUSFileMonitorFilter{
+						Behavior:    share.FileAccessBehaviorMonitor, // share.FileAccessBehaviorBlock,
+						Path:        fltr.Path,
+						Regex:       ".*",
+						Recursive:   false,
+						CustomerAdd: true,
+					})
+				*/
 				default:
 					filters = append(filters, fltr)
 				}
 			}
-			filters = append(filters, share.CLUSFileMonitorFilter{
-				Behavior: share.FileAccessBehaviorBlock, Path: "/usr/local/bin/scripts", Regex: ".*", Recursive: true, CustomerAdd: true,
-			})
-			filters = append(filters, share.CLUSFileMonitorFilter{
-				Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
-			})
+
+			if role != "manager" {
+				filters = append(filters, share.CLUSFileMonitorFilter{
+					Behavior: share.FileAccessBehaviorBlock, Path: "/usr/local/bin/scripts", Regex: ".*", Recursive: true, CustomerAdd: true,
+				})
+			}
 			conf.Profile.Filters = filters // customized
 		}
 
+		conf.Profile.Filters = append(conf.Profile.Filters, share.CLUSFileMonitorFilter{
+			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
+		})
 		conf.Profile.Mode = share.PolicyModeEnforce
 		conf.Profile.Group = group
 		if info.Pid != 0 {

@@ -45,7 +45,7 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 		if len(containers) == 0 {
 			return "", "", "", "", nil, ErrEmptyContainerList
 		}
-		platform, flavor, network = getPlatform(containers)
+		platform, cloudPlatform, flavor, network = getPlatform(containers)
 	} else {
 		if container.IsPidHost() {
 			return "", "", "", "", nil, err
@@ -54,7 +54,7 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 		if RT, err = container.InitStubRtDriver(SYS); err != nil {
 			return "", "", "", "", nil, err
 		}
-		platform, flavor, network = getPlatformFromEnv()
+		platform, cloudPlatform, flavor, network = getPlatformFromEnv()
 	}
 
 	k8sVer, ocVer := orchAPI.GetK8sVersion(true, true)
@@ -69,24 +69,6 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 		platform = share.PlatformKubernetes
 	}
 
-	if platform == share.PlatformGoogleGKE {
-		// Follow the style of BenchLoop in bench.go
-		platform = share.PlatformKubernetes
-		cloudPlatform = share.CloudGKE
-	}
-
-	if platform == share.PlatformAzureAKS {
-		// Follow the style of BenchLoop in bench.go
-		platform = share.PlatformKubernetes
-		cloudPlatform = share.CloudAKS
-	}
-
-	if platform == share.PlatformAmazonEKS {
-		// Follow the style of BenchLoop in bench.go
-		platform = share.PlatformKubernetes
-		cloudPlatform = share.CloudEKS
-	}
-
 	ORCH = &orchHub{Driver: orchAPI.GetDriver(platform, flavor, network, k8sVer, ocVer, SYS, RT)}
 	if regResource != nil {
 		ORCH.ResourceDriver = regResource(platform, flavor, network)
@@ -95,31 +77,31 @@ func SetGlobalObjects(rtSocket string, regResource RegisterDriverFunc) (string, 
 	return platform, flavor, cloudPlatform, network, containers, nil
 }
 
-func getContainerPlatform(c *container.ContainerMeta) string {
+// Get the container platform and the cloud provider in getContainerPlatform
+func getContainerPlatform(c *container.ContainerMeta) (string, string) {
+	var platform, cloudPlatform string
+	platform = share.PlatformDocker
+	// Check for specific platform labels and conditions
 	if _, ok := c.Labels[container.RancherKeyContainerSystem]; ok {
-		return share.PlatformRancher
+		platform = share.PlatformRancher
+	} else if _, ok := c.Labels[container.KubeKeyPodNamespace]; ok {
+		platform = share.PlatformKubernetes
+	} else if _, ok := c.Labels[container.AliyunSystem]; ok {
+		platform = share.PlatformAliyun
+	} else if strings.HasPrefix(c.Image, container.ECSAgentImagePrefix) {
+		platform = share.PlatformAmazonECS
 	}
 
+	// Check for specific cloud platform conditions
 	if strings.Contains(c.Image, "gke") {
-		return share.PlatformGoogleGKE
-	}
-	if strings.Contains(c.Image, "amazonaws.com/eks") {
-		return share.PlatformAmazonEKS
-	}
-	if strings.Contains(c.Image, "microsoft") {
-		return share.PlatformAzureAKS
-	}
-	if _, ok := c.Labels[container.KubeKeyPodNamespace]; ok {
-		return share.PlatformKubernetes
-	}
-	if _, ok := c.Labels[container.AliyunSystem]; ok {
-		return share.PlatformAliyun
-	}
-	if strings.HasPrefix(c.Image, container.ECSAgentImagePrefix) {
-		return share.PlatformAmazonECS
+		cloudPlatform = share.CloudGKE
+	} else if strings.Contains(c.Image, "amazonaws.com/eks") {
+		cloudPlatform = share.CloudEKS
+	} else if strings.Contains(c.Image, "microsoft") {
+		cloudPlatform = share.CloudAKS
 	}
 
-	return share.PlatformDocker
+	return platform, cloudPlatform
 }
 
 func normalize(platform, flavor string) (string, string) {
@@ -154,10 +136,11 @@ func normalize(platform, flavor string) (string, string) {
 	return platform, flavor
 }
 
-func getPlatform(containers []*container.ContainerMeta) (string, string, string) {
+func getPlatform(containers []*container.ContainerMeta) (string, string, string, string) {
 	network := share.NetworkDefault
 
-	var hasOpenShiftProc bool
+	var hasOpenShiftProc, hasUpdatedPlatform bool
+	var cloudPlatform string
 	if oc, err := SYS.IsOpenshift(); err == nil {
 		hasOpenShiftProc = oc
 	}
@@ -169,42 +152,50 @@ func getPlatform(containers []*container.ContainerMeta) (string, string, string)
 	switch platform {
 	case share.PlatformDocker, share.PlatformKubernetes, share.PlatformAmazonECS, share.PlatformAliyun:
 		if flavor != "" {
-			return platform, flavor, network
+			return platform, cloudPlatform, flavor, network
 		}
 		// continue parsing flavor and network
 	case "":
+		platform = share.PlatformDocker
 		for _, c := range containers {
-			platform = getContainerPlatform(c)
-			if platform != share.PlatformDocker {
-				break
+			containerPlatform, containerCloudPlatform := getContainerPlatform(c)
+			// Find the first platform is not docker then update it
+			if !hasUpdatedPlatform && containerPlatform != share.PlatformDocker {
+				platform = containerPlatform
+				hasUpdatedPlatform = true
+			}
+
+			// containerCloudPlatform should consistant, thus keep updating if it's not empty
+			if cloudPlatform == "" {
+				cloudPlatform = containerCloudPlatform
 			}
 		}
 		// continue parsing flavor and network
 	default:
-		return platform, flavor, network
+		return platform, cloudPlatform, flavor, network
 	}
 
 	for _, c := range containers {
 		switch platform {
 		case share.PlatformDocker:
 			if _, ok := c.Labels[container.DockerSwarmServiceKey]; ok {
-				return share.PlatformDocker, share.FlavorSwarm, share.NetworkDefault
+				return share.PlatformDocker, cloudPlatform, share.FlavorSwarm, share.NetworkDefault
 			}
 			if _, ok := c.Labels[container.DockerUCPInstanceIDKey]; ok {
-				return share.PlatformDocker, share.FlavorUCP, share.NetworkDefault
+				return share.PlatformDocker, cloudPlatform, share.FlavorUCP, share.NetworkDefault
 			}
 		case share.PlatformKubernetes:
 			if hasOpenShiftProc {
-				return share.PlatformKubernetes, share.FlavorOpenShift, share.NetworkDefault
+				return share.PlatformKubernetes, cloudPlatform, share.FlavorOpenShift, share.NetworkDefault
 			} else if strings.Contains(c.Image, container.OpenShiftPodImage) {
 				flavor = share.FlavorOpenShift
 			}
 		default:
-			return platform, flavor, network
+			return platform, cloudPlatform, flavor, network
 		}
 	}
 
-	return platform, flavor, network
+	return platform, cloudPlatform, flavor, network
 }
 
 func IdentifyK8sContainerID(id string) (string, error) {
@@ -257,11 +248,31 @@ func SetPseudoOrchHub_UnitTest(platform, flavor, k8sVer, ocVer string, regResour
 	}
 }
 
-func getPlatformFromEnv() (string, string, string) {
+func getPlatformFromEnv() (string, string, string, string) {
 	network := share.NetworkDefault
 
 	// First decide the platform
 	envParser := utils.NewEnvironParser(os.Environ())
 	platform, flavor := normalize(envParser.GetPlatformName())
-	return platform, flavor, network
+	var cloudPlatform string
+
+	if platform == share.PlatformGoogleGKE {
+		// Follow the style of BenchLoop in bench.go
+		platform = share.PlatformKubernetes
+		cloudPlatform = share.CloudGKE
+	}
+
+	if platform == share.PlatformAzureAKS {
+		// Follow the style of BenchLoop in bench.go
+		platform = share.PlatformKubernetes
+		cloudPlatform = share.CloudAKS
+	}
+
+	if platform == share.PlatformAmazonEKS {
+		// Follow the style of BenchLoop in bench.go
+		platform = share.PlatformKubernetes
+		cloudPlatform = share.CloudEKS
+	}
+
+	return platform, cloudPlatform, flavor, network
 }

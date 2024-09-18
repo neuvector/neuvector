@@ -138,6 +138,7 @@ type FileWatch struct {
 	mux        sync.Mutex
 	bEnable    bool // profile function is enabled, default: true
 	aufs       bool
+	bNVProtect bool
 	fanotifier *FaNotify
 	inotifier  *Inotify
 	fileEvents map[string]*fileMod
@@ -214,6 +215,7 @@ type FileMonitorConfig struct {
 	ProfileEnable  bool
 	IsAufs         bool
 	EnableTrace    bool
+	NVProtect      bool
 	EndChan        chan bool
 	WalkerTask     *workerlet.Tasker
 	PidLookup      PidLookupCallback
@@ -222,10 +224,10 @@ type FileMonitorConfig struct {
 	EstRule        EstimateRuleSrcCallback
 }
 
-func NewFileWatcher(config *FileMonitorConfig, syslogLevel string) (*FileWatch, error) {
+func NewFileWatcher(config *FileMonitorConfig, logLevel string) (*FileWatch, error) {
 	// for file monitor
 	mLog.Out = os.Stdout
-	mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
+	mLog.Level = share.CLUSGetLogLevel(logLevel)
 	mLog.Formatter = &utils.LogFormatter{Module: "AGT"}
 	if config.EnableTrace {
 		mLog.SetLevel(log.DebugLevel)
@@ -240,6 +242,7 @@ func NewFileWatcher(config *FileMonitorConfig, syslogLevel string) (*FileWatch, 
 		sendRule:   config.SendAccessRule,
 		estRuleSrc: config.EstRule,
 		walkerTask: config.WalkerTask,
+		bNVProtect: config.NVProtect,
 	}
 
 	if !fw.bEnable {
@@ -248,7 +251,7 @@ func NewFileWatcher(config *FileMonitorConfig, syslogLevel string) (*FileWatch, 
 		return fw, nil
 	}
 
-	n, err := NewFaNotify(config.EndChan, config.PidLookup, global.SYS)
+	n, err := NewFaNotify(config.EndChan, config.PidLookup, fw.SendNVProcessAlert, global.SYS, fw.bNVProtect)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Open fanotify fail")
 		return nil, err
@@ -369,7 +372,7 @@ func (w *FileWatch) reportLearningRules() {
 					learnRules = append(learnRules, rl)
 				}
 			}
-			grp.learnRules = make(map[string]utils.Set)	// reset
+			grp.learnRules = make(map[string]utils.Set) // reset
 		}
 	}
 	w.mux.Unlock()
@@ -412,7 +415,7 @@ func addLearnedRules(grp *groupInfo, flt share.CLUSFileMonitorFilter, pInfo []*P
 		}
 
 		if learnRules.Cardinality() > 0 {
-			grp.learnRules[index] = learnRules	// update grp
+			grp.learnRules[index] = learnRules // update grp
 		}
 	} else {
 		log.WithFields(log.Fields{"index": index}).Debug("FMON: no access rules")
@@ -429,7 +432,7 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, even
 		return
 	}
 	mode := grp.mode
-	if mode == share.PolicyModeLearn && len(fmod.pInfo) > 0 {	// inotify has no process info
+	if mode == share.PolicyModeLearn && len(fmod.pInfo) > 0 { // inotify has no process info
 		for _, flt := range grp.profile.Filters {
 			if flt.CustomerAdd && filterPathMatch(path, flt) {
 				addLearnedRules(grp, flt, fmod.pInfo)
@@ -444,10 +447,9 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, even
 	}
 	w.mux.Unlock()
 
-
 	// it depends on the init conditions by runtime engine
 	if isRunTimeAddedFile(filepath.Join("/root", path)) {
-		if event == fileEventAccessed || time.Since(grp.startAt) < time.Duration(time.Second * 60) {
+		if event == fileEventAccessed || time.Since(grp.startAt) < time.Duration(time.Second*60) {
 			return
 		}
 	}
@@ -532,7 +534,7 @@ func (w *FileWatch) cbNotify(filePath string, mask uint32, params interface{}, p
 			}
 		}
 	} else {
-		fmod := &fileMod {
+		fmod := &fileMod{
 			mask:  mask,
 			finfo: params.(*osutil.FileInfoExt),
 		}
@@ -716,7 +718,7 @@ func (w *FileWatch) StartWatch(id string, rootPid int, conf *FsmonConfig, capBlo
 			bNeuvector: bNeuvectorSvc,
 			learnRules: make(map[string]utils.Set),
 			applyRules: make(map[string]utils.Set),
-			startAt: time.Now(),
+			startAt:    time.Now(),
 		}
 		w.groups[rootPid] = grp
 	}
@@ -920,7 +922,7 @@ func (w *FileWatch) ContainerCleanup(rootPid int, bLeave bool) {
 	defer w.mux.Unlock()
 	for path, _ := range w.fileEvents {
 		if pid, _ := global.SYS.ParseContainerFilePath(path); pid == rootPid {
-			delete( w.fileEvents, path)
+			delete(w.fileEvents, path)
 		}
 	}
 
@@ -972,11 +974,11 @@ func (w *FileWatch) GetProbeData() *FmonProbeData {
 	return &probeData
 }
 
-func (w *FileWatch) SetMonitorTrace(bEnable bool, syslogLevel string) {
+func (w *FileWatch) SetMonitorTrace(bEnable bool, logLevel string) {
 	if bEnable {
 		mLog.Level = log.DebugLevel
 	} else {
-		mLog.Level = share.CLUSGetSyslogLevel(syslogLevel)
+		mLog.Level = share.CLUSGetLogLevel(logLevel)
 	}
 }
 
@@ -1161,4 +1163,43 @@ func (w *FileWatch) getSubDirList(pid int, base, cid string) []string {
 		}
 	}
 	return dirList
+}
+
+////////////
+const (
+	fsNvProtectProcAlert = "NV.Protect: Process alert"
+)
+
+func (w *FileWatch) SendNVProcessAlert(rootPid, ppid int, cid, path, ppath string) {
+	w.mux.Lock()
+	grp, ok := w.groups[rootPid]
+	w.mux.Unlock()
+	if !ok {
+		log.WithFields(log.Fields{"rootPid": rootPid, "path": path}).Error()
+		return
+	}
+	var groupName string
+	if grp.profile != nil {
+		groupName = grp.profile.Group
+	}
+
+	rpt := &MonitorMessage{
+		ID:        cid,
+		Path:      path,
+		ProcPid:   ppid, // assuming
+		ProcPath:  path,
+		ProcPPid:  ppid,
+		ProcPPath: ppath,
+		Group:     groupName,
+		Msg:       fsNvProtectProcAlert,
+		Action:    share.PolicyActionDeny,
+	}
+	w.sendrpt(rpt)
+	log.WithFields(log.Fields{"rpt": rpt}).Debug("FMON:")
+}
+
+func (w *FileWatch) SetNVProtectFlag(bEnabled bool) {
+	log.WithFields(log.Fields{"bEnabled": bEnabled}).Info()
+	w.bNVProtect = bEnabled
+	w.fanotifier.bNVProtect = bEnabled
 }

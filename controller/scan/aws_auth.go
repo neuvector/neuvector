@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -14,8 +13,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/httpclient"
 )
 
 const awsRetryTimes = 3
@@ -62,30 +63,22 @@ func extractToken(token string, proxyEndpoint string) (*awsEcrAuth, error) {
 	}, nil
 }
 
-func proxyClient(proxy string) (*http.Client, error) {
-	var client *http.Client
-	if proxy != "" {
-		pxyUrl, err := url.Parse(proxy)
-		if err != nil {
-			return nil, err
-		}
-		transport := &http.Transport{
-			Proxy: http.ProxyURL(pxyUrl),
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-	} else {
-		client = &http.Client{}
+func newClient(proxy string) *http.Client {
+	var client http.Client
+
+	t, err := httpclient.GetTransport(proxy)
+	if err != nil {
+		log.WithError(err).Warn("failed to get transport")
+		return nil
 	}
-	return client, nil
+	client.Transport = t
+
+	return &client
 }
 
 func GetAwsEcrAuthToken(awsKey *share.CLUSAWSAccountKey, proxy string) (*awsEcrAuth, error) {
-	client, err := proxyClient(proxy)
-	if err != nil {
-		return nil, err
-	}
+	client := newClient(proxy)
+
 	conf := aws.NewConfig().WithHTTPClient(client).WithMaxRetries(awsRetryTimes)
 
 	if awsKey.AccessKeyID == "" && awsKey.SecretAccessKey == "" {

@@ -124,6 +124,7 @@ func leadChangeHandler(newLead, oldLead string) {
 			Leader:            Ctrler.Leader,
 			OrchConnStatus:    connStatus,
 			OrchConnLastError: connLastError,
+			ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 		})
 		key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
 		if err := cluster.Put(key, value); err != nil {
@@ -138,7 +139,18 @@ func leadChangeHandler(newLead, oldLead string) {
 			}
 
 			if emptyKvFound {
-				kv.GetConfigHelper().Restore()
+				if _, _, restored, restoredKvVersion, err := kv.GetConfigHelper().Restore(); restored && err == nil {
+					clog := share.CLUSEventLog{
+						Event:          share.CLUSEvKvRestored,
+						HostID:         Host.ID,
+						HostName:       Host.Name,
+						ControllerID:   Ctrler.ID,
+						ControllerName: Ctrler.Name,
+						ReportedAt:     time.Now().UTC(),
+						Msg:            fmt.Sprintf("Restored kv version: %s", restoredKvVersion),
+					}
+					evqueue.Append(&clog)
+				}
 				kv.ValidateWebhookCert()
 				setConfigLoaded()
 			} else {
@@ -397,6 +409,7 @@ func ctlrPutLocalInfo() {
 		Leader:            Ctrler.Leader,
 		OrchConnStatus:    connStatus,
 		OrchConnLastError: connLastError,
+		ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 	})
 	key = share.CLUSControllerKey(Host.ID, Ctrler.ID)
 	if err := cluster.Put(key, value); err != nil {

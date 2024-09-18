@@ -244,7 +244,7 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 				}
 			}
 		} else {
-			if profile.Baseline == share.ProfileBasic  || !e.IsK8sGroupWithProbe(name){
+			if profile.Baseline == share.ProfileBasic || !e.IsK8sGroupWithProbe(name) {
 				//not found in profile
 				act := defaultProcessAction(profile.Mode)
 				proc.Action = act
@@ -385,27 +385,21 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		/////////////////////////////////
 		// python
-		{"support", "*"}, // support
-		{"cli", "*"},     // cli
-		{"python", "/usr/bin/*"},// cli
-		{"*", "/usr/lib/jvm/*"}, // JVM
+		{"support", "*"},          // support
+		{"cli", "*"},              // cli
+		{"python", "/usr/bin/*"},  // cli
+		{"*", "/usr/lib64/jvm/*"}, // JVM
 
 		// tools
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},	// arm64
-		{"dash", "*"},
+		{"bash", "/usr/bin/bash"},
+		{"uname", "/usr/bin/uname"}, // cli
+		{"echo", "/usr/bin"},
 
-		// busybox
-		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"uname", "*"}, // cli
-		{"which", "*"}, // cli
-		{"echo", "*"},
-
-		// below entries for debug purpose : docker exec -ti manager sh
+		// below entries for debug purpose
 		{"ip", "/sbin/ip"},
 		{"tee", "/usr/bin/tee"},
-		{"stty", "*"},  // python
+		{"stty", "/usr/bin/stty"}, // python
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -428,8 +422,7 @@ func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// tools
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},	         // arm64
+		{"bash", "/usr/bin/bash"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -451,8 +444,7 @@ func buildCspProfileList(serviceGroup string) *share.CLUSProcessProfile {
 
 		// tools
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},
+		{"bash", "/usr/bin/bash"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -471,8 +463,7 @@ func buildRegistryAdapterProfileList(serviceGroup string) *share.CLUSProcessProf
 
 		// tools
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},	          // arm64
+		{"bash", "/usr/bin/bash"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -492,31 +483,35 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"consul", "*"}, // monitor also calls it through a shell command
 		{"controller", "/usr/local/bin/controller"},
 		{"monitor", "/usr/local/bin/monitor"},
-		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"opa", "/usr/local/bin/opa"},
 
 		// tools
-		{"ethtool", "/usr/sbin/ethtool"}, // network hardware setting
-		{"sysctl", "/sbin/sysctl"},       // monitor tool
-		{"tc", "/sbin/tc"},               // traffic control
-		{"getconf", "/usr/bin/getconf"},  // get configuration values
-		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
-		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
+		{"tcpdump", "/usr/sbin/tcpdump"},
+		{"getconf", "/usr/bin/getconf"}, // get configuration values
+		{"getent", "/usr/bin/getent"},   // get entries from Name Service Switch libraries
+		{"iconv", "/usr/bin/iconv"},     // convert encoding of given files from one encoding to another
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},	                  // arm64
-		{"cat", "*"},                     // k8s readiness and openshift operations
-		// busybox
-		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"mv", "/bin/busybox"},
-		{"netstat", "/bin/busybox"},     // monitor
-		{"touch", "/bin/busybox"},       // detect container layer on the AUFS
-		{"teardown.sh", "/bin/busybox"}, // monitor tool
+		{"cat", "*"}, // k8s readiness
+		{"busybox", "/bin/busybox"}, // k8s readiness: backward compatible
 
-		// below entries for debug purpose : docker exec -ti allinone sh
-		{"ip", "/sbin/ip"},
-		{"ls", "/bin/busybox"},
-		{"nslookup", "/bin/busybox"},
+		// bash
+		{"bash", "/usr/bin/bash"},
+		{"mv", "/usr/bin/mv"},
+		{"ss", "/usr/sbin/ss"},
+		{"nproc", "/usr/bin/nproc"}, // dp
+		{"touch", "/usr/bin/touch"}, // detect container layer on the AUFS
+		{"uname", "/usr/bin/uname"},
+		{"grep", "/usr/bin/grep"},
+		{"awk", "/usr/bin/gawk"},
+		{"stty", "/usr/bin/stty"}, // python
+
+		{"configure.sh", "*"}, // monitor tool
+		{"teardown.sh", "*"},  // monitor tool
+		{"netstat", "*"},      // monitor   <====== NOT
+		{"kill", "*"},
+
+		// below entries for debug purpose:
+		{"ip", "/usr/sbin/ip"},
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -538,39 +533,42 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
 
 		// tools
-		{"ethtool", "/usr/sbin/ethtool"}, // network hardware setting
-		{"tc", "/sbin/tc"},               // traffic control
-		{"modinfo", "/sbin/modinfo"},     // monitor tool: configure.sh
-		{"getconf", "/usr/bin/getconf"},  // get configuration values
-		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
-		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
-		{"curl", "/usr/bin/curl"},        // cis benchmark
-		{"jq", "/usr/bin/jq"},            // cis benchmark
-		{"timeout", "/usr/bin/timeout"},  // could be used by tcpdump
+		{"tcpdump", "/usr/sbin/tcpdump"},
+		{"ethtool", "/usr/sbin/ethtool"},        // network hardware setting
+		{"tc", "/sbin/tc"},                      // traffic control
+		{"modinfo", "/sbin/modinfo"},            // monitor tool: configure.sh
+		{"getconf", "/usr/lib/getconf/getconf"}, // get configuration values
+		{"getent", "/usr/bin/getent"},           // get entries from Name Service Switch libraries
+		{"iconv", "/usr/bin/iconv"},             // convert encoding of given files from one encoding to another
+		{"curl", "/usr/bin/curl"},               // cis benchmark
+		{"jq", "/usr/bin/jq"},                   // cis benchmark
+		{"timeout", "/usr/bin/timeout"},         // could be used by tcpdump
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},	                  // arm64
-		{"dash", "*"},
 
-		// busybox
-		{"busybox", "/bin/busybox"},      // below busybox and its symbolic links
-		{"mv", "/bin/busybox"},
-		{"netstat", "/bin/busybox"},      // monitor
-		{"touch", "*"},                   // detect container layer on the AUFS
-		{"configure.sh", "*"},            // monitor tool
-		{"teardown.sh", "*"},             // monitor tool
-		{"nproc", "/bin/busybox"},        // dp
+		// bash
+		{"bash", "/usr/bin/bash"}, // below busybox and its symbolic links
+		{"mv", "/usr/bin/mv"},
+		{"ss", "/usr/sbin/ss"},
+		{"nproc", "/usr/bin/nproc"}, // dp
+		{"touch", "/usr/bin/touch"}, // detect container layer on the AUFS
+		{"uname", "/usr/bin/uname"},
+		{"grep", "/usr/bin/grep"},
+		{"awk", "/usr/bin/gawk"},
+		{"find", "/usr/bin/find"},
+		{"sed", "/usr/bin/sed"},
+		{"stty", "/usr/bin/stty"}, // python
 
-		// below entries for debug purpose : docker exec -ti allinone sh
-		{"ip", "/sbin/ip"},
-		{"iptables", "/sbin/xtables-legacy-multi"},      // dp
-		{"iptables-save", "/sbin/xtables-legacy-multi"}, // dp
-		{"ls", "/bin/busybox"},
-		{"nslookup", "/bin/busybox"},
+		{"configure.sh", "*"}, // monitor tool
+		{"teardown.sh", "*"},  // monitor tool
+		{"kill", "*"},
+
+		// below entries for debug purpose
+		{"ip", "/usr/sbin/ip"},
+		{"iptables", "/usr/sbin/xtables-legacy-multi"},      // dp
+		{"iptables-save", "/usr/sbin/xtables-legacy-multi"}, // dp
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause
@@ -589,11 +587,11 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		// python: python2.7 or python3.8
 		{"python", "/usr/bin/*"},      // runtime-gdb.py
 		{"supervisord", "/usr/bin/*"}, // start-up
-		{"support", "*"},     // support
-		{"cli", "*"},         // cli
+		{"support", "*"},              // support
+		{"cli", "*"},                  // cli: python312
 
 		// manager cores :  wildcard
-		{"*", "/usr/lib/jvm/*"}, // JVM
+		{"*", "/usr/lib64/jvm/*"}, // JVM
 
 		// /usr/local/bin
 		{"agent", "/usr/local/bin/agent"},
@@ -602,44 +600,45 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"dp", "/usr/local/bin/dp"},
 		{"monitor", "/usr/local/bin/monitor"},
 		{"nstools", "/usr/local/bin/nstools"},
-		{"tcpdump", "/usr/local/bin/tcpdump"},
 		{"opa", "/usr/local/bin/opa"},
 		{"pathWalker", "/usr/local/bin/pathWalker"},
 
 		// tools
-		{"ethtool", "/usr/sbin/ethtool"}, // network hardware setting
-		{"tc", "/sbin/tc"},               // traffic control
-		{"modinfo", "/sbin/modinfo"},     // monitor tool: configure.sh
-		{"getconf", "/usr/bin/getconf"},  // get configuration values
-		{"getent", "/usr/bin/getent"},    // get entries from Name Service Switch libraries
-		{"iconv", "/usr/bin/iconv"},      // convert encoding of given files from one encoding to another
-		{"curl", "/usr/bin/curl"},        // cis benchmark
-		{"jq", "/usr/bin/jq"},            // cis benchmark
-		{"timeout", "/usr/bin/timeout"},  // could be used by tcpdump
+		{"tcpdump", "/usr/sbin/tcpdump"},
+		{"ethtool", "/usr/sbin/ethtool"},        // network hardware setting
+		{"tc", "/sbin/tc"},                      // traffic control
+		{"modinfo", "/sbin/modinfo"},            // monitor tool: configure.sh
+		{"getconf", "/usr/lib/getconf/getconf"}, // get configuration values
+		{"getent", "/usr/bin/getent"},           // get entries from Name Service Switch libraries
+		{"iconv", "/usr/bin/iconv"},             // convert encoding of given files from one encoding to another
+		{"curl", "/usr/bin/curl"},               // cis benchmark
+		{"jq", "/usr/bin/jq"},                   // cis benchmark
+		{"timeout", "/usr/bin/timeout"},         // could be used by tcpdump
 		{"ps", "*"},
-		{"sh", "*"},
-		{"bash", "*"},	                  // arm64
-		{"dash", "*"},
+		{"cat", "*"}, // k8s readiness
+		{"busybox", "/bin/busybox"}, // k8s readiness: backward compatible
+
+		// bash
+		{"bash", "/usr/bin/bash"}, // below busybox and its symbolic links
+		{"mv", "/usr/bin/mv"},
+		{"ss", "/usr/sbin/ss"},
+		{"nproc", "/usr/bin/nproc"}, // dp
+		{"touch", "/usr/bin/touch"}, // detect container layer on the AUFS
+		{"uname", "/usr/bin/uname"},
+		{"grep", "/usr/bin/grep"},
+		{"awk", "/usr/bin/gawk"},
+		{"find", "/usr/bin/find"},
+		{"sed", "/usr/bin/sed"},
+		{"stty", "/usr/bin/stty"}, // python
+
+		{"configure.sh", "*"}, // monitor tool
+		{"teardown.sh", "*"},  // monitor tool
 		{"kill", "*"},
-		{"cat", "*"},                     // k8s readiness and openshift operations
 
-		// busybox
-		{"busybox", "/bin/busybox"}, // below busybox and its symbolic links
-		{"mv", "/bin/busybox"},
-		{"netstat", "/bin/busybox"},      // monitor
-		{"touch", "*"},                   // detect container layer on the AUFS
-		{"uname", "*"},                   // cli
-		{"which", "*"},                   // cli
-		{"configure.sh", "*"},            // monitor tool
-		{"teardown.sh", "*"},             // monitor tool
-		{"stty", "*"},         			  // python
-		{"nproc", "/bin/busybox"},        // dp
-
-		// below entries for debug purpose : docker exec -ti allinone sh
-		{"ip", "/sbin/ip"},
-		{"iptables", "/sbin/xtables-legacy-multi"},      // dp
-		{"iptables-save", "/sbin/xtables-legacy-multi"}, // dp
-		{"nslookup", "/bin/busybox"},
+		// below entries for debug purpose
+		{"ip", "/usr/sbin/ip"},
+		{"iptables", "/usr/sbin/xtables-legacy-multi"},      // dp
+		{"iptables-save", "/usr/sbin/xtables-legacy-multi"}, // dp
 
 		// k8s or openshift environment
 		{"pause", "/pause"},     // k8s, pause

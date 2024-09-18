@@ -310,6 +310,8 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			ScannerAutoscale:          rc.ScannerAutoscale,
 			NoTelemetryReport:         rc.NoTelemetryReport,
 			RemoteRepositories:        rc.RemoteRepositories,
+			EnableTLSVerification:     rc.EnableTLSVerification,
+			GlobalCaCerts:             rc.GlobalCaCerts,
 		},
 		NetConfig: &api.RESTSysNetConfigConfig{
 			NetServiceStatus:     rc.NetServiceStatus,

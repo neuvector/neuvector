@@ -1365,13 +1365,14 @@ func handlerGetFedMember(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
+	acc0, login := getAccessControl(w, r, "")
+	if acc0 == nil {
 		return
-	} else if !login.hasFedPermission() {
+	} else if !login.hasFedPermission() && !acc0.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0) {
 		restRespAccessDenied(w, login)
 		return
 	}
+	acc := acc0.BoostPermissions(share.PERM_SYSTEM_CONFIG | share.PERM_FED)
 
 	org, err := cacher.GetFedMember(_clusterStatusMap, acc) // org is type RESTFedMembereshipData
 	if err != nil {
@@ -2790,12 +2791,16 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					fedCfg := cacher.GetFedSettings()
 					if respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
 						// fed scan data deployment option is changed on master cluster.
-						scanRevs, _, err := clusHelper.GetFedScanRevisions()
 						// delete fed repo scan result stored on managed cluster if fed repo scan data deployment is disabled on master cluster
 						clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName)
-						scanRevs.ScannedRepoRev = 0
-						if err == nil {
-							clusHelper.PutFedScanRevisions(&scanRevs, nil)
+						for i := 0; i < 3; i++ {
+							if scanRevs, rev, err := clusHelper.GetFedScanRevisions(); err == nil {
+								scanRevs.ScannedRepoRev = 0
+								if err = clusHelper.PutFedScanRevisions(&scanRevs, &rev); err == nil {
+									break
+								}
+								time.Sleep(time.Second * 2)
+							}
 						}
 						fedCfg.DeployRepoScanData = respTo.DeployRepoScanData
 						clusHelper.PutFedSettings(nil, fedCfg)

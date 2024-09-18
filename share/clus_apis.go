@@ -792,37 +792,39 @@ type CLUSSystemConfig struct {
 	NewServiceProfileBaseline string `json:"new_service_profile_baseline"`
 	UnusedGroupAging          uint8  `json:"unused_group_aging"`
 	CLUSSyslogConfig
-	SingleCVEPerSyslog   bool                      `json:"single_cve_per_syslog"`
-	SyslogCVEInLayers    bool                      `json:"syslog_cve_in_layers"`
-	AuthOrder            []string                  `json:"auth_order"`
-	AuthByPlatform       bool                      `json:"auth_by_platform"`
-	RancherEP            string                    `json:"rancher_ep"`
-	InternalSubnets      []string                  `json:"configured_internal_subnets,omitempty"`
-	WebhookEnable_UNUSED bool                      `json:"webhook_enable"`
-	WebhookUrl_UNUSED    string                    `json:"webhook_url"`
-	Webhooks             []CLUSWebhook             `json:"webhooks"`
-	ClusterName          string                    `json:"cluster_name"`
-	ControllerDebug      []string                  `json:"controller_debug"`
-	TapProxymesh         bool                      `json:"tap_proxymesh"`
-	RegistryHttpProxy    CLUSProxy                 `json:"registry_http_proxy"`
-	RegistryHttpsProxy   CLUSProxy                 `json:"registry_https_proxy"`
-	IBMSAConfigNV        CLUSIBMSAConfigNV         `json:"ibmsa_config_nv"`
-	IBMSAConfig          CLUSIBMSAConfig           `json:"ibmsa_config"`
-	IBMSAOnboardData     CLUSIBMSAOnboardData      `json:"ibmsa_onboard_data"`
-	XffEnabled           bool                      `json:"xff_enabled"`
-	CfgType              TCfgType                  `json:"cfg_type"`
-	NetServiceStatus     bool                      `json:"net_service_status"`
-	NetServicePolicyMode string                    `json:"net_service_policy_mode"`
-	DisableNetPolicy     bool                      `json:"disable_net_policy"`
-	DetectUnmanagedWl    bool                      `json:"detect_unmanaged_wl"`
-	EnableIcmpPolicy     bool                      `json:"enable_icmp_policy"`
-	ModeAutoD2M          bool                      `json:"mode_auto_d2m"`
-	ModeAutoD2MDuration  int64                     `json:"mode_auto_d2m_duration"`
-	ModeAutoM2P          bool                      `json:"mode_auto_m2p"`
-	ModeAutoM2PDuration  int64                     `json:"mode_auto_m2p_duration"`
-	ScannerAutoscale     CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
-	NoTelemetryReport    bool                      `json:"no_telemetry_report,omitempty"`
-	RemoteRepositories   []CLUSRemoteRepository    `json:"remote_repositories"`
+	SingleCVEPerSyslog    bool                      `json:"single_cve_per_syslog"`
+	SyslogCVEInLayers     bool                      `json:"syslog_cve_in_layers"`
+	AuthOrder             []string                  `json:"auth_order"`
+	AuthByPlatform        bool                      `json:"auth_by_platform"`
+	RancherEP             string                    `json:"rancher_ep"`
+	InternalSubnets       []string                  `json:"configured_internal_subnets,omitempty"`
+	WebhookEnable_UNUSED  bool                      `json:"webhook_enable"`
+	WebhookUrl_UNUSED     string                    `json:"webhook_url"`
+	Webhooks              []CLUSWebhook             `json:"webhooks"`
+	ClusterName           string                    `json:"cluster_name"`
+	ControllerDebug       []string                  `json:"controller_debug"`
+	TapProxymesh          bool                      `json:"tap_proxymesh"`
+	RegistryHttpProxy     CLUSProxy                 `json:"registry_http_proxy"`
+	RegistryHttpsProxy    CLUSProxy                 `json:"registry_https_proxy"`
+	IBMSAConfigNV         CLUSIBMSAConfigNV         `json:"ibmsa_config_nv"`
+	IBMSAConfig           CLUSIBMSAConfig           `json:"ibmsa_config"`
+	IBMSAOnboardData      CLUSIBMSAOnboardData      `json:"ibmsa_onboard_data"`
+	XffEnabled            bool                      `json:"xff_enabled"`
+	CfgType               TCfgType                  `json:"cfg_type"`
+	NetServiceStatus      bool                      `json:"net_service_status"`
+	NetServicePolicyMode  string                    `json:"net_service_policy_mode"`
+	DisableNetPolicy      bool                      `json:"disable_net_policy"`
+	DetectUnmanagedWl     bool                      `json:"detect_unmanaged_wl"`
+	EnableIcmpPolicy      bool                      `json:"enable_icmp_policy"`
+	ModeAutoD2M           bool                      `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration   int64                     `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P           bool                      `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration   int64                     `json:"mode_auto_m2p_duration"`
+	ScannerAutoscale      CLUSSystemConfigAutoscale `json:"scanner_autoscale"`
+	NoTelemetryReport     bool                      `json:"no_telemetry_report,omitempty"`
+	RemoteRepositories    []CLUSRemoteRepository    `json:"remote_repositories"`
+	EnableTLSVerification bool                      `json:"enable_tls_verification"`
+	GlobalCaCerts         []string                  `json:"cacerts"`
 }
 
 type CLUSSystemConfigAutoscale struct {
@@ -992,6 +994,7 @@ type CLUSServerOIDC struct {
 	ClientSecret string   `json:"client_secret,cloak"`
 	Scopes       []string `json:"scopes"`
 	GroupClaim   string   `json:"group_claim"`
+	UseProxy     bool     `json:"use_proxy"`
 }
 
 type CLUSServer struct {
@@ -1072,6 +1075,7 @@ type CLUSController struct {
 	Leader            bool   `json:"leader"`
 	OrchConnStatus    string `json:"orch_conn_status"`
 	OrchConnLastError string `json:"orch_conn_last_error"`
+	ReadPrimeConfig   bool   `json:"read_prime_config"`
 }
 
 type CLUSProtoPort struct {
@@ -1263,11 +1267,12 @@ type CLUSAgentConfig struct {
 	Debug                []string `json:"debug,omitempty"`
 	DisableNvProtectMode bool     `json:"disable_nvprotect"`
 	DisableKvCongestCtl  bool     `json:"disable_kvcctl"`
-	SyslogLevel          string   `json:"syslog_level,omitempty"`
+	LogLevel             string   `json:"log_level,omitempty"`
 }
 
 type CLUSControllerConfig struct {
-	Debug []string `json:"debug,omitempty"`
+	Debug    []string `json:"debug,omitempty"`
+	LogLevel string   `json:"log_level,omitempty"`
 }
 
 type CLUSVolume struct {
@@ -1455,6 +1460,8 @@ const (
 	CLUSEvCrdSkipped                 // for crd Config import
 	CLUSEvK8sAdmissionWebhookCChange // for admission control
 	CLUSEvGroupMetricViolation       //network metric violation per group level
+	CLUSEvKvRestored                 // kv is restored from pvc
+	CLUSEvScanDataRestored           // scan data is restored from pvc
 )
 
 const (
@@ -1714,34 +1721,25 @@ const (
 )
 
 const (
-	SyslogLevel_Panic = "panic"
-	SyslogLevel_Fatal = "fatal"
-	SyslogLevel_Error = "error"
-	SyslogLevel_Warn  = "warn"
-	SyslogLevel_Info  = "info"
-	SyslogLevel_Debug = "debug"
-	SyslogLevel_Trace = "trace"
+	LogLevel_Error = "error"
+	LogLevel_Warn  = "warn"
+	LogLevel_Info  = "info"
+	LogLevel_Debug = "debug"
 )
 
-func CLUSGetSyslogLevel(syslogLevel string) log.Level {
-	switch syslogLevel {
-	case SyslogLevel_Panic:
-		return log.PanicLevel
-	case SyslogLevel_Fatal:
-		return log.FatalLevel
-	case SyslogLevel_Error:
+func CLUSGetLogLevel(logLevel string) log.Level {
+	switch logLevel {
+	case LogLevel_Error:
 		return log.ErrorLevel
-	case SyslogLevel_Warn:
+	case LogLevel_Warn:
 		return log.WarnLevel
-	case SyslogLevel_Debug:
+	case LogLevel_Info:
+		return log.InfoLevel
+	case LogLevel_Debug:
 		return log.DebugLevel
-	case SyslogLevel_Trace:
-		return log.TraceLevel
-	case SyslogLevel_Info:
 	default:
 		return log.InfoLevel
 	}
-	return log.InfoLevel
 }
 
 type CLUSCustomCheck struct {
@@ -2477,6 +2475,7 @@ type CLUSFedScanRevisions struct {
 	ScannedRegRevs map[string]uint64 `json:"scanned_reg_revs"` // increases whenever the scan result of any image in a fed registry is changed (registry name : revision)
 	ScannedRepoRev uint64            `json:"scanned_repo_rev"` // increases whenever there is any change in master cluster's repo scan data
 	Restoring      bool              `json:"restoring"`        // fed registry revision
+	RestoreAt      time.Time         `json:"restore_at"`
 }
 
 // dlp rule

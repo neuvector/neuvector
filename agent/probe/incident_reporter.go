@@ -103,7 +103,6 @@ func (p *Probe) patchProcessHistoryForDeniedReport(alert *ProbeProcess) {
 }
 
 func (p *Probe) SendAggregateProbeReport(pmsg *ProbeMessage, bExtOp bool) bool {
-
 	pid, key, uniqeKey := generateReportKey(pmsg)
 	pmsg.StartAt = time.Now().UTC()
 
@@ -157,13 +156,19 @@ func (p *Probe) SendAggregateProbeReport(pmsg *ProbeMessage, bExtOp bool) bool {
 var pkgCmds utils.Set = utils.NewSet("dpkg", "yum", "dnf", "rpm", "apk", "zypper")
 
 const (
-	fsPackageUpdate = "Software packages were updated."
-	fsComboAction   = "Files were modified or deleted."
-	fsNvProtectAlert= "NV.Protect: Files were modified."
+	fsPackageUpdate      = "Software packages were updated."
+	fsComboAction        = "Files were modified or deleted."
+	fsNvProtectAlert     = "NV.Protect: Files were modified."
+	fsNvProtectProcAlert = "NV.Protect: Process alert"
 )
 
 /////
 func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
+	if pmsg.Msg == fsNvProtectProcAlert {
+		p.sendFsmonNVProtectProbeReport(pmsg)
+		return false
+	}
+
 	key1, uniqeKey := genFsMonReportKey(PROBE_REPORT_FILE_MODIFIED, pmsg) // borrow
 	pmsg.Package = pmsg.Package || pkgCmds.Contains(pmsg.ProcName) || pkgCmds.Contains(filepath.Base(pmsg.ProcPath))
 	mLog.WithFields(log.Fields{"pmsg": pmsg, "key1": key1}).Debug()
@@ -174,7 +179,7 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 	bUpdated := false
 	if pmsga, ok := p.pMsgAggregates[key1]; ok {
 		pmsga.expireCnt = expireCountdown // extend expiration
-		if pmsg.ProcPid > 0 {	// fanotify
+		if pmsg.ProcPid > 0 {             // fanotify
 			if pmsga.pid == 0 { // inotify before
 				pmsga.expireCnt = 2 // quick response: update the process information
 				pmsga.pid = pmsg.ProcPid
@@ -287,7 +292,7 @@ func (p *Probe) processAggregateProbeReports() int {
 		pmsga.triggerCnt--
 		pmsga.expireCnt--
 		if pmsga.expireCnt == 0 {
-			if pmsga.count > 1  || (pmsga.bFsMonMsg && pmsga.count != 0 && pmsga.fsMsg.Path != "") {
+			if pmsga.count > 1 || (pmsga.bFsMonMsg && pmsga.count != 0 && pmsga.fsMsg.Path != "") {
 				go p.sendReport(*pmsga)
 				cnt++
 			}
@@ -352,7 +357,7 @@ func (p *Probe) sendReport(pmsga probeMsgAggregate) {
 
 func (p *Probe) sendFsnJavaPkgReport(id string, files []string, bAdd bool) {
 	group, _, _ := p.getServiceGroupName(id)
-	fsMsg := fsmon.MonitorMessage {
+	fsMsg := fsmon.MonitorMessage{
 		ID:      id,
 		Path:    strings.Join(files, ", "),
 		Group:   group,
@@ -362,7 +367,7 @@ func (p *Probe) sendFsnJavaPkgReport(id string, files []string, bAdd bool) {
 		StartAt: time.Now().UTC(),
 	}
 
-	if bAdd {	// inofrmative
+	if bAdd { // inofrmative
 		fsMsg.Path += " (added)"
 	} else {
 		fsMsg.Path += " (removed)"
@@ -373,7 +378,7 @@ func (p *Probe) sendFsnJavaPkgReport(id string, files []string, bAdd bool) {
 }
 
 func (p *Probe) sendFsnNvProtectReport(id string, files []string) {
-	fsMsg := fsmon.MonitorMessage {
+	fsMsg := fsmon.MonitorMessage{
 		ID:      id,
 		Path:    strings.Join(files, ", "),
 		Group:   share.GroupNVProtect,
@@ -385,4 +390,18 @@ func (p *Probe) sendFsnNvProtectReport(id string, files []string) {
 
 	p.notifyFsTaskChan <- &fsMsg
 	log.WithFields(log.Fields{"report": fsMsg}).Debug("PROC:")
+}
+
+func (p *Probe) sendFsmonNVProtectProbeReport(fmsg *fsmon.MonitorMessage) {
+	proc := &procInternal{
+		ppid:  fmsg.ProcPPid,
+		pname: filepath.Base(fmsg.ProcPPath),
+		ppath: fmsg.ProcPPath,
+		pid:   fmsg.ProcPid, // assuming
+		name:  filepath.Base(fmsg.ProcPath),
+		path:  fmsg.ProcPath,
+	}
+
+	p.sendProcessIncident(true, fmsg.ID, share.CLUSReservedUuidNotAlllowed, fmsg.Group, share.GroupNVProtect, proc)
+	log.WithFields(log.Fields{"proc": proc, "fmsg": fmsg}).Debug("PROC:")
 }

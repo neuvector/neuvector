@@ -77,7 +77,7 @@ static threat_property_t threat_property[] = {
 
 static threat_config_t threat_config[] = {
 [DPI_THRT_NONE]             {false, DPI_ACTION_NONE, },
-[DPI_THRT_TCP_FLOOD]        {false, DPI_ACTION_DROP, },
+[DPI_THRT_TCP_FLOOD]        {true, DPI_ACTION_DROP, },
 [DPI_THRT_ICMP_FLOOD]       {true, DPI_ACTION_DROP, },
 [DPI_THRT_IP_SRC_SESSION]   {false, DPI_ACTION_DROP, },
 [DPI_THRT_BAD_PACKET]       {true, DPI_ACTION_DROP, },

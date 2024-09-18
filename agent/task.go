@@ -12,6 +12,7 @@ import (
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/probe"
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/fsmon"
@@ -172,73 +173,91 @@ func configKvCongestCtl(enable bool) {
 func taskConfigAgent(conf *share.CLUSAgentConfig) {
 	log.WithFields(log.Fields{"config": conf}).Debug("")
 
-	// debug
-	var hasCPath, hasConn, hasCluster, hasMonitorTrace bool
-	if conf.Debug == nil {
-		conf.Debug = make([]string, 0)
-	}
-	newDebug := utils.NewSet()
-	for _, d := range conf.Debug {
-		switch d {
-		case "cpath":
-			hasCPath = true
-			newDebug.Add("ctrl")
-		case "conn":
-			hasConn = true
-		case "cluster":
-			hasCluster = true
-		case "monitor":
-			hasMonitorTrace = true
-		default:
-			newDebug.Add(d)
+	// Log level configuration will override the debug config during runtime,
+	// because the CLI only allows one command to be run each time.
+	if conf.LogLevel != "" && conf.LogLevel != share.LogLevel_Debug {
+		if conf.LogLevel != gInfo.agentConfig.LogLevel {
+			log.SetLevel(share.CLUSGetLogLevel(conf.LogLevel))
+			connLog.Level = share.CLUSGetLogLevel(conf.LogLevel)
+			prober.SetMonitorTrace(false, conf.LogLevel)
+			fileWatcher.SetMonitorTrace(false, conf.LogLevel)
+			if !agentEnv.runWithController {
+				cluster.SetLogLevel(share.CLUSGetLogLevel(conf.LogLevel))
+			}
+			cats := make([]string, 0)
+			gInfo.agentConfig.Debug = cats
+			debug := &dp.DPDebug{Categories: cats}
+			dp.DPCtrlConfigAgent(debug)
+			gInfo.agentConfig.LogLevel = conf.LogLevel
 		}
-	}
-	if hasCPath {
-		log.SetLevel(log.DebugLevel)
 	} else {
-		if conf.SyslogLevel == "debug" {
-			newDebug.Add("ctrl")
+		// debug
+		var hasCPath, hasConn, hasCluster, hasMonitorTrace bool
+		if conf.Debug == nil {
+			conf.Debug = make([]string, 0)
 		}
-		log.SetLevel(share.CLUSGetSyslogLevel(conf.SyslogLevel))
-	}
-	if hasConn {
-		connLog.Level = log.DebugLevel
-	} else {
-		connLog.Level = share.CLUSGetSyslogLevel(conf.SyslogLevel)
-	}
-
-	prober.SetMonitorTrace(hasMonitorTrace, conf.SyslogLevel)
-	fileWatcher.SetMonitorTrace(hasMonitorTrace, conf.SyslogLevel)
-
-	if !agentEnv.runWithController {
-		if hasCluster {
-			cluster.SetLogLevel(log.DebugLevel)
+		newDebug := utils.NewSet()
+		for _, d := range conf.Debug {
+			switch d {
+			case "cpath":
+				hasCPath = true
+				newDebug.Add("ctrl")
+			case "conn":
+				hasConn = true
+			case "cluster":
+				hasCluster = true
+			case "monitor":
+				hasMonitorTrace = true
+			default:
+				newDebug.Add(d)
+			}
+		}
+		if hasCPath {
+			log.SetLevel(log.DebugLevel)
 		} else {
-			cluster.SetLogLevel(share.CLUSGetSyslogLevel(conf.SyslogLevel))
+			log.SetLevel(log.InfoLevel)
 		}
-	}
-
-	oldDebug := utils.NewSet()
-	for _, d := range gInfo.agentConfig.Debug {
-		oldDebug.Add(d)
-	}
-	if !oldDebug.Equal(newDebug) {
-		// rebuild debug config because we might add 'ctrl'
-		i := 0
-		cats := make([]string, newDebug.Cardinality())
-		for d := range newDebug.Iter() {
-			cats[i] = d.(string)
-			i++
+		if hasConn {
+			connLog.Level = log.DebugLevel
+		} else {
+			connLog.Level = log.InfoLevel
 		}
 
-		gInfo.agentConfig.Debug = cats
+		prober.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
+		fileWatcher.SetMonitorTrace(hasMonitorTrace, api.LogLevelINFO)
 
-		debug := &dp.DPDebug{Categories: cats}
-		dp.DPCtrlConfigAgent(debug)
+		if !agentEnv.runWithController {
+			if hasCluster {
+				cluster.SetLogLevel(log.DebugLevel)
+			} else {
+				cluster.SetLogLevel(log.InfoLevel)
+			}
+		}
+
+		oldDebug := utils.NewSet()
+		for _, d := range gInfo.agentConfig.Debug {
+			oldDebug.Add(d)
+		}
+		if !oldDebug.Equal(newDebug) {
+			// rebuild debug config because we might add 'ctrl'
+			i := 0
+			cats := make([]string, newDebug.Cardinality())
+			for d := range newDebug.Iter() {
+				cats[i] = d.(string)
+				i++
+			}
+
+			gInfo.agentConfig.Debug = cats
+
+			debug := &dp.DPDebug{Categories: cats}
+			dp.DPCtrlConfigAgent(debug)
+			gInfo.agentConfig.LogLevel = share.LogLevel_Debug
+		}
 	}
 
 	//////
 	prober.SetNvProtect(conf.DisableNvProtectMode) // default: false (enabled)
+	fileWatcher.SetNVProtectFlag(!conf.DisableNvProtectMode)
 	configKvCongestCtl(!conf.DisableKvCongestCtl)
 }
 

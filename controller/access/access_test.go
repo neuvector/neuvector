@@ -1179,7 +1179,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/session/summary",
 			"v1/file_monitor_file",
 			"v1/system/usage",
-			"v1/system/rbac",
+			"v1/system/alerts",
 		},
 		CONST_API_RT_SCAN: []string{
 			"v1/scan/config",

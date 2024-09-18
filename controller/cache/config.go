@@ -1,17 +1,25 @@
 package cache
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/httpclient"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -21,6 +29,8 @@ type webhookCache struct {
 	url      string
 	useProxy bool
 }
+
+const DefaultScannerConfigUpdateTimeout = time.Minute * 5
 
 var systemConfigCache share.CLUSSystemConfig = common.DefaultSystemConfig
 var fedSystemConfigCache share.CLUSSystemConfig = share.CLUSSystemConfig{CfgType: share.FederalCfg}
@@ -66,7 +76,9 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 
 func setControllerDebug(debug []string, debugCPath bool) {
 	var hasCPath, hasConn, hasMutex, hasScan, hasCluster, hasK8sMonitor bool
-
+	if len(debug) == 0 && !debugCPath {
+		return
+	}
 	for _, d := range debug {
 		switch d {
 		case "cpath":
@@ -113,6 +125,11 @@ func setControllerDebug(debug []string, debugCPath bool) {
 	} else {
 		cctx.K8sResLog.Level = log.InfoLevel
 	}
+
+	if debugCPath || hasCPath || hasConn || hasMutex ||
+		hasScan || hasCluster || hasK8sMonitor {
+		common.CtrlLogLevel = share.LogLevel_Debug
+	}
 }
 
 func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -133,7 +150,21 @@ func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte)
 		cacheMutexUnlock()
 
 		if id == localDev.Ctrler.ID {
-			setControllerDebug(cconf.Debug, false)
+			// Log level configuration will override the debug config during runtime,
+			// because the CLI only allows one command to be run each time.
+			if cconf.LogLevel != "" && cconf.LogLevel != share.LogLevel_Debug {
+				if cconf.LogLevel != common.CtrlLogLevel {
+					log.SetLevel(share.CLUSGetLogLevel(cconf.LogLevel))
+					cctx.ConnLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					cctx.ScanLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					cctx.MutexLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					cluster.SetLogLevel(share.CLUSGetLogLevel(cconf.LogLevel))
+					cctx.K8sResLog.Level = share.CLUSGetLogLevel(cconf.LogLevel)
+					common.CtrlLogLevel = cconf.LogLevel
+				}
+			} else {
+				setControllerDebug(cconf.Debug, false)
+			}
 		}
 
 		log.WithFields(log.Fields{"config": cconf, "id": id}).Debug("")
@@ -289,6 +320,8 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		ModeAutoM2P:               systemConfigCache.ModeAutoM2P,
 		ModeAutoM2PDuration:       systemConfigCache.ModeAutoM2PDuration,
 		NoTelemetryReport:         systemConfigCache.NoTelemetryReport,
+		EnableTLSVerification:     systemConfigCache.EnableTLSVerification,
+		GlobalCaCerts:             systemConfigCache.GlobalCaCerts,
 	}
 	if systemConfigCache.SyslogIP != nil {
 		rconf.SyslogServer = systemConfigCache.SyslogIP.String()
@@ -454,6 +487,68 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleDlpRuleCalculation(true)
 		}
 		automodeConfigUpdate(cfg, systemConfigCache)
+
+		// Setup default TLS config.
+
+		// If GlobalCaCerts is not empty, create a CertPool and assign it to tls.Config.
+		// It will replace the default CertPool which comes from system/container image.
+		var pool *x509.CertPool
+		if len(cfg.GlobalCaCerts) > 0 {
+			pool = x509.NewCertPool()
+			for _, cacert := range cfg.GlobalCaCerts {
+				if ok := pool.AppendCertsFromPEM([]byte(cacert)); !ok {
+					log.WithFields(log.Fields{"cacert": cacert}).Warn("failed to parse ca cert")
+				}
+			}
+		}
+
+		// Use configured proxy if available, otherwise use container runtime's settings
+		// Note: at the time of writing, these settings are only available in docker.
+		httpProxy := httpclient.ParseProxy(&cfg.RegistryHttpProxy)
+		httpsProxy := httpclient.ParseProxy(&cfg.RegistryHttpsProxy)
+
+		// NoProxy is empty for now.
+		httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
+			TLSconfig: &tls.Config{
+				InsecureSkipVerify: !cfg.EnableTLSVerification,
+				RootCAs:            pool,
+			},
+		}, httpProxy, httpsProxy, "")
+
+		go func() {
+			scannerConfigTimeout := DefaultScannerConfigUpdateTimeout
+			if envvar := os.Getenv("SCANNER_CONFIG_UPDATE_TIMEOUT"); envvar != "" {
+				if v, err := time.ParseDuration(envvar); err == nil {
+					scannerConfigTimeout = v
+				} else {
+					log.WithError(err).Warn("failed to load scannerConfigTimeout")
+				}
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), scannerConfigTimeout)
+			defer cancel()
+			err := rpc.RunTaskForEachScanner(func(client share.ScannerServiceClient) error {
+				_, err := client.SetScannerSettings(ctx, &share.ScannerSettings{
+					EnableTLSVerification: cfg.EnableTLSVerification,
+					CACerts:               strings.Join(cfg.GlobalCaCerts, "\n"),
+					HttpProxy:             httpclient.GetHttpProxy(),
+					HttpsProxy:            httpclient.GetHttpsProxy(),
+					NoProxy:               "",
+				})
+				if err != nil {
+					log.WithError(err).Warn("failed to update scanner settings")
+					// Note: grpc-go doesn't support errors.Is().  See https://github.com/grpc/grpc-go/issues/3616
+					if strings.HasSuffix(err.Error(), "context canceled") || strings.HasSuffix(err.Error(), "context deadline exceeded") {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				log.WithError(err).Warn("failed to run RunTaskForEachScanner")
+			}
+		}()
+
 	case cluster.ClusterNotifyDelete:
 		// Triggered at configuration import
 		cfg = common.DefaultSystemConfig

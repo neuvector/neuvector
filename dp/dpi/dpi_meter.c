@@ -259,6 +259,7 @@ int dpi_meter_packet_inc(uint8_t type, dpi_packet_t *p)
 
 int dpi_meter_synflood_inc(dpi_packet_t *p)
 {
+    meter_info_t *info = &meter_info[DPI_METER_SYN_FLOOD];
     uint32_t log_id = DPI_THRT_TCP_FLOOD;
 
     if (!dpi_threat_status(log_id)) return DPI_METER_ACTION_NONE;
@@ -280,6 +281,13 @@ int dpi_meter_synflood_inc(dpi_packet_t *p)
             // not to increase meter drop count
 
             if (!p->ep->tap) {
+                if (th_snap.tick - m->last_log >= info->log_timeout && m->log_count > 0) {
+                    dpi_ddos_log(info->log_id, m, "TCP SYN Packet rate %u(pps) exceeds the shreshold %u(pps)", m->last_count, info->lower_limit);
+                    m->last_log = th_snap.tick;
+                    m->log_count = 0;
+                }
+
+                th_counter.drop_meters ++;
                 // TODO: SYN proxy logic goes here
                 dpi_set_action(p, DPI_ACTION_DROP);
                 return DPI_METER_ACTION_CLEAR;
