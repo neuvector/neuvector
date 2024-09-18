@@ -224,6 +224,7 @@ func TestGroupPolicyMode(t *testing.T) {
 	clusHelper = &mockCluster
 
 	systemConfigCache.NewServicePolicyMode = share.PolicyModeEvaluate
+	systemConfigCache.NewServiceProfileMode = share.PolicyModeEvaluate
 
 	policyApplyIngress = true // k8s
 	var extIPs []net.IP = make([]net.IP, 0)

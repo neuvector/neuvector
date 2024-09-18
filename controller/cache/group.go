@@ -341,7 +341,7 @@ func isGroupProfileExist(name, policyMode string) (bool, string) {
 			case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
 			default:
 				// invalid mode, use the default mode
-				mode = getNewServicePolicyMode()
+				_, mode = getNewServicePolicyMode()
 			}
 		}
 		return false, mode
@@ -903,7 +903,7 @@ func createServiceIPGroup(r *resource.Service) *share.CLUSGroup {
 	return cg
 }
 
-func createLearnedGroup(wlc *workloadCache, policyMode, baseline string, notScored bool, comment string, acc *access.AccessControl) error {
+func createLearnedGroup(wlc *workloadCache, policyMode, profileMode, baseline string, notScored bool, comment string, acc *access.AccessControl) error {
 	var criteria []share.CLUSCriteriaEntry
 
 	criteria = append(criteria, share.CLUSCriteriaEntry{
@@ -925,7 +925,7 @@ func createLearnedGroup(wlc *workloadCache, policyMode, baseline string, notScor
 		CfgType:         share.Learned,
 		Criteria:        criteria,
 		PolicyMode:      policyMode,
-		ProfileMode:     policyMode,
+		ProfileMode:     profileMode,
 		NotScored:       notScored,
 		Domain:          wlc.workload.Domain,
 		Kind:            share.GroupKindContainer,
@@ -964,9 +964,16 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 
 	var policyMode string
 	if svc.PolicyMode == nil || *svc.PolicyMode == "" {
-		policyMode = getNewServicePolicyMode()
+		policyMode, _ = getNewServicePolicyMode()
 	} else {
 		policyMode = *svc.PolicyMode
+	}
+
+	var profileMode string
+	if svc.ProfileMode == nil || *svc.ProfileMode == "" {
+		_, profileMode = getNewServicePolicyMode()
+	} else {
+		profileMode = *svc.ProfileMode
 	}
 
 	var baseline string
@@ -997,7 +1004,7 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 		return common.ErrObjectExists
 	}
 
-	return createLearnedGroup(wlc, policyMode, baseline, notScored, comment, acc)
+	return createLearnedGroup(wlc, policyMode, profileMode, baseline, notScored, comment, acc)
 }
 
 func groupRemoveEvent(ev share.TLogEvent, group string) {
@@ -1393,7 +1400,8 @@ func groupWorkloadJoin(id string, param interface{}) {
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
 			if bHasGroupProfile {
-				createLearnedGroup(wlc, getNewServicePolicyMode(), getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
+				policyMode, profileMode := getNewServicePolicyMode()
+				createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				}

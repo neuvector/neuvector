@@ -173,6 +173,7 @@ type RESTRiskScoreMetrics struct {
 	K8sVersion       string                    `json:"kube_version"`
 	OCVersion        string                    `json:"openshift_version"`
 	NewServiceMode   string                    `json:"new_service_policy_mode"`
+	NewProfileMode   string                    `json:"new_service_profile_mode"`
 	DenyAdmCtrlRules int                       `json:"deny_adm_ctrl_rules"`
 	Hosts            int                       `json:"hosts"`
 	WLs              RESTRiskScoreMetricsWL    `json:"workloads"`
