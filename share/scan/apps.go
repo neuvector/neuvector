@@ -442,13 +442,10 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath str
 		log.WithFields(log.Fields{"fullpath": fullpath}).Error("unable to create temp dir")
 	}
 
-	// the real filepath
-	path := filename
+	path := origJar
 	if depth > 0 {
 		path = origJar + ":" + filename
 	}
-
-	doneWithFileParsing := false
 	pkgs := make(map[string][]AppPackage)
 	for _, f := range r.File {
 		if f.FileInfo().IsDir() {
@@ -483,7 +480,7 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath str
 			} else {
 				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "depth": depth, "err": err}).Error("open jar file fail")
 			}
-		} else if !doneWithFileParsing && strings.HasSuffix(f.Name, javaPOMproperty) {
+		} else if strings.HasSuffix(f.Name, javaPOMproperty) {
 			var groupId, version, artifactId string
 			rc, err := f.Open()
 			if err != nil {
@@ -523,10 +520,15 @@ func (s *ScanApps) parseJarPackage(r zip.Reader, origJar, filename, fullpath str
 			}
 
 			key := fmt.Sprintf("%s-%s-%s", pkg.FileName, pkg.ModuleName, pkg.Version)
-			dedup.Add(key)                 // reference
-			pkgs[path] = []AppPackage{pkg} // higher priority: replace others
-			doneWithFileParsing = true     // No need to parse other manifest files of the same jar file
-		} else if !doneWithFileParsing && strings.HasSuffix(f.Name, javaManifest) {
+			if !dedup.Contains(key) {
+				dedup.Add(key)
+				if _, ok := pkgs[path]; !ok {
+					pkgs[path] = []AppPackage{pkg}
+				} else {
+					pkgs[path] = append(pkgs[path], pkg)
+				}
+			}
+		} else if strings.HasSuffix(f.Name, javaManifest) {
 			rc, err := f.Open()
 			if err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("open manifest file fail")
