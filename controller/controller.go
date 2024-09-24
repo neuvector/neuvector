@@ -213,6 +213,7 @@ func main() {
 	var joinAddr, advAddr, bindAddr string
 	var err error
 	debug := false
+	debugLevel := make([]string, 0)
 
 	log.SetOutput(os.Stdout)
 	log.SetLevel(share.CLUSGetLogLevel(common.CtrlLogLevel))
@@ -246,6 +247,7 @@ func main() {
 	bind := flag.String("b", "", "Cluster bind address")
 	rtSock := flag.String("u", "", "Container socket URL")
 	log_level := flag.String("log_level", share.LogLevel_Info, "Controller log level")
+	debug_level := flag.String("v", "", "debug level")
 	restPort := flag.Uint("p", api.DefaultControllerRESTAPIPort, "REST API server port")
 	fedPort := flag.Uint("fed_port", 11443, "Fed REST API server port")
 	rpcPort := flag.Uint("rpc_port", 0, "Cluster server RPC port")
@@ -280,10 +282,28 @@ func main() {
 		if *log_level == share.LogLevel_Debug {
 			debug = true
 			ctrlEnv.debugCPath = true
+			debugLevel = []string{"cpath"}
 		} else {
 			connLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
 			mutexLog.Level = share.CLUSGetLogLevel(common.CtrlLogLevel)
 		}
+	}
+	if debug && *debug_level != "" {
+		var validLevelSet utils.Set = utils.NewSet("conn", "mutex", "scan", "cluster", "k8s_monitor")
+		splitLevels := strings.Split(*debug_level, " ")
+		var validLevels []string
+		for _, level := range splitLevels {
+			level = strings.TrimSpace(level)
+			if level == "all" {
+				validLevels = append(validLevels, validLevelSet.ToStringSlice()...)
+				break
+			}
+			if validLevelSet.Contains(level) {
+				validLevels = append(validLevels, level)
+			}
+		}
+		levels := utils.NewSetFromSliceKind(append(debugLevel, validLevels...))
+		debugLevel = levels.ToStringSlice()
 	}
 	if *join != "" {
 		// Join addresses might not be all ready. Accept whatever input is, resolve them
@@ -803,6 +823,7 @@ func main() {
 		OrchChan:                 orchObjChan,
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
+		Debug:                    debugLevel,
 		EnableRmNsGroups:         enableRmNsGrps,
 		EnableIcmpPolicy:         enableIcmpPolicy,
 		ConnLog:                  connLog,

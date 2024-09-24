@@ -678,6 +678,9 @@ func configInit() {
 		var param interface{} = &cfg.IBMSAConfig
 		cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
 	}
+	if !utils.CompareSliceWithoutOrder(systemConfigCache.ControllerDebug, cctx.Debug) {
+		systemConfigCache.ControllerDebug = cctx.Debug
+	}
 	setControllerDebug(systemConfigCache.ControllerDebug, cctx.DebugCPath)
 	scan.UpdateProxy(&systemConfigCache.RegistryHttpProxy, &systemConfigCache.RegistryHttpsProxy)
 

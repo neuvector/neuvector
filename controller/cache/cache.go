@@ -182,6 +182,7 @@ type Context struct {
 	OrchChan                 chan *resource.Event
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
+	Debug                    []string
 	EnableRmNsGroups         bool
 	EnableIcmpPolicy         bool
 	ConnLog                  *log.Logger
