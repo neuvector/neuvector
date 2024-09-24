@@ -110,7 +110,7 @@ type NvSecurityParse struct {
 }
 
 type NvSecurityTarget struct {
-	PolicyMode *string                `json:"policymode, omitempty"`
+	PolicyMode *string                `json:"policymode,omitempty"`
 	Selector   api.RESTCrdGroupConfig `json:"selector"`
 }
 
@@ -125,6 +125,7 @@ type NvSecurityRuleDetail struct {
 
 type NvSecurityProcessProfile struct {
 	Baseline *string `json:"baseline"`
+	Mode     *string `json:"mode"` // added in 5.4.1 for process/file profiles
 }
 
 type NvSecurityProcessRule struct {
@@ -231,18 +232,18 @@ type NvSecurityAdmCtrlSpec struct {
 }
 
 /*
-type NvAdmCtrlSecurityRule struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              NvSecurityAdmCtrlSpec `json:"spec"`
-}
+	type NvAdmCtrlSecurityRule struct {
+		metav1.TypeMeta   `json:",inline"`
+		metav1.ObjectMeta `json:"metadata,omitempty"`
+		Spec              NvSecurityAdmCtrlSpec `json:"spec"`
+	}
 
-type NvAdmCtrlSecurityRuleList struct {
-	metav1.TypeMeta  `json:",inline"`
-	metav1.ListMeta  `json:"metadata,omitempty"`
-	Items            []*NvAdmCtrlSecurityRule `json:"items"`
-	XXX_unrecognized []byte                   `json:"-"`
-}
+	type NvAdmCtrlSecurityRuleList struct {
+		metav1.TypeMeta  `json:",inline"`
+		metav1.ListMeta  `json:"metadata,omitempty"`
+		Items            []*NvAdmCtrlSecurityRule `json:"items"`
+		XXX_unrecognized []byte                   `json:"-"`
+	}
 */
 type NvAdmCtrlSecurityRule struct {
 	metav1.TypeMeta   `json:",inline"`
