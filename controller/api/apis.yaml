@@ -7281,6 +7281,11 @@ definitions:
       policy_mode:
         type: string
         example: Monitor
+        enum: [Learn, Monitor, Protect]
+      profile_mode:
+        type: string
+        example: Monitor
+        enum: [Learn, Monitor, Protect]
       remote_export_options:
         $ref: '#/definitions/RESTRemoteExportOptions'
   RESTHost:
