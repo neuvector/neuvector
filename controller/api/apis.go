@@ -1740,6 +1740,7 @@ const (
 
 type RESTSystemConfigConfig struct {
 	NewServicePolicyMode      *string                          `json:"new_service_policy_mode,omitempty"`
+	NewServiceProfileMode     *string                          `json:"new_service_profile_mode,omitempty"`
 	NewServiceProfileBaseline *string                          `json:"new_service_profile_baseline,omitempty"`
 	UnusedGroupAging          *uint8                           `json:"unused_group_aging,omitempty"`
 	SyslogServer              *string                          `json:"syslog_ip,omitempty"`
@@ -1817,6 +1818,7 @@ type RESTSystemConfigConfigData struct {
 
 type RESTSystemConfigSvcCfgV2 struct {
 	NewServicePolicyMode      *string `json:"new_service_policy_mode,omitempty"`
+	NewServiceProfileMode     *string `json:"new_service_profile_mode,omitempty"`
 	NewServiceProfileBaseline *string `json:"new_service_profile_baseline,omitempty"`
 }
 
@@ -1889,6 +1891,7 @@ type RESTUnquarReq struct {
 
 type RESTSystemRequest struct {
 	PolicyMode      *string        `json:"policy_mode,omitempty"`
+	ProfileMode     *string        `json:"profile_mode,omitempty"`
 	BaselineProfile *string        `json:"baseline_profile,omitempty"`
 	Unquar          *RESTUnquarReq `json:"unquarantine,omitempty"`
 }
@@ -1906,6 +1909,7 @@ type RESTProxyConfig struct {
 // If more log servers needed, they can be defined as servers.
 type RESTSystemConfig struct {
 	NewServicePolicyMode      string                    `json:"new_service_policy_mode"`
+	NewServiceProfileMode     string                    `json:"new_service_profile_mode"`
 	NewServiceProfileBaseline string                    `json:"new_service_profile_baseline"`
 	UnusedGroupAging          uint8                     `json:"unused_group_aging"`
 	SyslogServer              string                    `json:"syslog_ip"`
@@ -1959,6 +1963,7 @@ type RESTSystemConfigData struct {
 
 type RESTSystemConfigNewSvcV2 struct {
 	NewServicePolicyMode      string `json:"new_service_policy_mode"`
+	NewServiceProfileMode     string `json:"new_service_profile_mode"`
 	NewServiceProfileBaseline string `json:"new_service_profile_baseline"`
 }
 
@@ -2096,6 +2101,7 @@ type RESTServiceConfig struct {
 	Domain          string  `json:"domain"`
 	Comment         *string `json:"comment"`
 	PolicyMode      *string `json:"policy_mode,omitempty"`
+	ProfileMode     *string `json:"profile_mode,omitempty"`
 	BaselineProfile *string `json:"baseline_profile,omitempty"`
 	NotScored       *bool   `json:"not_scored,omitempty"`
 }
@@ -2133,6 +2139,7 @@ type RESTServiceData struct {
 type RESTServiceBatchConfig struct {
 	Services        []string `json:"services,omitempty"`
 	PolicyMode      *string  `json:"policy_mode,omitempty"`
+	ProfileMode     *string  `json:"profile_mode,omitempty"`
 	BaselineProfile *string  `json:"baseline_profile,omitempty"`
 	NotScored       *bool    `json:"not_scored,omitempty"`
 }

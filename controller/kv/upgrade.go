@@ -53,6 +53,10 @@ func upgradeSystemConfig(cfg *share.CLUSSystemConfig) (bool, bool) {
 		cfg.NewServicePolicyMode = common.DefaultSystemConfig.NewServicePolicyMode
 		upd = true
 	}
+	if cfg.NewServiceProfileMode == "" {
+		cfg.NewServiceProfileMode = common.DefaultSystemConfig.NewServiceProfileMode
+		upd = true
+	}
 	if cfg.NewServiceProfileBaseline == "" {
 		cfg.NewServiceProfileBaseline = common.DefaultSystemConfig.NewServiceProfileBaseline
 		upd = true

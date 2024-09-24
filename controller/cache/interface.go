@@ -218,7 +218,7 @@ type CacheInterface interface {
 	DoesDlpSensorExist(name string, acc *access.AccessControl) (bool, error)
 	GetDlpRuleNames() *[]string
 	GetDlpRuleSensorGroupById(id uint32) (string, string, *[]string)
-	GetNewServicePolicyMode() string
+	GetNewServicePolicyMode() (string, string)
 	GetNewServiceProfileBaseline() string
 	GetUnusedGroupAging() uint8
 	GetNetServiceStatus() bool

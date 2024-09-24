@@ -98,6 +98,7 @@ const RegistryFedRepoScanName string = "fed._repo_scan"
 
 var DefaultSystemConfig = share.CLUSSystemConfig{
 	NewServicePolicyMode:      share.PolicyModeLearn,
+	NewServiceProfileMode:     share.PolicyModeLearn,
 	NewServiceProfileBaseline: share.ProfileZeroDrift,
 	UnusedGroupAging:          share.UnusedGroupAgingDefault,
 	CLUSSyslogConfig: share.CLUSSyslogConfig{

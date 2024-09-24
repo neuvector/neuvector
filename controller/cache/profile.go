@@ -78,7 +78,7 @@ func handleProfileReport(gproc map[string][]*share.CLUSProcessProfileEntry) erro
 						if exist.ProfileMode != "" {
 							profile.Mode = exist.ProfileMode // replaced
 						} else {
-							profile.Mode = getNewServicePolicyMode()
+							_, profile.Mode = getNewServicePolicyMode()
 						}
 					}
 				} else {
@@ -116,7 +116,7 @@ func handleProfileReport(gproc map[string][]*share.CLUSProcessProfileEntry) erro
 			if exist, _, _ := clusHelper.GetGroup(group, accReadAll); exist != nil && exist.ProfileMode != "" {
 				profile.Mode = exist.ProfileMode // replaced
 			} else {
-				profile.Mode = getNewServicePolicyMode()
+				_, profile.Mode = getNewServicePolicyMode()
 			}
 
 			for _, proc := range procs {
