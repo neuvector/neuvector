@@ -158,7 +158,20 @@ func (s *SystemTools) getContainerIDByCgroup(path string) (string, bool, error, 
 		}
 		return id, containerInContainer, nil, true
 	}
-	return getContainerIDByCgroupReader(f) // V1
+
+	// v1
+	id, containerInContainer, _, bFlushed := getContainerIDByCgroupReader(f);
+	if id != "" {
+		return id, containerInContainer, nil, bFlushed
+	}
+
+	// last resort for k8s: it will return the pod ID
+	if f2, err := os.Open(filepath.Join(path, "mountinfo")); err == nil {
+		defer f2.Close()
+		id, containerInContainer, _ = getContainerIDByCgroupReaderV2(f2, from_hostname)
+		return id, containerInContainer, nil, true
+	}
+	return "", false, nil, false
 }
 
 // Return container ID, container-in-container, and error
