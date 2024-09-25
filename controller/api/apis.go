@@ -529,10 +529,16 @@ type RESTListData struct {
 	List *RESTList `json:"list"`
 }
 
+// NV 5.4(-):   process/file profile mode value priority is "policy_mode"
+// NV 5.4.1(+): process/file profile mode value priority is "profile_mode" -> "policy_mode"
+// NV future: 	     process profile mode value priority is "profile_mode" -> "policy_mode"
+// NV future:           file profile mode value priority is "file_profile_mode" -> "profile_mode" -> "policy_mode"
 type RESTGroupExport struct {
 	Groups              []string                 `json:"groups"`
 	PolicyMode          string                   `json:"policy_mode,omitempty"`
+	ProfileMode         string                   `json:"profile_mode,omitempty"` // for both process/file profiles(if specified) since 5.4.1
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
+	//FileProfileMode   string                   `json:"file_profile_mode,omitempty"`    // for file profile(if specified). not supported yet
 }
 
 type RESTAdmCtrlRulesExport struct {

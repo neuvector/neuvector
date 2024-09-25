@@ -385,6 +385,14 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 									apiextv1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
+							"mode": apiextv1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1.JSON{
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
+									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
+								},
+							},
 						},
 					},
 					"file": apiextv1.JSONSchemaProps{
@@ -485,6 +493,14 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileZeroDrift]},
 									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileDefault_UNUSED]},
 									apiextv1b1.JSON{Raw: b.enumMap[share.ProfileShield_UNUSED]},
+								},
+							},
+							"mode": apiextv1b1.JSONSchemaProps{
+								Type: b.schemaTypeString,
+								Enum: []apiextv1b1.JSON{
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
+									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
 								},
 							},
 						},
