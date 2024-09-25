@@ -359,6 +359,10 @@ static pid_t fork_exec(int i)
             args[a ++] = "-log_level";
             args[a ++] = log_level;
         }
+        if ((debug_level = getenv(ENV_DEBUG_LEVEL)) != NULL) {
+            args[a ++] = "-v";
+            args[a ++] = debug_level;
+        }
         if ((search_regs = getenv(ENV_CTRL_SEARCH_REGS)) != NULL) {
             args[a ++] = "-search_registries";
             args[a ++] = search_regs;
