@@ -151,13 +151,16 @@ type RESTRiskScoreMetricsWL struct {
 }
 
 type RESTRiskScoreMetricsGroup struct {
-	Groups           int `json:"groups"`
-	DiscoverGroups   int `json:"discover_groups"`
-	MonitorGroups    int `json:"monitor_groups"`
-	ProtectGroups    int `json:"protect_groups"`
-	DiscoverGroupsZD int `json:"discover_groups_zero_drift"`
-	MonitorGroupsZD  int `json:"monitor_groups_zero_drift"`
-	ProtectGroupsZD  int `json:"protect_groups_zero_drift"`
+	Groups                  int `json:"groups"`
+	DiscoverGroups          int `json:"discover_groups"`
+	MonitorGroups           int `json:"monitor_groups"`
+	ProtectGroups           int `json:"protect_groups"`
+	ProfileDiscoverGroups   int `json:"profile_discover_groups"`
+	ProfileMonitorGroups    int `json:"profile_monitor_groups"`
+	ProfileProtectGroups    int `json:"profile_protect_groups"`
+	DiscoverGroupsZD        int `json:"discover_groups_zero_drift"`
+	MonitorGroupsZD         int `json:"monitor_groups_zero_drift"`
+	ProtectGroupsZD         int `json:"protect_groups_zero_drift"`
 }
 
 type RESTRiskScoreMetricsCVE struct {
