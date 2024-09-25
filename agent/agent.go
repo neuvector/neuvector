@@ -299,7 +299,20 @@ func main() {
 	}
 
 	if debug && *debug_level != "" {
-		levels := utils.NewSetFromSliceKind(append(gInfo.agentConfig.Debug, strings.Split(*debug_level, " ")...))
+		var validLevelSet utils.Set = utils.NewSet("conn", "error", "ctrl", "packet", "session", "timer", "tcp", "parser", "log", "ddos", "cluster", "policy", "dlp", "monitor")
+		splitLevels := strings.Split(*debug_level, " ")
+		var validLevels []string
+		for _, level := range splitLevels {
+			level = strings.TrimSpace(level)
+			if level == "all" {
+				validLevels = append(validLevels, validLevelSet.ToStringSlice()...)
+				break
+			}
+			if validLevelSet.Contains(level) {
+				validLevels = append(validLevels, level)
+			}
+		}
+		levels := utils.NewSetFromSliceKind(append(gInfo.agentConfig.Debug, validLevels...))
 		gInfo.agentConfig.Debug = levels.ToStringSlice()
 	}
 

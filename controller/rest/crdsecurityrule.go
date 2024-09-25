@@ -2219,6 +2219,7 @@ targetpass:
 	policyModeCfg := gfwrule.Spec.Target.PolicyMode
 	// The "fed.nodes" group works like a user-defined group(i.e. no policy mode/baseline) but has the highest priority(process/file) rules.
 	// PolicyMode is for network rules
+	var defPolicyMode, defProfileMode string
 	if utils.DoesGroupHavePolicyMode(crdCfgRet.TargetName) {
 		if policyModeCfg != nil {
 			if *policyModeCfg != share.PolicyModeLearn &&
@@ -2235,11 +2236,10 @@ targetpass:
 				}
 			}
 		} else {
-			tmp, tmProfile := cacher.GetNewServicePolicyMode()
+			defPolicyMode, defProfileMode = cacher.GetNewServicePolicyMode()
 			crdCfgRet.PolicyModeCfg = &api.RESTServiceConfig{
 				Name:       crdCfgRet.TargetName,
-				PolicyMode: &tmp,
-				ProfileMode: &tmProfile,
+				PolicyMode: &defPolicyMode,
 			}
 		}
 	} else {
@@ -2305,14 +2305,30 @@ targetpass:
 	// for a group that doesn't support policy/profile mode, its baseline value should be empty as well
 	if crdCfgRet.TargetName != "" && utils.HasGroupProfiles(crdCfgRet.TargetName) {
 		// Process profile
-		mode := "" // user-created group
-		if crdCfgRet.PolicyModeCfg != nil && crdCfgRet.PolicyModeCfg.PolicyMode != nil {
-			// PolicyMode is configured for target group (in yaml)
-			mode = *crdCfgRet.PolicyModeCfg.PolicyMode
-		}
+		// for both process/file profiles since 5.4.1, the profile mode value adoption priority: process_profile.mode -> target.policymode -> global default profile mode
+		mode := "" // user-created group.
 		// baseline is a sub-option of profileMode. So only groups that support policyMode/profileMode support baseline option
 		baseline := ""
 		if utils.DoesGroupHavePolicyMode(crdCfgRet.TargetName) {
+			mode = defProfileMode
+			if policyModeCfg != nil {
+				// PolicyMode is configured for target group (in yaml), backward compatible to 5.4 customers
+				mode = *policyModeCfg
+			}
+			if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Mode != nil {
+				// Mode is configured for process profile (in yaml)
+				profileModeCfg := *gfwrule.Spec.ProcessProfile.Mode
+				if profileModeCfg != share.PolicyModeLearn &&
+					profileModeCfg != share.PolicyModeEvaluate &&
+					profileModeCfg != share.PolicyModeEnforce {
+					errMsg = fmt.Sprintf("%s Rule format error:   invalide profile mode %s", reviewTypeDisplay, profileModeCfg)
+					buffer.WriteString(errMsg)
+					errCount++
+				} else {
+					mode = profileModeCfg
+				}
+			}
+
 			isTargetGroupNodes := utils.IsGroupNodes(crdCfgRet.TargetName)
 			if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Baseline != nil {
 				// Baseline is configured for target group (in yaml)
@@ -2338,6 +2354,10 @@ targetpass:
 			Baseline:    baseline,
 			Mode:        mode,
 			ProcessList: make([]*api.RESTProcessProfileEntry, 0, len(gfwrule.Spec.ProcessRule)),
+		}
+
+		if crdCfgRet.PolicyModeCfg != nil && pprofile.Mode != "" {
+			crdCfgRet.PolicyModeCfg.ProfileMode = &pprofile.Mode
 		}
 
 		for _, pp := range gfwrule.Spec.ProcessRule {
@@ -2943,7 +2963,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		profileMode, baseline = h.crdRebuildGroupProfiles(crdRecord.ProfileName, recordList, share.ReviewTypeCRD)
 		// now profileMode/baseline are the final values in case there are multiple CRs for a target group
 	}
-	//policyMode = h.crdGetProfileSecurityLevel(crdRecord.ProfileName, "policyMode", recordList)
+	policyMode = h.crdGetProfileSecurityLevel(crdRecord.ProfileName, "policyMode", recordList)
 	h.crdHandlePolicyMode(crdCfgRet.TargetName, policyMode, profileMode, baseline)
 
 	crInfo = fmt.Sprintf("target group: %s", crdCfgRet.TargetName)
@@ -3337,7 +3357,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 
 		// export process and file profiles
-		exportProcessRule(gname, &(resptmp.Spec), acc)
+		exportProcessRule(gname, &rconf, &(resptmp.Spec), acc)
 		if gname != api.AllHostGroup { // TODO: skip file for now
 			exportFileRule(gname, &(resptmp.Spec), acc)
 		}
@@ -3390,10 +3410,12 @@ func (h *nvCrdHandler) crdDeleteRecordEx(kvCrdKind, recordName, profileName stri
 	if profileName == "" {
 		return
 	}
-	if kvCrdKind == resource.NvSecurityRuleKind && utils.HasGroupProfiles(profileName) {
-		profileMode, baseline := h.crdRebuildGroupProfiles(profileName, recordList, share.ReviewTypeCRD)
-		policyMode := profileMode
-		//policyMode = h.crdGetProfileSecurityLevel(profileName, "policyMode", recordList)
+	if kvCrdKind == resource.NvSecurityRuleKind {
+		var profileMode, baseline string
+		if utils.HasGroupProfiles(profileName) {
+			profileMode, baseline = h.crdRebuildGroupProfiles(profileName, recordList, share.ReviewTypeCRD)
+		}
+		policyMode := h.crdGetProfileSecurityLevel(profileName, "policyMode", recordList)
 		h.crdHandlePolicyMode(profileName, policyMode, profileMode, baseline)
 	}
 }
@@ -3427,7 +3449,7 @@ func (h *nvCrdHandler) crdGetFileRules(profile *api.RESTFileMonitorProfile) []sh
 	return rules
 }
 
-func exportProcessRule(group string, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
+func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if profile, err := cacher.GetProcessProfile(group, acc); err == nil {
 		if utils.DoesGroupHavePolicyMode(group) {
@@ -3436,7 +3458,12 @@ func exportProcessRule(group string, secRule *resource.NvSecurityRuleSpec, acc *
 				baseline = share.ProfileBasic
 			}
 			secRule.ProcessProfile = &resource.NvSecurityProcessProfile{Baseline: &baseline}
-			secRule.ProcessProfile.Baseline = &baseline
+			if rconf.ProfileMode != "" {
+				secRule.ProcessProfile.Mode = &rconf.ProfileMode
+			} else if profile.Mode != "" {
+				profileMode := profile.Mode
+				secRule.ProcessProfile.Mode = &profileMode
+			}
 		}
 		dupChecker := utils.NewSet()
 		for _, gproc := range profile.ProcessList {
@@ -3625,7 +3652,8 @@ func (h *nvCrdHandler) crdGetProfileSecurityLevel(profileName, securityName stri
 }
 
 // rebuild group policyMode & process and file profiles from CRD recordList
-func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[string]*share.CLUSCrdSecurityRule, reviewType share.TReviewType) (string, string) {
+func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[string]*share.CLUSCrdSecurityRule,
+	reviewType share.TReviewType) (string, string) {
 
 	if grp, _, err := clusHelper.GetGroup(groupName, h.acc); grp == nil || err != nil {
 		log.WithFields(log.Fields{"groupName": groupName}).Debug("not existed")
