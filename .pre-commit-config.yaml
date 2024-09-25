@@ -1,0 +1,9 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: golangci-lint-staged
+        name: golangci-lint-staged
+        entry: ./build/pre-commit/golangci-lint-staged
+        language: golang
+        types: [go]
+        require_serial: true

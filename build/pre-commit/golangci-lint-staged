@@ -1,0 +1,25 @@
+#!/bin/bash
+
+GOLANGCI_LINT=`which golangci-lint`
+
+# Check for golangci-lint
+if [[ ! -x "$GOLANGCI_LINT" ]]; then
+  echo "Please install golangci-lint"
+  exit 1
+fi
+
+echo "Running golangci-lint"
+
+cleanup() {
+    rm /tmp/stage.patch
+}
+
+git diff --cached > /tmp/stage.patch
+trap cleanup EXIT
+golangci-lint run --new-from-patch=/tmp/stage.patch
+if [[ $? != 0 ]]; then
+  echo "Linting failed"
+  exit 1
+else
+ echo "Linting passed"
+fi
