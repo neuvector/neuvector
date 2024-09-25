@@ -249,6 +249,14 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 				s.Groups.ProtectGroupsZD++
 			}
 		}
+		switch g.ProfileMode {
+		case share.PolicyModeLearn:
+			s.Groups.ProfileDiscoverGroups++
+		case share.PolicyModeEvaluate:
+			s.Groups.ProfileMonitorGroups++
+		case share.PolicyModeEnforce:
+			s.Groups.ProfileProtectGroups++
+		}
 		s.Groups.Groups++
 	}
 
