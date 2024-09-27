@@ -1,3 +1,4 @@
+# Legacy Makefile.  Keep for backward compatibility
 .PHONY: fleet
 
 STAGE_DIR = stage
@@ -151,3 +152,87 @@ fleet:
 	@echo "Making $@ ..."
 	@docker pull neuvector/build_fleet:${BUILD_IMAGE_TAG}
 	@docker run --rm -ia STDOUT --name build -e NV_BUILD_TARGET=$(NV_BUILD_TARGET) --net=none -v $(CURDIR):/go/src/github.com/neuvector/neuvector -w /go/src/github.com/neuvector/neuvector --entrypoint ./make_fleet.sh neuvector/build_fleet:${BUILD_IMAGE_TAG}
+
+# Newer Makefile
+
+RUNNER := docker
+IMAGE_BUILDER := $(RUNNER) buildx
+MACHINE := neuvector
+BUILDX_ARGS ?= --sbom=true --attest type=provenance,mode=max --cache-to type=gha --cache-from type=gha
+DEFAULT_PLATFORMS := linux/amd64,linux/arm64,linux/x390s,linux/riscv64
+
+COMMIT = $(shell git rev-parse --short HEAD)
+ifeq ($(VERSION),)
+	# Define VERSION, which is used for image tags or to bake it into the
+	# compiled binary to enable the printing of the application version, 
+	# via the --version flag.
+	CHANGES = $(shell git status --porcelain --untracked-files=no)
+	ifneq ($(CHANGES),)
+		DIRTY = -dirty
+	endif
+
+	COMMIT = $(shell git rev-parse --short HEAD)
+	VERSION = $(COMMIT)$(DIRTY)
+
+	GIT_TAG = $(shell git tag -l --contains HEAD | head -n 1)
+
+	# Override VERSION with the Git tag if the current HEAD has a tag pointing to
+	# it AND the worktree isn't dirty.
+	ifneq ($(GIT_TAG),)
+		ifeq ($(DIRTY),)
+			VERSION = $(GIT_TAG)
+		endif
+	endif
+endif
+
+ifeq ($(TAG),)
+	TAG = $(VERSION)
+	ifneq ($(DIRTY),)
+		TAG = dev
+	endif
+endif
+
+TARGET_PLATFORMS ?= linux/amd64,linux/arm64
+REPO ?= neuvector
+CONTROLLER_IMAGE = $(REPO)/controller:$(TAG)
+ENFORCER_IMAGE = $(REPO)/enforcer:$(TAG)
+BUILD_ACTION = --load
+
+buildx-machine:
+	docker buildx ls
+	@docker buildx ls | grep $(MACHINE) || \
+	docker buildx create --name=$(MACHINE) --platform=$(DEFAULT_PLATFORMS)
+
+test-controller-image:
+	# Instead of loading image, target all platforms, effectivelly testing
+	# the build for the target architectures.
+	$(MAKE) build-controller-image BUILD_ACTION="--platform=$(TARGET_PLATFORMS)"
+
+build-controller-image: buildx-machine ## build (and load) the container image targeting the current platform.
+	$(IMAGE_BUILDER) build -f package/Dockerfile.controller \
+		--builder $(MACHINE) $(IMAGE_ARGS) \
+		--build-arg VERSION=$(VERSION) -t "$(CONTROLLER_IMAGE)" $(BUILD_ACTION) .
+	@echo "Built $(CONTROLLER_IMAGE)"
+
+push-controller-image: buildx-machine
+	$(IMAGE_BUILDER) build -f package/Dockerfile.controller \
+		--builder $(MACHINE) $(IMAGE_ARGS) $(IID_FILE_FLAG) $(BUILDX_ARGS) \
+		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/$(IMAGE_PREFIX)controller:$(TAG)" --push .
+	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)controller:$(TAG)"
+
+test-enforcer-image:
+	# Instead of loading image, target all platforms, effectivelly testing
+	# the build for the target architectures.
+	$(MAKE) build-enforcer-image BUILD_ACTION="--platform=$(TARGET_PLATFORMS)"
+
+build-enforcer-image: buildx-machine ## build (and load) the container image targeting the current platform.
+	$(IMAGE_BUILDER) build -f package/Dockerfile.enforcer \
+		--builder $(MACHINE) $(IMAGE_ARGS) \
+		--build-arg VERSION=$(VERSION) -t "$(ENFORCER_IMAGE)" $(BUILD_ACTION) .
+	@echo "Built $(ENFORCER_IMAGE)"
+
+push-enforcer-image: buildx-machine
+	$(IMAGE_BUILDER) build -f package/Dockerfile.enforcer \
+		--builder $(MACHINE) $(IMAGE_ARGS) $(IID_FILE_FLAG) $(BUILDX_ARGS) \
+		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)" --push .
+	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)"
