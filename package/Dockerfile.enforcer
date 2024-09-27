@@ -1,0 +1,95 @@
+#
+# Builder
+#
+FROM registry.suse.com/bci/golang:1.22 AS builder
+
+ARG VERSION
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN zypper ref && \
+    zypper install -y --no-recommends gcc13 gcc13-c++ make glibc-devel glibc-devel-static \
+    automake autoconf libtool libpcap-devel pcre-devel pcre2-devel curl wget zip git \
+    libnfnetlink-devel libnetfilter_queue-devel libmnl-devel liburcu-devel libjansson-devel \
+    jemalloc-devel && \
+    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 10 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 10
+
+# Install hyperscan
+RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
+    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/repodata/repomd.xml.key && \
+    zypper --non-interactive refresh && \
+    zypper install -y libhs5-vectorscan5 vectorscan-devel
+
+ENV GOPATH=/go
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+
+COPY . /src
+WORKDIR /src
+RUN sed -i -e 's/interim.*xxxx/'"${VERSION:1}"'/g' ./agent/version.go
+RUN bash package/build_enforcer.sh
+
+#
+# Base image
+# 
+FROM registry.suse.com/bci/bci-micro:15.6 AS micro
+FROM registry.suse.com/bci/bci-base:15.6 AS base
+
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN zypper -n in --no-recommends unzip
+
+COPY --from=micro / /chroot/
+RUN zypper refresh && zypper --installroot /chroot -n in --no-recommends \
+    ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk tcpdump sed kmod wget unzip \
+    libnetfilter_queue-devel liburcu-devel libpcap-devel pcre2-devel libjansson-devel libmnl-devel jemalloc-devel
+ 
+# Install yq and vectorscan
+RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
+    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/repodata/repomd.xml.key && \
+    zypper -n refresh && \
+    zypper --installroot /chroot install -y yq libhs5-vectorscan5 vectorscan-devel
+
+RUN zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/log/
+
+RUN touch /chroot/usr/local/bin/.nvcontainer && mkdir -p /chroot/etc/neuvector/certs/internal/
+
+COPY package/deps /deps/
+
+ARG CONSUL_VERSION=1.20.1
+RUN curl -fL https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_${TARGETARCH}.zip -o consul.zip \
+    && cat /deps/${TARGETOS}_${TARGETARCH}/consul.checksum | sha256sum --check --status && unzip consul.zip -d /chroot/usr/local/bin/
+
+RUN cd /usr/bin/ && rm -rf basename chcon chgrp chmod chown chroot cksum dd df dircolors dirname du install install-info join locale localedef mkdir mkfifo mknod mktemp paste pathchk readlink realpath sync smidiff smidump smilink smiquery smistrip smixlate tee tiemout tload top truncate unlink watch
+
+#
+# Artifact
+#
+FROM micro
+
+ARG COMMIT
+ARG VERSION
+
+WORKDIR /
+COPY --from=base /chroot/ /
+COPY --from=builder /src/stage /
+
+RUN ln -s /usr/lib64/libpcap.so /usr/lib64/libpcap.so.0.8
+
+LABEL "name"="enforcer" \
+      "vendor"="SUSE Security" \
+      "neuvector.image"="neuvector/enforcer" \
+      "neuvector.role"="enforcer" \
+      "neuvector.rev"="${COMMIT}" \
+      "io.artifacthub.package.logo-url"=https://avatars2.githubusercontent.com/u/19367275 \
+      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/neuvector/neuvector/${VERSION}/README.md" \
+      "org.opencontainers.image.description"="SUSE Security Enforcer" \
+      "org.opencontainers.image.title"="SUSE Security Enforcer" \
+      "org.opencontainers.image.source"="https://github.com/neuvector/neuvector/" \
+      "org.opencontainers.image.version"="${VERSION}" \
+      "org.opensuse.reference"="neuvector/enforcer:${VERSION}"
+
+ENTRYPOINT ["/usr/local/bin/monitor", "-r"]
