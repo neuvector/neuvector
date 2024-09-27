@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # write is needed for:
+      # - OIDC for cosign's use in ecm-distro-tools/publish-image.
+      # - Read vault secrets in rancher-eio/read-vault-secrets.
+      id-token: write
+    
+    strategy:
+      matrix:
+        include:
+          - target: controller
+            rancher_target: neuvector-controller
+            make-target: push-controller-image
+            platforms: linux/amd64,linux/arm64
+          - target: enforcer
+            rancher_target: neuvector-enforcer
+            make-target: push-enforcer-image
+            platforms: linux/amd64,linux/arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Load Secrets from Vault
+      uses: rancher-eio/read-vault-secrets@main
+      with:
+        secrets: |
+          secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | RANCHER_DOCKER_USERNAME ;
+          secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | RANCHER_DOCKER_PASSWORD ;
+          secret/data/github/repo/${{ github.repository }}/dockerhub/neuvector/credentials username | DOCKER_USERNAME ;
+          secret/data/github/repo/${{ github.repository }}/dockerhub/neuvector/credentials password | DOCKER_PASSWORD ;
+          secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials registry | PRIME_REGISTRY ;
+          secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials username | PRIME_REGISTRY_USERNAME ;
+          secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials password | PRIME_REGISTRY_PASSWORD
+    - name: Parse target tag
+      run: |
+        TARGET=${{ github.ref_name }}
+        echo "TAG=${TARGET#v}" >> $GITHUB_ENV
+    - name: Get controller
+      env:
+        GH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+      run: |
+        gh release download ${{ github.ref_name }} -D controller/ -p controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
+        gh release download ${{ github.ref_name }} -D controller/ -p controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
+        gh release download ${{ github.ref_name }} -D controller/ -p sha256sum-controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
+        gh release download ${{ github.ref_name }} -D controller/ -p sha256sum-controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
+        cd controller
+        cat sha256sum-controller-amd64 | sha256sum --check
+        cat sha256sum-controller-arm64 | sha256sum --check
+
+    - name: Publish neuvector manifest
+      uses: rancher/ecm-distro-tools/actions/publish-image@master
+      with:
+        push-to-public: true
+        push-to-prime: false
+        image: ${{ matrix.target }}
+        tag: ${{ env.TAG }}
+        platforms: ${{ matrix.platforms }}
+        make-target: ${{ matrix.make-target }}
+
+        public-registry: docker.io
+        public-repo: neuvector
+        public-username: ${{ env.DOCKER_USERNAME }}
+        public-password: ${{ env.DOCKER_PASSWORD }}
+    - name: Publish rancher manifest
+      uses: rancher/ecm-distro-tools/actions/publish-image@master
+      env:
+        IMAGE_PREFIX: neuvector-
+      with:
+        image: ${{ matrix.rancher_target }}
+        tag: ${{ env.TAG }}
+        platforms: ${{ matrix.platforms }}
+        make-target: ${{ matrix.make-target }}
+
+        public-registry: docker.io
+        public-repo: rancher
+        public-username: ${{ env.RANCHER_DOCKER_USERNAME }}
+        public-password: ${{ env.RANCHER_DOCKER_PASSWORD }}
+
+        prime-registry: ${{ env.PRIME_REGISTRY }}
+        prime-repo: rancher
+        prime-username: ${{ env.PRIME_REGISTRY_USERNAME }}
+        prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
