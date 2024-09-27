@@ -1,0 +1,89 @@
+#
+# Builder
+#
+FROM registry.suse.com/bci/golang:1.22 AS builder
+
+ARG VERSION
+
+ENV GOPATH=/go
+ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+
+# Setup build dependencies
+RUN zypper install -y pcre-devel
+
+# Build controller
+COPY agent/ /src/agent
+COPY controller/ /src/controller
+COPY db/ /src/db
+COPY monitor/ /src/monitor
+COPY package/ /src/package
+COPY tools/ /src/tools
+COPY share/ /src/share
+COPY scripts/ /src/scripts
+COPY templates/ /src/templates
+COPY upgrader/ /src/upgrader
+COPY vendor /src/vendor
+COPY go.mod go.sum base.h defs.h genlic.sh /src/
+WORKDIR /src
+RUN sed -i -e 's/interim.*xxxx/'"${VERSION:1}"'/g' ./controller/version.go
+RUN bash package/build_controller.sh
+
+#
+# Base image
+#
+FROM registry.suse.com/bci/bci-micro:15.6 AS micro
+FROM registry.suse.com/bci/bci-base:15.6 AS base
+
+ARG TARGETOS
+ARG TARGETARCH
+
+COPY --from=micro / /chroot/
+
+RUN zypper --non-interactive install --no-recommends unzip
+
+# Runtime dependencies
+RUN zypper refresh && zypper --non-interactive --installroot /chroot install --no-recommends \
+    ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk libpcre2-posix3 && \
+    zypper --non-interactive --installroot /chroot clean -a && \
+    rm -rf /chroot/var/log/
+
+RUN touch /chroot/usr/local/bin/.nvcontainer
+RUN mkdir -p /chroot/etc/neuvector/certs/internal/
+
+COPY package/deps /deps/
+
+ARG CONSUL_VERSION=1.20.1
+RUN curl -fL https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_${TARGETOS}_${TARGETARCH}.zip -o consul.zip \
+    && cat /deps/${TARGETOS}_${TARGETARCH}/consul.checksum | sha256sum --check --status && unzip consul.zip -d /chroot/usr/local/bin/
+
+ARG OPA_VERSION=v0.69.0
+RUN curl -fL https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_${TARGETOS}_${TARGETARCH}_static -o opa \
+    && cat /deps/${TARGETOS}_${TARGETARCH}/opa.checksum | sha256sum --check --status && chmod +x opa && mv opa /chroot/usr/local/bin
+
+RUN cd /chroot/usr/bin/ && rm -rf basename chcon chgrp chmod chown chroot cksum dd df dircolors dirname du install install-info join locale localedef mkdir mkfifo mknod mktemp paste pathchk readlink realpath sync smidiff smidump smilink smiquery smistrip smixlate tee tiemout tload top truncate unlink watch
+
+#
+# Artifact
+#
+FROM micro
+ARG VERSION
+ARG COMMIT
+WORKDIR /
+COPY --from=base /chroot/ /
+COPY --from=builder /src/stage /
+
+
+LABEL "name"="controller" \
+      "vendor"="SUSE Security" \
+      "neuvector.image"="neuvector/controller" \
+      "neuvector.role"="controller" \
+      "neuvector.rev"="${COMMIT}" \
+      "io.artifacthub.package.logo-url"=https://avatars2.githubusercontent.com/u/19367275 \
+      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/neuvector/neuvector/${VERSION}/README.md" \
+      "org.opencontainers.image.description"="SUSE Security Controller" \
+      "org.opencontainers.image.title"="SUSE Security Controller" \
+      "org.opencontainers.image.source"="https://github.com/neuvector/neuvector/" \
+      "org.opencontainers.image.version"="${VERSION}" \
+      "org.opensuse.reference"="neuvector/controller:${VERSION}"
+
+ENTRYPOINT ["/usr/local/bin/monitor", "-c"]
