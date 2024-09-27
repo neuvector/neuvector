@@ -22,10 +22,12 @@ jobs:
           - target: controller
             rancher_target: neuvector-controller
             make-target: push-controller-image
+            make-rancher-target: push-controller-rancher-image
             platforms: linux/amd64,linux/arm64
           - target: enforcer
             rancher_target: neuvector-enforcer
             make-target: push-enforcer-image
+            make-rancher-target: push-enforcer-rancher-image
             platforms: linux/amd64,linux/arm64
     
     steps:
@@ -78,7 +80,7 @@ jobs:
         image: ${{ matrix.rancher_target }}
         tag: ${{ env.TAG }}
         platforms: ${{ matrix.platforms }}
-        make-target: ${{ matrix.make-target }}
+        make-target: ${{ matrix.make-rancher-target }}
 
         prime-registry: ${{ env.PRIME_REGISTRY }}
         prime-repo: rancher
