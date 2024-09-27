@@ -36,7 +36,7 @@ jobs:
       with:
         secrets: |
           secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | RANCHER_DOCKER_USERNAME ;
-          secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | RANCHER_PASSWORD ;
+          secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | RANCHER_DOCKER_PASSWORD ;
           secret/data/github/repo/${{ github.repository }}/dockerhub/neuvector/credentials username | DOCKER_USERNAME ;
           secret/data/github/repo/${{ github.repository }}/dockerhub/neuvector/credentials password | DOCKER_PASSWORD ;
           secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials registry | PRIME_REGISTRY ;
@@ -58,7 +58,7 @@ jobs:
         cat sha256sum-controller-amd64 | sha256sum --check
         cat sha256sum-controller-arm64 | sha256sum --check
 
-    - name: Publish public manifest
+    - name: Publish neuvector manifest
       uses: rancher/ecm-distro-tools/actions/publish-image@master
       with:
         push-to-public: true
@@ -72,13 +72,11 @@ jobs:
         public-repo: neuvector
         public-username: ${{ env.DOCKER_USERNAME }}
         public-password: ${{ env.DOCKER_PASSWORD }}
-    - name: Publish prime manifest
+    - name: Publish rancher manifest
       uses: rancher/ecm-distro-tools/actions/publish-image@master
       env:
         IMAGE_PREFIX: neuvector-
       with:
-        push-to-public: true
-        push-to-prime: true
         image: ${{ matrix.rancher_target }}
         tag: ${{ env.TAG }}
         platforms: ${{ matrix.platforms }}
