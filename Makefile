@@ -197,7 +197,6 @@ REPO ?= neuvector
 CONTROLLER_IMAGE = $(REPO)/controller:$(TAG)
 ENFORCER_IMAGE = $(REPO)/enforcer:$(TAG)
 BUILD_ACTION = --load
-TARGET_PREFIX ?=
 
 buildx-machine:
 	docker buildx ls
@@ -218,7 +217,7 @@ build-controller-image: buildx-machine ## build (and load) the container image t
 push-controller-image: buildx-machine
 	$(IMAGE_BUILDER) build -f package/Dockerfile.controller \
 		--builder $(MACHINE) $(IMAGE_ARGS) $(IID_FILE_FLAG) $(BUILDX_ARGS) \
-		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/controller:$(TAG)" --push .
+		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/$(IMAGE_PREFIX)controller:$(TAG)" --push .
 	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)controller:$(TAG)"
 
 test-enforcer-image:
@@ -236,4 +235,4 @@ push-enforcer-image: buildx-machine
 	$(IMAGE_BUILDER) build -f package/Dockerfile.enforcer \
 		--builder $(MACHINE) $(IMAGE_ARGS) $(IID_FILE_FLAG) $(BUILDX_ARGS) \
 		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)" --push .
-	@echo "Pushed $(REPO)/enforcer:$(TAG)"
+	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)"
