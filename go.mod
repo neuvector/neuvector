@@ -37,7 +37,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mattn/go-sqlite3 v1.14.18
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/neuvector/k8s v1.4.1-0.20240405192846-f2f129a7880d
+	github.com/neuvector/k8s v1.4.1-0.20240927235710-267b5539dbb2
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runtime-spec v1.1.1-0.20230922153023-c0e90434df2a
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021

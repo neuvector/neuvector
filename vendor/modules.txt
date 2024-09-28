@@ -503,8 +503,8 @@ github.com/neuvector/go-rpmdb/pkg/bdb
 github.com/neuvector/go-rpmdb/pkg/db
 github.com/neuvector/go-rpmdb/pkg/ndb
 github.com/neuvector/go-rpmdb/pkg/sqlite3
-# github.com/neuvector/k8s v1.4.1-0.20240405192846-f2f129a7880d
-## explicit; go 1.22
+# github.com/neuvector/k8s v1.4.1-0.20240927235710-267b5539dbb2
+## explicit; go 1.20
 github.com/neuvector/k8s
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
