@@ -353,8 +353,8 @@ github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f h1:y5//uYreIhSUg3J
 github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f/go.mod h1:ZdcZmHo+o7JKHSa8/e818NopupXU1YMK5fe1lsApnBw=
 github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a h1:lmvuJ3uQVRk14exDRLu1Oq78iz8dLE7CJo+QodD+tos=
 github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a/go.mod h1:tQW+vmxLXFPfI1HuRjoiIxOh8A7JudpfWl8xmezEGSs=
-github.com/neuvector/k8s v1.4.1-0.20240405192846-f2f129a7880d h1:elJNpaVs8jS3G0g/Bn3ijbbjIDSjuA2FXAjE4P8/+J0=
-github.com/neuvector/k8s v1.4.1-0.20240405192846-f2f129a7880d/go.mod h1:2FcsqFoVAVkluXnfyiMLBNVtezt+QNStsdYJE/PXiNg=
+github.com/neuvector/k8s v1.4.1-0.20240927235710-267b5539dbb2 h1:ErNATq8ND8Ke4yEagOhA457EEMXPszYU2wNlDG872GA=
+github.com/neuvector/k8s v1.4.1-0.20240927235710-267b5539dbb2/go.mod h1:i+OXyeu9FL2MGugXs0HO4wJP5IP9LgynOUuV+91mAZA=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.11.0 h1:JAKSXpt1YjtLA7YpPiqO9ss6sNXEsPfSGdwN0UHqzrw=
