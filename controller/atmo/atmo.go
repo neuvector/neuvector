@@ -2,6 +2,7 @@ package atmo
 
 import (
 	"time"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -14,13 +15,26 @@ const (
 	Monitor2Protect  = 1
 )
 
+const (
+	AllMode     = 0		// not used
+	ProfileMode = 1
+	PolicyMode  = 2
+)
+
+const (
+	allModeType = "@all"		// not used
+	profileType = "@profile"
+	policyType  = "@policy"
+)
+
 type AutoModeHelper interface {
 	ConfigureCompleteDuration(mover int, dComplete time.Duration)
-	AddGroup(mover int, group string) bool
+	AddGroup(mover int, group string, modeType int) bool
 	RemoveGroup(group string)
 	Counts(mover int) int
 	Enabled() (bool, bool)
 	List(mover int) []string
+	GetTheGroupType(group string) (int, string)
 }
 
 //////
@@ -59,7 +73,7 @@ var atmo_ctx 	*automode_ctx
 
 const discover_probe = time.Second * 60		// interval: 1 minute
 const discover_complete = time.Hour * 6		// convert into counters
-const monitor_probe = time.Minute * 5 		// interval: 5
+const monitor_probe = time.Minute * 5       // interval: 5
 const monitor_complete = time.Hour * 12		// convert into counters
 
 ///
@@ -112,6 +126,13 @@ func (ctx *automode_ctx) ConfigProbeTime(mover int, probe time.Duration) {
 	}
 }
 
+func (ctx *automode_ctx) GetTheGroupType(group string) (int, string) {
+	if strings.HasSuffix(group, profileType) {
+		return ProfileMode, strings.TrimSuffix(group, profileType)	// profile
+	}
+	return PolicyMode, strings.TrimSuffix(group, policyType) // policy
+}
+
 //////////////////////////////////////////////////////////////////////////
 func (ctx *automode_ctx) ConfigureCompleteDuration(mover int, dComplete time.Duration) {
 	log.WithFields(log.Fields{"complete": dComplete, "mover": mover}).Debug("ATMO:")
@@ -141,7 +162,17 @@ func (ctx *automode_ctx) ConfigureCompleteDuration(mover int, dComplete time.Dur
 	}
 }
 
-func (ctx *automode_ctx) AddGroup(mover int, group string) bool {
+func (ctx *automode_ctx) AddGroup(mover int, theGroup string, modeType int) bool {
+	var group string
+	switch modeType {
+	case ProfileMode:
+		group = theGroup + profileType
+	case PolicyMode:
+		group = theGroup + policyType
+	default:
+		return false
+	}
+
 	switch mover {
 		case Discover2Monitor:
 			ctx.removeMember(Monitor2Protect, group)
@@ -163,8 +194,10 @@ func (ctx *automode_ctx) RemoveGroup(group string) {
 	// log.WithFields(log.Fields{"group": group}).Debug("ATMO:")
 
 	// where is it?
-	ctx.removeMember(Discover2Monitor, group)
-	ctx.removeMember(Monitor2Protect, group)
+	ctx.removeMember(Discover2Monitor, group + profileType)
+	ctx.removeMember(Monitor2Protect, group  + profileType)
+	ctx.removeMember(Discover2Monitor, group + policyType)
+	ctx.removeMember(Monitor2Protect, group  + policyType)
 }
 
 func (ctx *automode_ctx) Counts(mover int) int {
