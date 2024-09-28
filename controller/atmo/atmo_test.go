@@ -13,6 +13,7 @@ import (
 )
 
 func my_test_func(mover int, group string, probeDuration time.Duration) (bool, error) {
+	// log.WithFields(log.Fields{"group": group, "mover": mover}).Debug("ATMO:")
 	switch mover {
 	case Discover2Monitor:
 		return true, nil
@@ -23,6 +24,7 @@ func my_test_func(mover int, group string, probeDuration time.Duration) (bool, e
 }
 
 func my_decision_func(mover int, group string, err error) error {
+	log.WithFields(log.Fields{"group": group, "mover": mover, "error": err}).Debug("ATMO:")
 	if err != nil {
 		log.WithFields(log.Fields{"mover": mover, "error": err}).Debug("ATMO: member left")
 		return nil
@@ -68,7 +70,7 @@ func testAddGroups(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("m2d%d", i)
-		if ok := ctx.AddGroup(Monitor2Protect, name); !ok {
+		if ok := ctx.AddGroup(Monitor2Protect, name, ProfileMode); !ok {
 			t.Errorf("Error: failed to add %s\n", name)
 			break
 		}
@@ -77,7 +79,7 @@ func testAddGroups(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		name := fmt.Sprintf("d2m%d", i)
-		if ok := ctx.AddGroup(Discover2Monitor, name); !ok {
+		if ok := ctx.AddGroup(Discover2Monitor, name, ProfileMode); !ok {
 			t.Errorf("Error: failed to add %s\n", name)
 			break
 		}
