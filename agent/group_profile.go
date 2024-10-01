@@ -320,9 +320,19 @@ func deleteGroupProfileCache(name string) bool {
 //////////////////////////////////////////////////////
 ///////// Group-based selection functions ////////////
 //////////////////////////////////////////////////////
-func isContainerSelected(c *containerData, group *share.CLUSGroup) bool {
+func isContainerSelected(c, pod *containerData, group *share.CLUSGroup) bool {
 	// TODO: remove "CriteriaKeyAddress" from entry ??
 	wl := createWorkload(c.info, &c.service, &c.domain)
+	if pod != nil && pod.info != nil {   // include its POD's labels
+		label := make(map[string]string) // make an extended label map
+		for n, v := range c.info.Labels {
+			label[n] = v
+		}
+		for n, v := range pod.info.Labels {
+			label[n] = v
+		}
+		wl.Labels = label
+	}
 	return share.IsGroupMember(group, wl, getDomainData(wl.Domain))
 }
 
@@ -334,9 +344,16 @@ func refreshGroupMembers(grpCache *groupProfileData) {
 		return
 	}
 
+	var pod *containerData
+
 	gInfoRLock()
 	for _, c := range gInfo.activeContainers {
-		if isContainerSelected(c, grpCache.group) {
+		if c.parentNS != "" {
+			if parent, ok := gInfo.activeContainers[c.parentNS]; ok {
+				pod = parent
+			}
+		}
+		if isContainerSelected(c, pod, grpCache.group) {
 			grpCache.members.Add(c.id)
 
 			// pod-level inclusion
@@ -655,8 +672,6 @@ func calculateProcGroupProfile(id, svc string) (*share.CLUSProcessProfile, bool)
 			}
 		}
 	}
-
-	// log.WithFields(log.Fields{"Svc": svc, "id": id, "proc": proc.Process}).Debug("GRP:")
 	return proc, true
 }
 
@@ -877,7 +892,7 @@ func workloadJoinGroup(c, parent *containerData) {
 			continue
 		}
 
-		if isContainerSelected(c, grpCache.group) {
+		if isContainerSelected(c, parent, grpCache.group) {
 			grpCache.members.Add(c.id)
 			groups.Add(name) // reference
 
@@ -1118,6 +1133,8 @@ func domainChange(domain share.CLUSDomain) {
 	}
 	grpCacheLock.Unlock()
 
+	var pod *containerData
+
 	gInfoRLock()
 	for _, c := range gInfo.activeContainers {
 		targets.Add(c.id) // include all containers
@@ -1126,7 +1143,12 @@ func domainChange(domain share.CLUSDomain) {
 	for _, cache := range groups {
 		cache.members.Clear() // reset
 		for _, c := range gInfo.activeContainers {
-			if isContainerSelected(c, cache.group) {
+			if c.parentNS != "" {
+				if parent, ok := gInfo.activeContainers[c.parentNS]; ok {
+					pod = parent
+				}
+			}
+			if isContainerSelected(c, pod, cache.group) {
 				cache.members.Add(c.id)
 			}
 		}
