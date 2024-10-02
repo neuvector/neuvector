@@ -794,8 +794,10 @@ func (p *Probe) patchRuntimeUser(proc *procInternal) {
 		```
 	*/
 	if global.RT.IsRuntimeProcess(proc.pname, nil) {
-		proc.user = p.getUserName(proc.pid, proc.euid)
-		mLog.WithFields(log.Fields{"name": proc.name, "parent name": proc.pname, "parent pid": proc.ppid, "uid": proc.euid, "proc user": proc.user}).Debug("Patching process' username because it came from containerd exec")
+		if user := p.getUserName(proc.pid, proc.euid); user != proc.user {
+			proc.user = user
+			mLog.WithFields(log.Fields{"name": proc.name, "pname": proc.pname, "pid": proc.pid, "uid": proc.euid, "user": proc.user}).Debug("Patching user from exec")
+		}
 	}
 }
 
@@ -2490,7 +2492,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	}
 
 	nShellCmd := p.isShellScript(id, proc)
-	mode, setting, derivedGroup, svcGroup, allowSuspicious, err := p.procPolicyLookupFunc(id, proc.riskType, proc.pname, proc.ppath, proc.pid, proc.pgid, nShellCmd, pp)
+	mode, baseline, derivedGroup, svcGroup, allowSuspicious, err := p.procPolicyLookupFunc(id, proc.riskType, proc.pname, proc.ppath, proc.pid, proc.pgid, nShellCmd, pp)
 	if err != nil {
 		// add conatiner task has not established yet
 		// log.WithFields(log.Fields{"name": proc.name, "error": err}).Debug("PROC:")
@@ -2529,7 +2531,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	// We don't need to report the violations more often, but we should make sure that if we
 	// transition from monitor -> protect, we ignore the reported flag to control determine actions.
 	if (proc.reported&profileReported) == 0 || mode == share.PolicyModeEnforce {
-		bZeroDrift := setting == share.ProfileZeroDrift
+		bZeroDrift := baseline == share.ProfileZeroDrift
 		if bZeroDrift {
 			if pass := p.IsAllowedShieldProcess(id, mode, svcGroup, proc, pp, true); pass {
 				switch pp.Action {
