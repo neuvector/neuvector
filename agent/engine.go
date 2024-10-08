@@ -1725,14 +1725,13 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 			for _, fltr := range conf.Profile.Filters {
 				switch fltr.Path {
 				case "/bin", "/sbin", "/usr/bin", "/usr/sbin": // apply blocking controls
-				/*	filters = append(filters, share.CLUSFileMonitorFilter{
+					filters = append(filters, share.CLUSFileMonitorFilter{
 						Behavior:    share.FileAccessBehaviorMonitor, // share.FileAccessBehaviorBlock,
 						Path:        fltr.Path,
 						Regex:       ".*",
 						Recursive:   false,
 						CustomerAdd: true,
 					})
-				*/
 				default:
 					filters = append(filters, fltr)
 				}
