@@ -590,6 +590,12 @@ func (m CacheMethod) GetFedRules(reqRevs map[string]uint64, acc *access.AccessCo
 					current.ProcessProfilesData = &share.CLUSFedProcessProfileData{Revision: fedRev, Profiles: m.GetFedProcessProfileCache()}
 				case share.FedSystemConfigType:
 					current.SystemConfigData = &share.CLUSFedSystemConfigData{Revision: fedRev, SystemConfig: m.GetFedSystemConfig(acc)}
+				case share.FedDlpSensorGrpType:
+					current.DlpGroupSensorData = &share.CLUSFedDlpGroupSensorData{Revision: fedRev}
+					current.DlpGroupSensorData.DlpSensors, current.DlpGroupSensorData.DlpGroups = m.GetFedDlpGroupSensorCache()
+				case share.FedWafSensorGrpType:
+					current.WafGroupSensorData = &share.CLUSFedWafGroupSensorData{Revision: fedRev}
+					current.WafGroupSensorData.WafSensors, current.WafGroupSensorData.WafGroups = m.GetFedWafGroupSensorCache()
 				}
 			}
 			cacheMutexRUnlock()
