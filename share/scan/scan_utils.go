@@ -218,7 +218,7 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 	apps := NewScanApps(true)
 	apps.ExtractAppPkg(path, path)
 	pkgs := apps.marshal()
-	files := []utils.TarFileInfo{utils.TarFileInfo{AppFileName, pkgs}}
+	files := []utils.TarFileInfo{{AppFileName, pkgs}}
 	buf, _ := utils.MakeTar(files)
 	appPkgs, _ := apps.Data()[path]
 	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone

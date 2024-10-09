@@ -33,9 +33,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
 	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
 	pathInfoMap := map[string]*keyCertFileInfo{
-		share.CLUSRootCAKey: &keyCertFileInfo{share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
-		cnAdm:               &keyCertFileInfo{resource.NvAdmSvcName, admKeyPath, admCertPath, true},
-		cnCrd:               &keyCertFileInfo{resource.NvCrdSvcName, crdKeyPath, crdCertPath, true},
+		share.CLUSRootCAKey: {share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
+		cnAdm:               {resource.NvAdmSvcName, admKeyPath, admCertPath, true},
+		cnCrd:               {resource.NvCrdSvcName, crdKeyPath, crdCertPath, true},
 	}
 
 	certmanagerCerts := map[string]bool{

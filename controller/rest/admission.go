@@ -155,7 +155,7 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 			}
 			if crt.Name == share.CriteriaKeyCVEScoreCount && len(crt.SubCriteria) == 0 {
 				crt.SubCriteria = []*share.CLUSAdmRuleCriterion{
-					&share.CLUSAdmRuleCriterion{
+					{
 						Name:  share.SubCriteriaCount,
 						Op:    share.CriteriaOpBiggerEqualThan,
 						Value: "1",
@@ -546,7 +546,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		k8sResInfo := admission.ValidatingWebhookConfigInfo{
 			Name: resource.NvAdmValidatingName,
 			WebhooksInfo: []*admission.WebhookInfo{
-				&admission.WebhookInfo{
+				{
 					Name: resource.NvAdmValidatingWebhookName,
 					ClientConfig: admission.ClientConfig{
 						ClientMode:  admClientMode,
@@ -556,7 +556,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 					FailurePolicy:  failurePolicy,
 					TimeoutSeconds: resource.DefTimeoutSeconds,
 				},
-				&admission.WebhookInfo{
+				{
 					Name: resource.NvStatusValidatingWebhookName,
 					ClientConfig: admission.ClientConfig{
 						ClientMode:  admClientMode,

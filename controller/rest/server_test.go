@@ -99,7 +99,7 @@ func TestServerRole(t *testing.T) { // for 4.2(-)
 	}
 
 	// Config role mapping with ciops
-	ldap.RoleGroups = map[string][]string{"ciops": []string{"g1", "g2"}}
+	ldap.RoleGroups = map[string][]string{"ciops": {"g1", "g2"}}
 	lcfg = api.RESTServerLDAPConfig{RoleGroups: &ldap.RoleGroups}
 	data = api.RESTServerConfigData{Config: &api.RESTServerConfig{Name: "s1", LDAP: &lcfg}}
 	body, _ = json.Marshal(data)
@@ -175,11 +175,11 @@ func TestServerRoleNew(t *testing.T) { // for 4.3(+)
 
 	// Config role mapping with ciops
 	ldap.GroupMappedRoles = []*share.GroupRoleMapping{
-		&share.GroupRoleMapping{
+		{
 			Group:      "g2",
 			GlobalRole: "ciops",
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g1",
 			GlobalRole: "ciops",
 		},
@@ -269,9 +269,9 @@ func TestServerConfig2(t *testing.T) { // for 4.2(-)
 	ldap := api.RESTServerLDAP{Type: "OpenLDAP", Hostname: "1.2.3.4", BaseDN: "ou=people"}
 	lcfg := api.RESTServerLDAPConfig{Type: &ldap.Type, Hostname: &ldap.Hostname, BaseDN: &ldap.BaseDN}
 	lcfg.RoleGroups = &map[string][]string{
-		"ciops":  []string{"g5", "g4"},
-		"admin":  []string{"g95", "g94"},
-		"reader": []string{"g23"},
+		"ciops":  {"g5", "g4"},
+		"admin":  {"g95", "g94"},
+		"reader": {"g23"},
 	}
 	data := api.RESTServerConfigData{Config: &api.RESTServerConfig{Name: "s1", LDAP: &lcfg}}
 	body, _ := json.Marshal(data)
@@ -286,23 +286,23 @@ func TestServerConfig2(t *testing.T) { // for 4.2(-)
 	json.Unmarshal(w.body, &sdata)
 	groupRoleMappings := sdata.Server.LDAP.GroupMappedRoles
 	expects := []*share.GroupRoleMapping{
-		&share.GroupRoleMapping{
+		{
 			Group:      "g94",
 			GlobalRole: "admin",
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g95",
 			GlobalRole: "admin",
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g23",
 			GlobalRole: "reader",
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g4",
 			GlobalRole: "ciops",
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g5",
 			GlobalRole: "ciops",
 		},
@@ -373,7 +373,7 @@ func TestServerConfigNew(t *testing.T) { // for 4.3(+)
 		// case: global domain("") is not supported for role -> domains mapping
 		cfgdata.Config.GroupRoleMapping.GlobalRole = api.UserRoleReader
 		cfgdata.Config.GroupRoleMapping.RoleDomains = map[string][]string{
-			"role-a": []string{""},
+			"role-a": {""},
 		}
 		body, _ = json.Marshal(cfgdata)
 		w = restCall("PATCH", url, body, api.UserRoleAdmin)
@@ -383,7 +383,7 @@ func TestServerConfigNew(t *testing.T) { // for 4.3(+)
 
 		// case: None role("") is not supported for role -> domain mapping
 		cfgdata.Config.GroupRoleMapping.RoleDomains = map[string][]string{
-			"": []string{"nv-99"},
+			"": {"nv-99"},
 		}
 		body, _ = json.Marshal(cfgdata)
 		w = restCall("PATCH", url, body, api.UserRoleAdmin)
@@ -422,22 +422,22 @@ func TestServerConfigNew2(t *testing.T) { // for 4.3(+)
 	lcfg := api.RESTServerLDAPConfig{Type: &ldap.Type, Hostname: &ldap.Hostname, BaseDN: &ldap.BaseDN}
 	data := api.RESTServerConfigData{Config: &api.RESTServerConfig{Name: "s1", LDAP: &lcfg}}
 	lcfg.GroupMappedRoles = &[]*share.GroupRoleMapping{
-		&share.GroupRoleMapping{
+		{
 			Group:      "g1",
 			GlobalRole: "role-1",
 			RoleDomains: map[string][]string{
-				"role-a": []string{"ns1"},
-				"role-b": []string{"ns4", "ns8", "ns7"},
-				"role-c": []string{"ns3", "ns2"},
+				"role-a": {"ns1"},
+				"role-b": {"ns4", "ns8", "ns7"},
+				"role-c": {"ns3", "ns2"},
 			},
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g1",
 			GlobalRole: "role-1",
 			RoleDomains: map[string][]string{
-				"role-a": []string{"ns1"},
-				"role-b": []string{"ns4", "ns8", "ns7"},
-				"role-c": []string{"ns3", "ns2"},
+				"role-a": {"ns1"},
+				"role-b": {"ns4", "ns8", "ns7"},
+				"role-c": {"ns3", "ns2"},
 			},
 		},
 	}
@@ -515,31 +515,31 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 	}
 
 	lcfg.GroupMappedRoles = &[]*share.GroupRoleMapping{
-		&share.GroupRoleMapping{
+		{
 			Group:      "g1",
 			GlobalRole: "role-1",
 			RoleDomains: map[string][]string{
-				"role-a": []string{"ns1"},
-				"role-b": []string{"ns4", "ns8", "ns7"},
-				"role-c": []string{"ns3", "ns2"},
+				"role-a": {"ns1"},
+				"role-b": {"ns4", "ns8", "ns7"},
+				"role-c": {"ns3", "ns2"},
 			},
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g2",
 			GlobalRole: "fedAdmin",
 			RoleDomains: map[string][]string{
-				"role-a": []string{"ns1"},
-				"role-b": []string{"ns4"},
-				"role-c": []string{"ns2", "ns3"},
+				"role-a": {"ns1"},
+				"role-b": {"ns4"},
+				"role-c": {"ns2", "ns3"},
 			},
 		},
-		&share.GroupRoleMapping{
+		{
 			Group:      "g3",
 			GlobalRole: "fedReader",
 			RoleDomains: map[string][]string{
-				"admin":  []string{"ns22", "ns1"},
-				"role-b": []string{},
-				"role-c": []string{"ns3", "ns2", "ns3"},
+				"admin":  {"ns22", "ns1"},
+				"role-b": {},
+				"role-c": {"ns3", "ns2", "ns3"},
 			},
 		},
 	}
@@ -577,25 +577,25 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 
 	{
 		expectedGroupMappedRoles := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "g2",
 				GlobalRole: "fedAdmin",
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "g3",
 				GlobalRole: "fedReader",
 				RoleDomains: map[string][]string{
-					"admin":  []string{"ns1", "ns22"},
-					"role-c": []string{"ns2", "ns3"},
+					"admin":  {"ns1", "ns22"},
+					"role-c": {"ns2", "ns3"},
 				},
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "g1",
 				GlobalRole: "role-1",
 				RoleDomains: map[string][]string{
-					"role-a": []string{"ns1"},
-					"role-b": []string{"ns4", "ns7", "ns8"},
-					"role-c": []string{"ns2", "ns3"},
+					"role-a": {"ns1"},
+					"role-b": {"ns4", "ns7", "ns8"},
+					"role-c": {"ns2", "ns3"},
 				},
 			},
 		}
@@ -619,12 +619,12 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 
 		// case: as long as fedAdmin/fedReader mapping(if any) in groups' roles mapping is not changed, admin is allowd to patch a server's group role mapping
 		new2 := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "dev",
 				GlobalRole: "role-2",
 				RoleDomains: map[string][]string{
-					"role-d": []string{"ns1"},
-					"role-c": []string{"ns11", "ns3", "ns2"},
+					"role-d": {"ns1"},
+					"role-c": {"ns11", "ns3", "ns2"},
 				},
 			},
 			expectedGroupMappedRoles[0], // for g2 -> fedAdmin
@@ -633,12 +633,12 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		expected2 := []*share.GroupRoleMapping{
 			new2[1], // for g2 -> fedAdmin
 			new2[2], // for g3 -> fedReader
-			&share.GroupRoleMapping{
+			{
 				Group:      "dev",
 				GlobalRole: "role-2",
 				RoleDomains: map[string][]string{
-					"role-d": []string{"ns1"},
-					"role-c": []string{"ns11", "ns2", "ns3"},
+					"role-d": {"ns1"},
+					"role-c": {"ns11", "ns2", "ns3"},
 				},
 			},
 		}
@@ -658,32 +658,32 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 
 	{
 		new3 := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "g1",
 				GlobalRole: "role-1",
 				RoleDomains: map[string][]string{
-					"role-a": []string{"ns1"},
-					"role-b": []string{"ns7", "ns4", "ns8"},
-					"role-c": []string{"ns3", "ns2"},
+					"role-a": {"ns1"},
+					"role-b": {"ns7", "ns4", "ns8"},
+					"role-c": {"ns3", "ns2"},
 				},
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "dev",
 				GlobalRole: "role-2",
 				RoleDomains: map[string][]string{
-					"role-d": []string{"ns1"},
-					"role-c": []string{"ns3", "ns2", "ns11"},
+					"role-d": {"ns1"},
+					"role-c": {"ns3", "ns2", "ns11"},
 				},
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "g1",
 				GlobalRole: "fedReader",
 				RoleDomains: map[string][]string{
-					"admin":  []string{"ns1"},
-					"role-a": []string{"ns2"},
+					"admin":  {"ns1"},
+					"role-a": {"ns2"},
 				},
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "g3",
 				GlobalRole: "fedAdmin",
 			},
@@ -691,21 +691,21 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		expected3 := []*share.GroupRoleMapping{
 			new3[2], // for g1 -> fedReader
 			new3[3], // for g3 -> fedAdmin
-			&share.GroupRoleMapping{
+			{
 				Group:      "g1",
 				GlobalRole: "role-1",
 				RoleDomains: map[string][]string{
-					"role-a": []string{"ns1"},
-					"role-b": []string{"ns4", "ns7", "ns8"},
-					"role-c": []string{"ns2", "ns3"},
+					"role-a": {"ns1"},
+					"role-b": {"ns4", "ns7", "ns8"},
+					"role-c": {"ns2", "ns3"},
 				},
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "dev",
 				GlobalRole: "role-2",
 				RoleDomains: map[string][]string{
-					"role-d": []string{"ns1"},
-					"role-c": []string{"ns11", "ns2", "ns3"},
+					"role-d": {"ns1"},
+					"role-c": {"ns11", "ns2", "ns3"},
 				},
 			},
 		}
@@ -768,12 +768,12 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 			expected3[0], // g-fed-11 -> fedReader
 			expected3[1], // g-fed-22 -> fedAdmin
 			expected3[3], // dev -> role-2
-			&share.GroupRoleMapping{
+			{
 				Group:      "qa",
 				GlobalRole: "role-3",
 				RoleDomains: map[string][]string{
-					"role-d": []string{"ns1, ns2"}, // space character is not allowed in k8s namespace !
-					"role-c": []string{"ns11"},
+					"role-d": {"ns1, ns2"}, // space character is not allowed in k8s namespace !
+					"role-c": {"ns11"},
 				},
 			},
 		}

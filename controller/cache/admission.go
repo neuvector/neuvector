@@ -1940,7 +1940,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 			case resource.NvAdmValidatingName:
 				k8sResInfo = admission.ValidatingWebhookConfigInfo{
 					WebhooksInfo: []*admission.WebhookInfo{
-						&admission.WebhookInfo{
+						{
 							Name: resource.NvAdmValidatingWebhookName,
 							ClientConfig: admission.ClientConfig{
 								ClientMode:  state.AdmClientMode,
@@ -1950,7 +1950,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 							FailurePolicy:  failurePolicy,
 							TimeoutSeconds: state.TimeoutSeconds,
 						},
-						&admission.WebhookInfo{
+						{
 							Name: resource.NvStatusValidatingWebhookName,
 							ClientConfig: admission.ClientConfig{
 								ClientMode:  state.AdmClientMode,
@@ -1968,7 +1968,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 			case resource.NvCrdValidatingName:
 				k8sResInfo = admission.ValidatingWebhookConfigInfo{
 					WebhooksInfo: []*admission.WebhookInfo{
-						&admission.WebhookInfo{
+						{
 							Name: resource.NvCrdValidatingWebhookName,
 							ClientConfig: admission.ClientConfig{
 								ClientMode:  state.AdmClientMode,

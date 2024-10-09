@@ -175,7 +175,7 @@ func TestLDAPLogin(t *testing.T) {
 		LDAP: &share.CLUSServerLDAP{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),
@@ -427,7 +427,7 @@ func TestLDAPLoginServer(t *testing.T) {
 		LDAP: &share.CLUSServerLDAP{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),
@@ -476,7 +476,7 @@ func TestSAMLLogin(t *testing.T) {
 		LDAP: &share.CLUSServerLDAP{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),
@@ -493,7 +493,7 @@ func TestSAMLLogin(t *testing.T) {
 		SAML: &share.CLUSServerSAML{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),
@@ -508,7 +508,7 @@ func TestSAMLLogin(t *testing.T) {
 	clusHelper.PutServerRev(&saml, 0)
 
 	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
-	mockAuther.addSAMLUser("token", map[string][]string{"Email": []string{"joe@example.com"}})
+	mockAuther.addSAMLUser("token", map[string][]string{"Email": {"joe@example.com"}})
 	remoteAuther = &mockAuther
 
 	w := loginServerToken("token", "saml1")
@@ -558,7 +558,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 		SAML: &share.CLUSServerSAML{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),
@@ -574,7 +574,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 
 	username := "joe"
 	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
-	mockAuther.addSAMLUser("joe-token", map[string][]string{"Username": []string{username}})
+	mockAuther.addSAMLUser("joe-token", map[string][]string{"Username": {username}})
 	remoteAuther = &mockAuther
 
 	w := loginServerToken("joe-token", "saml1")
@@ -707,22 +707,22 @@ func TestSAMLAttrs(t *testing.T) {
 	cs3 := &share.CLUSServer{Name: "saml1", Enable: true,
 		SAML: &share.CLUSServerSAML{CLUSServerAuth: share.CLUSServerAuth{
 			GroupMappedRoles: []*share.GroupRoleMapping{
-				&share.GroupRoleMapping{
+				{
 					Group:       "admin_group1",
 					GlobalRole:  api.UserRoleAdmin,
 					RoleDomains: make(map[string][]string),
 				},
-				&share.GroupRoleMapping{
+				{
 					Group:       "admin_group2",
 					GlobalRole:  api.UserRoleAdmin,
 					RoleDomains: make(map[string][]string),
 				},
-				&share.GroupRoleMapping{
+				{
 					Group:       "reader_group1",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
 				},
-				&share.GroupRoleMapping{
+				{
 					Group:       "reader_group2",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
@@ -734,22 +734,22 @@ func TestSAMLAttrs(t *testing.T) {
 		SAML: &share.CLUSServerSAML{CLUSServerAuth: share.CLUSServerAuth{
 			DefaultRole: api.UserRoleReader,
 			GroupMappedRoles: []*share.GroupRoleMapping{
-				&share.GroupRoleMapping{
+				{
 					Group:       "admin_group1",
 					GlobalRole:  api.UserRoleAdmin,
 					RoleDomains: make(map[string][]string),
 				},
-				&share.GroupRoleMapping{
+				{
 					Group:       "admin_group2",
 					GlobalRole:  api.UserRoleAdmin,
 					RoleDomains: make(map[string][]string),
 				},
-				&share.GroupRoleMapping{
+				{
 					Group:       "reader_group1",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
 				},
-				&share.GroupRoleMapping{
+				{
 					Group:       "reader_group2",
 					GlobalRole:  api.UserRoleReader,
 					RoleDomains: make(map[string][]string),
@@ -758,16 +758,16 @@ func TestSAMLAttrs(t *testing.T) {
 		}},
 	}
 	attr1 := map[string][]string{
-		"Username": []string{"joe"},
+		"Username": {"joe"},
 	}
 	attr2 := map[string][]string{
-		"NVRoleGroup": []string{"test_group"},
+		"NVRoleGroup": {"test_group"},
 	}
 	attr3 := map[string][]string{
-		"NVRoleGroup": []string{"test_group", "reader_group2"}, "Username": []string{"paul"},
+		"NVRoleGroup": {"test_group", "reader_group2"}, "Username": {"paul"},
 	}
 	attr4 := map[string][]string{
-		"NVRoleGroup": []string{"test_group", "admin_group1"}, "Email": []string{"jane@example.com"},
+		"NVRoleGroup": {"test_group", "admin_group1"}, "Email": {"jane@example.com"},
 	}
 
 	if user, username, err := samlAuthz(cs4, nil); err == nil {
@@ -819,7 +819,7 @@ func TestOIDCLogin(t *testing.T) {
 		LDAP: &share.CLUSServerLDAP{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),
@@ -836,7 +836,7 @@ func TestOIDCLogin(t *testing.T) {
 		OIDC: &share.CLUSServerOIDC{
 			CLUSServerAuth: share.CLUSServerAuth{
 				GroupMappedRoles: []*share.GroupRoleMapping{
-					&share.GroupRoleMapping{
+					{
 						Group:       "group1",
 						GlobalRole:  api.UserRoleReader,
 						RoleDomains: make(map[string][]string),

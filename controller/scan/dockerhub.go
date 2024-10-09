@@ -40,9 +40,9 @@ func (r dockerhub) GetRepoList(org, name string, limit int) ([]*share.CLUSImage,
 
 	if !strings.Contains(name, "*") {
 		if org == "" {
-			return []*share.CLUSImage{&share.CLUSImage{Repo: fmt.Sprintf("library/%s", name)}}, nil
+			return []*share.CLUSImage{{Repo: fmt.Sprintf("library/%s", name)}}, nil
 		} else {
-			return []*share.CLUSImage{&share.CLUSImage{Repo: fmt.Sprintf("%s/%s", org, name)}}, nil
+			return []*share.CLUSImage{{Repo: fmt.Sprintf("%s/%s", org, name)}}, nil
 		}
 	}
 

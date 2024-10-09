@@ -114,15 +114,15 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		filename string
 	}
 	fileContent := []*tFileContent{
-		&tFileContent{
+		{
 			data:     []byte(resp.CspConfigData),
 			filename: "neuvector/cspSupportConfig.json",
 		},
-		&tFileContent{
+		{
 			data:     nvUsageData,
 			filename: "neuvector/neuvectorUsage.json",
 		},
-		&tFileContent{
+		{
 			data:     []byte(resp.MeteringArchiveData),
 			filename: "neuvector/csp_billing_adapter_metering_archive.json",
 		},
