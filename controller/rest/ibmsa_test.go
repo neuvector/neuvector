@@ -266,9 +266,9 @@ func TestIBMSAIntegration(t *testing.T) {
 	}
 
 	cfg := share.CLUSIBMSAConfig{
-		AccountID:   "291266ca760e037c079edd4523242386",
-		APIKey:      "So66TbCeGr8wvmKguYU_zxzZe2apWjyjHDzHfAN1uuSB",
-		ProviderID:  "ServiceId-1bbc04a0-2185-4e81-9509-e600ba454003",
+		AccountID:   "FAKE_AccountID_VALUE",
+		APIKey:      "FAKE_APIKey_VALUE",
+		ProviderID:  "FAKE_ServiceId_VALUE", // "ServiceId-...............",
 		FindingsURL: _testingFindingURL,
 		TokenURL:    "https://10.1.1.1/identity/token",
 	}
@@ -357,7 +357,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	testData := ibmsaOccurrences{
 		NoteName:   "29104aa4ec94471284be7d33bf1b1391/providers/security-advisor/notes/onboarding-bp",
 		Kind:       "FINDING",
-		ID:         "ServiceId-1bbc04a0-2185-4e81-9509-e600ba454003",
+		ID:         "FAKE_ServiceId_VALUE", // "ServiceId-..........",
 		Context:    ibmsaContext{},
 		ProviderID: "security-advisor",
 		Finding:    &ibmsaFinding{Severity: "LOW"},
