@@ -177,6 +177,8 @@ type RESTFedRulesSettings struct {
 	FileMonitorData     *share.CLUSFedFileMonitorData    `json:"file_monitor_data,omitempty"`
 	ProcessProfilesData *share.CLUSFedProcessProfileData `json:"process_profiles_data,omitempty"`
 	SystemConfigData    *share.CLUSFedSystemConfigData   `json:"system_config_data,omitempty"`
+	DlpGroupSensorData  *share.CLUSFedDlpGroupSensorData `json:"dlp_group_sensor_data,omitempty"`
+	WafGroupSensorData  *share.CLUSFedWafGroupSensorData `json:"waf_group_sensor_data,omitempty"`
 }
 
 type RESTFedImageScanResult struct {

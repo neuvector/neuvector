@@ -2115,6 +2115,7 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 	fedGroupsCountOld := fedGroupNames.Cardinality()
 	emptyMonFilters := make([]share.CLUSFileMonitorFilter, 0)
 	emptyFarFilters := make(map[string]*share.CLUSFileAccessFilterRule)
+	var dlpwafGrpSet utils.Set = utils.NewSet()
 
 	txn := cluster.Transact()
 	defer txn.Close()
@@ -2235,6 +2236,7 @@ LOOP_ALL_IDS:
 					}
 					clusHelper.PutGroupTxn(txn, fedGroup)
 					fedGroupNames.Add(fedGrpName)
+					dlpwafGrpSet.Add(grpName)
 				} else {
 					errMsg = fmt.Sprintf("group %s not found(for rule %d)", grpName, id)
 					break LOOP_ALL_IDS
@@ -2268,6 +2270,11 @@ LOOP_ALL_IDS:
 			crhs = append(crhs[:topIdx], append(crhsPromoted, crhs[topIdx:]...)...)
 			clusHelper.PutPolicyRuleListTxn(txn, crhs)
 			if applyTransact(w, txn) == nil {
+				for gp := range dlpwafGrpSet.Iter() {
+					dwgrp := gp.(string)
+					PromoteFedDlpGroup(dwgrp, acc, login)
+					PromoteFedWafGroup(dwgrp, acc, login)
+				}
 				ruleTypes := []string{share.FedNetworkRulesType}
 				if fedGroupsCountOld != fedGroupNames.Cardinality() {
 					ruleTypes = append(ruleTypes, share.FedGroupType, share.FedProcessProfilesType, share.FedFileMonitorProfilesType)
