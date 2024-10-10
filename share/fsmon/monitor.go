@@ -596,8 +596,7 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 	dirList := make(map[string]*osutil.FileInfoExt)
 	singleFiles := make([]*osutil.FileInfoExt, 0)
 
-	// get files and dirs from all filters
-	for _, filter := range profile.Filters {
+	addFilterFn := func(filter share.CLUSFileMonitorFilter){
 		flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
 		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
 		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
@@ -612,25 +611,17 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
 			singleFiles = append(singleFiles, singles...)
 		}
+	}
+	// get files and dirs from all filters
+	for _, filter := range profile.Filters {
+		addFilterFn(filter)
 	}
 
 	// get files and dirs from all filters
 	for _, filter := range profile.FiltersCRD {
-		flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
-		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
-		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
-		bUserAdded := filter.CustomerAdd
-		if strings.Contains(filter.Path, "*") {
-			subDirs := w.getSubDirList(pid, filter.Path, cid)
-			for _, sub := range subDirs {
-				singles := w.getDirAndFileList(pid, sub, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
-				singleFiles = append(singleFiles, singles...)
-			}
-		} else {
-			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
-			singleFiles = append(singleFiles, singles...)
-		}
+		addFilterFn(filter)
 	}
+
 	return dirList, singleFiles
 }
 
