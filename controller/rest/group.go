@@ -620,6 +620,9 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		log.WithFields(log.Fields{"name": rg.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
 		return
+	} else if err == common.ErrObjectAccessDenied {
+		restRespAccessDenied(w, login)
+		return
 	}
 
 	for _, ct := range *rg.Criteria {
