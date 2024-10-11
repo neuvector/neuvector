@@ -33,9 +33,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
 	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
 	pathInfoMap := map[string]*keyCertFileInfo{
-		share.CLUSRootCAKey: &keyCertFileInfo{share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
-		cnAdm:               &keyCertFileInfo{resource.NvAdmSvcName, admKeyPath, admCertPath, true},
-		cnCrd:               &keyCertFileInfo{resource.NvCrdSvcName, crdKeyPath, crdCertPath, true},
+		share.CLUSRootCAKey: {share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
+		cnAdm:               {resource.NvAdmSvcName, admKeyPath, admCertPath, true},
+		cnCrd:               {resource.NvCrdSvcName, crdKeyPath, crdCertPath, true},
 	}
 
 	certmanagerCerts := map[string]bool{
@@ -46,7 +46,7 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	if pathInfo, ok := pathInfoMap[cn]; !ok {
 		if _, ok := certmanagerCerts[cn]; ok {
 			if cctx.NotifyCertChange != nil {
-				cctx.NotifyCertChange(cn)
+				_ = cctx.NotifyCertChange(cn)
 			}
 		} else {
 			log.WithFields(log.Fields{"cn": cn}).Debug("unsupported")
@@ -58,7 +58,7 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 		case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 			var cert share.CLUSX509Cert
 			var dec common.DecryptUnmarshaller
-			dec.Unmarshal(value, &cert)
+			_ = dec.Unmarshal(value, &cert)
 
 			if len(cert.Key) > 0 && len(cert.Cert) > 0 {
 				if err := os.WriteFile(pathInfo.keyPath, []byte(cert.Key), 0600); err == nil {
@@ -71,7 +71,7 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 							if admission.ResetCABundle(pathInfo.svcName, certData) {
 								// remembered cert is updated with new cert. in rest.restartWebhookServer() it will re-register the webhook resource to k8s
 								var param interface{} = &pathInfo.svcName
-								cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+								_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
 							}
 						}
 					}

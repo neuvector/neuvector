@@ -54,7 +54,7 @@ var connectReportInterval uint32 = reportInterval
 var reportTick uint32 = 0
 var nextConnectReportTick uint32 = reportInterval
 
-///
+// /
 const memoryRecyclePeriod uint32 = 10                       // minutes
 const memoryCheckPeriod uint32 = 5                          // minutes
 const memEnforcerMediumPeak uint64 = 3 * 512 * 1024 * 1024  // 1.5 GB
@@ -89,7 +89,11 @@ func statsLoop(bPassiveContainerDetect bool) {
 		memStatsTicker.Stop()
 	} else {
 		log.WithFields(log.Fields{"Controlled_Limit": agentEnv.memoryLimit, "Controlled_At": memStatsEnforcerResetMark}).Info("Memory Resource")
-		go global.SYS.MonitorMemoryPressureEvents(memStatsEnforcerResetMark, memoryPressureNotification)
+		go func() {
+			if err := global.SYS.MonitorMemoryPressureEvents(memStatsEnforcerResetMark, memoryPressureNotification); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Runtime: MonitorMemoryPressureEvents Failed")
+			}
+		}()
 	}
 
 	stateTimerInterval := runStateInterval
@@ -165,10 +169,8 @@ func statsLoop(bPassiveContainerDetect bool) {
 func timerLoop() {
 	ticker := time.Tick(time.Second * time.Duration(reportInterval))
 	for {
-		select {
-		case <-ticker:
-			go writeCluster()
-		}
+		<-ticker
+		go writeCluster()
 	}
 }
 
@@ -409,7 +411,7 @@ func updateSidecarConnection(conn *dp.Connection, id string) {
 					} else {
 						conn.ServerWL = podID.(string)
 					}
-					for port, _ := range pod.appMap {
+					for port := range pod.appMap {
 						if conn.ServerPort == port.Port && conn.IPProto == port.IPProto {
 							conn.ToSidecar = true
 						}

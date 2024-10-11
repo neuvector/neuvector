@@ -31,7 +31,9 @@ func dpMsgAppUpdate(msg []byte) {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &appHdr)
+	if dbgError := binary.Read(r, binary.BigEndian, &appHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	// Verify total length
 	ports := int(appHdr.Ports)
@@ -47,7 +49,9 @@ func dpMsgAppUpdate(msg []byte) {
 	apps := make(map[share.CLUSProtoPort]*share.CLUSApp)
 
 	for i := 0; i < ports; i++ {
-		binary.Read(r, binary.BigEndian, &app)
+		if dbgError := binary.Read(r, binary.BigEndian, &app); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		p := share.CLUSProtoPort{
 			Port:    uint16(app.Port),
 			IPProto: uint8(app.IPProto),
@@ -68,7 +72,9 @@ func dpMsgThreatLog(msg []byte) {
 	var tlog C.DPMsgThreatLog
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &tlog)
+	if dbgError := binary.Read(r, binary.BigEndian, &tlog); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	jlog := share.CLUSThreatLog{
 		ID:          utils.GetTimeUUID(time.Now().UTC()),
@@ -133,7 +139,9 @@ func dpMsgConnection(msg []byte) {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &connHdr)
+	if dbgError := binary.Read(r, binary.BigEndian, &connHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	// Verify total length
 	count := int(connHdr.Connects)
@@ -148,7 +156,9 @@ func dpMsgConnection(msg []byte) {
 	conns := make([]*ConnectionData, count)
 
 	for i := 0; i < count; i++ {
-		binary.Read(r, binary.BigEndian, &conn)
+		if dbgError := binary.Read(r, binary.BigEndian, &conn); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 
 		cc := &Connection{
 			ServerPort:   uint16(conn.ServerPort),
@@ -239,7 +249,9 @@ func dpMsgFqdnIpUpdate(msg []byte) {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &fqdnIpHdr)
+	if dbgError := binary.Read(r, binary.BigEndian, &fqdnIpHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	// Verify total length
 	ipcnt := int(fqdnIpHdr.IpCnt)
@@ -261,7 +273,9 @@ func dpMsgFqdnIpUpdate(msg []byte) {
 	}
 
 	for i := 0; i < ipcnt; i++ {
-		binary.Read(r, binary.BigEndian, &fqdnIp)
+		if dbgError := binary.Read(r, binary.BigEndian, &fqdnIp); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		fqdns.FqdnIP = append(fqdns.FqdnIP, net.IP(C.GoBytes(unsafe.Pointer(&fqdnIp.FqdnIP[0]), 4)))
 	}
 	log.WithFields(log.Fields{"fqdns": fqdns}).Debug("")
@@ -280,12 +294,14 @@ func dpMsgIpFqdnStorageUpdate(msg []byte) {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &ipFqdnStorageUpdateHdr)
+	if dbgError := binary.Read(r, binary.BigEndian, &ipFqdnStorageUpdateHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	ip := net.IP(C.GoBytes(unsafe.Pointer(&ipFqdnStorageUpdateHdr.IP[0]), 4))
 	name := C.GoString(&ipFqdnStorageUpdateHdr.Name[0])
 	ipFqdnStorageUpdate := &IpFqdnStorageUpdate{
-		IP: ip,
+		IP:   ip,
 		Name: name,
 	}
 
@@ -305,7 +321,9 @@ func dpMsgIpFqdnStorageRelease(msg []byte) {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &ipFqdnStorageReleaseHdr)
+	if dbgError := binary.Read(r, binary.BigEndian, &ipFqdnStorageReleaseHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	ip := net.IP(C.GoBytes(unsafe.Pointer(&ipFqdnStorageReleaseHdr.IP[0]), 4))
 
@@ -325,7 +343,9 @@ func ParseDPMsgHeader(msg []byte) *C.DPMsgHdr {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &hdr)
+	if dbgError := binary.Read(r, binary.BigEndian, &hdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	if int(hdr.Length) != len(msg) {
 		log.WithFields(log.Fields{
 			"kind": hdr.Kind, "expect": hdr.Length, "actual": len(msg),
@@ -366,7 +386,7 @@ func listenDP() {
 
 	var conn *net.UnixConn
 	kind := "unixgram"
-	addr := net.UnixAddr{ctrlServer, kind}
+	addr := net.UnixAddr{Name: ctrlServer, Net: kind}
 	defer os.Remove(ctrlServer)
 	conn, _ = net.ListenUnixgram(kind, &addr)
 	defer conn.Close()

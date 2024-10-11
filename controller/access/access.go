@@ -87,56 +87,56 @@ var apiPermissions map[int8]uint32 = map[int8]uint32{ // key is apiCategoryID
 // 1. if len(value.ComplexPermits) == 0, value is the effective internal permission used by controller
 // 2. if len(value.ComplexPermits) > 0, value.ComplexPermits has the effective internal permissions used by controller
 var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission can only be contained by other permissions
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_SYSTEM_CONFIG_ID,
 		Value:          share.PERM_SYSTEM_CONFIG,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_IBMSA_ID,
 		Value:          share.PERM_IBMSA,
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_FED_ID,
 		Value:          share.PERM_FED,
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_NV_RESOURCE_ID,
 		Value:          share.PERM_NV_RESOURCE,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERMS_RUNTIME_SCAN_ID,
 		Value:          share.PERMS_RUNTIME_SCAN,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 		ComplexPermits: []*api.RESTRolePermitOptionInternal{
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_RUNTIME_SCAN_BASIC_ID,
 				Value:          share.PERM_RUNTIME_SCAN_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_WORKLOAD_BASIC_ID,
 				Value:          share.PERM_WORKLOAD_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_INFRA_BASIC_ID,
 				Value:          share.PERM_INFRA_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
@@ -145,53 +145,53 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 			},
 		},
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_REG_SCAN_ID,
 		Value:          share.PERM_REG_SCAN,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_CICD_SCAN_ID,
 		Value:          share.PERM_CICD_SCAN,
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
 		WriteSupported: true,
 	},
-	/*	&api.RESTRolePermitOptionInternal{
+	/*	{
 		ID:           share.PERM_CLOUD_ID,
 		Value:        share.PERM_CLOUD,
 		SupportScope: CONST_PERM_SUPPORT_GLOBAL,
 	},*/
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERMS_RUNTIME_POLICIES_ID,
 		Value:          share.PERMS_RUNTIME_POLICIES,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 		ComplexPermits: []*api.RESTRolePermitOptionInternal{
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_GROUP_BASIC_ID,
 				Value:          share.PERM_GROUP_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_NETWORK_POLICY_BASIC_ID,
 				Value:          share.PERM_NETWORK_POLICY_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_SYSTEM_POLICY_BASIC_ID,
 				Value:          share.PERM_SYSTEM_POLICY_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_WORKLOAD_BASIC_ID,
 				Value:          share.PERM_WORKLOAD_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
@@ -200,35 +200,35 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 			},
 		},
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_ADM_CONTROL_ID,
 		Value:          share.PERM_ADM_CONTROL,
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERMS_COMPLIANCE_ID,
 		Value:          share.PERMS_COMPLIANCE,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 		ComplexPermits: []*api.RESTRolePermitOptionInternal{
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_COMPLIANCE_BASIC_ID,
 				Value:          share.PERM_COMPLIANCE_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_WORKLOAD_BASIC_ID,
 				Value:          share.PERM_WORKLOAD_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_BOTH,
 				ReadSupported:  true,
 				WriteSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:             share.PERM_INFRA_BASIC_ID,
 				Value:          share.PERM_INFRA_BASIC,
 				SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
@@ -237,25 +237,25 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 			},
 		},
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:            share.PERM_AUDIT_EVENTS_ID,
 		Value:         share.PERM_AUDIT_EVENTS,
 		SupportScope:  CONST_PERM_SUPPORT_BOTH,
 		ReadSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:            share.PERMS_SECURITY_EVENTS_ID,
 		Value:         share.PERMS_SECURITY_EVENTS,
 		SupportScope:  CONST_PERM_SUPPORT_BOTH,
 		ReadSupported: true,
 		ComplexPermits: []*api.RESTRolePermitOptionInternal{
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:            share.PERM_SECURITY_EVENTS_BASIC_ID,
 				Value:         share.PERM_SECURITY_EVENTS_BASIC,
 				SupportScope:  CONST_PERM_SUPPORT_BOTH,
 				ReadSupported: true,
 			},
-			&api.RESTRolePermitOptionInternal{
+			{
 				ID:            share.PERM_WORKLOAD_BASIC_ID,
 				Value:         share.PERM_WORKLOAD_BASIC,
 				SupportScope:  CONST_PERM_SUPPORT_BOTH,
@@ -263,27 +263,27 @@ var PermissionOptions = []*api.RESTRolePermitOptionInternal{ // basic permission
 			},
 		},
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:            share.PERM_EVENTS_ID,
 		Value:         share.PERM_EVENTS,
 		SupportScope:  CONST_PERM_SUPPORT_BOTH,
 		ReadSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_AUTHENTICATION_ID,
 		Value:          share.PERM_AUTHENTICATION,
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_AUTHORIZATION_ID,
 		Value:          share.PERM_AUTHORIZATION,
 		SupportScope:   CONST_PERM_SUPPORT_BOTH,
 		ReadSupported:  true,
 		WriteSupported: true,
 	},
-	&api.RESTRolePermitOptionInternal{
+	{
 		ID:             share.PERM_VULNERABILITY_ID,
 		Value:          share.PERM_VULNERABILITY,
 		SupportScope:   CONST_PERM_SUPPORT_GLOBAL,
@@ -298,52 +298,52 @@ var visibleRoles = utils.NewSet(api.UserRoleAdmin, api.UserRoleReader, api.UserR
 var mappableServerDefaultRoles = utils.NewSet(api.UserRoleAdmin, api.UserRoleReader, api.UserRoleCIOps, api.UserRoleNone) // for default role of server
 var mappableDomainRoles = utils.NewSet(api.UserRoleAdmin, api.UserRoleReader, api.UserRoleCIOps)                          // for groups' mapped domain roles of server
 var allRoles = map[string]*share.CLUSUserRoleInternal{                                                                    // changed from CustomRolesActions, key is role name, value is role permission
-	api.UserRoleFedAdmin: &share.CLUSUserRoleInternal{
+	api.UserRoleFedAdmin: {
 		Name:         api.UserRoleFedAdmin,
 		Comment:      "Federated Administrator role",
 		Reserved:     true,
 		ReadPermits:  share.PERMS_FED_READ,
 		WritePermits: share.PERMS_FED_WRITE,
 	},
-	api.UserRoleFedReader: &share.CLUSUserRoleInternal{
+	api.UserRoleFedReader: {
 		Name:        api.UserRoleFedReader,
 		Comment:     "Federated View role",
 		Reserved:    true,
 		ReadPermits: share.PERMS_FED_READ,
 	},
-	api.UserRoleAdmin: &share.CLUSUserRoleInternal{
+	api.UserRoleAdmin: {
 		Name:         api.UserRoleAdmin,
 		Comment:      "Global Administrator role",
 		Reserved:     true,
 		ReadPermits:  share.PERMS_CLUSTER_READ,
 		WritePermits: share.PERMS_CLUSTER_WRITE,
 	},
-	api.UserRoleReader: &share.CLUSUserRoleInternal{
+	api.UserRoleReader: {
 		Name:        api.UserRoleReader,
 		Comment:     "Global View role",
 		Reserved:    true,
 		ReadPermits: share.PERMS_CLUSTER_READ,
 	},
-	api.UserRoleNone: &share.CLUSUserRoleInternal{
+	api.UserRoleNone: {
 		Name:        api.UserRoleNone,
 		Comment:     "None",
 		Reserved:    true,
 		ReadPermits: 0,
 	},
-	api.UserRoleCIOps: &share.CLUSUserRoleInternal{
+	api.UserRoleCIOps: {
 		Name:         api.UserRoleCIOps,
 		Comment:      "CI Integration role",
 		Reserved:     true,
 		WritePermits: share.PERM_CICD_SCAN,
 	},
-	api.UserRoleIBMSA: &share.CLUSUserRoleInternal{
+	api.UserRoleIBMSA: {
 		Name:         api.UserRoleIBMSA,
 		Comment:      "for IBM Security Advisor",
 		Reserved:     true,
 		ReadPermits:  share.PERM_IBMSA,
 		WritePermits: share.PERM_IBMSA,
 	},
-	api.UserRoleImportStatus: &share.CLUSUserRoleInternal{
+	api.UserRoleImportStatus: {
 		Name:        api.UserRoleImportStatus,
 		Comment:     "for reading import status",
 		Reserved:    true,
@@ -451,7 +451,7 @@ func getRestRolePermitValues(roleName, domain string) map[string]rwPermit {
 		}
 		for _, option := range PermissionOptions {
 			// need to check fed/nv_resource permissions as well
-			permit, _ := rolePermits[option.ID]
+			permit := rolePermits[option.ID]
 			optionReadValue, optionWriteValue := option.Value, option.Value
 			if domain == AccessDomainGlobal {
 				optionReadValue &= share.PERMS_FED_READ
@@ -521,7 +521,7 @@ func getDomainPermissions(domain string, roles []string, extraPermits []share.Nv
 				} else {
 					for id, rw := range rolePermits {
 						if rw.read || rw.write {
-							rwFound, _ := allPermits[id]
+							rwFound := allPermits[id]
 							allPermits[id] = rwPermit{read: rwFound.read || rw.read, write: rwFound.write || rw.write}
 						}
 					}
@@ -544,7 +544,7 @@ func getDomainPermissions(domain string, roles []string, extraPermits []share.Nv
 	}
 	for _, permit := range GetTopLevelPermitsList(scope, dExtraPermits) { // iterate thru []*api.RESTRolePermission from extra permissions
 		if permit.Read || permit.Write {
-			rw, _ := allPermits[permit.ID]
+			rw := allPermits[permit.ID]
 			allPermits[permit.ID] = rwPermit{read: rw.read || permit.Read, write: rw.write || permit.Write}
 		}
 	}
@@ -584,7 +584,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 		}
 		for _, domain := range domains {
 			if domain != AccessDomainGlobal {
-				roles, _ := domainRoles[domain]
+				roles := domainRoles[domain]
 				domainRoles[domain] = append(roles, role)
 				allDomains[domain] = nil
 			}
@@ -599,7 +599,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 		}
 		for _, domain := range permitsDomains.Domains {
 			if domain != AccessDomainGlobal {
-				permits, _ := domainPermits[domain]
+				permits := domainPermits[domain]
 				domainPermits[domain] = append(permits, permitsDomains.Permits)
 				allDomains[domain] = nil
 			}
@@ -608,9 +608,9 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 
 	// 2-3. merge #2-1 & #2-2 to get the top-level permissions list for each domain
 	dPermitsList := make(map[string][]*api.RESTRolePermission, len(allDomains)) // domain -> list of permissions
-	for domain, _ := range allDomains {
-		roles, _ := domainRoles[domain]
-		extraPermits, _ := domainPermits[domain]
+	for domain := range allDomains {
+		roles := domainRoles[domain]
+		extraPermits := domainPermits[domain]
 		if permitsList := getDomainPermissions(domain, roles, extraPermits); len(permitsList) > 0 {
 			dPermitsList[domain] = permitsList
 		}
@@ -672,7 +672,7 @@ func getRequiredPermissions(r *http.Request) (int8, uint32) {
 			}
 		}
 	}
-	requiredPermissions, _ := apiPermissions[apiCategoryID]
+	requiredPermissions := apiPermissions[apiCategoryID]
 
 	return apiCategoryID, requiredPermissions
 }
@@ -717,7 +717,7 @@ func dumpApiUriParts(verb, parentURI string, nodes map[string]*UriApiNode) { // 
 func CompileUriPermitsMapping() {
 	if uriRequiredPermitsMappings == nil {
 		apiURIsGET := map[int8][]string{
-			CONST_API_NO_AUTH: []string{
+			CONST_API_NO_AUTH: {
 				"v1/partner/ibm_sa/*/setup",
 				"v1/partner/ibm_sa/*/setup/*",
 				"v1/token_auth_server",
@@ -725,7 +725,7 @@ func CompileUriPermitsMapping() {
 				"v1/eula",
 				"v1/fed/healthcheck",
 			},
-			CONST_API_DEBUG: []string{
+			CONST_API_DEBUG: {
 				"v1/meter",
 				"v1/enforcer/*/probe_summary",
 				"v1/enforcer/*/probe_processes",
@@ -745,7 +745,7 @@ func CompileUriPermitsMapping() {
 				"v1/system/usage",
 				"v1/system/alerts",
 			},
-			CONST_API_RT_SCAN: []string{
+			CONST_API_RT_SCAN: {
 				"v1/scan/config",
 				"v1/scan/status",
 				"v1/scan/cache_stat/*",
@@ -760,7 +760,7 @@ func CompileUriPermitsMapping() {
 				"v1/vulasset",
 				"v1/scan/asset/images",
 			},
-			CONST_API_REG_SCAN: []string{
+			CONST_API_REG_SCAN: {
 				"v1/scan/registry",
 				"v1/scan/registry/*",
 				"v1/scan/registry/*/images",
@@ -772,13 +772,13 @@ func CompileUriPermitsMapping() {
 				"v1/scan/sigstore/root_of_trust/*/verifier",
 				"v1/scan/sigstore/root_of_trust/*/verifier/*",
 			},
-			CONST_API_INFRA: []string{
+			CONST_API_INFRA: {
 				"v1/host",
 				"v1/host/*",
 				"v1/host/*/process_profile",
 				"v1/domain",
 			},
-			CONST_API_NV_RESOURCE: []string{
+			CONST_API_NV_RESOURCE: {
 				"v1/controller",
 				"v1/controller/*",
 				"v1/controller/*/config",
@@ -791,7 +791,7 @@ func CompileUriPermitsMapping() {
 				"v1/enforcer/*/config",
 				"v1/scan/scanner",
 			},
-			CONST_API_WORKLOAD: []string{
+			CONST_API_WORKLOAD: {
 				"v1/workload",
 				"v2/workload",
 				"v1/workload/*",
@@ -799,7 +799,7 @@ func CompileUriPermitsMapping() {
 				"v1/workload/*/stats",
 				"v1/workload/*/config",
 			},
-			CONST_API_GROUP: []string{
+			CONST_API_GROUP: {
 				"v1/group",
 				"v1/group/*",
 				"v1/group/*/stats",
@@ -807,7 +807,7 @@ func CompileUriPermitsMapping() {
 				"v1/service/*",
 				"v1/file/group",
 			},
-			CONST_API_RT_POLICIES: []string{
+			CONST_API_RT_POLICIES: {
 				"v1/workload/*/process",
 				"v1/workload/*/process_history",
 				"v1/workload/*/process_profile",
@@ -845,7 +845,7 @@ func CompileUriPermitsMapping() {
 				"v1/sniffer/*/pcap",
 				"v1/file/group/config",
 			},
-			CONST_API_ADM_CONTROL: []string{
+			CONST_API_ADM_CONTROL: {
 				"v1/admission/options",
 				"v1/admission/state",
 				"v1/admission/stats",
@@ -853,7 +853,7 @@ func CompileUriPermitsMapping() {
 				"v1/admission/rule/*",
 				"v1/debug/admission_stats",
 			},
-			CONST_API_COMPLIANCE: []string{
+			CONST_API_COMPLIANCE: {
 				"v1/host/*/compliance",
 				"v1/workload/*/compliance",
 				"v1/bench/host/*/docker",
@@ -866,10 +866,10 @@ func CompileUriPermitsMapping() {
 				"v1/compliance/profile/*",
 				"v1/compliance/available_filter",
 			},
-			CONST_API_AUDIT_EVENTS: []string{
+			CONST_API_AUDIT_EVENTS: {
 				"v1/log/audit",
 			},
-			CONST_API_SECURITY_EVENTS: []string{
+			CONST_API_SECURITY_EVENTS: {
 				"v1/log/incident",
 				"v1/log/threat",
 				"v1/log/threat/*",
@@ -877,16 +877,16 @@ func CompileUriPermitsMapping() {
 				"v1/log/security",
 				"v1/log/violation/workload",
 			},
-			CONST_API_EVENTS: []string{
+			CONST_API_EVENTS: {
 				"v1/log/event",
 				"v1/log/activity",
 			},
-			CONST_API_AUTHENTICATION: []string{
+			CONST_API_AUTHENTICATION: {
 				"v1/server",
 				"v1/server/*",
 				"v1/server/*/user",
 			},
-			CONST_API_AUTHORIZATION: []string{
+			CONST_API_AUTHORIZATION: {
 				"v1/user_role_permission/options",
 				"v1/user_role",
 				"v1/user_role/*",
@@ -897,11 +897,11 @@ func CompileUriPermitsMapping() {
 				"v1/api_key/*",
 				"v1/selfapikey",
 			},
-			CONST_API_PWD_PROFILE: []string{
+			CONST_API_PWD_PROFILE: {
 				"v1/password_profile",
 				"v1/password_profile/*",
 			},
-			CONST_API_SYSTEM_CONFIG: []string{
+			CONST_API_SYSTEM_CONFIG: {
 				"v1/partner/ibm_sa_ep",
 				"v1/partner/ibm_sa_config",
 				"v1/file/config",
@@ -911,20 +911,20 @@ func CompileUriPermitsMapping() {
 				"v1/system/summary",
 				"v1/internal/system",
 			},
-			CONST_API_FED: []string{
+			CONST_API_FED: {
 				"v1/fed/member",
 				"v1/fed/join_token",
 				"v1/fed/cluster/*/**",
 				"v1/fed/view/*",
 			},
-			CONST_API_VULNERABILITY: []string{
+			CONST_API_VULNERABILITY: {
 				"v1/vulnerability/profile",
 				"v1/vulnerability/profile/*",
 			},
 		}
 
 		apiURIsPOST := map[int8][]string{
-			CONST_API_NO_AUTH: []string{
+			CONST_API_NO_AUTH: {
 				"v1/token_auth_server/*",
 				"v1/fed/ping_internal",
 				"v1/fed/joint_test_internal",
@@ -933,7 +933,7 @@ func CompileUriPermitsMapping() {
 				"v1/auth/*",
 				"v1/eula",
 			},
-			CONST_API_DEBUG: []string{
+			CONST_API_DEBUG: {
 				"v1/fed/promote",
 				"v1/fed/join",
 				"v1/fed/leave",
@@ -946,7 +946,7 @@ func CompileUriPermitsMapping() {
 				"v1/csp/file/support",
 				"v1/internal/alert",
 			},
-			CONST_API_RT_SCAN: []string{
+			CONST_API_RT_SCAN: {
 				"v1/scan/workload/*",
 				"v1/scan/host/*",
 				"v1/scan/platform/platform",
@@ -954,7 +954,7 @@ func CompileUriPermitsMapping() {
 				"v1/assetvul",
 				"v1/scan/asset/images",
 			},
-			CONST_API_REG_SCAN: []string{
+			CONST_API_REG_SCAN: {
 				"v1/scan/registry/*/scan",
 				"v1/scan/registry",
 				"v2/scan/registry",
@@ -963,16 +963,16 @@ func CompileUriPermitsMapping() {
 				"v1/scan/sigstore/root_of_trust",
 				"v1/scan/sigstore/root_of_trust/*/verifier",
 			},
-			CONST_API_CICD_SCAN: []string{
+			CONST_API_CICD_SCAN: {
 				"v1/scan/result/repository",
 				"v1/scan/repository",
 			},
-			CONST_API_GROUP: []string{
+			CONST_API_GROUP: {
 				"v1/group",
 				"v1/file/group", // export group
 				"v1/service",
 			},
-			CONST_API_RT_POLICIES: []string{
+			CONST_API_RT_POLICIES: {
 				"v1/workload/request/*",
 				"v1/dlp/sensor",
 				"v1/waf/sensor",
@@ -984,88 +984,88 @@ func CompileUriPermitsMapping() {
 				"v1/sniffer",
 				"v1/file/group/config", // for providing similar function as crd import but do not rely on crd webhook
 			},
-			CONST_API_ADM_CONTROL: []string{
+			CONST_API_ADM_CONTROL: {
 				"v1/debug/admission/test",
 				"v1/admission/rule",
 				"v1/assess/admission/rule",
 				"v1/file/admission",
 				"v1/file/admission/config", // for providing similar function as crd import but do not rely on crd webhook
 			},
-			CONST_API_COMPLIANCE: []string{
+			CONST_API_COMPLIANCE: {
 				"v1/bench/host/*/docker",
 				"v1/bench/host/*/kubernetes",
 				"v1/file/compliance/profile",
 				"v1/file/compliance/profile/config",
 			},
-			CONST_API_AUTHENTICATION: []string{
+			CONST_API_AUTHENTICATION: {
 				"v1/server",
 				"v1/debug/server/test",
 			},
-			CONST_API_AUTHORIZATION: []string{
+			CONST_API_AUTHORIZATION: {
 				"v1/user_role",
 				"v1/user",
 				"v1/api_key",
 				"v1/user/*/password",
 			},
-			CONST_API_PWD_PROFILE: []string{
+			CONST_API_PWD_PROFILE: {
 				"v1/password_profile",
 			},
-			CONST_API_SYSTEM_CONFIG: []string{
+			CONST_API_SYSTEM_CONFIG: {
 				"v1/system/license/update",
 				"v1/system/config/webhook",
 				"v1/system/config/remote_repository",
 			},
-			CONST_API_IBMSA: []string{
+			CONST_API_IBMSA: {
 				"v1/partner/ibm_sa/*/setup/*",
 			},
-			CONST_API_FED: []string{
+			CONST_API_FED: {
 				"v1/fed/demote",
 				"v1/fed/deploy",
 				"v1/fed/cluster/*/**",
 				"v1/policy/rules/promote",
 				"v1/admission/rule/promote",
 			},
-			CONST_API_VULNERABILITY: []string{
+			CONST_API_VULNERABILITY: {
 				"v1/vulnerability/profile/*/entry",
 				"v1/file/vulnerability/profile",
 				"v1/file/vulnerability/profile/config",
 			},
-			CONST_API_WORKLOAD: []string{
+			CONST_API_WORKLOAD: {
 				"v2/workload",
 			},
 		}
 
 		apiURIsPATCH := map[int8][]string{
-			CONST_API_NO_AUTH: []string{
+			CONST_API_NO_AUTH: {
 				"v1/auth",
 			},
-			CONST_API_DEBUG: []string{
+			CONST_API_DEBUG: {
 				"v1/fed/config",
 			},
-			CONST_API_RT_SCAN: []string{
+			CONST_API_RT_SCAN: {
 				"v1/scan/config",
 			},
-			CONST_API_REG_SCAN: []string{
+			CONST_API_REG_SCAN: {
 				"v1/scan/registry/*",
 				"v2/scan/registry/*",
 				"v1/scan/sigstore/root_of_trust/*",
 				"v1/scan/sigstore/root_of_trust/*/verifier/*",
 			},
-			CONST_API_INFRA: []string{
+			CONST_API_INFRA: {
 				"v1/domain",
 				"v1/domain/*",
 			},
-			CONST_API_NV_RESOURCE: []string{
+			CONST_API_NV_RESOURCE: {
 				"v1/controller/*",
 				"v1/enforcer/*",
 			},
-			CONST_API_GROUP: []string{
+			CONST_API_GROUP: {
 				"v1/group/*",
 				"v1/service/config",
 				"v1/service/config/network",
 				"v1/service/config/profile",
 			},
-			CONST_API_RT_POLICIES: []string{
+			CONST_API_RT_POLICIES: {
 				"v1/workload/*",
 				"v1/dlp/sensor/*",
 				"v1/dlp/group/*",
@@ -1080,66 +1080,66 @@ func CompileUriPermitsMapping() {
 				"v1/response/rule/*",
 				"v1/sniffer/stop/*",
 			},
-			CONST_API_ADM_CONTROL: []string{
+			CONST_API_ADM_CONTROL: {
 				"v1/admission/state",
 				"v1/admission/rule",
 			},
-			CONST_API_COMPLIANCE: []string{
+			CONST_API_COMPLIANCE: {
 				"v1/custom_check/*",
 				"v1/compliance/profile/*",
 				"v1/compliance/profile/*/entry/*",
 			},
-			CONST_API_AUTHENTICATION: []string{
+			CONST_API_AUTHENTICATION: {
 				"v1/server/*",
 				"v1/server/*/role/*",
 				"v1/server/*/group/*",
 				"v1/server/*/groups",
 			},
-			CONST_API_AUTHORIZATION: []string{
+			CONST_API_AUTHORIZATION: {
 				"v1/user_role/*",
 				"v1/user/*",
 				"v1/user/*/role/*",
 			},
-			CONST_API_PWD_PROFILE: []string{
+			CONST_API_PWD_PROFILE: {
 				"v1/password_profile/*",
 			},
-			CONST_API_SYSTEM_CONFIG: []string{
+			CONST_API_SYSTEM_CONFIG: {
 				"v1/system/config",
 				"v2/system/config",
 				"v1/system/config/webhook/*",
 				"v1/system/config/remote_repository/*",
 			},
-			CONST_API_FED: []string{
+			CONST_API_FED: {
 				"v1/fed/cluster/*/**",
 			},
-			CONST_API_VULNERABILITY: []string{
+			CONST_API_VULNERABILITY: {
 				"v1/vulnerability/profile/*",
 				"v1/vulnerability/profile/*/entry/*",
 			},
 		}
 
 		apiURIsDELETE := map[int8][]string{
-			CONST_API_NO_AUTH: []string{
+			CONST_API_NO_AUTH: {
 				"v1/auth",
 			},
-			CONST_API_DEBUG: []string{
+			CONST_API_DEBUG: {
 				"v1/fed_auth",
 				"v1/conversation_endpoint/*",
 				"v1/conversation",
 				"v1/session",
 				"v1/partner/ibm_sa/*/setup/*/*", // not supported by NV/IBMSA yet. Only for internal testing [20200831]
 			},
-			CONST_API_REG_SCAN: []string{
+			CONST_API_REG_SCAN: {
 				"v1/scan/registry/*/scan",
 				"v1/scan/registry/*",
 				"v1/scan/registry/*/test",
 				"v1/scan/sigstore/root_of_trust/*",
 				"v1/scan/sigstore/root_of_trust/*/verifier/*",
 			},
-			CONST_API_GROUP: []string{
+			CONST_API_GROUP: {
 				"v1/group/*",
 			},
-			CONST_API_RT_POLICIES: []string{
+			CONST_API_RT_POLICIES: {
 				"v1/dlp/sensor/*",
 				"v1/waf/sensor/*",
 				"v1/policy/rule/*",
@@ -1149,34 +1149,34 @@ func CompileUriPermitsMapping() {
 				"v1/response/rule",
 				"v1/sniffer/*",
 			},
-			CONST_API_ADM_CONTROL: []string{
+			CONST_API_ADM_CONTROL: {
 				"v1/admission/rule/*",
 				"v1/admission/rules",
 			},
-			CONST_API_COMPLIANCE: []string{
+			CONST_API_COMPLIANCE: {
 				"v1/compliance/profile/*/entry/*",
 			},
-			CONST_API_AUTHENTICATION: []string{
+			CONST_API_AUTHENTICATION: {
 				"v1/server/*",
 			},
-			CONST_API_AUTHORIZATION: []string{
+			CONST_API_AUTHORIZATION: {
 				"v1/user_role/*",
 				"v1/user/*",
 				"v1/api_key/*",
 			},
-			CONST_API_PWD_PROFILE: []string{
+			CONST_API_PWD_PROFILE: {
 				"v1/password_profile/*",
 			},
-			CONST_API_SYSTEM_CONFIG: []string{
+			CONST_API_SYSTEM_CONFIG: {
 				"v1/system/license",
 				"v1/system/config/webhook/*",
 				"v1/system/config/remote_repository/*",
 			},
-			CONST_API_FED: []string{
+			CONST_API_FED: {
 				"v1/fed/cluster/*",
 				"v1/fed/cluster/*/**",
 			},
-			CONST_API_VULNERABILITY: []string{
+			CONST_API_VULNERABILITY: {
 				"v1/vulnerability/profile/*/entry/*",
 			},
 		}
@@ -1357,7 +1357,7 @@ type AccessOP string
 
 const (
 	AccessOPRead  AccessOP = "read"
-	AccessOPWrite          = "write"
+	AccessOPWrite AccessOP = "write"
 )
 
 const AccessDomainGlobal = ""

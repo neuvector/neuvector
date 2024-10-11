@@ -844,10 +844,15 @@ func (c *Client) write(endpoint string, in, out interface{}, q *WriteOptions) (*
 	return wm, nil
 }
 
-// parseQueryMeta is used to help parse query meta-data
+func parseQueryMeta(resp *http.Response, q *QueryMeta) {
+	_ = parseQueryMetaWrapped(resp, q)
+}
+
+// parseQueryMetaWrapped is used to help parse query meta-data
 //
 // TODO(rb): bug? the error from this function is never handled
-func parseQueryMeta(resp *http.Response, q *QueryMeta) error {
+// (see parseQueryMeta() in https://github.com/hashicorp/consul/blob/main/api/api.go)
+func parseQueryMetaWrapped(resp *http.Response, q *QueryMeta) error {
 	header := resp.Header
 
 	// Parse the X-Consul-Index (if it's set - hash based blocking queries don't
@@ -903,12 +908,12 @@ func parseQueryMeta(resp *http.Response, q *QueryMeta) error {
 func decodeBody(resp *http.Response, out interface{}) error {
 	// Neuvector: improve memory usage which incurs from manipulating buffering data
 	data, err := io.ReadAll(resp.Body)
-	if err==nil && data != nil {
+	if err == nil && data != nil {
 		return json.Unmarshal(data, out)
 	}
 	return err
-//	dec := json.NewDecoder(resp.Body)
-//	return dec.Decode(out)
+	// dec := json.NewDecoder(resp.Body)
+	// return dec.Decode(out)
 }
 
 // encodeBody is used to encode a request body
@@ -948,9 +953,14 @@ func (req *request) filterQuery(filter string) {
 // unexpected.
 func generateUnexpectedResponseCodeError(resp *http.Response) error {
 	var buf bytes.Buffer
-	io.Copy(&buf, resp.Body)
+	var msg string
+	if _, err := io.Copy(&buf, resp.Body); err == nil {
+		msg = buf.String()
+	} else {
+		msg = "copy error: " + err.Error()
+	}
 	resp.Body.Close()
-	return fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+	return fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, msg)
 }
 
 func requireNotFoundOrOK(d time.Duration, resp *http.Response, e error) (bool, time.Duration, *http.Response, error) {

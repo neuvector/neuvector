@@ -63,7 +63,7 @@ func userRoleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []b
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var role share.CLUSUserRole
-		json.Unmarshal(value, &role)
+		_ = json.Unmarshal(value, &role)
 		if roleInternal := parseUserRolePermissions(&role); roleInternal != nil {
 			access.AddRole(name, roleInternal)
 		}

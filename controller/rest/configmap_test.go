@@ -1,12 +1,13 @@
 package rest
 
 import (
+	"testing"
+
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
-	"testing"
 )
 
 func TestCustomRoleCfg(t *testing.T) {
@@ -223,7 +224,7 @@ func TestPwdProfileCfg(t *testing.T) {
 	}
 
 	allExpected := []*share.CLUSPwdProfile{
-		&share.CLUSPwdProfile{
+		{
 			Name:                        "default",
 			Comment:                     "default from configMap",
 			MinLen:                      10,
@@ -335,7 +336,7 @@ func TestUserCfg(t *testing.T) {
 	mockCacheInstance := &mockCache{
 		activePwdProfile: share.CLUSDefPwdProfileName,
 		pwdProfiles: map[string]*share.CLUSPwdProfile{
-			share.CLUSDefPwdProfileName: &share.CLUSPwdProfile{
+			share.CLUSDefPwdProfileName: {
 				Name:            share.CLUSDefPwdProfileName,
 				Comment:         share.CLUSDefPwdProfileName,
 				MinLen:          6,
@@ -351,7 +352,7 @@ func TestUserCfg(t *testing.T) {
 	mockCluster.SetCacheMockCallback(share.CLUSConfigUserRoleStore, cache.MockUserRoleConfigUpdate)
 
 	defProfile := mockCacheInstance.pwdProfiles[share.CLUSDefPwdProfileName]
-	clusHelper.PutPwdProfileRev(defProfile, 0)
+	_ = clusHelper.PutPwdProfileRev(defProfile, 0)
 
 	var context configMapHandlerContext
 	// test variation of  white space before/after value etc
@@ -371,7 +372,7 @@ func TestUserCfg(t *testing.T) {
 `
 	// create referenced custom role first
 	yaml_byte0 := []byte(yaml_data0)
-	handlecustomrolecfg(yaml_byte0, true, &skip, &context)
+	_ = handlecustomrolecfg(yaml_byte0, true, &skip, &context)
 	if s1, _, _ := clusHelper.GetCustomRoleRev("testRole123", accAdmin); s1 == nil {
 		t.Errorf("Fail to get testRole123 config\n")
 	}
@@ -462,7 +463,7 @@ func TestUserCfgNegative(t *testing.T) {
 	mockCacheInstance := &mockCache{
 		activePwdProfile: share.CLUSDefPwdProfileName,
 		pwdProfiles: map[string]*share.CLUSPwdProfile{
-			share.CLUSDefPwdProfileName: &share.CLUSPwdProfile{
+			share.CLUSDefPwdProfileName: {
 				Name:            share.CLUSDefPwdProfileName,
 				Comment:         share.CLUSDefPwdProfileName,
 				MinLen:          6,
@@ -476,7 +477,7 @@ func TestUserCfgNegative(t *testing.T) {
 
 	cacher = mockCacheInstance
 	defProfile := mockCacheInstance.pwdProfiles[share.CLUSDefPwdProfileName]
-	clusHelper.PutPwdProfileRev(defProfile, 0)
+	_ = clusHelper.PutPwdProfileRev(defProfile, 0)
 
 	// negative test about user assigned a non-existing custom role
 
@@ -613,11 +614,11 @@ Role_Groups:
 		t.Errorf("Failed to get ldap config\n")
 	} else {
 		expect := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapadmingroup",
 				GlobalRole: "admin",
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapreadergroup",
 				GlobalRole: "reader",
 			},
@@ -714,16 +715,16 @@ group_mapped_roles:
 		t.Errorf("Failed to get ldap config\n")
 	} else {
 		expect := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapadmingroup",
 				GlobalRole: "admin",
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapreadergroup",
 				GlobalRole: "reader",
 				RoleDomains: map[string][]string{
-					"ciops": []string{"ns1", "ns2"},
-					"admin": []string{"ns3"},
+					"ciops": {"ns1", "ns2"},
+					"admin": {"ns3"},
 				},
 			},
 		}
@@ -855,11 +856,11 @@ Role_Groups:
 		t.Errorf("Failed to get saml config\n")
 	} else {
 		expect := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "samplesamladmingroup",
 				GlobalRole: "admin",
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "samplesamlreadergroup",
 				GlobalRole: "reader",
 			},
@@ -1007,15 +1008,15 @@ group_mapped_roles:
 		t.Errorf("Failed to get saml config\n")
 	} else {
 		expect := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapadmingroup",
 				GlobalRole: "admin",
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapreadergroup",
 				GlobalRole: "reader",
 				RoleDomains: map[string][]string{
-					"admin": []string{"ns3", "ns4"},
+					"admin": {"ns3", "ns4"},
 				},
 			},
 		}
@@ -1098,11 +1099,11 @@ Role_Groups:
 		t.Errorf("Failed to get oidc config\n")
 	} else {
 		expect := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleoidcadmingroup",
 				GlobalRole: "admin",
 			},
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleoidcreadergroup",
 				GlobalRole: "reader",
 			},
@@ -1195,12 +1196,12 @@ group_mapped_roles:
 		t.Errorf("Failed to get oidc config\n")
 	} else {
 		expect := []*share.GroupRoleMapping{
-			&share.GroupRoleMapping{
+			{
 				Group:      "sampleldapadmingroup",
 				GlobalRole: "ciops",
 				RoleDomains: map[string][]string{
-					"reader": []string{"ns1", "ns3"},
-					"admin":  []string{"ns2", "ns4"},
+					"reader": {"ns1", "ns3"},
+					"admin":  {"ns2", "ns4"},
 				},
 			},
 		}

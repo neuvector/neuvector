@@ -8,3 +8,22 @@ linters:
     - staticcheck
     - unused
     - gofmt
+
+issues:
+  exclude-rules:
+    - path: share/
+      linters:
+        - staticcheck
+      text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+    - path: controller/
+      linters:
+        - staticcheck
+      text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+  exclude:
+    - "SA1019: grpc.RPCCompressor is deprecated: use encoding.RegisterCompressor"
+    - "SA1019: grpc.RPCDecompressor is deprecated: use encoding.RegisterCompressor"
+    - "SA1019: grpc.WithDecompressor is deprecated: use encoding.RegisterCompressor"
+    - "SA1019: grpc.WithCompressor is deprecated: use UseCompressor"
+    - "SA1019: grpc.WithInsecure is deprecated: use WithTransportCredentials and insecure.NewCredentials()"
+    - "SA1019: grpc.WithDialer is deprecated: use WithContextDialer"
+    - "SA1019: grpc.WithTimeout is deprecated: use DialContext instead of Dial and context.WithTimeout"

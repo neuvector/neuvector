@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
@@ -57,7 +58,7 @@ func connectPAIFromHost(conn *share.CLUSConnection, ca *nodeAttr, stip *serverTi
 		} else {
 			ep = specialEPName(api.LearnedHostPrefix, net.IP(conn.ClientIP).String())
 			if wlGraph.Node(ep) == "" &&
-				wouldGenerateUnmanagedEndpoint(conn, true) == false {
+				!wouldGenerateUnmanagedEndpoint(conn, true) {
 				cctx.ConnLog.WithFields(log.Fields{
 					"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 				}).Debug("Ignore ingress connection with old session from unmanaged host")
@@ -102,7 +103,7 @@ func connectPAIFromGlobal(conn *share.CLUSConnection, ca *nodeAttr, stip *server
 			ipStr := net.IP(conn.ClientIP).String()
 			ep = specialEPName(api.LearnedWorkloadPrefix, ipStr)
 			if wlGraph.Node(ep) == "" &&
-				wouldGenerateUnmanagedEndpoint(conn, true) == false {
+				!wouldGenerateUnmanagedEndpoint(conn, true) {
 				cctx.ConnLog.WithFields(log.Fields{
 					"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 				}).Debug("Ignore ingress connection with old session from unknown global IP")
@@ -188,7 +189,7 @@ func connectPAIToHost(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip)
 		} else {
 			ep = specialEPName(api.LearnedHostPrefix, net.IP(conn.ServerIP).String())
 			if wlGraph.Node(ep) == "" &&
-				wouldGenerateUnmanagedEndpoint(conn, false) == false {
+				!wouldGenerateUnmanagedEndpoint(conn, false) {
 				cctx.ConnLog.WithFields(log.Fields{
 					"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 				}).Debug("Ignore egress connection with old session to unknown host")
@@ -207,7 +208,7 @@ func connectPAIToHost(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip)
 // Return if connection should be added.
 func connectPAIToGlobal(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTip) bool {
 	if wl, alive := getWorkloadFromGlobalIP(net.IP(conn.ServerIP)); wl != "" {
-		if alive == false && wouldGenerateUnmanagedEndpoint(conn, false) {
+		if !alive && wouldGenerateUnmanagedEndpoint(conn, false) {
 			scheduleControllerResync(resyncRequestReasonEphemeral)
 		}
 		if conn.UwlIp {
@@ -245,7 +246,7 @@ func connectPAIToGlobal(conn *share.CLUSConnection, sa *nodeAttr, stip *serverTi
 			ipStr := net.IP(conn.ServerIP).String()
 			ep = specialEPName(api.LearnedWorkloadPrefix, ipStr)
 			if wlGraph.Node(ep) == "" &&
-				wouldGenerateUnmanagedEndpoint(conn, false) == false {
+				!wouldGenerateUnmanagedEndpoint(conn, false) {
 				cctx.ConnLog.WithFields(log.Fields{
 					"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP),
 				}).Debug("Ignore egress connection with old session to unknown global IP")
@@ -456,7 +457,7 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 								conn.ServerWL = fqdngrp
 								sa.addrgrp = true
 								cctx.ConnLog.WithFields(log.Fields{
-									"ServerWL": conn.ServerWL, "policyaction":conn.PolicyAction,
+									"ServerWL": conn.ServerWL, "policyaction": conn.PolicyAction,
 								}).Debug("To FQDN address group")
 							}
 						}

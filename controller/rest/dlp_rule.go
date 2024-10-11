@@ -422,8 +422,8 @@ func getDlpRuleID(dlpsensor *share.CLUSDlpSensor) uint32 {
 	}
 }
 
-//lock is alreay hold when call this function
-//clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+// lock is alreay hold when call this function
+// clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 func CreatePredefaultSensor() {
 	kv.CreateDefDlpRules(true)
 	kv.CreatePreDlpSensor(true)
@@ -458,7 +458,7 @@ func createDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, cfgTy
 			e := "sensor cannot be created in cluster!"
 			log.WithFields(log.Fields{"sensor": sensor.Name}).Error(e)
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		log.Debug("Creating predefined sensor!")
 	}
@@ -489,7 +489,7 @@ func createDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, cfgTy
 			e := "Dlp rule id overflow!"
 			log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 
 		//save full rule with pattern in default sensor
@@ -554,7 +554,7 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	if cached, err := cacher.DoesDlpSensorExist(conf.Name, acc); cached == true {
+	if cached, err := cacher.DoesDlpSensorExist(conf.Name, acc); cached {
 		e := "dlp sensor already exists"
 		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
@@ -693,7 +693,7 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 	var cfgType share.TCfgType = share.UserCreated
 	if reviewType != share.ReviewTypeCRD && sensor.CfgType == share.GroundCfg {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	} else if reviewType == share.ReviewTypeCRD {
 		cfgType = share.GroundCfg
 	}
@@ -804,7 +804,7 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 					e := "Dlp rule id overflow!"
 					log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return fmt.Errorf(e)
+					return fmt.Errorf("%s", e)
 				}
 			}
 			//save full rule with pattern in default sensor
@@ -840,13 +840,13 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 						e := "Cannot find dlp rule in this sensor!"
 						log.WithFields(log.Fields{"sensor": conf.Name, "rulename": rdr.Name}).Error(e)
 						restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 					if !foundInAll {
 						e := "Cannot find full dlp rule to delete!"
 						log.WithFields(log.Fields{"sensor": defsensor.Name, "rulename": rdr.Name}).Error(e)
 						restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 				}
 			}
@@ -890,7 +890,7 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 						e := "Dlp rule id overflow!"
 						log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 				}
 				//save full rule with pattern in default sensor
@@ -1264,14 +1264,14 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		e := "Cannot delete default sensor!"
 		log.WithFields(log.Fields{"name": name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	if name == share.CLUSDlpCcSensor || name == share.CLUSDlpSsnSensor {
 		e := "Cannot delete predefined sensor!"
 		log.WithFields(log.Fields{"name": name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	rdlpsensor, err := cacher.GetDlpSensor(name, acc)
@@ -1281,7 +1281,7 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		return err
 	} else if reviewType != share.ReviewTypeCRD && rdlpsensor.CfgType == api.CfgTypeGround {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	}
 
 	var lock cluster.LockInterface
@@ -1296,7 +1296,7 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 	if dlpsensor == nil {
 		log.WithFields(log.Fields{"name": name}).Error("Fail to get dlp sensor!")
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-		return fmt.Errorf(restErrMessage[api.RESTErrObjectNotFound])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrObjectNotFound])
 	}
 	defsensor := clusHelper.GetDlpSensor(share.CLUSDlpDefaultSensor)
 
@@ -1310,9 +1310,7 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		defsensor.PreRuleList = make(map[string][]*share.CLUSDlpRule)
 	}
 	for _, rn := range dlpsensor.RuleListNames {
-		if _, foundInAll := defsensor.RuleList[rn]; foundInAll {
-			delete(defsensor.RuleList, rn)
-		}
+		delete(defsensor.RuleList, rn)
 	}
 	clusHelper.PutDlpSensorTxn(txn, defsensor)
 	clusHelper.DeleteDlpSensorTxn(txn, name)
@@ -1432,9 +1430,7 @@ func parseDerivedDlpRules(dlpRuleMap map[string]*share.CLUSDerivedDlpRuleArray,
 			Wafrids:     make([]uint32, 0),
 			RuleType:    arr.RuleType,
 		}
-		for _, m := range arr.WlMacs {
-			wlDlpRule.DlpMacs = append(wlDlpRule.DlpMacs, m)
-		}
+		wlDlpRule.DlpMacs = append(wlDlpRule.DlpMacs, arr.WlMacs...)
 
 		for _, r := range arr.DlpRules {
 			wlDlpRule.DlpRules = append(wlDlpRule.DlpRules, derivedDlp2Rest(r))
@@ -1444,13 +1440,9 @@ func parseDerivedDlpRules(dlpRuleMap map[string]*share.CLUSDerivedDlpRuleArray,
 			wlDlpRule.WafRules = append(wlDlpRule.WafRules, derivedDlp2Rest(r))
 		}
 
-		for _, r := range arr.Rids {
-			wlDlpRule.Rids = append(wlDlpRule.Rids, r)
-		}
+		wlDlpRule.Rids = append(wlDlpRule.Rids, arr.Rids...)
+		wlDlpRule.Wafrids = append(wlDlpRule.Wafrids, arr.Wafrids...)
 
-		for _, r := range arr.Wafrids {
-			wlDlpRule.Wafrids = append(wlDlpRule.Wafrids, r)
-		}
 		wlrs = append(wlrs, &wlDlpRule)
 	}
 	return wlrs
@@ -1497,9 +1489,7 @@ func parseDerivedDlpRuleEntries(dlpRuleEntries []*share.CLUSDerivedDlpRuleEntry,
 			ID:       dre.ID,
 			Patterns: make([]string, 0),
 		}
-		for _, p := range dre.Patterns {
-			dlpRuleEntry.Patterns = append(dlpRuleEntry.Patterns, p)
-		}
+		dlpRuleEntry.Patterns = append(dlpRuleEntry.Patterns, dre.Patterns...)
 
 		rdre[i] = dlpRuleEntry
 	}
@@ -1636,7 +1626,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 
 		ruleList := make([]*resource.NvSecurityDlpRule, 0, len(sensor.RuleListNames))
-		for rName, _ := range sensor.RuleListNames {
+		for rName := range sensor.RuleListNames {
 			if r, ok := defSensor.RuleList[rName]; ok {
 				patterns := make([]api.RESTDlpCriteriaEntry, len(r.Patterns))
 				for idx, p := range r.Patterns {
@@ -1725,7 +1715,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 	if invalidCrdKind || len(secRules) == 0 {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_DLP)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_DLP)
 		return nil
 	}
 
@@ -1749,7 +1739,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 		for _, secRule := range secRules {
 			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdDlpContent(&secRule, share.ReviewTypeImportDLP, share.ReviewTypeDisplayDLP)
 			if errCount > 0 {
-				err = fmt.Errorf(errMsg)
+				err = fmt.Errorf("%s", errMsg)
 				break
 			} else {
 				parsedDlpCfgs = append(parsedDlpCfgs, parsedCfg)

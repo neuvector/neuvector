@@ -19,7 +19,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const logsSizeLimit = 500 * 1000
+// const logsSizeLimit = 500 * 1000
 
 func stats2REST(stats *share.CLUSStats) *api.RESTStats {
 	r := &api.RESTStats{
@@ -514,7 +514,7 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 			restRespNotFoundLogAccessDenied(w, login, err)
 			return
 		}
-		if wl.CapQuar == false {
+		if !wl.CapQuar {
 			err := "Unable to quarantine the container"
 			log.WithFields(log.Fields{"id": id}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err)
@@ -741,8 +741,6 @@ func handlerWorkloadRequest(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Unsupported command")
 		return
 	}
-
-	restRespSuccess(w, r, nil, acc, login, &req, "Container request")
 }
 
 func handlerWorkloadProcessProfile(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

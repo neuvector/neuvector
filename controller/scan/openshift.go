@@ -92,7 +92,7 @@ func (r *openshift) GetRepoList(org, name string, limit int) ([]*share.CLUSImage
 		ibMutex.RLock()
 		defer ibMutex.RUnlock()
 
-		for img, _ := range imageBank {
+		for img := range imageBank {
 			if repo == img.Repo {
 				dup := img
 				list = append(list, &dup)
@@ -105,7 +105,7 @@ func (r *openshift) GetRepoList(org, name string, limit int) ([]*share.CLUSImage
 		list = make([]*share.CLUSImage, len(imageBank))
 
 		i := 0
-		for img, _ := range imageBank {
+		for img := range imageBank {
 			dup := img
 			list[i] = &dup
 			i++

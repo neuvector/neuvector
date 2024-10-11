@@ -38,7 +38,7 @@ func pwdProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value [
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var profile share.CLUSPwdProfile
-		json.Unmarshal(value, &profile)
+		_ = json.Unmarshal(value, &profile)
 		cacheMutexLock()
 		pwdProfiles[name] = &profile
 		if name == activePwdProfileName && profile.SessionTimeout != 0 {

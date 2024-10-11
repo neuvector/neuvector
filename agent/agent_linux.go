@@ -14,9 +14,12 @@ import (
 func getHostAddrs() map[string]sk.NetIface {
 	var ifaces map[string]sk.NetIface
 
-	global.SYS.CallNetNamespaceFunc(1, func(params interface{}) {
+	dbgError := global.SYS.CallNetNamespaceFunc(1, func(params interface{}) {
 		ifaces = sk.GetGlobalAddrs()
 	}, nil)
+	if dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	return ifaces
 }
@@ -25,9 +28,12 @@ func getHostLinks() map[string]bool {
 	var linkAttrs map[string]sk.NetLinkAttrs
 	links := make(map[string]bool)
 
-	global.SYS.CallNetNamespaceFunc(1, func(params interface{}) {
+	dbgError := global.SYS.CallNetNamespaceFunc(1, func(params interface{}) {
 		linkAttrs = sk.GetNetLinkAttrs()
 	}, nil)
+	if dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	for name, linkAttr := range linkAttrs {
 		links[name] = linkAttr.OperState
@@ -91,7 +97,7 @@ func parseHostAddrs(ifaces map[string]sk.NetIface, platform, flavor, network str
 			}
 
 			for _, addr := range iface.Addrs {
-				if utils.IsIPv4(addr.IPNet.IP) && !addr.IPNet.IP.IsLinkLocalUnicast() {//169.254.x.x IP should not be included
+				if utils.IsIPv4(addr.IPNet.IP) && !addr.IPNet.IP.IsLinkLocalUnicast() { //169.254.x.x IP should not be included
 					log.WithFields(log.Fields{"link": name, "ipnet": addr.IPNet}).Info("Switch")
 					if name == "azure0" || name == "mgmt-br" || (iface.Type == "openvswitch" && name == "br-ex") {
 						devs[name] = append(devs[name], share.CLUSIPAddr{

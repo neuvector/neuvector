@@ -134,7 +134,7 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 		lead = waitClusterReady(time.Second*2, 60)
 
 		// Set ready flag so the controller IP can participate selection after restart
-		utils.SetReady("ctrl init done")
+		_ = utils.SetReady("ctrl init done")
 
 		if lead == "" {
 			return "", errors.New("Failed to elect leader")
@@ -205,13 +205,17 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 
 				if retryCluster < retryLimit {
 					log.WithFields(log.Fields{"JoinAddr": cc.joinAddrList}).Info("Retry join")
-					driver.Join(cc)
+					if err := driver.Join(cc); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Join")
+					}
 					leadCheckTimer.Reset(time.Second * 30)
 					retryCluster++
 				} else {
 					log.WithFields(log.Fields{"JoinAddr": cc.JoinAddr}).Info("Leave cluster")
 					// errCh will trigger restart
-					driver.Leave(cc.Server)
+					if err := driver.Leave(cc.Server); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Leave")
+					}
 				}
 			}
 		}
@@ -947,7 +951,7 @@ func FillClusterAddrs(cfg *ClusterConfig, sys *system.SystemTools) error {
 				// for lead election; if dns is resolved, other servers are already running - it's possible it's
 				// in the rolling upgrade process, don't make self ready until lead is found.
 				if retry == 1 && cfg.Server {
-					utils.SetReady("cluster init")
+					_ = utils.SetReady("cluster init")
 				}
 				time.Sleep(time.Second * (1 << retry))
 			} else {

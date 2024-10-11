@@ -177,7 +177,7 @@ func translateWorkloadApps(wl *share.CLUSWorkload) []string {
 			case syscall.IPPROTO_UDP:
 				app_set.Add(fmt.Sprintf("UDP/%d", app.Port))
 			case syscall.IPPROTO_ICMP:
-				app_set.Add(fmt.Sprintf("ICMP"))
+				app_set.Add("ICMP")
 			default:
 				app_set.Add(fmt.Sprintf("%d/%d", app.IPProto, app.Port))
 			}
@@ -329,7 +329,7 @@ func workload2REST(cache *workloadCache) *api.RESTWorkload {
 		ExitCode:          wl.ExitCode,
 		SecuredAt:         api.RESTTimeString(wl.SecuredAt),
 		Ifaces:            make(map[string][]*api.RESTIPAddr),
-		Ports:             make([]*api.RESTWorkloadPorts, len(wl.Ports), len(wl.Ports)),
+		Ports:             make([]*api.RESTWorkloadPorts, len(wl.Ports)),
 		Labels:            wl.Labels,
 		MemoryLimit:       wl.MemoryLimit,
 		CPUs:              wl.CPUs,
@@ -602,7 +602,7 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		var newHost, ok bool
 		var cache *hostCache
 		var host share.CLUSHost
-		json.Unmarshal(value, &host)
+		_ = json.Unmarshal(value, &host)
 
 		if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher && host.Flavor == "" {
 			host.Flavor = share.FlavorRancher
@@ -723,7 +723,7 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var agent share.CLUSAgent
 		var newAgent bool
-		json.Unmarshal(value, &agent)
+		_ = json.Unmarshal(value, &agent)
 
 		log.WithFields(log.Fields{"agent": agent}).Info("Add or update enforcer")
 
@@ -802,7 +802,7 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		log.WithFields(log.Fields{"agent": id}).Info("Delete enforcer")
 
 		cacheMutexLock()
-		cache, _ := agentCacheMap[id]
+		cache := agentCacheMap[id]
 		if cache != nil {
 			deleteAgentFromCache(cache)
 			addrDeviceDelete(id, cache.agent.Ifaces)
@@ -826,7 +826,7 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var ctrl share.CLUSController
 		var newCtrl bool
-		json.Unmarshal(value, &ctrl)
+		_ = json.Unmarshal(value, &ctrl)
 
 		log.WithFields(log.Fields{"controller": ctrl}).Info("Add or update controller")
 
@@ -843,7 +843,7 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 			for _, cc = range ctrlCacheMap {
 				if cc.ctrl.ID != ctrl.ID && cc.ctrl.ClusterIP == ctrl.ClusterIP {
 					log.WithFields(log.Fields{"controller": cc.ctrl}).Info("duplicated controller")
-					cluster.Delete(cc.clusKey)
+					_ = cluster.Delete(cc.clusKey)
 				}
 			}
 
@@ -874,7 +874,7 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 		log.WithFields(log.Fields{"controller": id}).Info("Delete controller")
 
 		cacheMutexLock()
-		cache, _ := ctrlCacheMap[id]
+		cache := ctrlCacheMap[id]
 		if cache != nil {
 			deleteControllerFromCache(cache)
 			addrDeviceDelete(id, cache.ctrl.Ifaces)
@@ -1136,17 +1136,6 @@ func addrOrchWorkloadStop(ipnet *net.IPNet) {
 	}
 }
 
-func isOrchNeuvectorDevice(podname, domain string) bool {
-	name := podname
-	if index := strings.LastIndex(name, "-pod-"); index != -1 {
-		name = name[:index+4]
-	}
-	name = utils.MakeServiceName(domain, name)
-	gname := makeLearnedGroupName(name)
-
-	return isNeuvectorContainerGroup(gname)
-}
-
 // Add IP-2-workload map for workloads reported by orchestration
 func addrOrchWorkloadAdd(ipnet *net.IPNet, nodename string) {
 	key := ipnet.IP.String()
@@ -1179,11 +1168,11 @@ func setServiceAccount(node, wlID, wlName string, wlCache *workloadCache) {
 	}
 	if wlCache.serviceAccount == "" {
 		var podSAMap map[string]string
-		if podSAMap, _ = nodePodSAMap[node]; podSAMap == nil {
+		if podSAMap = nodePodSAMap[node]; podSAMap == nil {
 			// if k8s node is named as IP, its node entry in nodePodSAMap has key as IP.
 			// because param(node) could be hostname, we try IP again when we cannot find the node entry using param(node)
 			if hostCache, ok := k8sHostInfoMap[node]; ok && hostCache.k8sNodeName != "" {
-				podSAMap, _ = nodePodSAMap[hostCache.k8sNodeName]
+				podSAMap = nodePodSAMap[hostCache.k8sNodeName]
 			}
 		}
 		if podSAMap != nil {
@@ -1286,7 +1275,7 @@ func addK8sPodEvent(pod resource.Pod, probeCmds [][]string) {
 	cacheMutexLock()
 	defer cacheMutexUnlock()
 	var bFound bool
-	for group, _ := range groupCacheMap {
+	for group := range groupCacheMap {
 		if group == p.group || group == p.groupAlt {
 			log.WithFields(log.Fields{"group": group}).Debug()
 			bFound = true
@@ -1363,7 +1352,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var wl share.CLUSWorkload
-		json.Unmarshal(value, &wl)
+		_ = json.Unmarshal(value, &wl)
 
 		// Check if it's NeuVector containers first
 		if wl.PlatformRole == container.PlatformContainerNeuVector {
@@ -1403,8 +1392,8 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			oldQuar := wlCache.workload.Quarantine
 			oldSvc := wlCache.workload.Service
 
-			if reflect.DeepEqual(wlCache.workload.Ifaces, wl.Ifaces) != true ||
-				reflect.DeepEqual(wlCache.workload.Ports, wl.Ports) != true {
+			if !reflect.DeepEqual(wlCache.workload.Ifaces, wl.Ifaces) ||
+				!reflect.DeepEqual(wlCache.workload.Ports, wl.Ports) {
 				log.WithFields(log.Fields{
 					"workload": container.ShortContainerId(wl.ID),
 				}).Debug("intf/ports changed")
@@ -1509,7 +1498,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 					log.WithFields(log.Fields{"group": wlCache.learnedGroupName}).Debug("Fix group fields")
 					gc.group.CapIntcp = wl.CapIntcp
 					gc.group.PlatformRole = wl.PlatformRole
-					clusHelper.PutGroup(gc.group, false)
+					_ = clusHelper.PutGroup(gc.group, false)
 				}
 			}
 		}
@@ -1591,7 +1580,7 @@ func networkEPUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var nep share.CLUSNetworkEP
-		json.Unmarshal(value, &nep)
+		_ = json.Unmarshal(value, &nep)
 		addToNetworkEPGroup(&nep)
 	case cluster.ClusterNotifyDelete:
 		id := share.CLUSNetworkEPKey2ID(key)
@@ -1720,14 +1709,6 @@ func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, mod
 	}
 }
 
-func subjectObject(key string) string {
-	return share.CLUSKeyNthToken(key, 1)
-}
-
-func subjectAction(key string) string {
-	return share.CLUSKeyNthToken(key, 0)
-}
-
 func registerEventHandlers() {
 	evhdls = make(map[int][]eventHandlerFunc)
 
@@ -1831,7 +1812,7 @@ func deleteControllerFromCache(cc *ctrlCache) {
 }
 
 func logAgentEvent(ev share.TLogEvent, agent *share.CLUSAgent, msg string) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	clog := share.CLUSEventLog{
@@ -1845,11 +1826,11 @@ func logAgentEvent(ev share.TLogEvent, agent *share.CLUSAgent, msg string) {
 
 	clog.ReportedAt = time.Now().UTC()
 
-	cctx.EvQueue.Append(&clog)
+	_ = cctx.EvQueue.Append(&clog)
 }
 
 func logControllerEvent(ev share.TLogEvent, ctrl *share.CLUSController, msg string) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	clog := share.CLUSEventLog{
@@ -1862,7 +1843,7 @@ func logControllerEvent(ev share.TLogEvent, ctrl *share.CLUSController, msg stri
 	}
 	clog.ReportedAt = time.Now().UTC()
 
-	cctx.EvQueue.Append(&clog)
+	_ = cctx.EvQueue.Append(&clog)
 }
 
 func markWorkloadState(workloads utils.Set, state string) {
@@ -1904,7 +1885,7 @@ func putSpecialIPNetToCluseter(checkDiff bool) {
 
 	effectiveSpecialSubnets = newEffectiveSpecial
 
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	var i int
@@ -1946,7 +1927,7 @@ func putInternalIPNetToCluseter(checkDiff bool) {
 
 	effectiveInternalSubnets = newEffective
 
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	var i int
@@ -2059,7 +2040,6 @@ func updateInternalIPNet(ipnet *net.IPNet, scope string, loose bool) {
 	if specChg {
 		putSpecialIPNetToCluseter(true)
 	}
-	return
 }
 
 // This is called with cacheMutex
@@ -2158,7 +2138,7 @@ func refreshInternalIPNet() {
 		cachedSpecialSubnets = newSpecialSubnets
 		putSpecialIPNetToCluseter(true)
 	} else {
-		for key, _ := range newSpecialSubnets {
+		for key := range newSpecialSubnets {
 			if _, ok := cachedSpecialSubnets[key]; !ok {
 				cachedSpecialSubnets = newSpecialSubnets
 				putSpecialIPNetToCluseter(true)
@@ -2173,7 +2153,7 @@ func refreshInternalIPNet() {
 		return
 	}
 
-	for key, _ := range newSubnets {
+	for key := range newSubnets {
 		if _, ok := cachedInternalSubnets[key]; !ok {
 			cachedInternalSubnets = newSubnets
 			putInternalIPNetToCluseter(true)
@@ -2275,7 +2255,7 @@ func querySessionRequest(nType cluster.ClusterNotifyType, key string, value []by
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var qsr api.QuerySessionRequest
-		json.Unmarshal(value, &qsr)
+		_ = json.Unmarshal(value, &qsr)
 
 		log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr}).Debug("[multi-cluster] consul kv watcher added event. Will call rest.CreateQuerySession()")
 

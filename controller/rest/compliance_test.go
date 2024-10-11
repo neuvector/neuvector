@@ -17,7 +17,7 @@ func TestComplianceProfileConfig(t *testing.T) {
 	clusHelper = &mockCluster
 	cacher = &mockCache{
 		cps: map[string]*api.RESTComplianceProfile{
-			"default": &api.RESTComplianceProfile{
+			"default": {
 				Name:          "default",
 				DisableSystem: false,
 				Entries:       []api.RESTComplianceProfileEntry{},
@@ -63,9 +63,9 @@ func TestComplianceProfileConfig(t *testing.T) {
 	cfg = api.RESTComplianceProfileConfig{
 		Name: "default",
 		Entries: &[]*api.RESTComplianceProfileEntry{
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1"},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"PCI"}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.2", Tags: []string{"PCI", "HIPAA", "PCI"}},
+			{TestNum: "D.1.1.1"},
+			{TestNum: "D.1.2.1", Tags: []string{"PCI"}},
+			{TestNum: "D.1.2.2", Tags: []string{"PCI", "HIPAA", "PCI"}},
 		},
 	}
 	data = api.RESTComplianceProfileConfigData{Config: &cfg}
@@ -103,10 +103,10 @@ func TestComplianceProfileConfig(t *testing.T) {
 	cfg = api.RESTComplianceProfileConfig{
 		Name: "default",
 		Entries: &[]*api.RESTComplianceProfileEntry{
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1", Tags: []string{"PCI"}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"PCI", "HIPAA"}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.1.1", Tags: []string{"NIST", "PCI"}},
-			&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"GDPR"}},
+			{TestNum: "D.1.1.1", Tags: []string{"PCI"}},
+			{TestNum: "D.1.2.1", Tags: []string{"PCI", "HIPAA"}},
+			{TestNum: "D.1.1.1", Tags: []string{"NIST", "PCI"}},
+			{TestNum: "D.1.2.1", Tags: []string{"GDPR"}},
 		},
 	}
 	data = api.RESTComplianceProfileConfigData{Config: &cfg}
@@ -211,7 +211,7 @@ func TestComplianceProfileNegative(t *testing.T) {
 	clusHelper = &mockCluster
 	cacher = &mockCache{
 		cps: map[string]*api.RESTComplianceProfile{
-			"default": &api.RESTComplianceProfile{
+			"default": {
 				Name:          "default",
 				DisableSystem: false,
 				Entries:       []api.RESTComplianceProfileEntry{},
@@ -223,7 +223,7 @@ func TestComplianceProfileNegative(t *testing.T) {
 		cfg := api.RESTComplianceProfileConfig{
 			Name: "default",
 			Entries: &[]*api.RESTComplianceProfileEntry{
-				&api.RESTComplianceProfileEntry{TestNum: "<abc>"},
+				{TestNum: "<abc>"},
 			},
 		}
 		data := api.RESTComplianceProfileConfigData{Config: &cfg}
@@ -239,7 +239,7 @@ func TestComplianceProfileNegative(t *testing.T) {
 		cfg := api.RESTComplianceProfileConfig{
 			Name: "default",
 			Entries: &[]*api.RESTComplianceProfileEntry{
-				&api.RESTComplianceProfileEntry{TestNum: "D.1.2.1", Tags: []string{"PCPI"}},
+				{TestNum: "D.1.2.1", Tags: []string{"PCPI"}},
 			},
 		}
 		data := api.RESTComplianceProfileConfigData{Config: &cfg}

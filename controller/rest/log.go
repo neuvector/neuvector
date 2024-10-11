@@ -323,8 +323,7 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	}
 
-	var violationMap map[string]*api.RESTViolationWorkload
-	violationMap = make(map[string]*api.RESTViolationWorkload)
+	violationMap := make(map[string]*api.RESTViolationWorkload)
 	for _, v := range violations {
 		var wlID, wlName, wlDomain string
 		if client {
@@ -362,7 +361,7 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	var asc bool = query.sorts[0].asc
 
-	sortField := []restFieldSort{restFieldSort{tag: "count", asc: asc}}
+	sortField := []restFieldSort{{tag: "count", asc: asc}}
 	restNewSorter(data, sortField).Sort()
 
 	// Copy the result

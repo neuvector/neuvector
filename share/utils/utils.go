@@ -42,7 +42,6 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/licenseinfo"
 )
 
 var IPv4Loopback = net.IPv4(127, 0, 0, 1)
@@ -111,7 +110,7 @@ func ResolveAddrList(addr string, skipLoopback bool) ([]string, bool) {
 			continue
 		}
 
-		for i, _ := range ips {
+		for i := range ips {
 			if skipLoopback && ips[i].IsLoopback() {
 				continue
 			}
@@ -123,7 +122,7 @@ func ResolveAddrList(addr string, skipLoopback bool) ([]string, bool) {
 					break
 				}
 			}
-			if dup == false {
+			if !dup {
 				ipList = append(ipList, ips[i].String())
 			}
 		}
@@ -143,7 +142,9 @@ func GetFunctionName(f interface{}) string {
 func GzipBytes(buf []byte) []byte {
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
-	w.Write(buf)
+	if _, err := w.Write(buf); err != nil {
+		log.WithFields(log.Fields{"err": err, "len": len(buf)}).Error()
+	}
 	w.Close()
 
 	return b.Bytes()
@@ -176,7 +177,9 @@ func GetStringUUID(s string) string {
 
 func GetRandomID(length int, prefix string) string {
 	id := make([]byte, length)
-	rand.Read(id)
+	if _, err := rand.Read(id); err != nil {
+		log.WithFields(log.Fields{"err": err, "prefix": prefix}).Error()
+	}
 	return fmt.Sprintf("%s%s", prefix, hex.EncodeToString(id))
 }
 
@@ -419,7 +422,7 @@ func GetPortLink(ipproto uint8, port uint16) string {
 	case syscall.IPPROTO_UDP:
 		return fmt.Sprintf("udp/%d", port)
 	case syscall.IPPROTO_ICMP:
-		return fmt.Sprintf("icmp")
+		return "icmp"
 	default:
 		if ipproto != 0 {
 			return fmt.Sprintf("ip:%d", ipproto)
@@ -504,12 +507,12 @@ func GetPortRangeLink(ipproto uint8, port uint16, portR uint16) string {
 	case syscall.IPPROTO_UDP:
 		return fmt.Sprintf("udp/%s", getPortRangeStr(port, portR))
 	case syscall.IPPROTO_ICMP:
-		return fmt.Sprintf("icmp")
+		return "icmp"
 	default:
 		if ipproto != 0 {
 			return fmt.Sprintf("ip:%d", ipproto)
 		} else {
-			return fmt.Sprintf("%s", getPortRangeStr(port, portR))
+			return getPortRangeStr(port, portR)
 		}
 	}
 }
@@ -517,14 +520,14 @@ func GetPortRangeLink(ipproto uint8, port uint16, portR uint16) string {
 func IsHostRelated(addr *share.CLUSWorkloadAddr) bool {
 	if strings.HasPrefix(addr.WlID, share.CLUSLearnedHostPrefix) {
 		return true
-	} else if addr.NatPortApp != nil && len(addr.NatPortApp) > 0 {
+	} else if len(addr.NatPortApp) > 0 {
 		return true
 	}
 	return false
 }
 
 func GetCommonPorts(ports1 string, ports2 string) string {
-	var p, pp string = "", ""
+	var p, pp string
 	var low, high uint16
 	var proto uint8
 
@@ -647,11 +650,11 @@ func ParseIPRange(value string) (net.IP, net.IP) {
 	ipRange := strings.Split(value, "-")
 	switch len(ipRange) {
 	case 1:
-		ip, ipnet, err := net.ParseCIDR(ipRange[0])
+		_, ipnet, err := net.ParseCIDR(ipRange[0])
 		if err == nil {
 			return ipnetToRange(ipnet)
 		} else {
-			ip = net.ParseIP(ipRange[0])
+			ip := net.ParseIP(ipRange[0])
 			if ip == nil {
 				return nil, nil
 			}
@@ -1015,14 +1018,8 @@ func getPasswordSymKey() []byte {
 	return passwordSymKey
 }
 
-func GetLicenseSymKey() []byte {
-	return licenseSymKey
-}
-
 func GetLicenseInfo(license string) (string, error) { // returns license json string
-	symmetricKey := GetLicenseSymKey()
-	licValue, err := licenseinfo.GetLicenseInfo(license, symmetricKey)
-	return licValue, err
+	return "", nil
 }
 
 func DecryptPassword(encrypted string) string {
@@ -1112,7 +1109,7 @@ func EncryptURLSafe(password string) string {
 // Determine if a directory is a mountpoint, by comparing the device for the directory
 // with the device for it's parent.  If they are the same, it's not a mountpoint, if they're
 // different, it is.
-var reProcessRootPath = regexp.MustCompile("/proc/\\d+/root/")
+var reProcessRootPath = regexp.MustCompile(`/proc/\d+/root/`)
 
 func IsMountPoint(path string) bool {
 	stat, err := os.Stat(path)
@@ -1330,9 +1327,12 @@ func FileHashCrc32(path string, size int64) uint32 {
 
 		if size > hashByteRange {
 			// explore ending section
-			f.Seek(hashByteRange, io.SeekEnd)
-			if n, err := f.Read(buf); err == nil {
-				crc += crc32.ChecksumIEEE(buf[:n])
+			if _, err := f.Seek(hashByteRange, io.SeekEnd); err == nil {
+				if n, err := f.Read(buf); err == nil {
+					crc += crc32.ChecksumIEEE(buf[:n])
+				} else {
+					log.WithFields(log.Fields{"err": err, "path": path, "size": size}).Error()
+				}
 			}
 		}
 	}

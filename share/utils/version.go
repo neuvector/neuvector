@@ -180,6 +180,37 @@ func (a Version) Compare(b Version) int {
 	return signum(verrevcmp(a.el_ver, b.el_ver))
 }
 
+// CompareWithoutEpoch uses same comparison logic as Compare but doesn't compare epoch.
+func (a Version) CompareWithoutEpoch(b Version) int {
+	// Quick check
+	if a == b {
+		return 0
+	}
+
+	// Max/Min comparison
+	if a == MinVersion || b == MaxVersion {
+		return -1
+	}
+	if b == MinVersion || a == MaxVersion {
+		return 1
+	}
+
+	// Compare version
+	rc := verrevcmp(a.version, b.version)
+	if rc != 0 {
+		return signum(rc)
+	}
+
+	// Compare revision
+	rc = verrevcmp(a.revision, b.revision)
+	if rc != 0 {
+		return signum(rc)
+	}
+
+	// Compare el_ver
+	return signum(verrevcmp(a.el_ver, b.el_ver))
+}
+
 // String returns the string representation of a Version
 func (v Version) String() (s string) {
 	if v.epoch != 0 {
@@ -201,9 +232,10 @@ func (v Version) MarshalJSON() ([]byte, error) {
 
 func (v *Version) UnmarshalJSON(b []byte) (err error) {
 	var str string
-	json.Unmarshal(b, &str)
-	vp := NewVersionUnsafe(str)
-	*v = vp
+	if err = json.Unmarshal(b, &str); err == nil {
+		vp := NewVersionUnsafe(str)
+		*v = vp
+	}
 	return
 }
 

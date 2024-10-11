@@ -74,7 +74,6 @@ func (c *orchConn) cbWatcherState(state string, err error) {
 			log.WithFields(log.Fields{"error": err}).Error()
 		}
 	}
-	return
 }
 
 func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, old interface{}) {
@@ -104,31 +103,31 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 		if event == resource.WatchEventDelete {
 			k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res, "old object": old}).Debug("Event received")
 			nvCrdInfo := map[string]*resource.NvCrdInfo{
-				resource.NvSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvSecurityRuleKind,
 				},
-				resource.NvClusterSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvClusterSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvSecurityRuleKind,
 				},
-				resource.NvAdmCtrlSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvAdmCtrlSecurityRuleName: {
 					LockKey:   share.CLUSLockAdmCtrlKey,
 					KvCrdKind: resource.NvAdmCtrlSecurityRuleKind,
 				},
-				resource.NvDlpSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvDlpSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvDlpSecurityRuleKind,
 				},
-				resource.NvWafSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvWafSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvWafSecurityRuleKind,
 				},
-				resource.NvVulnProfileSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvVulnProfileSecurityRuleName: {
 					LockKey:   share.CLUSLockVulnKey,
 					KvCrdKind: resource.NvVulnProfileSecurityRuleKind,
 				},
-				resource.NvCompProfileSecurityRuleName: &resource.NvCrdInfo{
+				resource.NvCompProfileSecurityRuleName: {
 					LockKey:   share.CLUSLockCompKey,
 					KvCrdKind: resource.NvCompProfileSecurityRuleKind,
 				},

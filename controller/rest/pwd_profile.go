@@ -20,83 +20,83 @@ const _pwdValidPerDayUnit = 1440
 
 var _pwdValidUnit time.Duration = _pwdValidPerDayUnit // default: per day
 
-func handlerPwdProfileCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
-	defer r.Body.Close()
+// func handlerPwdProfileCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+// 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+// 	defer r.Body.Close()
 
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	} else if !acc.Authorize(&share.CLUSPwdProfile{}, nil) {
-		restRespAccessDenied(w, login)
-		return
-	}
+// 	acc, login := getAccessControl(w, r, "")
+// 	if acc == nil {
+// 		return
+// 	} else if !acc.Authorize(&share.CLUSPwdProfile{}, nil) {
+// 		restRespAccessDenied(w, login)
+// 		return
+// 	}
 
-	// Read body
-	body, _ := io.ReadAll(r.Body)
+// 	// Read body
+// 	body, _ := io.ReadAll(r.Body)
 
-	var rconf api.RESTPwdProfileData
-	err := json.Unmarshal(body, &rconf)
-	if err != nil || rconf.PwdProfile == nil || rconf.PwdProfile.Name == share.CLUSSysPwdProfileName {
-		log.WithFields(log.Fields{"error": err}).Error("Request error")
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
+// 	var rconf api.RESTPwdProfileData
+// 	err := json.Unmarshal(body, &rconf)
+// 	if err != nil || rconf.PwdProfile == nil || rconf.PwdProfile.Name == share.CLUSSysPwdProfileName {
+// 		log.WithFields(log.Fields{"error": err}).Error("Request error")
+// 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+// 		return
+// 	}
 
-	rprofile := rconf.PwdProfile
-	if rprofile.SessionTimeout == 0 {
-		rprofile.SessionTimeout = common.DefIdleTimeoutInternal
-	}
-	if rprofile.MinLen <= 0 || rprofile.MinUpperCount < 0 || rprofile.MinLowerCount < 0 || rprofile.MinDigitCount < 0 || rprofile.MinSpecialCount < 0 ||
-		(rprofile.EnablePwdExpiration && rprofile.PwdExpireAfterDays <= 0) ||
-		(rprofile.EnablePwdHistory && rprofile.PwdHistoryCount <= 0) ||
-		(rprofile.EnableBlockAfterFailedLogin && (rprofile.BlockAfterFailedCount <= 0 || rprofile.BlockMinutes <= 0)) ||
-		(rprofile.MinLen < (rprofile.MinUpperCount + rprofile.MinLowerCount + rprofile.MinDigitCount + rprofile.MinSpecialCount)) ||
-		(rprofile.SessionTimeout > api.UserIdleTimeoutMax || rprofile.SessionTimeout < api.UserIdleTimeoutMin) {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "invalid value")
-		return
-	}
+// 	rprofile := rconf.PwdProfile
+// 	if rprofile.SessionTimeout == 0 {
+// 		rprofile.SessionTimeout = common.DefIdleTimeoutInternal
+// 	}
+// 	if rprofile.MinLen <= 0 || rprofile.MinUpperCount < 0 || rprofile.MinLowerCount < 0 || rprofile.MinDigitCount < 0 || rprofile.MinSpecialCount < 0 ||
+// 		(rprofile.EnablePwdExpiration && rprofile.PwdExpireAfterDays <= 0) ||
+// 		(rprofile.EnablePwdHistory && rprofile.PwdHistoryCount <= 0) ||
+// 		(rprofile.EnableBlockAfterFailedLogin && (rprofile.BlockAfterFailedCount <= 0 || rprofile.BlockMinutes <= 0)) ||
+// 		(rprofile.MinLen < (rprofile.MinUpperCount + rprofile.MinLowerCount + rprofile.MinDigitCount + rprofile.MinSpecialCount)) ||
+// 		(rprofile.SessionTimeout > api.UserIdleTimeoutMax || rprofile.SessionTimeout < api.UserIdleTimeoutMin) {
+// 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "invalid value")
+// 		return
+// 	}
 
-	profile := share.CLUSPwdProfile{
-		Name:                        rprofile.Name,
-		Comment:                     rprofile.Comment,
-		MinLen:                      rprofile.MinLen,
-		MinUpperCount:               rprofile.MinUpperCount,
-		MinLowerCount:               rprofile.MinLowerCount,
-		MinDigitCount:               rprofile.MinDigitCount,
-		MinSpecialCount:             rprofile.MinSpecialCount,
-		EnablePwdExpiration:         rprofile.EnablePwdExpiration,
-		PwdExpireAfterDays:          rprofile.PwdExpireAfterDays,
-		EnablePwdHistory:            rprofile.EnablePwdHistory,
-		PwdHistoryCount:             rprofile.PwdHistoryCount,
-		EnableBlockAfterFailedLogin: rprofile.EnableBlockAfterFailedLogin,
-		BlockAfterFailedCount:       rprofile.BlockAfterFailedCount,
-		BlockMinutes:                rprofile.BlockMinutes,
-		SessionTimeout:              rprofile.SessionTimeout,
-	}
-	if profile.PwdHistoryCount > _maxPwdHistoryCount {
-		profile.PwdHistoryCount = _maxPwdHistoryCount
-	}
+// 	profile := share.CLUSPwdProfile{
+// 		Name:                        rprofile.Name,
+// 		Comment:                     rprofile.Comment,
+// 		MinLen:                      rprofile.MinLen,
+// 		MinUpperCount:               rprofile.MinUpperCount,
+// 		MinLowerCount:               rprofile.MinLowerCount,
+// 		MinDigitCount:               rprofile.MinDigitCount,
+// 		MinSpecialCount:             rprofile.MinSpecialCount,
+// 		EnablePwdExpiration:         rprofile.EnablePwdExpiration,
+// 		PwdExpireAfterDays:          rprofile.PwdExpireAfterDays,
+// 		EnablePwdHistory:            rprofile.EnablePwdHistory,
+// 		PwdHistoryCount:             rprofile.PwdHistoryCount,
+// 		EnableBlockAfterFailedLogin: rprofile.EnableBlockAfterFailedLogin,
+// 		BlockAfterFailedCount:       rprofile.BlockAfterFailedCount,
+// 		BlockMinutes:                rprofile.BlockMinutes,
+// 		SessionTimeout:              rprofile.SessionTimeout,
+// 	}
+// 	if profile.PwdHistoryCount > _maxPwdHistoryCount {
+// 		profile.PwdHistoryCount = _maxPwdHistoryCount
+// 	}
 
-	var lock cluster.LockInterface
-	if lock, err = lockClusKey(w, share.CLUSLockUserKey); err != nil {
-		return
-	}
-	defer clusHelper.ReleaseLock(lock)
+// 	var lock cluster.LockInterface
+// 	if lock, err = lockClusKey(w, share.CLUSLockUserKey); err != nil {
+// 		return
+// 	}
+// 	defer clusHelper.ReleaseLock(lock)
 
-	// Check if profile already exists
-	if profileExisting, _, _ := clusHelper.GetPwdProfileRev(rprofile.Name, acc); profileExisting != nil {
-		e := "password profile already exists"
-		log.WithFields(log.Fields{"create": rprofile.Name}).Error(e)
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
-		return
-	} else if err := clusHelper.PutPwdProfileRev(&profile, 0); err != nil {
-		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return
-	}
+// 	// Check if profile already exists
+// 	if profileExisting, _, _ := clusHelper.GetPwdProfileRev(rprofile.Name, acc); profileExisting != nil {
+// 		e := "password profile already exists"
+// 		log.WithFields(log.Fields{"create": rprofile.Name}).Error(e)
+// 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
+// 		return
+// 	} else if err := clusHelper.PutPwdProfileRev(&profile, 0); err != nil {
+// 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+// 		return
+// 	}
 
-	restRespSuccess(w, r, nil, acc, login, &rprofile, "Create password profile")
-}
+// 	restRespSuccess(w, r, nil, acc, login, &rprofile, "Create password profile")
+// }
 
 func handlerPwdProfileShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
@@ -357,43 +357,43 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Configure passport profile")
 }
 
-func handlerPwdProfileDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
-	defer r.Body.Close()
+// func handlerPwdProfileDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+// 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+// 	defer r.Body.Close()
 
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	} else if !acc.Authorize(&share.CLUSPwdProfile{}, nil) {
-		restRespAccessDenied(w, login)
-		return
-	}
+// 	acc, login := getAccessControl(w, r, "")
+// 	if acc == nil {
+// 		return
+// 	} else if !acc.Authorize(&share.CLUSPwdProfile{}, nil) {
+// 		restRespAccessDenied(w, login)
+// 		return
+// 	}
 
-	errMsg := ""
-	name := ps.ByName("name")
-	if name == share.CLUSDefPwdProfileName || name == share.CLUSSysPwdProfileName {
-		errMsg = "Cannot delete reserved password profile"
-	} else if activeProfileName := clusHelper.GetActivePwdProfileName(); name == activeProfileName {
-		errMsg = "Cannot delete the active password profile"
-	}
-	if errMsg != "" {
-		log.WithFields(log.Fields{"profile": name}).Error(errMsg)
-		restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, errMsg)
-		return
-	}
+// 	errMsg := ""
+// 	name := ps.ByName("name")
+// 	if name == share.CLUSDefPwdProfileName || name == share.CLUSSysPwdProfileName {
+// 		errMsg = "Cannot delete reserved password profile"
+// 	} else if activeProfileName := clusHelper.GetActivePwdProfileName(); name == activeProfileName {
+// 		errMsg = "Cannot delete the active password profile"
+// 	}
+// 	if errMsg != "" {
+// 		log.WithFields(log.Fields{"profile": name}).Error(errMsg)
+// 		restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, errMsg)
+// 		return
+// 	}
 
-	var err error
-	var lock cluster.LockInterface
-	if lock, err = lockClusKey(w, share.CLUSLockUserKey); err != nil {
-		return
-	}
-	defer clusHelper.ReleaseLock(lock)
+// 	var err error
+// 	var lock cluster.LockInterface
+// 	if lock, err = lockClusKey(w, share.CLUSLockUserKey); err != nil {
+// 		return
+// 	}
+// 	defer clusHelper.ReleaseLock(lock)
 
-	if err := clusHelper.DeletePwdProfile(name); err != nil {
-		log.WithFields(log.Fields{"profile": name}).Error("get passport profile")
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
-		return
-	}
+// 	if err := clusHelper.DeletePwdProfile(name); err != nil {
+// 		log.WithFields(log.Fields{"profile": name}).Error("get passport profile")
+// 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+// 		return
+// 	}
 
-	restRespSuccess(w, r, nil, acc, login, nil, "Delete password profile")
-}
+// 	restRespSuccess(w, r, nil, acc, login, nil, "Delete password profile")
+// }

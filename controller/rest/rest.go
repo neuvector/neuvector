@@ -26,7 +26,7 @@ import (
 
 	"errors"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"sigs.k8s.io/yaml"
 
 	"github.com/hashicorp/go-version"
@@ -68,6 +68,7 @@ const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's giv
 
 var evqueue cluster.ObjectQueueInterface
 var auditQueue cluster.ObjectQueueInterface
+
 var messenger cluster.MessengerInterface
 var clusHelper kv.ClusterHelper
 var cfgHelper kv.ConfigHelper
@@ -79,6 +80,7 @@ var k8sPlatform bool
 
 var fedRestServerMutex sync.Mutex
 var fedRestServerState uint64
+
 var crdEventProcTicker *time.Ticker
 
 var dockerRegistries utils.Set
@@ -96,7 +98,7 @@ var _restPort uint
 var _fedPort uint
 var _fedServerChan chan bool
 
-var _licSigKeyEnv int
+// var _licSigKeyEnv int
 
 var _teleNeuvectorURL string
 var _teleFreq uint
@@ -187,7 +189,7 @@ func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, hea
 		hNames = append(hNames, "X-Transaction-ID")
 	}
 	for _, hName := range hNames {
-		if v, _ := headers[hName]; v != "" {
+		if v := headers[hName]; v != "" {
 			w.Header().Set(hName, v)
 		}
 	}
@@ -705,7 +707,7 @@ func restNewFilter(data interface{}, filters []restFieldFilter) *restFilter {
 		}
 	}
 
-	for i, _ := range filters {
+	for i := range filters {
 		rf.FilteredBy(data, &filters[i])
 	}
 
@@ -716,7 +718,7 @@ func (rf *restFilter) FilteredBy(data interface{}, ff *restFieldFilter) *restFil
 	v := reflect.ValueOf(data).Elem()
 
 	// Get field name from tag
-	if ff.field, _ = rf.tags[ff.tag]; ff.field == "" {
+	if ff.field = rf.tags[ff.tag]; ff.field == "" {
 		log.WithFields(log.Fields{"tag": ff.tag}).Debug("Field with tag not exist")
 		return rf
 	}
@@ -868,7 +870,7 @@ func restNewSorter(data []interface{}, sorts []restFieldSort) *restSorter {
 		}
 	}
 
-	for i, _ := range sorts {
+	for i := range sorts {
 		rs.SortedBy(&sorts[i])
 	}
 	return &rs
@@ -879,7 +881,7 @@ func (rs *restSorter) SortedBy(s *restFieldSort) *restSorter {
 	v := reflect.ValueOf(d).Elem()
 
 	// Get field name from tag
-	if s.field, _ = rs.tags[s.tag]; s.field == "" {
+	if s.field = rs.tags[s.tag]; s.field == "" {
 		log.WithFields(log.Fields{"tag": s.tag}).Error("Field with tag not exist")
 		return rs
 	}
@@ -1002,12 +1004,10 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		clog.RESTBody = string(body[:size])
 	}
 
-	if fields != nil {
-		for key, value := range fields {
-			switch key {
-			case restLogFieldMsg:
-				clog.Msg = value
-			}
+	for key, value := range fields {
+		switch key {
+		case restLogFieldMsg:
+			clog.Msg = value
 		}
 	}
 
@@ -1028,10 +1028,10 @@ func getNewestVersion(vers utils.Set) string {
 	return newest
 }
 
-func isIDStringValid(name string) bool {
-	valid, _ := regexp.MatchString("^[.a-zA-Z0-9_-]*$", name)
-	return valid
-}
+// func isIDStringValid(name string) bool {
+// 	valid, _ := regexp.MatchString("^[.a-zA-Z0-9_-]*$", name)
+// 	return valid
+// }
 
 func isObjectNameValid(name string) bool {
 	// Object name must starts with letters or digits
@@ -1493,6 +1493,36 @@ func PreInitContext(ctx *Context) {
 	cfgHelper = kv.GetConfigHelper()
 }
 
+func initSearchRegistries(ctx *Context) {
+	searchRegistries = utils.NewSet()
+
+	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
+		reg = strings.Trim(reg, " ")
+		if len(reg) > 0 {
+			parsedReg, err := url.Parse(reg)
+			if err != nil {
+				log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
+				continue
+			}
+			var regURL string
+			if parsedReg.Scheme == "" {
+				// when scheme is not specified in reg, host is in parsedReg.Path
+				path := parsedReg.Path
+				if i := strings.Index(parsedReg.Path, "/"); i > 0 {
+					path = parsedReg.Path[:i]
+				}
+				regURL = fmt.Sprintf("https://%s/", path)
+			} else {
+				// when scheme is specified in reg, host is in parsedReg.Host
+				regURL = fmt.Sprintf("%s://%s/", parsedReg.Scheme, parsedReg.Host)
+			}
+			if !searchRegistries.Contains(regURL) {
+				searchRegistries.Add(regURL)
+			}
+		}
+	}
+}
+
 // InitContext() must be called before StartRESTServer(), StartFedRestServer or AdmissionRestServer()
 func InitContext(ctx *Context) {
 
@@ -1516,28 +1546,13 @@ func InitContext(ctx *Context) {
 		log.WithError(err).Error("failed to initialize keys/certificates.")
 	}
 
-	searchRegistries = utils.NewSet()
-
-	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
-		if parsedReg, err := url.Parse(reg); err != nil {
-			log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
-			continue
-		} else if parsedReg.Host != "" {
-			reg = parsedReg.Host
-		}
-
-		k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
-		if !searchRegistries.Contains(k) {
-			searchRegistries.Add(k)
-		}
-	}
+	initSearchRegistries(ctx)
 
 	initHttpClients()
 }
 
 func StartRESTServer(isNewCluster bool, isLead bool) {
 	initDefaultRegistries()
-	licenseInit()
 	newRepoScanMgr()
 	newRegTestMgr()
 
@@ -1612,9 +1627,6 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.PATCH("/v1/system/config/webhook/:name", handlerSystemWebhookConfig)  // supported 'scope' query parameter values: "fed"/"local"(default).
 	r.DELETE("/v1/system/config/webhook/:name", handlerSystemWebhookDelete) // supported 'scope' query parameter values: "fed"/"local"(default).
 	r.POST("/v1/system/request", handlerSystemRequest)
-	r.GET("/v1/system/license", handlerLicenseShow)
-	r.POST("/v1/system/license/update", handlerLicenseUpdate)
-	r.DELETE("/v1/system/license", handlerLicenseDelete)
 	r.GET("/v1/domain", handlerDomainList)
 	r.PATCH("/v1/domain", handlerDomainConfig)
 	r.PATCH("/v1/domain/:name", handlerDomainEntryConfig)

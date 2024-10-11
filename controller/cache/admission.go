@@ -52,8 +52,6 @@ const (
 	_matchedSrcImageEnvVars    = "image environment variables"
 	_matchedSrcResourceEnvVars = "resource environment variables"
 	_matchedSrcBothEnvVars     = "resource and image environment variables"
-
-	_matchedSrcResourceAnnotations = "resource annotations"
 )
 
 var admUriStates map[string]*nvsysadmission.AdmUriState // key is uri for admission request
@@ -68,7 +66,6 @@ var admCacheMutex sync.RWMutex // only for setting/getting admission control 'en
 var nvDeployStatus map[string]bool
 var nvDeployDeleted uint32 // non-zero means nv deployment is being deleted
 var whRevertCount uint32   // ValidatingWebhookConfiguration neuvector-validating-admission-webhook revert count (because of unknown matchExpressions keys)
-var initFedRole string
 
 var reservedRegs = make(map[string][]string)
 
@@ -183,7 +180,7 @@ func initCache() {
 	for idx, ruleType := range ruleTypes {
 		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
 		if err != nil && err.Error() == cluster.ErrKeyNotFound.Error() {
-			clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleType, arhs)
+			_ = clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleType, arhs)
 		}
 		ruleCaches[idx].RuleMap = make(map[uint32]*share.CLUSAdmissionRule, len(arhs)) // key is ruleID
 		ruleCaches[idx].RuleHeads = make([]*share.CLUSRuleHead, 0, len(arhs))
@@ -326,7 +323,7 @@ func admissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 		RuleType: rule.RuleType,
 		RuleMode: rule.RuleMode,
 	}
-	r.CfgType, _ = cfgTypeMapping[rule.CfgType]
+	r.CfgType = cfgTypeMapping[rule.CfgType]
 	if rule.CfgType == share.FederalCfg {
 		if r.RuleType == share.FedAdmCtrlExceptRulesType {
 			r.RuleType = api.ValidatingExceptRuleType
@@ -500,7 +497,7 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 		switch cfgType {
 		case share.CLUSAdmissionCfgState:
 			var state share.CLUSAdmissionState
-			json.Unmarshal(value, &state)
+			_ = json.Unmarshal(value, &state)
 			updated, nvInstalled := updateNvDeployStatus(state.NvDeployStatus)
 			if updated && !nvInstalled {
 				atomic.StoreUint32(&nvDeployDeleted, 1)
@@ -522,14 +519,14 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 					switch admType {
 					case admission.NvAdmValidateType:
 						category = admission.AdmRuleCatK8s
-						if oldState, _ := admStateCache.CtrlStates[admType]; oldState != nil {
+						if oldState := admStateCache.CtrlStates[admType]; oldState != nil {
 							if oldState.Uri != ctrlState.Uri || oldState.NvStatusUri != ctrlState.NvStatusUri {
 								var param interface{} = &resource.NvAdmSvcName
-								cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+								_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
 							}
 						}
 					}
-					setAdmCtrlStateCache(admType, category, &state, ctrlState.Uri, ctrlState.NvStatusUri)
+					_ = setAdmCtrlStateCache(admType, category, &state, ctrlState.Uri, ctrlState.NvStatusUri)
 				}
 				if admStateCache.Enable && !state.Enable {
 					whRevertCount = 0
@@ -546,7 +543,7 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			}
 		case share.CLUSAdmissionCfgRule:
 			var rule share.CLUSAdmissionRule
-			json.Unmarshal(value, &rule)
+			_ = json.Unmarshal(value, &rule)
 			for _, crt := range rule.Criteria {
 				switch crt.Op {
 				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
@@ -569,7 +566,7 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			log.WithFields(log.Fields{"nType": nType, "cfgType": cfgType, "rule.ID": rule.ID}).Debug("admissionConfigUpdate, add/modify to opa")
 		case share.CLUSAdmissionCfgRuleList:
 			var heads []*share.CLUSRuleHead
-			json.Unmarshal(value, &heads)
+			_ = json.Unmarshal(value, &heads)
 			admPolicyCache.RuleHeads = heads
 			ids := utils.NewSet()
 			for _, rh := range heads {
@@ -591,7 +588,7 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			}
 		case share.CLUSAdmissionStatistics:
 			var stats share.CLUSAdmissionStats
-			json.Unmarshal(value, &stats)
+			_ = json.Unmarshal(value, &stats)
 			atomic.StoreUint64(&admStats.K8sAllowedRequests, stats.K8sAllowedRequests)
 			atomic.StoreUint64(&admStats.K8sDeniedRequests, stats.K8sDeniedRequests)
 			atomic.StoreUint64(&admStats.K8sErroneousRequests, stats.K8sErroneousRequests)
@@ -1195,7 +1192,7 @@ func matchImageValue(crtOp, crtValue string, c *nvsysadmission.AdmContainerInfo)
 	for ctnerReg := range c.ImageRegistry.Iter() {
 		if crtHasRegistry {
 			if crtHasTag {
-				if strings.Index(c.ImageTag, "sha") == 0 && strings.Index(c.ImageTag, ":") != -1 {
+				if strings.Index(c.ImageTag, "sha") == 0 && strings.Contains(c.ImageTag, ":") {
 					fullName = fmt.Sprintf("%s%s@%s", ctnerReg, c.ImageRepo, c.ImageTag) // ex: https://index.docker.io/nvlab/iperf@sha256:6f8ee848131d2fe7fb7fc5c96dab9adba619b55b7f0d87f6c4dbfaf77f7936f5
 				} else {
 					fullName = fmt.Sprintf("%s%s:%s", ctnerReg, c.ImageRepo, c.ImageTag) // ex: https://index.docker.io/nvlab/iperf:latest
@@ -1205,7 +1202,7 @@ func matchImageValue(crtOp, crtValue string, c *nvsysadmission.AdmContainerInfo)
 			}
 		} else {
 			if crtHasTag {
-				if strings.Index(c.ImageTag, "sha") == 0 && strings.Index(c.ImageTag, ":") != -1 {
+				if strings.Index(c.ImageTag, "sha") == 0 && strings.Contains(c.ImageTag, ":") {
 					fullName = fmt.Sprintf("%s@%s", c.ImageRepo, c.ImageTag) // ex: nvlab/iperf@sha256:6f8ee848131d2fe7fb7fc5c96dab9adba619b55b7f0d87f6c4dbfaf77f7936f5
 				} else {
 					fullName = fmt.Sprintf("%s:%s", c.ImageRepo, c.ImageTag) // ex: nvlab/iperf:latest
@@ -1295,7 +1292,7 @@ func mergeStringMaps(propFromYaml map[string]string, propFromImage map[string]st
 		if v, ok := propFromYaml[k2]; ok {
 			if v2 != v {
 				// a key exists in both propFromYaml & propFromImage with different values
-				slice, _ := union[k2]
+				slice := union[k2]
 				union[k2] = append(slice, v2)
 			}
 		} else {
@@ -1528,7 +1525,7 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 			mets[key] = met
 			poss[key] = positive
 		} else {
-			p, _ := poss[key]
+			p := poss[key]
 			if !positive && !p {
 				mets[key] = v && met
 			} else {
@@ -1677,7 +1674,6 @@ func sameNameCriteriaToString(ruleType string, criteria []*share.CLUSAdmRuleCrit
 		}
 		if str == "" {
 			opDsiplay := getOpDisplay(crt)
-			displayName = ""
 
 			if crt.Type != "" {
 				crt.Name = crt.Type
@@ -1940,7 +1936,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 			case resource.NvAdmValidatingName:
 				k8sResInfo = admission.ValidatingWebhookConfigInfo{
 					WebhooksInfo: []*admission.WebhookInfo{
-						&admission.WebhookInfo{
+						{
 							Name: resource.NvAdmValidatingWebhookName,
 							ClientConfig: admission.ClientConfig{
 								ClientMode:  state.AdmClientMode,
@@ -1950,7 +1946,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 							FailurePolicy:  failurePolicy,
 							TimeoutSeconds: state.TimeoutSeconds,
 						},
-						&admission.WebhookInfo{
+						{
 							Name: resource.NvStatusValidatingWebhookName,
 							ClientConfig: admission.ClientConfig{
 								ClientMode:  state.AdmClientMode,
@@ -1968,7 +1964,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 			case resource.NvCrdValidatingName:
 				k8sResInfo = admission.ValidatingWebhookConfigInfo{
 					WebhooksInfo: []*admission.WebhookInfo{
-						&admission.WebhookInfo{
+						{
 							Name: resource.NvCrdValidatingWebhookName,
 							ClientConfig: admission.ClientConfig{
 								ClientMode:  state.AdmClientMode,
@@ -1991,7 +1987,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 					Msg:        msg,
 					ReportedAt: time.Now().UTC(),
 				}
-				cctx.EvQueue.Append(&alog)
+				_ = cctx.EvQueue.Append(&alog)
 			}
 			return skip, err
 		}
@@ -2087,10 +2083,8 @@ func (m CacheMethod) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResO
 			// As specified in https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/,
 			// the environment variables set using the env or envFrom field will override any environment variables specified in the container image.
 			// So environment variables set in yaml will override any environment variables specified in the scanned result.
-			for k, _ := range c.EnvVars {
-				if _, exist := scannedImage.EnvVars[k]; exist {
-					delete(scannedImage.EnvVars, k)
-				}
+			for k := range c.EnvVars {
+				delete(scannedImage.EnvVars, k)
 			}
 		}
 
@@ -2318,7 +2312,7 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 		}
 		if set.Cardinality() > 0 {
 			c.Value = strings.Join(set.ToStringSlice(), setDelim)
-			if crit.SubCriteria != nil && len(crit.SubCriteria) > 0 {
+			if len(crit.SubCriteria) > 0 {
 				if c.SubCriteria, err = AdmCriteria2CLUS(crit.SubCriteria); err != nil {
 					return nil, fmt.Errorf("Invalid criterion value")
 				}
@@ -2541,7 +2535,7 @@ func fillDenyMessageFromRule(c *nvsysadmission.AdmContainerInfo, rule *share.CLU
 				messages = append(messages, temp)
 			}
 			if c.RunAsUser == -1 && scannedImage.RunAsRoot {
-				messages = append(messages, fmt.Sprintf("runAsRoot in the image"))
+				messages = append(messages, "runAsRoot in the image")
 			}
 			if len(messages) > 0 {
 				message = fmt.Sprintf("Found %s.", strings.Join(messages, " or "))
@@ -2725,7 +2719,7 @@ func isAdmissionPVCRuleMet(criteria []*share.CLUSAdmRuleCriterion, ns, name, scN
 			mets[key] = met
 			poss[key] = positive
 		} else {
-			p, _ := poss[key]
+			p := poss[key]
 			if !positive && !p {
 				mets[key] = v && met
 			} else {

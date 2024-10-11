@@ -42,9 +42,9 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 	now := time.Now()
 	if obj, err = global.ORCH.GetResource(RscTypeConfigMap, NvAdmSvcNamespace, "csp-config"); err == nil {
 		if cm, ok := obj.(*corev1.ConfigMap); cm == nil || !ok {
-			err = fmt.Errorf("Error: Unknown type")
+			log.WithFields(log.Fields{"err": "Error: Unknown type"}).Error()
 		} else {
-			err = fmt.Errorf("No billing data")
+			// err = fmt.Errorf("No billing data")
 			if cm.Data != nil {
 				if value, ok := cm.Data["data"]; ok {
 					resp.CspConfigData = value
@@ -77,7 +77,7 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 		if cm, ok := obj.(*corev1.ConfigMap); cm == nil || !ok {
 			err = fmt.Errorf("Error: Unknown type")
 		} else if cm.Data != nil {
-			resp.MeteringArchiveData, _ = cm.Data["archive"]
+			resp.MeteringArchiveData = cm.Data["archive"]
 		}
 	}
 

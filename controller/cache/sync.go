@@ -198,7 +198,6 @@ func cbSync(subject string, body []byte, args ...interface{}) {
 	}
 	log.WithFields(log.Fields{"sync": msg.CatgName}).Error("unknown sync reply")
 	*ret = syncRxErrorFailed
-	return
 }
 
 // Return data parsing error code and grpc error
@@ -413,7 +412,6 @@ func queueHotSyncRequest(filter []ctrlResyncFilter) {
 		}
 	}
 	resyncMutex.Unlock()
-	return
 }
 
 func putHotSyncRequest() int {
@@ -542,6 +540,4 @@ func syncCheck(isLeader bool) {
 			}
 		}
 	}
-
-	return
 }

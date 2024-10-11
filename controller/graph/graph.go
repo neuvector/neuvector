@@ -193,13 +193,13 @@ func (g *Graph) DeleteNode(node string) string {
 	}
 
 	for link, gl := range gn.ins {
-		for n, _ := range gl.ends {
+		for n := range gl.ends {
 			g.DeleteLink(n, link, node)
 		}
 	}
 
 	for link, gl := range gn.outs {
-		for n, _ := range gl.ends {
+		for n := range gl.ends {
 			g.DeleteLink(node, link, n)
 		}
 	}
@@ -223,7 +223,7 @@ func (g *Graph) Node(v string) string {
 
 func (g *Graph) All() utils.Set {
 	ret := utils.NewSet()
-	for v, _ := range g.nodes {
+	for v := range g.nodes {
 		ret.Add(v)
 	}
 	return ret
@@ -285,7 +285,7 @@ func (g *Graph) Ins(node string) utils.Set {
 	ret := utils.NewSet()
 	n := g.nodes[node]
 	for _, l := range n.ins {
-		for v, _ := range l.ends {
+		for v := range l.ends {
 			ret.Add(v)
 		}
 	}
@@ -303,7 +303,7 @@ func (g *Graph) InsByLink(node string, link string) utils.Set {
 	if gl, ok := n.ins[link]; !ok {
 		return ret
 	} else {
-		for v, _ := range gl.ends {
+		for v := range gl.ends {
 			ret.Add(v)
 		}
 	}
@@ -319,7 +319,7 @@ func (g *Graph) Outs(node string) utils.Set {
 	ret := utils.NewSet()
 	n := g.nodes[node]
 	for _, l := range n.outs {
-		for v, _ := range l.ends {
+		for v := range l.ends {
 			ret.Add(v)
 		}
 	}
@@ -337,7 +337,7 @@ func (g *Graph) OutsByLink(node string, link string) utils.Set {
 	if gl, ok := n.outs[link]; !ok {
 		return ret
 	} else {
-		for v, _ := range gl.ends {
+		for v := range gl.ends {
 			ret.Add(v)
 		}
 	}

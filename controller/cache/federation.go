@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,12 +56,12 @@ func fedInit(restoredFedRole string) {
 	m := clusHelper.GetFedMembership()
 	if m == nil {
 		m = &share.CLUSFedMembership{}
-		clusHelper.PutFedMembership(m)
+		_ = clusHelper.PutFedMembership(m)
 	}
 	l := clusHelper.GetFedJointClusterList()
 	if l == nil {
 		l = &share.CLUSFedJoinedClusterList{IDs: make([]string, 0)}
-		clusHelper.PutFedJointClusterList(l)
+		_ = clusHelper.PutFedJointClusterList(l)
 	}
 
 	revCache, _ := clusHelper.GetFedRulesRevisionRev()
@@ -87,7 +86,7 @@ func fedInit(restoredFedRole string) {
 				}
 			}
 			if wrt {
-				clusHelper.PutFedRulesRevision(nil, revCache)
+				_ = clusHelper.PutFedRulesRevision(nil, revCache)
 			}
 			fedRulesRevisionCache.Revisions = revCache.Revisions
 		}
@@ -134,6 +133,7 @@ func fedScanDataCacheMutexRUnlock() {
 	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Released")
 }
 
+/*
 func serializeFile(fileName string, dataBase64 string) {
 	if len(dataBase64) > 0 {
 		_, err := os.Stat(fileName)
@@ -154,11 +154,12 @@ func serializeFile(fileName string, dataBase64 string) {
 		log.WithFields(log.Fields{"path": fileName}).Error("empty dataBase64")
 	}
 }
+*/
 
 func purgeFiles(fileNamePrefix string) {
 	dir := "/etc/neuvector/certs"
 	pathPrefix := fmt.Sprintf("%s/%s", dir, fileNamePrefix)
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if info != nil && strings.Index(path, pathPrefix) == 0 {
 			os.Remove(path)
 		}
@@ -178,22 +179,22 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		case share.CLUSFedMembershipSubKey:
 			var m share.CLUSFedMembership
 			var dec common.DecryptUnmarshaller
-			dec.Unmarshal(value, &m)
+			_ = dec.Unmarshal(value, &m)
 			log.WithFields(log.Fields{"role": m.FedRole}).Info()
 			if m.FedRole == api.FedRoleMaster {
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleMaster)
-				kv.GetFedCaCertPath(m.MasterCluster.ID)
-				go cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil)
+				_, _ = kv.GetFedCaCertPath(m.MasterCluster.ID)
+				go func() { _ = cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil) }()
 			} else if m.FedRole == api.FedRoleJoint {
 				var param interface{} = &m.JointCluster
 				if err := cctx.StartStopFedPingPollFunc(share.JointLoadOwnKeys, 0, param); err == nil {
 					//serializeFile(masterCaCertPath, m.MasterCluster.CACert)
-					go cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil)
+					go func() { _ = cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil) }()
 				}
 			} else if m.FedRole == api.FedRoleNone {
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleNone)
-				cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil)
-				go cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil)
+				_ = cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil)
+				go func() { _ = cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil) }()
 				purgeFiles("fed.master.")
 				purgeFiles("fed.client.")
 				fedSystemConfigCache = share.CLUSSystemConfig{CfgType: share.FederalCfg}
@@ -211,7 +212,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			if id != "" {
 				var cluster share.CLUSFedJointClusterInfo
 				var dec common.DecryptUnmarshaller
-				dec.Unmarshal(value, &cluster)
+				_ = dec.Unmarshal(value, &cluster)
 				cache, ok := fedJoinedClustersCache[id]
 				if cache == nil || !ok {
 					log.WithFields(log.Fields{"id": id}).Info("add")
@@ -220,7 +221,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 						tokenCache: make(map[string]string),
 					}
 					var param interface{} = &cluster
-					cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param)
+					_ = cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param)
 					fedJoinedClustersCache[id] = cache
 				} else {
 					if cache.cluster.Name != cluster.Name {
@@ -231,20 +232,20 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				}
 				if isLeader() && cluster.Disabled {
 					data := share.CLUSFedClusterStatus{Status: 207} // _fedLicenseDisallowed
-					clusHelper.PutFedJointClusterStatus(id, &data)
+					_ = clusHelper.PutFedJointClusterStatus(id, &data)
 				}
 			}
 		case share.CLUSFedClustersStatusSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
 			var status share.CLUSFedClusterStatus
-			json.Unmarshal(value, &status)
+			_ = json.Unmarshal(value, &status)
 			if status.Nodes == 0 {
 				status.Nodes = 1
 			}
 			fedJoinedClusterStatusCache[id] = status
 		case share.CLUSFedRulesRevisionSubKey:
 			var revCache share.CLUSFedRulesRevision
-			json.Unmarshal(value, &revCache)
+			_ = json.Unmarshal(value, &revCache)
 			// when demote/leave/kicked, in kv the cluster's fedRole is updated first and the CLUSFedRulesRevisionSubKey is updated last(after all fed rules are deleted).
 			// however, it may take a while for all deleted fed rule keys to be updated in cache.
 			if isLeader() && fedMembershipCache.FedRole == api.FedRoleNone {
@@ -260,7 +261,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					if m := clusHelper.GetFedMembership(); m != nil {
 						if m.PendingDismiss {
 							m.PendingDismiss = false
-							clusHelper.PutFedMembership(m)
+							_ = clusHelper.PutFedMembership(m)
 						}
 					}
 				}
@@ -272,12 +273,12 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		case share.CLUSFedToPingPollSubKey:
 			if isLeader() {
 				var doPingPoll share.CLUSFedDoPingPoll
-				json.Unmarshal(value, &doPingPoll)
-				go cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil)
+				_ = json.Unmarshal(value, &doPingPoll)
+				go func() { _ = cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil) }()
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
-			json.Unmarshal(value, &cfg)
+			_ = json.Unmarshal(value, &cfg)
 			fedWebhookCacheTemp := make(map[string]*webhookCache, 0)
 			for _, h := range cfg.Webhooks {
 				if h.Enable {
@@ -292,7 +293,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			fedSystemConfigCache = cfg
 		case share.CLUSFedSettingsSubKey:
 			var cfg share.CLUSFedSettings
-			json.Unmarshal(value, &cfg)
+			_ = json.Unmarshal(value, &cfg)
 			fedSettingsCache = cfg
 		}
 	case cluster.ClusterNotifyDelete:
@@ -307,7 +308,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				delete(fedJoinedClustersCache, id)
 				purgeFiles(fmt.Sprintf("fed.client.%s.", id))
 				var param interface{} = &id
-				cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param)
+				_ = cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param)
 			}
 		case share.CLUSFedClustersStatusSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
@@ -879,8 +880,8 @@ func (m CacheMethod) GetFedScanResultMD5(cachedScanDataRevs, masterScanDataRevs 
 				if masterRegRev, ok2 := masterScanDataRevs.ScannedRegRevs[regName]; !ok2 {
 					// the fed registry is deleted on master cluster
 					delete(cachedScanDataRevs.ScannedRegRevs, regName)
-					clusHelper.DeleteRegistryKeys(regName)
-					clusHelper.DeleteRegistry(nil, regName)
+					_ = clusHelper.DeleteRegistryKeys(regName)
+					_ = clusHelper.DeleteRegistry(nil, regName)
 				} else if cachedRegRev != masterRegRev {
 					// the fed registry on managed cluster has different scan data revision from what master cluster has. collect scan result md5 of images in the fed registry
 					imagesMD5 := make(map[string]string, len(cachedImagesMD5)) // image id : scan result md5

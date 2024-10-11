@@ -592,7 +592,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	if invalidCrdKind || len(secRules) == 0 {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
 		return nil
 	}
 
@@ -615,7 +615,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
 			if cpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdCompProfileContent(&secRule, share.ReviewTypeImportCompProfile, share.ReviewTypeDisplayCompProfile); errCount > 0 {
-				err = fmt.Errorf(errMsg)
+				err = fmt.Errorf("%s", errMsg)
 				break
 			} else {
 				cmpProfilesCfg = append(cmpProfilesCfg, cpCfgRet)

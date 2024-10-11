@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // FileType is a file spefification
@@ -68,185 +68,185 @@ const (
 // DefaultRules defines a default rule set
 var DefaultRules []Rule = []Rule{
 	// Textual Encodings of PKIX, PKCS, and CMS Structures: https://tools.ietf.org/html/rfc7468
-	Rule{Description: "Private.Key",
+	{Description: "Private.Key",
 		Expression: `^-----BEGIN ((EC|PGP|DSA|RSA|OPENSSH|SSH2) )?PRIVATE KEY( BLOCK)?-----`, Tags: []string{share.SecretPrivateKey, "GeneralPrivateKey"},
 		Suggestion: msgRemove},
-	Rule{Description: "Private.Key",
+	{Description: "Private.Key",
 		Expression: `^PuTTY-User-Key-File-2:`, Tags: []string{share.SecretPrivateKey, "PuttyPrivateKey"},
 		Suggestion: msgRemove},
-	Rule{Description: "XML.Signature.Private.Key",
+	{Description: "XML.Signature.Private.Key",
 		Expression: `(?m)^<RSAKeyValue>`, Tags: []string{share.SecretPrivateKey, "XmlPrivateKey"},
 		Suggestion: msgRemove},
-	//	Rule{Description: "Certificate",
+	//	{Description: "Certificate",
 	//		Expression: `^-----BEGIN (CERTIFICATE|CMS|PKCS7|X509 CRL)-----`, Tags: []string{share.SecretX509, "Certificate"},
 	//		Suggestion: msgRemove},
-	//	Rule{Description: "Public.Key",
+	//	{Description: "Public.Key",
 	//		Expression: `^-----BEGIN PUBLIC KEY-----`, Tags: []string{share.SecretX509, "PublicKey"},
 	//		Suggestion: msgRemove},
-	//	Rule{Description: "Public.Key",
+	//	{Description: "Public.Key",
 	//		Expression: `^ssh-rsa`, Tags: []string{share.SecretX509, "PublicKey"},
 	//		Suggestion: msgRemove},
 
 	// Amazon: https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html
 	// AWS IAM: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html
-	Rule{Description: "AWS.Manager.ID",
+	{Description: "AWS.Manager.ID",
 		Expression: `(?m)[\s|"|'|=|:]+(A3T[A-Z0-9]|ACCA|AKIA|AGPA|AIDA|AIPA|AKIA|ANPA|ANVA|APKA|AROA|ASCA|ASIA)([A-Z0-9]{16})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "AWs"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 2, Min: 3.375, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 2, Min: 3.375, Max: 6.0}}},
 	// TBD: Rule{ Description:"AWS Secret Key",
 	//	Expression: `(?i)aws(.{0,20})?(?-i)[0-9a-zA-Z\/+]{40}`, Tags:[]string{share.SecretRegular, "AWS"},
 	//	Suggestion: msgReferVender},
-	Rule{Description: "AWS.MWS.Key",
+	{Description: "AWS.MWS.Key",
 		Expression: `(?m)[\s|"|'|=|:]+amzn\.mws\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\s|"|')`, Tags: []string{share.SecretRegular, "AWS", "MWS"},
 		Suggestion: msgReferVender},
 
 	// Facebook: https://developers.facebook.com/docs/facebook-login/access-tokens/
 	// API calls
-	Rule{Description: "Facebook.Client.Secret",
+	{Description: "Facebook.Client.Secret",
 		Expression: `(?im)(facebook|fb)\S{0,32}access_token(.{0,128})client_secret=(?-i)([0-9a-f]{32}\b)`, Tags: []string{share.SecretProgram, "Facebook"},
 		Suggestion: msgReferVender},
-	Rule{Description: "Facebook.Endpoint.Secret",
+	{Description: "Facebook.Endpoint.Secret",
 		Expression: `(?im)(facebook|fb)\S{0,32}&access_token=([0-9a-f]{32}\b)`, Tags: []string{share.SecretProgram, "Facebook"},
 		Suggestion: msgReferVender},
-	Rule{Description: "Facebook.App.Secret",
+	{Description: "Facebook.App.Secret",
 		Expression: `(?im)^\s*\w*(facebook|fb)\S*\s*[:=]+\s*['"]?([0-9a-f]{32})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Facebook"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 2, Min: 3.6, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 2, Min: 3.6, Max: 6.0}}},
 
 	// Facebook SDK: https://github.com/facebook/facebook-nodejs-business-sdk, https://github.com/facebook/facebook-python-business-sdk
-	//Rule{	Description:"Facebook SDK access token",
+	//{	Description:"Facebook SDK access token",
 	//	Expression: `(?m)\sFacebookAdsApi.init\(`, ExprFName: `.*\.(js|py)`, Tags:[]string{share.SecretProgram, "Facebook"},
 	//	Suggestion: msgReferVender},
 
 	// Twitter: https://developer.twitter.com/en/docs/basics/authentication/oauth-2-0/
 	// strict: it should match another string = "grant_type=client_credentials"
-	//Rule{	Description:"Twitter Oath2 Secret",
+	//{	Description:"Twitter Oath2 Secret",
 	//	Expression: `(?im)\s(https:\/\/api.twitter.com\/oauth2\/token)`, Tags:[]string{share.SecretProgram, "Twitter"},
 	//	Suggestion: msgReferVender},
 
 	// it guesses the secret variables ....
-	Rule{Description: "Twitter.Client.ID",
+	{Description: "Twitter.Client.ID",
 		Expression: `(?im)^\s*\w*twitter\S*\s*[:=]+\s*['"]?([0-9a-z]{18,25})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Twitter"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 3.75, Max: 6.0}}},
-	Rule{Description: "Twitter.Secret.Key",
+		Entropies:  []Entropy{{Group: 1, Min: 3.75, Max: 6.0}}},
+	{Description: "Twitter.Secret.Key",
 		Expression: `(?im)^\s*\w*twitter\S*\s*[:=]+\s*['"]?([0-9a-z]{35,44})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Twitter"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 4.0, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 1, Min: 4.0, Max: 6.0}}},
 
 	// Github : it guesses the secret variables ....
-	Rule{Description: "Github.Secret",
+	{Description: "Github.Secret",
 		Expression: `(?im)^\s*\w*github\S*\s*[:=]+\s*['"]?([0-9a-z]{35,40})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Github"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 4.0, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 1, Min: 4.0, Max: 6.0}}},
 
 	// Paypal Braintree: Python, PHP5, NodeJS SDKs: https://articles.braintreepayments.com/control-panel/important-gateway-credentials
-	//Rule{	Description:"PayPal Braintree SDK Gateway",
+	//{	Description:"PayPal Braintree SDK Gateway",
 	//	Expression: `(?m)\s(braintree.BraintreeGateway\(|new Braintree\\Gateway|braintree.connect\()`, ExprFName: `.*\.(js|py|php)`, Tags:[]string{share.SecretProgram, "Paypal"},
 	//	Suggestion: msgReferVender},
 
 	// TBD
-	//Rule{	Description:"PayPal Braintree Tokens",
+	//{	Description:"PayPal Braintree Tokens",
 	//	Expression: `(?m)access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}`, Tags:[]string{share.SecretProgram, "Paypal"},
 	//	Suggestion: msgReferVender},
 
 	// Square: product, https://developer.squareup.com/apps/
-	Rule{Description: "Square.Product.ID",
+	{Description: "Square.Product.ID",
 		Expression: `(?m)[\s|"|'|=|:]+sq0(at|id)p-[0-9A-Za-z\-_]{22}(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "square"},
 		Suggestion: msgReferVender},
-	Rule{Description: "Square.OAuth.Secret",
+	{Description: "Square.OAuth.Secret",
 		Expression: `(?m)[\s|"|'|=|:]+sq0csp-[0-9A-Za-z]{10}-[0-9A-Za-z]{6}_[0-9A-Za-z]{25}(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "square"},
 		Suggestion: msgReferVender},
 
 	// Stripe: https://dashboard.stripe.com/test/apikeys
-	Rule{Description: "Stripe.Access.Key",
+	{Description: "Stripe.Access.Key",
 		Expression: `(?m)[\s|"|'|=|:]+(?:r|s|p)k_(live|test)_([0-9a-zA-Z]{24,34})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Stripe"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 2, Min: 4.0, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 2, Min: 4.0, Max: 6.0}}},
 
 	// Slack: https://api.slack.com/web
-	Rule{Description: "Slack.API.tokens",
+	{Description: "Slack.API.tokens",
 		Expression: `(?m)[\s|"|'|=|:]+xox[baprs]-[0-9a-zA-Z]{4,21}-[0-9a-zA-Z]{4,21}(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Slack"},
 		Suggestion: msgReferVender},
-	Rule{Description: "Slack Webhook",
+	{Description: "Slack Webhook",
 		Expression: `(?m)\shttps://hooks.slack.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}`, Tags: []string{share.SecretProgram, "slack"},
 		Suggestion: msgReferVender},
 
 	// Linkedin: https://www.linkedin.com/developers/
-	Rule{Description: "LinkedIn.Client.ID",
+	{Description: "LinkedIn.Client.ID",
 		Expression: `(?im)^\s*\w*linkedin\S*\s*[:=]+\s*['"]?(?-i)([0-9a-z]{14})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "LinkedIn"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 3.5, Max: 6.0}}},
-	Rule{Description: "LinkedIn.Secret.Key",
+		Entropies:  []Entropy{{Group: 1, Min: 3.5, Max: 6.0}}},
+	{Description: "LinkedIn.Secret.Key",
 		Expression: `(?im)^\s*\w*linkedin\S*\s*[:=]+\s*['"]?([0-9a-zA-Z]{16})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "LinkedIn"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 3.75, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 1, Min: 3.75, Max: 6.0}}},
 
 	//TBD: API calls
-	//Rule{	Description:"LinkedIn OAuth secret",
+	//{	Description:"LinkedIn OAuth secret",
 	//	Expression: `(?im)https://www.linkedin.com/oauth/v2/accessToken`, Tags:[]string{share.SecretProgram, "LinkedIn"},
 	//	Suggestion: msgReferVender},
-	//Rule{	Description:"LinkedIn API token",
+	//{	Description:"LinkedIn API token",
 	//	Expression: `(?im)https://api.linkedin.com/v2/me`, Tags:[]string{share.SecretProgram, "LinkedIn"},
 	//	Suggestion: msgReferVender},
-	//Rule{	Description:"LinkedIn OAuth secret",
+	//{	Description:"LinkedIn OAuth secret",
 
 	// Below: have not been tested
 	// Google: TBD
-	Rule{Description: "Google.API.Key",
+	{Description: "Google.API.Key",
 		Expression: `(?m)[\s|"|'|=|:]+AIza([0-9A-Za-z\\-_]{35})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Google"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 4.0, Max: 6.0}}},
-	//Rule{	Description:"Google (GCP) Service Account",
+		Entropies:  []Entropy{{Group: 1, Min: 4.0, Max: 6.0}}},
+	//{	Description:"Google (GCP) Service Account",
 	//	Expression: `(?m)\s"type": "service_account"`, Tags:[]string{share.SecretProgram, "Google"},
 	//	Suggestion: msgReferVender},
 
 	// Misc:
-	Rule{Description: "SendGrid.API.Key",
+	{Description: "SendGrid.API.Key",
 		Expression: `(?m)\sSG\.[\w_]{16,32}\.[\w_]{16,64}(?:\s|"|')`, Tags: []string{share.SecretRegular, "SendGrid"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 0, Min: 4.0, Max: 6.0}}},
-	Rule{Description: "Twilio.API.Key",
+		Entropies:  []Entropy{{Group: 0, Min: 4.0, Max: 6.0}}},
+	{Description: "Twilio.API.Key",
 		Expression: `(?im)^\s*\w*twilio\S*\s*[:=]+\s*['"]?(SK[0-9a-f]{32})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "twilio"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 4.0, Max: 6.0}}},
-	Rule{Description: "Heroku.API.Key",
+		Entropies:  []Entropy{{Group: 1, Min: 4.0, Max: 6.0}}},
+	{Description: "Heroku.API.Key",
 		Expression: `(?im)^\s*\w*wheroku\S*\s*[:=]+\s*['"]?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\s|$|"|)'`, Tags: []string{share.SecretRegular, "Heroku"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 1, Min: 4.0, Max: 6.0}}},
-	Rule{Description: "MailChimp.API.Key",
+		Entropies:  []Entropy{{Group: 1, Min: 4.0, Max: 6.0}}},
+	{Description: "MailChimp.API.Key",
 		Expression: `(?im)^\s*\w*(mailchimp|mc)\S*\s*[:=]+\s*['"]?([0-9a-f]{32}-us[0-9]{1,2})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Mailchimp"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 2, Min: 4.0, Max: 6.0}}},
-	Rule{Description: "Mailgun.API.Key",
+		Entropies:  []Entropy{{Group: 2, Min: 4.0, Max: 6.0}}},
+	{Description: "Mailgun.API.Key",
 		Expression: `(?im)^\s*\w*(mailgun|mg)\S*\s*[:=]+\s*['"]?(key-[0-9a-z]{32})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "Mailgun"},
 		Suggestion: msgReferVender,
-		Entropies:  []Entropy{Entropy{Group: 2, Min: 4.0, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 2, Min: 4.0, Max: 6.0}}},
 
 	// Generic: many false-positive cases
 	// Credential: one of leading text, at least 8 charactres[special characters] and no space is allowed in the secret, up to 120
 	// to reduce the false-positive: the secret context is guarded between " or '
 	// ^: at beginning of text or line (m=true), does not work with json files
 	// ignore . in the secret, it could be a structure pointer for a program
-	Rule{Description: "Credential",
+	{Description: "Credential",
 		Expression: `(?im)^\s*\w*(passwd|api_key|apikey|password|secret)\S*\s*[:=]+\s*['"]?([0-9a-z-_.\|!"$%&\/\(\)\?\^\'\\\+\-\*@~\[\];]{20,120})(?:\s|$|"|')`, Tags: []string{share.SecretRegular, "API", "generic"},
 		Suggestion: msgCloak,
-		Entropies:  []Entropy{Entropy{Group: 2, Min: 4.00, Max: 6.0}}},
+		Entropies:  []Entropy{{Group: 2, Min: 4.00, Max: 6.0}}},
 
 	// Only on certain files, remove repo_token
-	Rule{Description: "Password.in.YML",
+	{Description: "Password.in.YML",
 		Expression: `(?i)(password|passwd|api_token)\S{0,32}\s*:\s*(?-i)([0-9a-zA-Z\/+]{16,40}\b)`, ExprFName: `.*\.ya?ml`, Tags: []string{share.SecretProgram, "yaml", "yml"},
 		Suggestion: msgReferVender},
 
 	// Only on certain files/paths
-	//	Rule{	Description:"Password in Property",
+	//	{	Description:"Password in Property",
 	//		Expression: `(?i)(password|token)\S{0,32}\s*:\s*[:]\s*?(?-i)([0-9a-zA-Z\/+]{4,40}\b)`, ExprFName: `.*\.properties`,	ExprFPath: `config(guration)?`,	Tags: []string{share.SecretProgram, "yaml", "yml"},
 	//		Suggestion: msgReferVender},
 }
 
 // DefaultFileType is for default profile
 var DefaultFileType []FileType = []FileType{
-	FileType{Description: "ALL", Expression: `.*`},
+	{Description: "ALL", Expression: `.*`},
 }
 
 // buildConfig(): build the necessary filters
@@ -262,9 +262,9 @@ func buildConfig(config Config) (Config, error) {
 	if config.Blacklist == nil {
 		// 2nd-layer screen: skip common binary extension (program-able from input configuration)
 		config.Blacklist = []FileType{
-			FileType{Description: "common binary files", Expression: `\S[.](jpg|png|gif|mov|avi|mpeg|pdf|mp4|mp3|svg|tar|gz|zip)$`},
-			FileType{Description: "common program files", Expression: `\S[.](js|jar|java|rb|rbw|py|pyc|md|cpp|cxx|html|htm|scala|pl)$`},
-			FileType{Description: "auto-generated files", Expression: `[0-9a-zA-Z_-]{32,64}`, MinEntropy: 3.0},
+			{Description: "common binary files", Expression: `\S[.](jpg|png|gif|mov|avi|mpeg|pdf|mp4|mp3|svg|tar|gz|zip)$`},
+			{Description: "common program files", Expression: `\S[.](js|jar|java|rb|rbw|py|pyc|md|cpp|cxx|html|htm|scala|pl)$`},
+			{Description: "auto-generated files", Expression: `[0-9a-zA-Z_-]{32,64}`, MinEntropy: 3.0},
 		}
 	}
 
@@ -272,7 +272,7 @@ func buildConfig(config Config) (Config, error) {
 		// skip common unused flders during production: test/unittest/..... for a prject following a common practice
 		// for example, node js: https://gist.github.com/tracker1/59f2c13044315f88bee9
 		config.SkipFolder = []FileType{
-			FileType{Description: "nodeJS project", Expression: `\/node_modules\/\S+\/(test|unit|integration|env|testing)$`},
+			{Description: "nodeJS project", Expression: `\/node_modules\/\S+\/(test|unit|integration|env|testing)$`},
 			//	FileType{Description:"packages info", Expression: `\/var\/lib\/dpkg\/`},
 		}
 	}
@@ -407,6 +407,7 @@ func isSelectedFile(filename string, list []FileType) bool {
 	return false
 }
 
+/*
 func isBinaryCerticiate(reportPath, ext string) (*share.CLUSSecretLog, bool) {
 	// base64: pem, crt, key, p7b, p7c
 	// binary: der, pfx, p12
@@ -431,6 +432,7 @@ func isBinaryCerticiate(reportPath, ext string) (*share.CLUSSecretLog, bool) {
 	}
 	return seclog, true
 }
+*/
 
 // exclude comment lines from the original content
 // #, <!, and {*
@@ -709,9 +711,9 @@ func FindSecretsByRootpath(rootPath string, envVars []byte, config Config) ([]sh
 	if err != nil {
 		err = fmt.Errorf("Exited by error: path=%s, error=%s", rootPath, err)
 	}
-//	scanFileTotal += cnt
-//	log.WithFields(log.Fields{"scanFileTotal": scanFileTotal}).Debug("SCRT")
-	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Now().Sub(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
+	//	scanFileTotal += cnt
+	//	log.WithFields(log.Fields{"scanFileTotal": scanFileTotal}).Debug("SCRT")
+	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Since(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
 	return res, perm, err
 }
 
@@ -793,7 +795,7 @@ func FindSecretsByFilePathMap(fileMap map[string]string, envVars []byte, config 
 		err = fmt.Errorf("Timeout")
 	}
 
-	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Now().Sub(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
+	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Since(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
 	return res, perm, err
 }
 

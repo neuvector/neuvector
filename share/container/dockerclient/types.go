@@ -23,7 +23,7 @@ type HealthConfig struct {
 	Interval    time.Duration `json:",omitempty"` // Interval is the time to wait between checks.
 	Timeout     time.Duration `json:",omitempty"` // Timeout is the time to wait before considering the check to have hung.
 	StartPeriod time.Duration `json:",omitempty"` // The start period for the container to initialize before the retries starts to count down.
-	Retries int `json:",omitempty"`
+	Retries     int           `json:",omitempty"`
 }
 
 type ContainerConfig struct {
@@ -64,7 +64,7 @@ type ContainerConfig struct {
 
 	// Network configuration support
 	NetworkingConfig NetworkingConfig
-	Healthcheck     *HealthConfig
+	Healthcheck      *HealthConfig
 }
 
 type HostConfig struct {
@@ -390,7 +390,7 @@ type ContainerInfo struct {
 	ResolvConfPath string
 	Volumes        map[string]string
 	HostConfig     *HostConfig
-	Mounts          []MountPoint
+	Mounts         []MountPoint
 }
 
 type ContainerChanges struct {

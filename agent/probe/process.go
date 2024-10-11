@@ -472,9 +472,7 @@ func (p *Probe) addContainer(id string, proc *procInternal, scanMode bool) {
 	}
 
 	p.containerMap[id] = c
-	if _, ok := p.pidContainerMap[pid]; ok {
-		delete(p.pidContainerMap, pid) // update
-	}
+	delete(p.pidContainerMap, pid) // update
 	p.pidContainerMap[pid] = c
 	p.resetIoNodes = true // JW
 
@@ -623,6 +621,7 @@ func (p *Probe) isEnforcerChildren(proc *procInternal, id string) bool {
 	return false
 }
 
+/* removed by golint
 func (p *Probe) evaluateRuncTrigger(id string, proc *procInternal) {
 	if id == "" {
 		if strings.HasSuffix(proc.path, "/runc") {
@@ -659,6 +658,7 @@ func (p *Probe) evaluateRuncTrigger(id string, proc *procInternal) {
 		}
 	}
 }
+*/
 
 func (p *Probe) evaluateRuntimeCmd(proc *procInternal) bool {
 	if global.RT.IsRuntimeProcess(filepath.Base(proc.ppath), nil) {
@@ -724,18 +724,6 @@ func (p *Probe) printProcReport(id string, proc *procInternal) {
 	//	p.sleepTestCounter(proc, c.id)
 }
 
-func (p *Probe) sleepTestCounter(proc *procInternal, id string) {
-	if id != "" {
-		if proc.cmds[0] == "sleep" { // sleep batch script
-			p.profileSleepTestCnt++
-		} else if proc.cmds[0] == "top" { // reset and read the result
-			s := fmt.Sprintf("PROC: sleep cnt= %d\n", p.profileSleepTestCnt)
-			log.Debug(s)
-			p.profileSleepTestCnt = 0
-		}
-	}
-}
-
 func (p *Probe) isSuspiciousProcess(proc *procInternal, id string) (*suspicProcInfo, bool) {
 	if id == "" && proc.name == "sshd" { // exclude sshd from group nodes
 		proc.riskType = "" // reset
@@ -764,7 +752,6 @@ func (p *Probe) isSuspiciousProcess(proc *procInternal, id string) (*suspicProcI
 		proc.riskyChild = true
 		return info, ok
 	}
-	return nil, false
 }
 
 /*
@@ -804,7 +791,7 @@ func (p *Probe) patchRuntimeUser(proc *procInternal) {
 // TODO, improved it with snapshot, passing by reference for all structures
 func (p *Probe) evalNewRunningApp(pid int) {
 	p.lockProcMux() // minimum section lock
-	c, _ := p.pidContainerMap[pid]
+	c := p.pidContainerMap[pid]
 	proc, ok := p.pidProcMap[pid] // bottom-line
 	if ok {
 		// the same pid might go throuth here twice, do not change its tag
@@ -934,7 +921,7 @@ func (p *Probe) checkUserGroup_uidChange(escalProc *procInternal, c *procContain
 	if auth, err := osutil.CheckUidAuthority(rUser, escalProc.pid); err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Check user authority fail")
 		return "", "", true
-	} else if auth == true {
+	} else if auth {
 		return "", "", false
 	}
 	return rUser, eUser, true
@@ -1408,7 +1395,7 @@ func (p *Probe) getUserName(pid, uid int) (user string) {
 		var ok bool
 		if user, ok = c.userns.users[uid]; !ok {
 			if root, min, err := osutil.GetAllUsers(pid, c.userns.users); err == nil {
-				user, _ = c.userns.users[uid]
+				user = c.userns.users[uid]
 				c.userns.root = root
 				c.userns.uidMin = min
 			}
@@ -1431,7 +1418,7 @@ func (p *Probe) checkUserGroup(escalProc *procInternal, c *procContainer) (strin
 	if auth, err := osutil.CheckUidAuthority(eUser, escalProc.pid); err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Check user authority fail")
 		return "", "", false
-	} else if auth == true {
+	} else if auth {
 		return "", "", false
 	}
 	return rUser, eUser, true
@@ -1607,7 +1594,6 @@ func (p *Probe) initReadProcesses() bool {
 		}
 	}
 	p.walkNewProcesses()
-	// p.processContainerNewChanges()
 	p.inspectNewProcesses(true) // catch existing processes
 	return foundKube
 }
@@ -2291,7 +2277,6 @@ func (p *Probe) isAllowIpRuntimeCommand(cmds []string) bool {
 			pass = true
 		case "del", "add", "flush", "set", "change", "append", "replace", "update", "deleteall": // operators
 			pass = false
-			break
 		}
 	}
 	return pass
@@ -2645,7 +2630,7 @@ func (p *Probe) ProcessLookup(pid int) *fsmon.ProcInfo {
 }
 
 // ///////////////////////////////////////////////////////////////////
-// ///////////////////////////////////////////////////////////////////
+/* removed by golint
 func printLastProcElements(list []*procInternal, nLastItems int) {
 	start := 0
 	length := len(list)
@@ -2661,6 +2646,7 @@ func printLastProcElements(list []*procInternal, nLastItems int) {
 		log.WithFields(log.Fields{"i": i, "cmds": list[i].cmds}).Debug("PROC:")
 	}
 }
+*/
 
 // ////// only from netlink monitor, already guarded by procMux
 func (p *Probe) addProcHistory(id string, proc *procInternal, bFromMonitor bool) {
@@ -2688,11 +2674,12 @@ func (p *Probe) addProcHistory(id string, proc *procInternal, bFromMonitor bool)
 		histProc = ringbuffer.New(400) // TODO: more ?
 		p.procHistoryMap[id] = histProc
 	}
+
 	histProc.Write(proc)
 
 	// Verification section, test only
-	// log.WithFields(log.Fields{"path": proc.path, "id": id, "cnt": histProc.Leng()}).Debug("PROC: ")
-	//	if histProc.Leng() == 400 {
+	// log.WithFields(log.Fields{"path": proc.path, "id": id, "cnt": histProc.Length()}).Debug("PROC: ")
+	// if histProc.Length()() == 400 {
 	//		var list []*procInternal
 	//		elements := histProc.DumpExt()
 	//		for i := 0; i < len(elements); i++ {
@@ -2770,8 +2757,7 @@ func (p *Probe) alterRiskyAction(pid int, riskapp map[string]string) {
 // //
 func (p *Probe) updateCurrentRiskyAppRule(id string, pg *share.CLUSProcessProfile) {
 	var riskType string
-	var riskapp map[string]string
-	riskapp = make(map[string]string)
+	riskapp := make(map[string]string)
 	for _, pp := range pg.Process {
 		// It is based on the NAME only and could create a mismatched condition for discovery/monitor mode
 		// for example, the serveal sshd binaries in different folders but we release the chains here
@@ -2797,7 +2783,7 @@ func (p *Probe) updateCurrentRiskyAppRule(id string, pg *share.CLUSProcessProfil
 	}
 
 	// fill the non-existing items
-	for riskType, _ = range suspicProcMap {
+	for riskType = range suspicProcMap {
 		if _, ok := riskapp[riskType]; !ok {
 			riskapp[riskType] = share.PolicyActionCheckApp
 		}
@@ -3191,7 +3177,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				bPass = false
 				ppe.Action = negativeResByMode(mode)
 				ppe.Uuid = share.CLUSReservedUuidAnchorMode
-			} else if bCanBeLearned == false {
+			} else if !bCanBeLearned {
 				// allowed but will not be learned
 				ppe.Action = share.PolicyActionAllow
 				mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "svcGroup": svcGroup}).Debug()

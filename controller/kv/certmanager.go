@@ -71,9 +71,13 @@ func (c *CertManager) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			c.CheckAndRenewCerts()
+			if err := c.CheckAndRenewCerts(); err != nil {
+				log.WithError(err).Error("failed to check/renew certificate")
+			}
 		case cn := <-c.notifyChan:
-			c.UpdateCerts(cn)
+			if err := c.UpdateCerts(cn); err != nil {
+				log.WithError(err).Error("failed to update certificate")
+			}
 		case <-ctx.Done():
 			goto end
 		}
@@ -239,7 +243,9 @@ func (c *CertManager) CheckAndRenewCerts() error {
 	defer c.mutex.Unlock()
 
 	for cn, callback := range c.callbacks {
-		c.checkAndRotateCert(cn, callback)
+		if err := c.checkAndRotateCert(cn, callback); err != nil {
+			log.WithError(err).Error("failed to check/rotate cert")
+		}
 	}
 
 	log.Debug("CheckAndRenewCerts() completes.")

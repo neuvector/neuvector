@@ -193,7 +193,7 @@ func group2BriefREST(cache *groupCache, withCap bool) *api.RESTGroupBrief {
 		g.CapChgMode = &cache.capChgMode
 		g.CapScorable = &cache.capScorable
 	}
-	g.CfgType, _ = cfgTypeMapping[cache.group.CfgType]
+	g.CfgType = cfgTypeMapping[cache.group.CfgType]
 	return g
 }
 
@@ -378,7 +378,7 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var group share.CLUSGroup
-		json.Unmarshal(value, &group)
+		_ = json.Unmarshal(value, &group)
 
 		// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 		// for example, in upgrade case, the group will be created. This is to remove the group as we see it.
@@ -392,7 +392,7 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 
 			kv.DeletePolicyByGroup(group.Name)
 			kv.DeleteResponseRuleByGroup(group.Name)
-			clusHelper.DeleteGroup(group.Name)
+			_ = clusHelper.DeleteGroup(group.Name)
 			log.WithFields(log.Fields{"group": group.Name}).Info("Delete neuvector group")
 			return
 		}
@@ -577,13 +577,13 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 
 		var err error
 		txn := cluster.Transact()
-		clusHelper.DeleteProcessProfileTxn(txn, name)
-		clusHelper.DeleteFileMonitorTxn(txn, name)
+		_ = clusHelper.DeleteProcessProfileTxn(txn, name)
+		_ = clusHelper.DeleteFileMonitorTxn(txn, name)
 		if cache != nil && cache.group != nil && cache.group.Kind == share.GroupKindContainer {
-			clusHelper.DeleteDlpGroup(txn, name)
-			clusHelper.DeleteWafGroup(txn, name)
+			_ = clusHelper.DeleteDlpGroup(txn, name)
+			_ = clusHelper.DeleteWafGroup(txn, name)
 		}
-		clusHelper.DeleteCustomCheckConfig(txn, name)
+		_ = clusHelper.DeleteCustomCheckConfig(txn, name)
 		_, err = txn.Apply()
 		txn.Close()
 
@@ -652,9 +652,9 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 			txn := cluster.Transact()
 			defer txn.Close()
 
-			clusHelper.PutPolicyRuleListTxn(txn, keeps)
+			_ = clusHelper.PutPolicyRuleListTxn(txn, keeps)
 			for id := range dels.Iter() {
-				clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+				_ = clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
 			}
 			if ok, err := txn.Apply(); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("")
@@ -667,7 +667,7 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	}
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
-		clusHelper.DeleteGroup(gname)
+		_ = clusHelper.DeleteGroup(gname)
 	}
 }
 
@@ -859,7 +859,7 @@ func createServiceIPGroup(r *resource.Service) *share.CLUSGroup {
 			Op:    share.CriteriaOpEqual,
 		})
 	}
-	if r.Selector != nil && len(r.Selector) > 0 {
+	if len(r.Selector) > 0 {
 		for k, v := range r.Selector {
 			// This criteria is just for information/flag purpose right now
 			// Cannot match to find the correponding workloads yet
@@ -1016,7 +1016,7 @@ func groupRemoveEvent(ev share.TLogEvent, group string) {
 		ReportedAt: time.Now().UTC(),
 	}
 	clog.Msg = fmt.Sprintf("Auto remove unused group: %s and related network/response rules.\n", group)
-	cctx.EvQueue.Append(&clog)
+	_ = cctx.EvQueue.Append(&clog)
 }
 
 const groupsPruneDelay = time.Duration(time.Minute * 10)
@@ -1055,7 +1055,7 @@ func (p *groupRemovalEvent) Expire() {
 }
 
 func rmEmptyGroupsFromCluster() {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	emptyGroupsMutex.Lock()
@@ -1086,11 +1086,9 @@ func rmEmptyGroupsFromCluster() {
 		cg, _, _ := clusHelper.GetGroup(name, accAll)
 		if cg == nil {
 			log.WithFields(log.Fields{"group": name}).Error("Group doesn't exist in kv")
-			if _, ok := groupCacheMap[name]; ok {
-				delete(groupCacheMap, name)
-			}
+			delete(groupCacheMap, name)
 		} else {
-			clusHelper.DeleteGroupTxn(txn, name)
+			_ = clusHelper.DeleteGroupTxn(txn, name)
 		}
 	}
 	if ok, err1 := txn.Apply(); err1 != nil || !ok {
@@ -1099,39 +1097,6 @@ func rmEmptyGroupsFromCluster() {
 	for _, name := range groups {
 		groupRemoveEvent(share.CLUSEvGroupAutoRemove, name)
 	}
-}
-
-func deleteGroupFromCluster(groupname string) bool {
-	if isLeader() == false {
-		return false
-	}
-	log.WithFields(log.Fields{"group": groupname}).Info("")
-
-	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Acquire lock error")
-		return false
-	}
-	defer clusHelper.ReleaseLock(lock)
-
-	accAll := access.NewAdminAccessControl()
-	cg, _, _ := clusHelper.GetGroup(groupname, accAll)
-	if cg == nil {
-		log.WithFields(log.Fields{"group": groupname}).Error("Group doesn't exist in kv")
-		if _, ok := groupCacheMap[groupname]; ok {
-			delete(groupCacheMap, groupname)
-		}
-	} else {
-		if err := clusHelper.DeleteGroup(groupname); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("")
-			return false
-		}
-	}
-	//needs to execute delete function inside lock
-	//to keep the integrity of policy ruleHeads
-	kv.DeletePolicyByGroup(groupname)
-	kv.DeleteResponseRuleByGroup(groupname)
-	return true
 }
 
 const groupsRemovalAdditionalDelay = time.Duration(time.Second * 10)
@@ -1229,9 +1194,7 @@ func refreshGroupMetricMap(groupname string, wlid string, deletegrp bool) {
 			if grpMet.WlMetric == nil {
 				grpMet.WlMetric = make(map[string]*share.CLUSWlMetric)
 			}
-			if _, exst := grpMet.WlMetric[wlid]; exst {
-				delete(grpMet.WlMetric, wlid)
-			}
+			delete(grpMet.WlMetric, wlid)
 			if len(grpMet.WlMetric) == 0 {
 				delete(groupMetricMap, groupname)
 			} else {
@@ -1306,7 +1269,7 @@ func hostWorkloadStart(id string, param interface{}) {
 		}
 		host.runningCntrs.Add(wl.ID)
 		host.workloads.Add(wl.ID)
-		db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
+		_ = db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
 	}
 }
 
@@ -1334,7 +1297,7 @@ func hostWorkloadDelete(id string, param interface{}) {
 		host.runningPods.Remove(wl.ID)
 		host.runningCntrs.Remove(wl.ID)
 		host.workloads.Remove(wl.ID)
-		db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
+		_ = db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
 	}
 }
 
@@ -1403,7 +1366,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 		if isLeader() {
 			if bHasGroupProfile {
 				policyMode, profileMode := getNewServicePolicyMode()
-				createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
+				_ = createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				}
@@ -1493,10 +1456,7 @@ func updateFqdn2Group(cache *groupCache) {
 	for _, ct := range cache.group.Criteria {
 		if ct.Key == share.CriteriaKeyAddress {
 			if a := getIPList(ct.Value); a == nil {
-				fqdname := ct.Value
-				if strings.HasPrefix(fqdname, share.CLUSWLFqdnVhPrefix) {
-					fqdname = fqdname[len(share.CLUSWLFqdnVhPrefix):]
-				}
+				fqdname := strings.TrimPrefix(ct.Value, share.CLUSWLFqdnVhPrefix)
 				if fqdn2GrpMap[fqdname] == nil {
 					fqdn2GrpMap[fqdname] = utils.NewSet()
 				}
@@ -1600,9 +1560,7 @@ func refreshGroupMember(cache *groupCache) {
 	// for openshift platform, add nv.ip.xxx to group if domain matches
 	if !policyApplyIngress && cache.group.CfgType != share.Learned {
 		//remove existing grp->nv.ip.xxx mapping
-		if _, ok := grpSvcIpByDomainMap[cache.group.Name]; ok {
-			delete(grpSvcIpByDomainMap, cache.group.Name)
-		}
+		delete(grpSvcIpByDomainMap, cache.group.Name)
 		// check all nv.ip.xxx svc group
 		for _, svcipcache := range groupCacheMap {
 			if svcipcache.group.Kind != share.GroupKindIPService ||
@@ -1729,14 +1687,6 @@ func (m CacheMethod) GetGroupCount(scope string, acc *access.AccessControl) int 
 		}
 	}
 	return count
-}
-
-func getGroupCache(name string) *groupCache {
-	if cache, ok := groupCacheMap[name]; ok {
-		return cache
-	}
-
-	return nil
 }
 
 func (m CacheMethod) GetGroupBrief(name string, withCap bool, acc *access.AccessControl) (*api.RESTGroupBrief, error) {
@@ -1959,16 +1909,16 @@ func (m CacheMethod) DeleteGroupCache(name string, acc *access.AccessControl) er
 
 	txn := cluster.Transact()
 	//delete group related policy
-	clusHelper.DeleteProcessProfileTxn(txn, name)
-	clusHelper.DeleteFileMonitorTxn(txn, name)
+	_ = clusHelper.DeleteProcessProfileTxn(txn, name)
+	_ = clusHelper.DeleteFileMonitorTxn(txn, name)
 	if cache != nil && cache.group != nil {
 		if cache.group.Kind == share.GroupKindContainer {
-			clusHelper.DeleteDlpGroup(txn, name)
-			clusHelper.DeleteWafGroup(txn, name)
+			_ = clusHelper.DeleteDlpGroup(txn, name)
+			_ = clusHelper.DeleteWafGroup(txn, name)
 		}
 	}
-	clusHelper.DeleteCustomCheckConfig(txn, name)
-	txn.Apply()
+	_ = clusHelper.DeleteCustomCheckConfig(txn, name)
+	_, _ = txn.Apply()
 	txn.Close()
 
 	return nil

@@ -33,13 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
-	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/scan/secrets"
@@ -51,10 +49,10 @@ const (
 	tlsClientCA = "/var/neuvector/clientCA.cert.pem"
 )
 
-const (
-	admissionWebhookAnnotationStatusKey = "neuvector-mutating-admission-webhook/status"
-	admissionWebhookLabelKey            = "neuvector-mutating-admission-webhook/label"
-)
+// const (
+// 	admissionWebhookAnnotationStatusKey = "neuvector-mutating-admission-webhook/status"
+// 	admissionWebhookLabelKey            = "neuvector-mutating-admission-webhook/label"
+// )
 
 const errFmtUnmarshall = "could not unmarshal raw %s object"
 
@@ -121,9 +119,9 @@ const (
 )
 
 var sidecarImages = []*ContainerImage{
-	&ContainerImage{registry: "https://gcr.io/", imageRepo: "istio-release/proxyv2"},
-	&ContainerImage{registry: "https://gcr.io/", imageRepo: "linkerd-io/proxy"},
-	&ContainerImage{registry: "https://docker.io/", imageRepo: "istio/proxyv2"},
+	{registry: "https://gcr.io/", imageRepo: "istio-release/proxyv2"},
+	{registry: "https://gcr.io/", imageRepo: "linkerd-io/proxy"},
+	{registry: "https://docker.io/", imageRepo: "istio/proxyv2"},
 }
 
 /*
@@ -1141,7 +1139,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 	stamps.Parsed = time.Now()
 
 	totalContainers := 0
-	{
+	if admResObject != nil {
 		reqImages := make([]string, 0, len(admResObject.AllContainers))
 		for _, containers := range admResObject.AllContainers {
 			for _, c := range containers {
@@ -1358,7 +1356,9 @@ func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, adm
 
 		if admType == admission.NvAdmValidateType {
 			admissionResponse, _, ignoredReq = whsvr.validate(&ar, globalMode, defaultAction, stamps, false)
-			admissionResponse.UID = ar.Request.UID
+			if admissionResponse != nil {
+				admissionResponse.UID = ar.Request.UID
+			}
 		} else {
 			log.WithFields(log.Fields{"path": r.URL.Path}).Debug("unsupported path")
 			http.Error(w, "unsupported", http.StatusNotImplemented)
@@ -1464,7 +1464,7 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 
 	stamps.Start = time.Now()
 	whsvr.serveWithTimeStamps(w, r, &stamps)
-	diff := time.Now().Sub(stamps.Start)
+	diff := time.Since(stamps.Start)
 	if diff.Seconds() >= 28 {
 		log.WithFields(log.Fields{"image": stamps.Images, "seconds": diff.Seconds(),
 			"fetch": stamps.Fetched.Sub(stamps.GonnaFetch).Seconds()}).Warn("unexpected")
@@ -1720,22 +1720,22 @@ func scanEnvVarSecrets(vars map[string]string) []share.ScanSecretLog {
 	return slogs
 }
 
-func updateToOtherControllers(docKey string, jsonData string) {
-	// call grpc
-	info := share.CLUSKubernetesResInfo{
-		DocKey: docKey,
-		Data:   jsonData,
-	}
+// func updateToOtherControllers(docKey string, jsonData string) {
+// 	// call grpc
+// 	info := share.CLUSKubernetesResInfo{
+// 		DocKey: docKey,
+// 		Data:   jsonData,
+// 	}
 
-	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
-	for _, ep := range eps {
-		log.WithFields(log.Fields{"ep.ClusterIP": ep.ClusterIP, "ClusterIP": localDev.Ctrler.ClusterIP}).Debug("updateToOtherControllers(grpc-client)")
+// 	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
+// 	for _, ep := range eps {
+// 		log.WithFields(log.Fields{"ep.ClusterIP": ep.ClusterIP, "ClusterIP": localDev.Ctrler.ClusterIP}).Debug("updateToOtherControllers(grpc-client)")
 
-		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
-			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
-		}
-	}
-}
+// 		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
+// 			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
+// 		}
+// 	}
+// }
 
 func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {
 	docKey := info.DocKey

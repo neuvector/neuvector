@@ -199,19 +199,19 @@ const (
 	EventNameAwsLambdaScan                           = "AwsLambda.Scan"
 )
 
-var incidentNameList []string = []string{
-	EventNameHostPrivilEscalate,
-	EventNameContainerPrivilEscalate,
-	EventNameHostSuspiciousProcess,
-	EventNameContainerSuspiciousProcess,
-	EventNameHostFileAccessViolation,
-	EventNameContainerFileAccessViolation,
-	EventNameHostPackageUpdated,
-	EventNameContainerPackageUpdated,
-	EventNameHostTunnelDetected,
-	EventNameProcessProfileViolation,
-	EventNameHostProcessProfileViolation,
-}
+// var incidentNameList []string = []string{
+// 	EventNameHostPrivilEscalate,
+// 	EventNameContainerPrivilEscalate,
+// 	EventNameHostSuspiciousProcess,
+// 	EventNameContainerSuspiciousProcess,
+// 	EventNameHostFileAccessViolation,
+// 	EventNameContainerFileAccessViolation,
+// 	EventNameHostPackageUpdated,
+// 	EventNameContainerPackageUpdated,
+// 	EventNameHostTunnelDetected,
+// 	EventNameProcessProfileViolation,
+// 	EventNameHostProcessProfileViolation,
+// }
 
 const (
 	EventCatREST       = "RESTFUL"

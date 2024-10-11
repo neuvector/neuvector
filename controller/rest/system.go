@@ -226,7 +226,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 
 	var rconf *api.RESTSystemConfig
 	var fedConf *api.RESTFedSystemConfig
-	scope, _ := restParseQuery(r).pairs[api.QueryScope]
+	scope := restParseQuery(r).pairs[api.QueryScope]
 	if scope == share.ScopeFed || scope == share.ScopeAll {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster || fedRole == api.FedRoleJoint {
 			if cconf := cacher.GetFedSystemConfig(acc); cconf == nil {
@@ -301,7 +301,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 				Config: &api.RESTSystemConfigV2{
 					NewSvc: api.RESTSystemConfigNewSvcV2{
 						NewServicePolicyMode:      rconf.NewServicePolicyMode,
-						NewServiceProfileMode:      rconf.NewServiceProfileMode,
+						NewServiceProfileMode:     rconf.NewServiceProfileMode,
 						NewServiceProfileBaseline: rconf.NewServiceProfileBaseline,
 					},
 					Syslog: api.RESTSystemConfigSyslogV2{
@@ -424,12 +424,12 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	rc := req.Request
 	if rc.PolicyMode != nil && *rc.PolicyMode == share.PolicyModeEnforce &&
-		licenseAllowEnforce() == false {
+		!licenseAllowEnforce() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 	if rc.ProfileMode != nil && *rc.ProfileMode == share.PolicyModeEnforce &&
-		licenseAllowEnforce() == false {
+		!licenseAllowEnforce() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -559,7 +559,7 @@ func validateWebhook(h *api.RESTWebhook) (int, error) {
 		return api.RESTErrInvalidName, errors.New(msg)
 	}
 
-	if isObjectNameValid(h.Name) == false {
+	if !isObjectNameValid(h.Name) {
 		log.WithFields(log.Fields{"name": h.Name}).Error("Invalid webhook name")
 		return api.RESTErrInvalidName, errors.New("Invalid webhook name")
 	}
@@ -734,7 +734,7 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 			return
 		}
 
-		for i, _ := range cconf.Webhooks {
+		for i := range cconf.Webhooks {
 			if cconf.Webhooks[i].Name == rwh.Name {
 				log.WithFields(log.Fields{"name": rwh.Name}).Error("Duplicate webhook name")
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Duplicate webhook name")
@@ -780,7 +780,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -855,7 +855,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 		}
 
 		var found bool
-		for i, _ := range cconf.Webhooks {
+		for i := range cconf.Webhooks {
 			if cconf.Webhooks[i].Name == rwh.Name {
 				cconf.Webhooks[i] = share.CLUSWebhook{
 					Name:     rwh.Name,
@@ -911,7 +911,7 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -975,7 +975,7 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 		}
 
 		var found bool
-		for i, _ := range cconf.Webhooks {
+		for i := range cconf.Webhooks {
 			if cconf.Webhooks[i].Name == name {
 				// No retain order. Show API sort the webhook list.
 				s := len(cconf.Webhooks)
@@ -1375,7 +1375,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 			}
 
 			if rc.AuthByPlatform != nil {
-				if cconf.AuthByPlatform && *rc.AuthByPlatform == false {
+				if cconf.AuthByPlatform && !*rc.AuthByPlatform {
 					kick = true
 				}
 				cconf.AuthByPlatform = *rc.AuthByPlatform
@@ -1811,10 +1811,10 @@ func session2REST(s *share.CLUSSession) *api.RESTSession {
 	if s.Application == 0 {
 		app = utils.GetPortLink(uint8(s.IPProto), uint16(s.ServerPort))
 	} else {
-		app, _ = common.AppNameMap[s.Application]
+		app = common.AppNameMap[s.Application]
 	}
 	if s.XffApp != 0 {
-		xffapp, _ = common.AppNameMap[s.XffApp]
+		xffapp = common.AppNameMap[s.XffApp]
 	}
 	id := uint64(s.ID)
 	if s.HostMode {
@@ -2619,7 +2619,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		} else {
 			body, _ := io.ReadAll(r.Body)
 			body = _preprocessImportBody(body)
-			json_data, err := yaml.YAMLToJSON(body)
+			var json_data []byte
+			json_data, err = yaml.YAMLToJSON(body)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Request error")
 				restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2711,7 +2712,6 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		msgToken = "compliance profile"
 	}
 	configLog(share.CLUSEvImportFail, login, fmt.Sprintf("Failed to import %s", msgToken))
-	return
 }
 
 func handlerConfigImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -2787,43 +2787,43 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 
 	if importType == share.IMPORT_TYPE_CONFIG {
 		nvCrdInfo := []*resource.NvCrdInfo{
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdSecurityRule,
 				SpecNamesKind: resource.NvSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdClusterSecurityRule,
 				SpecNamesKind: resource.NvClusterSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdAdmCtrlSecurityRule,
 				SpecNamesKind: resource.NvAdmCtrlSecurityRuleKind,
 				LockKey:       share.CLUSLockAdmCtrlKey,
 				KvCrdKind:     resource.NvAdmCtrlSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdDlpSecurityRule,
 				SpecNamesKind: resource.NvDlpSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvDlpSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdWafSecurityRule,
 				SpecNamesKind: resource.NvWafSecurityRuleKind,
 				LockKey:       share.CLUSLockPolicyKey,
 				KvCrdKind:     resource.NvWafSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdVulnProfile,
 				SpecNamesKind: resource.NvVulnProfileSecurityRuleKind,
 				LockKey:       share.CLUSLockVulnKey,
 				KvCrdKind:     resource.NvVulnProfileSecurityRuleKind,
 			},
-			&resource.NvCrdInfo{
+			{
 				RscType:       resource.RscTypeCrdCompProfile,
 				SpecNamesKind: resource.NvCompProfileSecurityRuleKind,
 				LockKey:       share.CLUSLockCompKey,

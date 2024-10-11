@@ -94,7 +94,7 @@ func (p *Probe) getInode2ContainerMap() map[uint32]*inodeEntry {
 	defer p.unlockProcMux()
 
 	for pid, c := range p.pidContainerMap {
-		if global.SYS.CheckProcExist(pid) == false {
+		if !global.SYS.CheckProcExist(pid) {
 			continue
 		}
 
@@ -122,7 +122,7 @@ func (p *Probe) updateSessionTable(newMap map[string]*session) []*dp.ConnectionD
 	defer p.sessionMux.Unlock()
 
 	// Delete expired session
-	for key, _ := range p.sessionTable {
+	for key := range p.sessionTable {
 		if _, ok := newMap[key]; !ok {
 			delete(p.sessionTable, key)
 		}
@@ -326,7 +326,6 @@ func (p *Probe) NotifyPolicyChange(containerSet utils.Set) {
 			continue
 		}
 	}
-	return
 }
 
 // return dummy inode and the node is exist
@@ -339,7 +338,7 @@ func (p *Probe) lookupInode(updated *bool, inode uint32, oldInodesMap map[uint32
 		// look at the previous inode map first
 		ifd1, ok = p.inodesMap[inode]
 		if ok {
-			if ifd1.dummy == false {
+			if !ifd1.dummy {
 				return ifd1.id, true
 			}
 			// we get the inodes too early, retry 5s
@@ -349,7 +348,7 @@ func (p *Probe) lookupInode(updated *bool, inode uint32, oldInodesMap map[uint32
 		}
 	}
 
-	if *updated == false {
+	if !*updated {
 		*updated = true
 		// get a new inode map
 		p.inodesMap = p.getInode2ContainerMap()
@@ -358,7 +357,7 @@ func (p *Probe) lookupInode(updated *bool, inode uint32, oldInodesMap map[uint32
 		}
 	} else {
 		// lookup from the old map, for the dummy
-		ifd1, _ = oldInodesMap[inode]
+		ifd1 = oldInodesMap[inode]
 	}
 
 	// Cannot map the inode to the process, add a dummy entry to prevent reading fd folder again.

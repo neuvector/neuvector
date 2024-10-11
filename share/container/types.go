@@ -241,9 +241,7 @@ func Connect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 // A UNIX socket is marked with an s as the first letter of the mode string, e.g.
 // srwxrwxrwx /tmp/.X11-unix/X0
 func isUnixSockFile(filename string) bool {
-	if strings.HasPrefix(filename, "unix://") {
-		filename = filename[len("unix://"):]
-	}
+	filename = strings.TrimPrefix(filename, "unix://")
 
 	info, err := os.Stat(filename)
 	if err != nil {
@@ -252,7 +250,7 @@ func isUnixSockFile(filename string) bool {
 	return (info.Mode() & os.ModeSocket) != 0
 }
 
-//// construct a json string from map[]
+// // construct a json string from map[]
 func buildJsonFromMap(info map[string]string) string {
 	// sort all keys
 	keys := []string{}
@@ -281,7 +279,7 @@ func connectRt(rtPath, rtType string, sys *system.SystemTools) (Runtime, error) 
 	if fpath, ok := justifyRuntimeSocketFile(rtPath); !ok {
 		return nil, ErrUnknownRuntime
 	} else {
-		rtPath = fpath  // updated
+		rtPath = fpath // updated
 	}
 
 	log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug()
@@ -300,7 +298,7 @@ func connectRt(rtPath, rtType string, sys *system.SystemTools) (Runtime, error) 
 			return rt, nil
 		}
 	default:
-		if rt, err := dockerConnect(rtPath, sys); err == nil {	// prefer docker
+		if rt, err := dockerConnect(rtPath, sys); err == nil { // prefer docker
 			return rt, nil
 		}
 		if rt, err := containerdConnect(rtPath, sys); err == nil {
@@ -420,7 +418,7 @@ func isK3sLikely(cmds []string) (string, bool) {
 
 			// only at agent
 			if strings.HasPrefix(cmd, "--pause-image") {
-				if (i+1) < len(cmds) {
+				if (i + 1) < len(cmds) {
 					pause_img = cmds[i+1]
 				}
 			}
@@ -473,7 +471,7 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 						}
 
 						if endpoint == "" {
-							continue   // find next process
+							continue // find next process
 						}
 						// pre-k8s-1.24, docker is the default runtime
 						return endpoint, pause_img, true
@@ -485,22 +483,22 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 	return "", "", false
 }
 
-func IsPidHost() bool {	// pid host, pid-1 is the Linux bootup process
+func IsPidHost() bool { // pid host, pid-1 is the Linux bootup process
 	name, _ := os.Readlink("/proc/1/exe")
 	// nv containers: "monitor" is for the controller
 	return name != "/usr/local/bin/monitor"
 }
 
 func justifyRuntimeSocketFile(rtPath string) (string, bool) {
-	if isUnixSockFile(rtPath) == false {
-		if strings.HasPrefix(rtPath, "/proc/") == false{
+	if !isUnixSockFile(rtPath) {
+		if !strings.HasPrefix(rtPath, "/proc/") {
 			// log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug("not exist")
 			return "", false
 		}
 
 		// The /run directory is the companion directory to /var/run.
 		rtPath = strings.Replace(rtPath, "/var/", "/", 1) // remove "/var"
-		if isUnixSockFile(rtPath) == false {
+		if !isUnixSockFile(rtPath) {
 			// log.WithFields(log.Fields{"path": rtPath, "type": rtType}).Debug("not exist")
 			return "", false
 		}

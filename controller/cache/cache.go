@@ -220,7 +220,6 @@ var clusHelper kv.ClusterHelper
 var cfgHelper kv.ConfigHelper
 var dispatchHelper kv.DispatcherHelper
 var evhdls eventHandlers
-var admCtrlEvQueue cluster.ObjectQueueInterface
 
 type CacheMethod struct {
 	leadAddr        string
@@ -239,10 +238,6 @@ var policyApplyIngress bool
 
 func shouldExit() bool {
 	return (atomic.LoadInt32(&exitingFlag) != 0)
-}
-
-func hasLeader() bool {
-	return cacher.leadAddr != ""
 }
 
 func isLeader() bool {
@@ -319,7 +314,7 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	SchedulePruneGroups()
 
 	if localDev.Host.Platform == share.PlatformKubernetes {
-		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+		_, _ = cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
 	}
 }
 
@@ -359,8 +354,6 @@ func deriveWorkloadState(cache *workloadCache) string {
 	default:
 		return api.WorkloadStateDiscover
 	}
-
-	return api.WorkloadStateDiscover
 }
 
 func initHostCache(id string) *hostCache {
@@ -456,7 +449,7 @@ func (m CacheMethod) GetHost(id string, acc *access.AccessControl) (*api.RESTHos
 		if !acc.Authorize(cache.host, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
-		k8sCache, _ := k8sHostInfoMap[cache.host.Name]
+		k8sCache := k8sHostInfoMap[cache.host.Name]
 		return host2REST(cache, k8sCache), nil
 	}
 	return nil, common.ErrObjectNotFound
@@ -541,7 +534,7 @@ func getAgentName(id string) string {
 
 func getAgentNameNoLock(id string) string {
 	if id != "" {
-		if cache, _ := agentCacheMap[id]; cache != nil {
+		if cache := agentCacheMap[id]; cache != nil {
 			return cache.displayName
 		}
 	}
@@ -781,7 +774,7 @@ func getCombinedThreatSeverity(wafseverity, dlpseverity, severity uint8) (string
 }
 
 func getCombinedThreatName(threatid, dlpid, wafid uint32) string {
-	var dname, tname, wname string = "", "", ""
+	var dname, tname, wname string
 
 	if isDlpThreatID(dlpid) {
 		dname, _, _ = getDlpThreatNameSensorGroup(dlpid)
@@ -1143,25 +1136,10 @@ func (m CacheMethod) GetAllHosts(acc *access.AccessControl) []*api.RESTHost {
 		if !acc.Authorize(cache.host, nil) || isDummyHostCache(cache) {
 			continue
 		}
-		k8sCache, _ := k8sHostInfoMap[cache.host.Name]
+		k8sCache := k8sHostInfoMap[cache.host.Name]
 		hosts = append(hosts, host2REST(cache, k8sCache))
 	}
 	return hosts
-}
-
-func getAllControllers() []*share.CLUSController {
-	cacheMutexRLock()
-	defer cacheMutexRUnlock()
-
-	ctrls := make([]*share.CLUSController, 0, len(ctrlCacheMap))
-	for _, cache := range ctrlCacheMap {
-		if isDummyCtrlCache(cache) {
-			continue
-		}
-
-		ctrls = append(ctrls, cache.ctrl)
-	}
-	return ctrls
 }
 
 func (m CacheMethod) GetAllControllers(acc *access.AccessControl) []*api.RESTController {
@@ -1177,21 +1155,6 @@ func (m CacheMethod) GetAllControllers(acc *access.AccessControl) []*api.RESTCon
 		ctrls = append(ctrls, ctrl2REST(cache))
 	}
 	return ctrls
-}
-
-func getAllAgents() []*share.CLUSAgent {
-	cacheMutexRLock()
-	defer cacheMutexRUnlock()
-
-	agents := make([]*share.CLUSAgent, 0, len(agentCacheMap))
-	for _, cache := range agentCacheMap {
-		if isDummyAgentCache(cache) {
-			continue
-		}
-
-		agents = append(agents, cache.agent)
-	}
-	return agents
 }
 
 func (m CacheMethod) GetAllAgents(acc *access.AccessControl) []*api.RESTAgent {
@@ -1226,7 +1189,7 @@ func (m CacheMethod) GetAllWorkloads(view string, acc *access.AccessControl, idl
 			}
 
 			if idlist.Cardinality() > 0 {
-				if idlist.Contains(cache.workload.ID) == false {
+				if !idlist.Contains(cache.workload.ID) {
 					continue
 				}
 			}
@@ -1590,7 +1553,7 @@ func (m CacheMethod) GetIP2WorkloadMap(hostID string) []*api.RESTDebugIP2Workloa
 			l = append(l, &api.RESTDebugIP2Workload{IP: key, Workload: fakeWorkloadBrief(svc.group.Name)})
 		}
 
-		for key, _ := range tunnelHostMap {
+		for key := range tunnelHostMap {
 			l = append(l, &api.RESTDebugIP2Workload{IP: key, Workload: &api.RESTWorkloadBrief{
 				ID: api.EndpointIngress, Name: api.EndpointIngress, DisplayName: api.EndpointIngress,
 			}})
@@ -1709,7 +1672,7 @@ func startWorkerThread(ctx *Context) {
 			select {
 			case <-usageReportTicker.C:
 				if isLeader() {
-					writeUsageReport()
+					_ = writeUsageReport()
 				}
 			case <-groupMetricCheckTicker.C:
 				if isLeader() {
@@ -1720,7 +1683,7 @@ func startWorkerThread(ctx *Context) {
 					if !noTelemetry {
 						if sendTelemetry, teleData := getTelemetryData(telemetryFreq); sendTelemetry {
 							var param interface{} = &teleData
-							cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
+							_ = cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
 						}
 					}
 					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
@@ -1728,7 +1691,7 @@ func startWorkerThread(ctx *Context) {
 					}
 
 					masterCluster := cacher.GetFedMasterCluster(access.NewReaderAccessControl())
-					ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID)
+					_ = ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID)
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()
@@ -1762,7 +1725,7 @@ func startWorkerThread(ctx *Context) {
 									cache.errCount++
 									if cache.errCount >= scannerClearnupErrorMax {
 										log.WithFields(log.Fields{"scanner": sid}).Info("Remove stalled internal scanner")
-										clusHelper.DeleteScanner(sid)
+										_ = clusHelper.DeleteScanner(sid)
 									}
 								} else {
 									cache.errCount = 0
@@ -1775,7 +1738,7 @@ func startWorkerThread(ctx *Context) {
 								cache.errCount++
 								if cache.errCount >= scannerClearnupErrorMax {
 									log.WithFields(log.Fields{"scanner": sid}).Info("Remove stalled external scanner")
-									clusHelper.DeleteScanner(sid)
+									_ = clusHelper.DeleteScanner(sid)
 								}
 							} else {
 								cache.errCount = 0
@@ -1821,11 +1784,8 @@ func startWorkerThread(ctx *Context) {
 							addrOrchHostAdd(n.IPNets)
 							clusterUsage.nodes += 1
 						} else {
-							if ((o.IPNets == nil || len(o.IPNets) == 0) &&
-								(n.IPNets != nil && len(n.IPNets) > 0)) ||
-								(o.IPNets != nil && len(o.IPNets) > 0 &&
-									n.IPNets != nil && len(n.IPNets) > 0 &&
-									!reflect.DeepEqual(o.IPNets, n.IPNets)) {
+							if (len(o.IPNets) == 0 && len(n.IPNets) > 0) ||
+								(len(o.IPNets) > 0 && len(n.IPNets) > 0 && !reflect.DeepEqual(o.IPNets, n.IPNets)) {
 								addrOrchHostAdd(n.IPNets)
 							}
 						}
@@ -1961,7 +1921,7 @@ func startWorkerThread(ctx *Context) {
 									}
 								} else {
 									var podSAMap map[string]string
-									if podSAMap, _ = nodePodSAMap[n.Node]; podSAMap == nil {
+									if podSAMap = nodePodSAMap[n.Node]; podSAMap == nil {
 										podSAMap = make(map[string]string, 1)
 										nodePodSAMap[n.Node] = podSAMap
 									}
@@ -1972,11 +1932,9 @@ func startWorkerThread(ctx *Context) {
 						}
 					} else if o != nil && n == nil { // delete
 						cacheMutexLock()
-						if podSAMap, ok := nodePodSAMap[o.Node]; podSAMap != nil {
+						if podSAMap := nodePodSAMap[o.Node]; podSAMap != nil {
 							for _, containerID := range o.ContainerIDs {
-								if _, ok = podSAMap[containerID]; ok {
-									delete(podSAMap, containerID)
-								}
+								delete(podSAMap, containerID)
 							}
 						}
 						cacheMutexUnlock()
@@ -1995,12 +1953,9 @@ func startWorkerThread(ctx *Context) {
 							createServiceIPGroup(n)
 						} else if (n == nil || n.IPs == nil || len(n.IPs) == 0) && (o != nil && o.IPs != nil && len(o.IPs) > 0) {
 							deleteServiceIPGroup(o.Domain, o.Name, 0) // 0 means we don't know the group's CfgType yet
-						} else if (o != nil && (o.ExternalIPs == nil || len(o.ExternalIPs) == 0) &&
-							(n != nil && n.ExternalIPs != nil && len(n.ExternalIPs) > 0)) ||
-							(o != nil && o.ExternalIPs != nil && len(o.ExternalIPs) > 0 &&
-								n != nil && (n.ExternalIPs == nil || len(n.ExternalIPs) == 0)) ||
-							(o != nil && o.ExternalIPs != nil && len(o.ExternalIPs) > 0 &&
-								n != nil && n.ExternalIPs != nil && len(n.ExternalIPs) > 0 &&
+						} else if (o != nil && len(o.ExternalIPs) == 0 && (n != nil && len(n.ExternalIPs) > 0)) ||
+							(o != nil && len(o.ExternalIPs) > 0 && n != nil && len(n.ExternalIPs) == 0) ||
+							(o != nil && len(o.ExternalIPs) > 0 && n != nil && len(n.ExternalIPs) > 0 &&
 								!reflect.DeepEqual(o.ExternalIPs, n.ExternalIPs)) {
 							// externalIP changes
 							createServiceIPGroup(n)
@@ -2125,7 +2080,7 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
 				alog.Msg = fmt.Sprintf("Failed to re-configure admission control after mismatched Kubernetes resource configuration found (%s).", config.Name)
 			}
-			cctx.EvQueue.Append(&alog)
+			_ = cctx.EvQueue.Append(&alog)
 		}
 	}
 }
@@ -2170,7 +2125,7 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	// license update will update the limit and could trigger actions
 	licenseInit()
 	ruleid.SetGetGroupWithoutLockFunc(getGroupWithoutLock)
-	clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
+	_ = clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
 	automode_init(ctx)
 
 	db.SetGetCVERecordFunc(GetCVERecord)
@@ -2195,7 +2150,7 @@ func CacheEvent(ev share.TLogEvent, msg string) error {
 			ControllerName: localDev.Ctrler.Name,
 			Msg:            msg,
 		}
-		cctx.EvQueue.Append(&log)
+		_ = cctx.EvQueue.Append(&log)
 		if ev == share.CLUSEvK8sNvRBAC {
 			cctx.EvQueue.Flush()
 		}
@@ -2272,7 +2227,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 	updated := utils.NewSet() // allow one update per round
 
 	cacheMutexRLock()
-	for id, _ := range wlCacheMap {
+	for id := range wlCacheMap {
 		ids.Add(id)
 		suspected.Remove(id) // remove the missing id
 	}
@@ -2318,7 +2273,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 			for _, key := range removed {
 				txn.DeleteTree(key)
 			}
-			txn.Apply()
+			_, _ = txn.Apply()
 			txn.Close()
 			log.WithFields(log.Fields{"pruned": len(removed), "removed": removed}).Info()
 		}

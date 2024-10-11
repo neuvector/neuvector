@@ -315,8 +315,8 @@ func validateWafRuleConfig(list []api.RESTWafRule) error {
 	return nil
 }
 
-//lock is alreay hold when call this function
-//clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+// lock is alreay hold when call this function
+// clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 func createDefaultWafSensor() {
 	kv.CreateDefWafRules(true)
 	kv.CreatePreWafSensor(true)
@@ -350,7 +350,7 @@ func createWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, cfgTy
 			e := "sensor cannot be created in cluster!"
 			log.WithFields(log.Fields{"sensor": sensor.Name}).Error(e)
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		log.Debug("Creating default waf sensor!")
 	}
@@ -381,7 +381,7 @@ func createWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, cfgTy
 			e := "Waf rule id overflow!"
 			log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 
 		//save full rule with pattern in default sensor
@@ -446,7 +446,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached == true {
+	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached {
 		e := "waf sensor already exists"
 		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
@@ -492,7 +492,7 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 	var cfgType share.TCfgType = share.UserCreated
 	if reviewType != share.ReviewTypeCRD && sensor.CfgType == share.GroundCfg {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	} else if reviewType == share.ReviewTypeCRD {
 		cfgType = share.GroundCfg
 	}
@@ -602,7 +602,7 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 					e := "Waf rule id overflow!"
 					log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return fmt.Errorf(e)
+					return fmt.Errorf("%s", e)
 				}
 			}
 			//save full rule with pattern in default sensor
@@ -638,13 +638,13 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 						e := "Cannot find waf rule in this sensor!"
 						log.WithFields(log.Fields{"sensor": conf.Name, "rulename": rdr.Name}).Error(e)
 						restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 					if !foundInAll {
 						e := "Cannot find full waf rule to delete!"
 						log.WithFields(log.Fields{"sensor": defsensor.Name, "rulename": rdr.Name}).Error(e)
 						restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 				}
 			}
@@ -688,7 +688,7 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 						e := "Waf rule id overflow!"
 						log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 				}
 				//save full rule with pattern in default sensor
@@ -797,13 +797,13 @@ func processGroupSensors(w http.ResponseWriter, cg *share.CLUSWafGroup, sensors 
 			e := "Cannot use default sensor in waf group!"
 			log.WithFields(log.Fields{"name": rs.Name}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if rs.Action != share.DlpRuleActionAllow && rs.Action != share.DlpRuleActionDrop {
 			e := "Action is not supported!"
 			log.WithFields(log.Fields{"sensor": rs}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if cs := clusHelper.GetWafSensor(rs.Name); cs == nil {
 			e := "Waf sensor does not exist"
@@ -894,7 +894,6 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 			if len(*conf.DelSensors) > 0 && len(cg.Sensors) > 0 {
 				for _, rs := range *conf.DelSensors {
-					var found bool = false
 					cs := &share.CLUSWafSetting{Name: rs, Action: share.DlpRuleActionDrop}
 					idx, found := common.FindSensorInWafGroup(cg.Sensors, cs)
 					if found {
@@ -947,14 +946,14 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		return err
 	} else if reviewType != share.ReviewTypeCRD && rwafsensor.CfgType == api.CfgTypeGround {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	}
 
 	if name == share.CLUSWafDefaultSensor {
 		e := "Cannot delete default sensor!"
 		log.WithFields(log.Fields{"name": name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	var lock cluster.LockInterface
@@ -969,7 +968,7 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 	if wafsensor == nil {
 		log.WithFields(log.Fields{"name": name}).Error("Fail to get waf sensor!")
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-		return fmt.Errorf(restErrMessage[api.RESTErrObjectNotFound])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrObjectNotFound])
 	}
 	defsensor := clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
 
@@ -983,9 +982,7 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		defsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
 	}
 	for _, rn := range wafsensor.RuleListNames {
-		if _, foundInAll := defsensor.RuleList[rn]; foundInAll {
-			delete(defsensor.RuleList, rn)
-		}
+		delete(defsensor.RuleList, rn)
 	}
 	clusHelper.PutWafSensorTxn(txn, defsensor)
 	clusHelper.DeleteWafSensorTxn(txn, name)
@@ -1067,7 +1064,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 
 		ruleList := make([]*resource.NvSecurityWafRule, 0, len(sensor.RuleListNames))
-		for rName, _ := range sensor.RuleListNames {
+		for rName := range sensor.RuleListNames {
 			if r, ok := defSensor.RuleList[rName]; ok {
 				patterns := make([]api.RESTWafCriteriaEntry, len(r.Patterns))
 				for idx, p := range r.Patterns {
@@ -1156,7 +1153,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	if invalidCrdKind || len(secRules) == 0 {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_WAF)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_WAF)
 		return nil
 	}
 
@@ -1180,7 +1177,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 		for _, secRule := range secRules {
 			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdWafContent(&secRule, share.ReviewTypeImportWAF, share.ReviewTypeDisplayWAF)
 			if errCount > 0 {
-				err = fmt.Errorf(errMsg)
+				err = fmt.Errorf("%s", errMsg)
 				break
 			} else {
 				parsedWafCfgs = append(parsedWafCfgs, parsedCfg)

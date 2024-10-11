@@ -86,10 +86,9 @@ func (m *mockCache) Group2CLUS(group *api.RESTGroup) *share.CLUSGroup {
 		PlatformRole:   group.PlatformRole,
 		Criteria:       make([]share.CLUSCriteriaEntry, len(group.Criteria)),
 	}
-	c.CfgType, _ = cfgTypeMapping[group.CfgType]
-	for i, d := range group.CreaterDomains {
-		c.CreaterDomains[i] = d
-	}
+	c.CfgType = cfgTypeMapping[group.CfgType]
+	copy(c.CreaterDomains, group.CreaterDomains)
+
 	for i, crt := range group.Criteria {
 		c.Criteria[i] = share.CLUSCriteriaEntry{
 			Key: crt.Key, Value: crt.Value, Op: crt.Op,
@@ -114,7 +113,7 @@ func (m *mockCache) Policy2CLUS(rule *api.RESTPolicyRule) *share.CLUSPolicyRule 
 		Priority:       rule.Priority,
 		Applications:   appNames2IDs(rule.Applications),
 	}
-	c.CfgType, _ = cfgTypeMapping[rule.CfgType]
+	c.CfgType = cfgTypeMapping[rule.CfgType]
 
 	return &c
 }
@@ -267,7 +266,7 @@ func (m *mockCache) CreateService(svc *api.RESTServiceConfig, acc *access.Access
 			Domain:  svc.Domain,
 			Kind:    share.GroupKindContainer,
 		}
-		clusHelper.PutGroup(&rg, true)
+		_ = clusHelper.PutGroup(&rg, true)
 		return nil
 	}
 }
@@ -322,10 +321,8 @@ func (m *mockCache) Group2REST(group *share.CLUSGroup) *api.RESTGroup {
 			CreaterDomains: make([]string, len(group.CreaterDomains)),
 		},
 	}
-	for idx, cd := range group.CreaterDomains {
-		g.CreaterDomains[idx] = cd
-	}
-	g.CfgType, _ = cfgTypeMap2Api[group.CfgType]
+	copy(g.CreaterDomains, group.CreaterDomains)
+	g.CfgType = cfgTypeMap2Api[group.CfgType]
 	return &g
 }
 
@@ -414,9 +411,7 @@ func (m *mockCache) GetComplianceProfile(name string, acc *access.AccessControl)
 		for _, m := range metaMap {
 			if _, ok := filter[m.TestNum]; !ok {
 				var tags []string
-				for _, complianceTag := range m.Tags {
-					tags = append(tags, complianceTag)
-				}
+				tags = append(tags, m.Tags...)
 				filter[m.TestNum] = tags
 			}
 		}
@@ -498,13 +493,13 @@ func mockLoginUser(name, role, fedRole string, roleDomains map[string][]string) 
 
 var router *httprouter.Router
 
-func preTestDebug() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.DebugLevel)
-	initTest()
-	access.CompileUriPermitsMapping()
-}
+// func preTestDebug() {
+// 	log.SetOutput(os.Stdout)
+// 	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+// 	log.SetLevel(log.DebugLevel)
+// 	initTest()
+// 	access.CompileUriPermitsMapping()
+// }
 
 func preTest() {
 	log.SetOutput(os.Stdout)
@@ -749,17 +744,17 @@ func loginServerToken(token, server string) *mockResponseWriter {
 	return w
 }
 
-func loginServerGetSLORedirectURL(token, server string) *mockResponseWriter {
-	w := new(mockResponseWriter)
-	data := api.RESTTokenRedirect{
-		Redirect: "https://localhost/samlslo",
-	}
-	body, _ := json.Marshal(data)
-	r, _ := http.NewRequest("GET", "/v1/token_auth_server/"+server+"/slo", bytes.NewBuffer(body))
-	r.Header.Add("X-Auth-Token", token)
-	router.ServeHTTP(w, r)
-	return w
-}
+// func loginServerGetSLORedirectURL(token, server string) *mockResponseWriter {
+// 	w := new(mockResponseWriter)
+// 	data := api.RESTTokenRedirect{
+// 		Redirect: "https://localhost/samlslo",
+// 	}
+// 	body, _ := json.Marshal(data)
+// 	r, _ := http.NewRequest("GET", "/v1/token_auth_server/"+server+"/slo", bytes.NewBuffer(body))
+// 	r.Header.Add("X-Auth-Token", token)
+// 	router.ServeHTTP(w, r)
+// 	return w
+// }
 
 func logout(token string) *mockResponseWriter {
 	w := new(mockResponseWriter)

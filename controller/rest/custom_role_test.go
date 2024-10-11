@@ -49,7 +49,7 @@ func verifyCustomRole(testID string, data *api.RESTUserRoleConfigData, acc *acce
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get role: status=%v.", w.status)
 	}
-	json.Unmarshal(w.body, &resp)
+	_ = json.Unmarshal(w.body, &resp)
 	if resp.Role.Name != data.Config.Name || resp.Role.Comment != data.Config.Comment || resp.Role.Reserved {
 		t.Fatalf("Incorrect role by REST: role=%v", data.Config.Name)
 	} else {
@@ -116,7 +116,7 @@ func TestRoleCreateDelete(t *testing.T) {
 
 	// Create role with permission
 	data.Config.Permissions = []*api.RESTRolePermission{
-		&api.RESTRolePermission{ID: "authentication", Write: true},
+		{ID: "authentication", Write: true},
 	}
 	body, _ = json.Marshal(data)
 	w = restCall("POST", "/v1/user_role", body, api.UserRoleAdmin)
@@ -134,7 +134,7 @@ func TestRoleCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get roles: status=%v.", w.status)
 	}
-	json.Unmarshal(w.body, &resp)
+	_ = json.Unmarshal(w.body, &resp)
 	if len(resp.Roles) != 4 { // 4 reserved roles(not including None) + created custom role
 		t.Fatalf("Incorrect role count in rest: count=%v expected=5", len(resp.Roles))
 	}
@@ -208,7 +208,7 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 
 	var obj share.CLUSAgent
 	nvURIs := map[string][]string{ // key is http verb, value is URIs with the sme verb
-		"GET": []string{
+		"GET": {
 			"/v1/meter", // test this API as all the following handlers call authDebugCaller(w, acc, login) too
 			/*"/v1/enforcer/:id/probe_summary",
 			"/v1/enforcer/:id/probe_processes",
@@ -226,12 +226,12 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 			"/v1/session/summary",
 			"/v1/file_monitor_file",*/
 		},
-		/*"POST": []string{
+		/*"POST": {
 			"/v1/debug/controller/sync/:id",
 			"/v1/controller/:id/profiling",
 			"/v1/enforcer/:id/profiling",
 		},
-		"DELETE": []string{
+		"DELETE": {
 			"/v1/conversation_endpoint/:id",
 			"/v1/conversation",
 			"/v1/session",
@@ -240,32 +240,32 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 
 	fedURIs1 := map[string][]string{ // key is http verb, value is URIs with the sme verb
 		// all the following APIs require admin role
-		"POST": []string{
+		"POST": {
 			"/v1/fed/promote",
 			"/v1/fed/join",
 			"/v1/fed/leave",
 			"/v1/fed/remove_internal",
 			"/v1/fed/command_internal",
 		},
-		"PATCH": []string{
+		"PATCH": {
 			"/v1/fed/config",
 		},
-		"DELETE": []string{
+		"DELETE": {
 			"/v1/fed_auth",
 		},
 	}
 
 	fedURIs2 := map[string][]string{ // key is http verb, value is URIs with the sme verb
 		// the following APIs require fedAdmin role
-		"POST": []string{
+		"POST": {
 			"/v1/fed/demote",
 			"/v1/fed/deploy",
 			"/v1/fed/cluster/:id/*request",
 		},
-		"PATCH": []string{
+		"PATCH": {
 			"/v1/fed/cluster/:id/*request",
 		},
-		"DELETE": []string{
+		"DELETE": {
 			"/v1/fed/cluster/:id",
 			"/v1/fed/cluster/:id/*request",
 		},
@@ -322,14 +322,14 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 
 	// Create the all configurable read role & other roles to not having all configurable modify permission enabled. however, no custom role can have the same permissions as reader
 	dataNonAdminRoles := []*api.RESTUserRoleConfigData{
-		&api.RESTUserRoleConfigData{
+		{
 			Config: &api.RESTUserRoleConfig{
 				Name:        "custom-role-2",
 				Comment:     "all configurable read enabled role",
 				Permissions: permitsAllConfigurableRead,
 			},
 		},
-		&api.RESTUserRoleConfigData{
+		{
 			Config: &api.RESTUserRoleConfig{
 				Name:        "custom-role-3",
 				Comment:     "other role",
@@ -338,14 +338,14 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 		},
 	}
 	dataNonAdminUsers := []*api.RESTUserData{
-		&api.RESTUserData{
+		{
 			User: &api.RESTUser{
 				Fullname: "reader-jack",
 				Password: "123456",
 				Role:     dataNonAdminRoles[0].Config.Name,
 			},
 		},
-		&api.RESTUserData{
+		{
 			User: &api.RESTUser{
 				Fullname: "other-jane",
 				Password: "123456",
@@ -505,7 +505,7 @@ func TestRoleConfig(t *testing.T) {
 			Name:    "custom-role-1",
 			Comment: "for testing",
 			Permissions: []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: "audit_events", Read: true},
+				{ID: "audit_events", Read: true},
 			},
 		},
 	}
@@ -521,7 +521,7 @@ func TestRoleConfig(t *testing.T) {
 	viewOnlyPermissionIDs := []string{"audit_events", "security_events", "events"}
 	for _, viewOnlyPermitID := range viewOnlyPermissionIDs {
 		data.Config.Permissions = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: viewOnlyPermitID, Read: true},
+			{ID: viewOnlyPermitID, Read: true},
 		}
 
 		body, _ = json.Marshal(data)
@@ -550,7 +550,7 @@ func TestRoleConfig(t *testing.T) {
 	modifyOnlyPermissionIDs := []string{"ci_scan"}
 	for _, modifyOnlyPermitID := range modifyOnlyPermissionIDs {
 		data.Config.Permissions = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: modifyOnlyPermitID, Write: true},
+			{ID: modifyOnlyPermitID, Write: true},
 		}
 		body, _ = json.Marshal(data)
 		w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -565,7 +565,7 @@ func TestRoleConfig(t *testing.T) {
 	rwPermissionIDs := []string{"rt_scan", "reg_scan", "rt_policy", "admctrl", "compliance", "authentication", "authorization", "config"}
 	for _, rwPermitID := range rwPermissionIDs {
 		data.Config.Permissions = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: rwPermitID, Read: true, Write: true},
+			{ID: rwPermitID, Read: true, Write: true},
 		}
 		body, _ = json.Marshal(data)
 		w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -640,7 +640,7 @@ func TestRoleConfigNegative(t *testing.T) {
 			Name:    "custom-role-1",
 			Comment: "for viewing audit logs",
 			Permissions: []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: "audit_events", Read: true},
+				{ID: "audit_events", Read: true},
 			},
 		}}
 
@@ -675,8 +675,8 @@ func TestRoleConfigNegative(t *testing.T) {
 
 	// Config role with duplicate permission id
 	data.Config.Permissions = []*api.RESTRolePermission{
-		&api.RESTRolePermission{ID: "audit_events", Read: true},
-		&api.RESTRolePermission{ID: "audit_events", Read: true},
+		{ID: "audit_events", Read: true},
+		{ID: "audit_events", Read: true},
 	}
 	body, _ = json.Marshal(data)
 	w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -688,7 +688,7 @@ func TestRoleConfigNegative(t *testing.T) {
 	viewOnlyPermissionIDs := []string{"audit_events", "security_events", "events"}
 	for _, viewOnlyPermitID := range viewOnlyPermissionIDs {
 		data.Config.Permissions = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: viewOnlyPermitID, Write: true},
+			{ID: viewOnlyPermitID, Write: true},
 		}
 		body, _ = json.Marshal(data)
 		w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -701,7 +701,7 @@ func TestRoleConfigNegative(t *testing.T) {
 	modifyOnlyPermissions := []string{"ci_scan"}
 	for _, modifyOnlyPermitID := range modifyOnlyPermissions {
 		data.Config.Permissions = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: modifyOnlyPermitID, Read: true},
+			{ID: modifyOnlyPermitID, Read: true},
 		}
 		body, _ = json.Marshal(data)
 		w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -714,7 +714,7 @@ func TestRoleConfigNegative(t *testing.T) {
 	hiddenPermissionIDs := []string{"ibmsa", "fed", "adm_basic"} // "fed" is hidden until the cluster is promoted
 	for _, hiddenOnlyPermitID := range hiddenPermissionIDs {
 		data.Config.Permissions = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: hiddenOnlyPermitID},
+			{ID: hiddenOnlyPermitID},
 		}
 		body, _ = json.Marshal(data)
 		w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -725,7 +725,7 @@ func TestRoleConfigNegative(t *testing.T) {
 
 	// Config role with invalid permission id
 	data.Config.Permissions = []*api.RESTRolePermission{
-		&api.RESTRolePermission{ID: "audit_events_bad", Read: true},
+		{ID: "audit_events_bad", Read: true},
 	}
 	body, _ = json.Marshal(data)
 	w = restCall("PATCH", "/v1/user_role/"+data.Config.Name, body, api.UserRoleAdmin)
@@ -757,21 +757,21 @@ func TestUserWithCustomRole(t *testing.T) {
 
 	// Create role with permission
 	dataRoles := []api.RESTUserRoleConfigData{
-		api.RESTUserRoleConfigData{
+		{
 			Config: &api.RESTUserRoleConfig{
 				Name:    "custom-role-1", // has view/modify authorization permission
 				Comment: "modify authorization",
 				Permissions: []*api.RESTRolePermission{
-					&api.RESTRolePermission{ID: "authorization", Write: true},
+					{ID: "authorization", Write: true},
 				},
 			},
 		},
-		api.RESTUserRoleConfigData{
+		{
 			Config: &api.RESTUserRoleConfig{
 				Name:    "custom-role-2", // has only view authorization permission
 				Comment: "view authorization",
 				Permissions: []*api.RESTRolePermission{
-					&api.RESTRolePermission{ID: "authorization", Read: true},
+					{ID: "authorization", Read: true},
 				},
 			},
 		},

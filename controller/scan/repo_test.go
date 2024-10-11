@@ -16,9 +16,9 @@ var sr1 = share.ScanResult{
 	Error:     share.ScanErrorCode_ScanErrNone,
 	Namespace: "alpine:2.10",
 	Vuls: []*share.ScanVulnerability{
-		&share.ScanVulnerability{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
-		&share.ScanVulnerability{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
-		&share.ScanVulnerability{Name: "CVE-2018-0001", Severity: "High", PublishedDate: "1514764800"},
+		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
+		{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
+		{Name: "CVE-2018-0001", Severity: "High", PublishedDate: "1514764800"},
 	},
 	Repository: "neuvector/alpine",
 	Tag:        "2.10.1",
@@ -38,9 +38,9 @@ var sr2 = share.ScanResult{
 	Error:     share.ScanErrorCode_ScanErrNone,
 	Namespace: "alpine:2.10",
 	Vuls: []*share.ScanVulnerability{
-		&share.ScanVulnerability{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
-		&share.ScanVulnerability{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
-		&share.ScanVulnerability{Name: "CVE-2020-0002", Severity: "Medium", PublishedDate: "1546300900"},
+		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
+		{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
+		{Name: "CVE-2020-0002", Severity: "Medium", PublishedDate: "1546300900"},
 	},
 	Repository: "neuvector/alpine",
 	Tag:        "2.10.1",
@@ -60,8 +60,8 @@ var sr3 = share.ScanResult{
 	Error:     share.ScanErrorCode_ScanErrNone,
 	Namespace: "alpine:2.10",
 	Vuls: []*share.ScanVulnerability{
-		&share.ScanVulnerability{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
-		&share.ScanVulnerability{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
+		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
+		{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
 	},
 	Registry:   "https://docker.io/",
 	Repository: "neuvector/alpine",
@@ -109,9 +109,9 @@ func TestLocalRepoScan(t *testing.T) {
 		t.Errorf("Unable to local image cache: id=%+v", sr1.ImageID)
 	} else if c.highVuls != 2 || c.medVuls != 1 {
 		t.Errorf("Incorrect CVE count: high=%+v, medium=%+v", c.highVuls, c.medVuls)
-	} else if h, _ := c.vulInfo["High"]; len(h) != 2 {
+	} else if h := c.vulInfo["High"]; len(h) != 2 {
 		t.Errorf("Incorrect CVE info high count: high=%+v", len(h))
-	} else if m, _ := c.vulInfo["Medium"]; len(m) != 1 {
+	} else if m := c.vulInfo["Medium"]; len(m) != 1 {
 		t.Errorf("Incorrect CVE info medium count: medium=%+v", len(m))
 	}
 
@@ -126,7 +126,7 @@ func TestLocalRepoScan(t *testing.T) {
 	}
 
 	// Store another result, same name different ID
-	smd.StoreRepoScanResult(&sr2)
+	_ = smd.StoreRepoScanResult(&sr2)
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
 	_, ok = mockCluster.ScanSums[key]
 	if !ok {
@@ -171,15 +171,15 @@ func TestRemoteRepoScan(t *testing.T) {
 	newRepoScanRegistry(common.RegistryRepoScanName)
 
 	// store a local image
-	smd.StoreRepoScanResult(&sr1)
+	_ = smd.StoreRepoScanResult(&sr1)
 	key := share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
-	sum, _ := mockCluster.ScanSums[key]
+	sum := mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, false, nil)
 
 	// store a remote image
-	smd.StoreRepoScanResult(&sr3)
+	_ = smd.StoreRepoScanResult(&sr3)
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr3.ImageID)
-	sum, _ = mockCluster.ScanSums[key]
+	sum = mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr3.ImageID, sum, false, nil)
 
 	// search image that registry matches

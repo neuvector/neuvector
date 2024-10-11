@@ -123,9 +123,7 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 		}
 	}
 
-	for _, m := range item.Message {
-		r.Message = append(r.Message, m)
-	}
+	r.Message = append(r.Message, item.Message...)
 
 	if len(r.Message) > 0 {
 		allMessages := strings.Join(r.Message, ", ")
@@ -751,9 +749,10 @@ func getCISReportFromCluster(bench share.BenchType, id string, cpf *compliancePr
 }
 
 func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *access.AccessControl) (*api.RESTBenchReport, int, string) {
-	rpt1, code, errMsg := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, acc)
+	rpt1, code, _ := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, acc)
 	if code != 0 {
 		// Ignore the error in the master node as some nodes are not master. (BenchStatusNotSupport)
+		log.WithFields(log.Fields{"code": code}).Debug("Ignore the error in the master node as some nodes are not master")
 	}
 	rpt2, code, errMsg := getCISReportFromCluster(share.BenchKubeWorker, id, cpf, acc)
 	if code != 0 {
@@ -763,9 +762,7 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 	if rpt1 == nil || len(rpt1.Items) == 0 {
 		return rpt2, 0, ""
 	} else {
-		for _, item := range rpt2.Items {
-			rpt1.Items = append(rpt1.Items, item)
-		}
+		rpt1.Items = append(rpt1.Items, rpt2.Items...)
 
 		return rpt1, 0, ""
 	}
@@ -1016,7 +1013,7 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 
 					// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
 					// Policy mode is empty if the image is not used.
-					pm, _ := img2mode[id]
+					pm := img2mode[id]
 					for i := 0; i < len(idns); i++ {
 						idns[i].PolicyMode = pm
 					}
@@ -1059,17 +1056,17 @@ func handlerAssetCompliance(w http.ResponseWriter, r *http.Request, ps httproute
 
 	// remove id from RESTIDName to reduce data size.
 	for _, wls := range resp.Workloads {
-		for i, _ := range wls {
+		for i := range wls {
 			wls[i].ID = ""
 		}
 	}
 	for _, nodes := range resp.Nodes {
-		for i, _ := range nodes {
+		for i := range nodes {
 			nodes[i].ID = ""
 		}
 	}
 	for _, images := range resp.Images {
-		for i, _ := range images {
+		for i := range images {
 			images[i].ID = ""
 		}
 	}

@@ -143,7 +143,7 @@ func getScannedImages(reqImgRegistry utils.Set, reqImgRepo, reqImgTag string, vp
 	for _, reqRegistry := range reqImgRegistrySlice {
 		for _, rs := range regs {
 			// No registry comparison for images in repoScan registry.
-			if strings.Index(strings.ToLower(rs.config.Registry), reqRegistry) == -1 {
+			if !strings.Contains(strings.ToLower(rs.config.Registry), reqRegistry) {
 				// image in admission control request is in differerent registry from current registry
 				continue
 			}
@@ -241,9 +241,9 @@ func GetScannedImageSummary(reqImgRegistry utils.Set, reqImgRepo, reqImgTag stri
 		summary.Modules = s.modules
 
 		if s.cache.vulInfo != nil {
-			summary.CriticalVulInfo, _ = s.cache.vulInfo[share.VulnSeverityCritical]
-			summary.HighVulInfo, _ = s.cache.vulInfo[share.VulnSeverityHigh]
-			summary.MediumVulInfo, _ = s.cache.vulInfo[share.VulnSeverityMedium]
+			summary.CriticalVulInfo = s.cache.vulInfo[share.VulnSeverityCritical]
+			summary.HighVulInfo = s.cache.vulInfo[share.VulnSeverityHigh]
+			summary.MediumVulInfo = s.cache.vulInfo[share.VulnSeverityMedium]
 		}
 		summary.LowVulInfo = s.cache.lowVulInfo
 		for _, envVar := range s.cache.envs {
@@ -618,9 +618,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			}
 
 			rrpt.SignatureInfo.Verifiers = make([]string, len(c.signatureVerifiers))
-			for i, v := range c.signatureVerifiers {
-				rrpt.SignatureInfo.Verifiers[i] = v
-			}
+			copy(rrpt.SignatureInfo.Verifiers, c.signatureVerifiers)
 		}
 	}
 
@@ -670,13 +668,14 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 			}
 			rvuls = vpf.FilterVulREST(rvuls, idns, showTag)
 
-			var rsecrets []*api.RESTScanSecret
-			if !rs.config.DisableFiles && layer.Secrets != nil {
-				rsecrets = make([]*api.RESTScanSecret, 0)
-				for _, s := range layer.Secrets.Logs {
-					rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
-				}
-			}
+			// we don't return secret in the report
+			// var rsecrets []*api.RESTScanSecret
+			// if !rs.config.DisableFiles && layer.Secrets != nil {
+			// 	rsecrets = make([]*api.RESTScanSecret, 0)
+			// 	for _, s := range layer.Secrets.Logs {
+			// 		rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
+			// 	}
+			// }
 			layers[j] = &api.RESTScanLayer{Digest: layer.Digest, Cmds: layer.Cmds, Vuls: rvuls /*Secrets: rsecrets,*/, Size: layer.Size}
 		}
 		return &api.RESTScanLayersReport{Layers: layers}, nil
@@ -707,7 +706,7 @@ func (m *scanMethod) GetRegistryImageSummary(name string, vpf scanUtils.VPFInter
 				continue
 			}
 
-			cache, _ := rs.cache[id]
+			cache := rs.cache[id]
 			rsum := image2RESTSummary(rs, id, sum, cache, vpf)
 			for _, image := range sum.Images {
 				s := *rsum

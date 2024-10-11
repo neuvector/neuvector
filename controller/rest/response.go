@@ -148,49 +148,49 @@ func getServerlessNameList() []string {
 func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTResponseRuleOptions {
 	if responseRuleOptions == nil {
 		responseRuleOptions = map[string]*api.RESTResponseRuleOptions{
-			share.EventEvent: &api.RESTResponseRuleOptions{
+			share.EventEvent: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel},
 				Name:  getEventNameList(true),
 				Level: getEventLevelList(api.LogLevelList),
 			},
-			share.EventCVEReport: &api.RESTResponseRuleOptions{
+			share.EventCVEReport: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel,
 					share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium,
 					share.EventCondTypeCVEName, share.EventCondTypeCVEHighWithFix},
 				Name:  getCVEReportNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelERR, api.LogLevelWARNING}),
 			},
-			share.EventRuntime: &api.RESTResponseRuleOptions{
+			share.EventRuntime: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel, share.EventCondTypeProc},
 				Name:  getSecurityEventNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelERR, api.LogLevelWARNING, api.LogLevelNOTICE, api.LogLevelINFO}),
 			},
 			/*
-				share.EventIncident: &api.RESTResponseRuleOptions{
+				share.EventIncident: {
 					Types: []string{share.EventCondTypeName, share.EventCondTypeLevel, share.EventCondTypeProc},
 					Name:  getSecurityEventNameList(),
 					Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelWARNING}),
 				},
-				share.EventViolation: &api.RESTResponseRuleOptions{
+				share.EventViolation: {
 					Types: []string{share.EventCondTypeLevel},
 					Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelWARNING}),
 				},
-				share.EventThreat: &api.RESTResponseRuleOptions{
+				share.EventThreat: {
 					Types: []string{share.EventCondTypeLevel},
 					Level: getEventLevelList(api.ThreatLevelList),
 				},
 			*/
-			share.EventServerless: &api.RESTResponseRuleOptions{
+			share.EventServerless: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel},
 				Name:  getServerlessNameList(),
 				Level: getEventLevelList([]string{api.LogLevelWARNING, api.LogLevelINFO}),
 			},
-			share.EventCompliance: &api.RESTResponseRuleOptions{
+			share.EventCompliance: {
 				Types: []string{share.EventCondTypeLevel, share.EventCondTypeName},
 				Name:  getComplianceItemNameList(),
 				Level: getEventLevelList([]string{api.LogLevelWARNING}),
 			},
-			share.EventAdmCtrl: &api.RESTResponseRuleOptions{
+			share.EventAdmCtrl: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel},
 				Name:  getAdmCtrlNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelWARNING, api.LogLevelINFO}),
@@ -212,7 +212,7 @@ func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTRespon
 	if !acc.HasGlobalPermissions(share.PERMS_RUNTIME_POLICIES, 0) {
 		if responseRuleOptionsForLocalUsers == nil {
 			responseRuleOptionsForLocalUsers = map[string]*api.RESTResponseRuleOptions{
-				share.EventEvent: &api.RESTResponseRuleOptions{
+				share.EventEvent: {
 					Types: responseRuleOptions[share.EventEvent].Types,
 					Name:  getEventNameList(false),
 					Level: responseRuleOptions[share.EventEvent].Level,
@@ -238,7 +238,7 @@ func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	}
 	if (scope == share.ScopeFed && (!acc.IsFedReader() && !acc.IsFedAdmin() && !acc.HasPermFed())) || !acc.Authorize(&share.CLUSResponseRuleOptionsDummy{}, nil) {
@@ -319,9 +319,9 @@ func validateResponseRule(r *api.RESTResponseRule, acc *access.AccessControl) er
 				} else if cd.CondType == share.EventCondTypeCVEName {
 					r.Conditions[i].CondValue = strings.ToUpper(cd.CondValue)
 				}
-			} else if r.Event == share.EventCompliance {
-				// value validation
-			}
+			} //else if r.Event == share.EventCompliance {
+			// value validation
+			// }
 			if !cds.Contains(cd.CondType) {
 				cds.Add(cd.CondType)
 			} else {
@@ -400,7 +400,7 @@ func responseRule2Cluster(r *api.RESTResponseRule) *share.CLUSResponseRule {
 		Webhooks:   r.Webhooks,
 		Disable:    r.Disable,
 	}
-	ret.CfgType, _ = cfgTypeMapping[r.CfgType]
+	ret.CfgType = cfgTypeMapping[r.CfgType]
 	return ret
 }
 
@@ -455,7 +455,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local rules
+	scope := query.pairs[api.QueryScope] // empty string means fed & local rules
 
 	size := query.limit
 	if size == 0 {
@@ -473,7 +473,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	collectedRules := make([]*api.RESTResponseRule, 0)
+	var collectedRules []*api.RESTResponseRule
 	if query.limit == 0 {
 		collectedRules = rules[query.start:]
 	} else {
@@ -589,7 +589,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	var cfgType share.TCfgType = share.UserCreated
@@ -603,7 +603,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 
 		if rr.ID == api.PolicyAutoID {
@@ -898,7 +898,7 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope]
+	scope := query.pairs[api.QueryScope]
 	if scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {

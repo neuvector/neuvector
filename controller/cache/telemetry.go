@@ -28,7 +28,7 @@ func getTelemetryData(telemetryFreq uint) (bool, common.TelemetryData) {
 	var lastUploadTime time.Time
 	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
-		json.Unmarshal(value, &nvUpgradeInfo)
+		_ = json.Unmarshal(value, &nvUpgradeInfo)
 		lastUploadTime = nvUpgradeInfo.LastUploadTime
 	}
 	var past time.Duration = time.Minute * time.Duration(telemetryFreq)

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -34,7 +32,9 @@ var ovsPipe ovsPipeDriver = ovsPipeDriver{}
 
 func (d *ovsPipeDriver) ovsAttachPort(port string) uint {
 	if !d.ovsPortExists(port) {
-		d.ovsAddPort(ovsBridgeName, port, "veth")
+		if dbgError := d.ovsAddPort(ovsBridgeName, port, "veth"); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 
 	ofPort := d.ovsGetOFPort(port)
@@ -84,8 +84,12 @@ func (d *ovsPipeDriver) AttachPortPair(pair *InterceptPair) (net.HardwareAddr, n
 }
 
 func (d *ovsPipeDriver) DetachPortPair(pair *InterceptPair) {
-	d.ovsDelPort(ovsBridgeName, pair.inPort)
-	d.ovsDelPort(ovsBridgeName, pair.exPort)
+	if dbgError := d.ovsDelPort(ovsBridgeName, pair.inPort); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+	if dbgError := d.ovsDelPort(ovsBridgeName, pair.exPort); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *ovsPipeDriver) ResetPortPair(pid int, pair *InterceptPair) {
@@ -251,6 +255,7 @@ func ovsKernelModuleLoaded() bool {
 	return true
 }
 
+/* removed by golint
 func ovsDaemonPid() (int, error) {
 	output, err := shell("pgrep ovs-vswitchd")
 	if err != nil {
@@ -265,6 +270,7 @@ func ovsDaemonPid() (int, error) {
 
 	return strconv.Atoi(s)
 }
+*/
 
 func (d *ovsPipeDriver) ovsBridgeExists(br string) bool {
 	d.ovsCacheMutex.RLock()
@@ -290,6 +296,7 @@ func (d *ovsPipeDriver) ovsPortExists(port string) bool {
 	return false
 }
 
+/* removed by golint
 func (d *ovsPipeDriver) ovsGetUUIDByName(port string) string {
 	for uuid, row := range d.ovsPortCache {
 		if port == row.Fields["name"].(string) {
@@ -298,6 +305,7 @@ func (d *ovsPipeDriver) ovsGetUUIDByName(port string) string {
 	}
 	return ""
 }
+*/
 
 func (d *ovsPipeDriver) ovsGetRowOFPort(row *libovsdb.Row) uint {
 	switch row.Fields["ofport"].(type) {
@@ -342,18 +350,22 @@ func (d *ovsPipeDriver) ovsGetOFPort(port string) uint {
 
 func (d *ovsPipeDriver) ovsCreateBridge(bridgeName string) error {
 	log.WithFields(log.Fields{"bridge": bridgeName}).Debug("")
-
-	shell(fmt.Sprintf("ovs-vsctl add-br %v", bridgeName))
+	if _, dbgError := shell(fmt.Sprintf("ovs-vsctl add-br %v", bridgeName)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	if !ovsKernelModuleLoaded() {
-		shell(fmt.Sprintf("ovs-vsctl set bridge %v datapath_type=netdev", bridgeName))
+		if _, dbgError := shell(fmt.Sprintf("ovs-vsctl set bridge %v datapath_type=netdev", bridgeName)); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	return nil
 }
 
 func (d *ovsPipeDriver) ovsDelBridge(bridgeName string) error {
 	log.WithFields(log.Fields{"bridge": bridgeName}).Debug("")
-
-	shell(fmt.Sprintf("ovs-vsctl del-br %v", bridgeName))
+	if _, dbgError := shell(fmt.Sprintf("ovs-vsctl del-br %v", bridgeName)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	return nil
 }
 
@@ -363,18 +375,23 @@ func (d *ovsPipeDriver) ovsAddPort(bridgeName string, portName string, portType 
 	}).Debug("")
 
 	if portType == "internal" {
-		shell(fmt.Sprintf("ovs-vsctl add-port %v %v -- set interface %v type=internal",
-			bridgeName, portName, portName))
+		if _, dbgError := shell(fmt.Sprintf("ovs-vsctl add-port %v %v -- set interface %v type=internal",
+			bridgeName, portName, portName)); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	} else {
-		shell(fmt.Sprintf("ovs-vsctl add-port %v %v", bridgeName, portName))
+		if _, dbgError := shell(fmt.Sprintf("ovs-vsctl add-port %v %v", bridgeName, portName)); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	return nil
 }
 
 func (d *ovsPipeDriver) ovsDelPort(bridgeName string, portName string) error {
 	log.WithFields(log.Fields{"bridge": bridgeName, "port": portName}).Debug("")
-
-	shell(fmt.Sprintf("ovs-vsctl del-port %v %v", bridgeName, portName))
+	if _, dbgError := shell(fmt.Sprintf("ovs-vsctl del-port %v %v", bridgeName, portName)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	return nil
 }
 
@@ -446,9 +463,14 @@ func (d *ovsPipeDriver) ovsPopulateCache(updates *libovsdb.TableUpdates) {
 
 func (d *ovsPipeDriver) ovsSetup(jumboframe bool) {
 	if d.ovsBridgeExists(ovsBridgeName) {
-		d.ovsDelBridge(ovsBridgeName)
+		if dbgError := d.ovsDelBridge(ovsBridgeName); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
-	d.ovsCreateBridge(ovsBridgeName)
+
+	if dbgError := d.ovsCreateBridge(ovsBridgeName); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	nap()
 	nap()
 
@@ -477,16 +499,24 @@ func (d *ovsPipeDriver) ovsSetup(jumboframe bool) {
 
 	link, _ := netlink.LinkByName(nvVbrPortName)
 	if link != nil {
-		d.ovsDelPort(ovsBridgeName, nvVbrPortName)
-		netlink.LinkSetDown(link)
-		netlink.LinkDel(link)
+		if dbgError := d.ovsDelPort(ovsBridgeName, nvVbrPortName); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := netlink.LinkDel(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		nap()
 	}
 	createNVPorts(jumboframe)
 
 	// Add to ovs
 	if !d.ovsPortExists(nvVbrPortName) {
-		d.ovsAddPort(ovsBridgeName, nvVbrPortName, "veth")
+		if dbgError := d.ovsAddPort(ovsBridgeName, nvVbrPortName, "veth"); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 
 	nap()
@@ -499,23 +529,37 @@ func (d *ovsPipeDriver) ovsSetup(jumboframe bool) {
 func (d *ovsPipeDriver) Cleanup() {
 	link, _ := netlink.LinkByName(nvVbrPortName)
 	if link != nil {
-		d.ovsDelPort(ovsBridgeName, nvVbrPortName)
-		netlink.LinkSetDown(link)
-		netlink.LinkDel(link)
+		if dbgError := d.ovsDelPort(ovsBridgeName, nvVbrPortName); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := netlink.LinkDel(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
-	d.ovsDelBridge(ovsBridgeName)
+	if dbgError := d.ovsDelBridge(ovsBridgeName); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *ovsPipeDriver) ovsAddFlow(bridgeName string, flow string) {
-	shell(fmt.Sprintf("ovs-ofctl add-flow %v %v", d.ovsBridgeSocket(bridgeName), flow))
+	if _, dbgError := shell(fmt.Sprintf("ovs-ofctl add-flow %v %v", d.ovsBridgeSocket(bridgeName), flow)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *ovsPipeDriver) ovsDelFlow(bridgeName string, flow string) {
-	shell(fmt.Sprintf("ovs-ofctl del-flows %v %v", d.ovsBridgeSocket(bridgeName), flow))
+	if _, dbgError := shell(fmt.Sprintf("ovs-ofctl del-flows %v %v", d.ovsBridgeSocket(bridgeName), flow)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *ovsPipeDriver) ovsDelAllFlows(bridgeName string) {
-	shell(fmt.Sprintf("ovs-ofctl del-flows %v", d.ovsBridgeSocket(bridgeName)))
+	if _, dbgError := shell(fmt.Sprintf("ovs-ofctl del-flows %v", d.ovsBridgeSocket(bridgeName))); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *ovsPipeDriver) Connect(jumboframe bool) {

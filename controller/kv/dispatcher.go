@@ -38,8 +38,8 @@ type DispatcherHelper interface {
 // FROM object store: object/config/(type)/name
 // TO profile store: node/<nodeID>/profile/(type)/name
 type keyMappingHelper struct {
-	obj string  // object/config/(ept)/
-	prf string  // profiles/(ept)/
+	obj string // object/config/(ept)/
+	prf string // profiles/(ept)/
 }
 
 // counting (profile) workloads on a node
@@ -52,16 +52,16 @@ type FuncIsGroupMember func(name, id string) bool
 type FuncGetConfigKVData func(key string) ([]byte, bool)
 type kvDispatcher struct {
 	mutex          sync.RWMutex
-	nodes          utils.Set                    // debug purpose: keep a record of all nodes
-	customs        utils.Set                    // reserved: purge custom groups
-	node2groups    map[string]*nodeMemberCache  // accounting purpose: [nodeID] => {group-members}
-	group2nodes    map[string]utils.Set         // dispatching purpose: [group] => {nodes}
-	profileKeys    []keyMappingHelper           // utility: profile keys in the object/ store
-	matchedGrpFunc FuncIsGroupMember            // help purging custom groups when workloads leave.
+	nodes          utils.Set                   // debug purpose: keep a record of all nodes
+	customs        utils.Set                   // reserved: purge custom groups
+	node2groups    map[string]*nodeMemberCache // accounting purpose: [nodeID] => {group-members}
+	group2nodes    map[string]utils.Set        // dispatching purpose: [group] => {nodes}
+	profileKeys    []keyMappingHelper          // utility: profile keys in the object/ store
+	matchedGrpFunc FuncIsGroupMember           // help purging custom groups when workloads leave.
 	getKvDataFunc  FuncGetConfigKVData
 }
 
-//////////////////////////////////
+// ////////////////////////////////
 func (dpt *kvDispatcher) lockR() {
 	dpt.mutex.RLock()
 }
@@ -78,49 +78,51 @@ func (dpt *kvDispatcher) unlock() {
 	dpt.mutex.Unlock()
 }
 
-func (dpt *kvDispatcher) dump() {
-	log.WithFields(log.Fields{"nodes-group": len(dpt.node2groups), "nodes": dpt.nodes.Cardinality(), "groups": len(dpt.group2nodes)}).Debug("DPT:")
-	for node, cache := range dpt.node2groups {
-		log.WithFields(log.Fields{"node": node}).Debug("DPT:")
-		for group, ids := range cache.members {
-			log.WithFields(log.Fields{"group": group, "count": ids.Cardinality()}).Debug("DPT:")
+/*
+	func (dpt *kvDispatcher) dump() {
+		log.WithFields(log.Fields{"nodes-group": len(dpt.node2groups), "nodes": dpt.nodes.Cardinality(), "groups": len(dpt.group2nodes)}).Debug("DPT:")
+		for node, cache := range dpt.node2groups {
+			log.WithFields(log.Fields{"node": node}).Debug("DPT:")
+			for group, ids := range cache.members {
+				log.WithFields(log.Fields{"group": group, "count": ids.Cardinality()}).Debug("DPT:")
+			}
+		}
+
+		for group, nodes := range dpt.group2nodes {
+			log.WithFields(log.Fields{"group": group, "nodes": nodes.String(), "count": nodes.Cardinality()}).Debug("DPT:")
 		}
 	}
 
-	for group, nodes := range dpt.group2nodes {
-		log.WithFields(log.Fields{"group": group, "nodes": nodes.String(), "count": nodes.Cardinality()}).Debug("DPT:")
-	}
-}
+// / reserved: future periodical purge procedure, returns expired custom groups
 
-/// reserved: future periodical purge procedure, returns expired custom groups
-func (dpt *kvDispatcher) purgeCustomGroupsByNode(node string) utils.Set {
-	log.WithFields(log.Fields{"node": node}).Debug("DPT: reserved")
-	exCustomGrps := utils.NewSet()
+	func (dpt *kvDispatcher) purgeCustomGroupsByNode(node string) utils.Set {
+		log.WithFields(log.Fields{"node": node}).Debug("DPT: reserved")
+		exCustomGrps := utils.NewSet()
 
-	// search this node
-	if nodeCache, ok := dpt.node2groups[node]; ok {
-		for customGrp := range dpt.customs.Iter() {
-			custom := customGrp.(string)
-			if nodes, ok := dpt.group2nodes[custom]; ok && nodes.Contains(node) {
-				found := false
-				// search groups by one of its workload(id)
-				for _, ids := range nodeCache.members {
-					if dpt.matchedGrpFunc(custom, ids.Any().(string)) {
-						found = true
-						break   // leave nodeCache
+		// search this node
+		if nodeCache, ok := dpt.node2groups[node]; ok {
+			for customGrp := range dpt.customs.Iter() {
+				custom := customGrp.(string)
+				if nodes, ok := dpt.group2nodes[custom]; ok && nodes.Contains(node) {
+					found := false
+					// search groups by one of its workload(id)
+					for _, ids := range nodeCache.members {
+						if dpt.matchedGrpFunc(custom, ids.Any().(string)) {
+							found = true
+							break // leave nodeCache
+						}
 					}
-				}
 
-				if !found {
-					exCustomGrps.Add(custom)
-					nodes.Remove(node)
+					if !found {
+						exCustomGrps.Add(custom)
+						nodes.Remove(node)
+					}
 				}
 			}
 		}
+		return exCustomGrps
 	}
-	return exCustomGrps
-}
-
+*/
 func (dpt *kvDispatcher) purgeCustomGroupsByNodeGroups(node string, customGrps utils.Set) utils.Set {
 	exCustomGrps := utils.NewSet()
 
@@ -135,7 +137,7 @@ func (dpt *kvDispatcher) purgeCustomGroupsByNodeGroups(node string, customGrps u
 				if dpt.matchedGrpFunc(custom, ids.Any().(string)) {
 					// log.WithFields(log.Fields{"group": group, "custom": custom}).Debug("DPT: found")
 					found = true
-					break   // leave nodeCache
+					break // leave nodeCache
 				}
 			}
 
@@ -149,7 +151,6 @@ func (dpt *kvDispatcher) purgeCustomGroupsByNodeGroups(node string, customGrps u
 	}
 	return exCustomGrps
 }
-
 
 func (dpt *kvDispatcher) refreshServiceGroup2Nodes(group, node, id string, bRemoved bool) bool {
 	nodeCache, ok1 := dpt.node2groups[node]
@@ -172,7 +173,7 @@ func (dpt *kvDispatcher) refreshServiceGroup2Nodes(group, node, id string, bRemo
 			ids.Remove(id)
 			// log.WithFields(log.Fields{"group": group, "cnt": ids.Cardinality()}).Debug("DPT:")
 			if ids.Cardinality() == 0 {
-				bGroupChanged = true        // removed
+				bGroupChanged = true // removed
 				delete(nodeCache.members, group)
 				nodes.Remove(node)
 				if nodes.Cardinality() == 0 {
@@ -183,7 +184,7 @@ func (dpt *kvDispatcher) refreshServiceGroup2Nodes(group, node, id string, bRemo
 	} else {
 		// Add:
 		if ids, ok := nodeCache.members[group]; !ok {
-			bGroupChanged = true        // newly added
+			bGroupChanged = true // newly added
 			nodeCache.members[group] = utils.NewSet(id)
 		} else {
 			ids.Add(id)
@@ -197,7 +198,7 @@ func (dpt *kvDispatcher) refreshCustomGroups(name string, serviceGrps utils.Set,
 	// refresh: only care the group2nodes shortcuts
 	if bRemoved {
 		delete(dpt.group2nodes, name)
-		dpt.customs.Remove(name)       // reserved
+		dpt.customs.Remove(name) // reserved
 		return
 	}
 
@@ -218,7 +219,7 @@ func (dpt *kvDispatcher) refreshCustomGroups(name string, serviceGrps utils.Set,
 
 	// the user defined groups are stored in the group2nodes
 	dpt.group2nodes[name] = targetNodes
-	dpt.customs.Add(name)   // reserved
+	dpt.customs.Add(name) // reserved
 }
 
 func (dpt *kvDispatcher) copyProfileKeys(node, group string, txn *cluster.ClusterTransact) {
@@ -277,9 +278,9 @@ func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.S
 	// check node
 	var bNewNode, bNewGroup bool
 	if _, ok := dpt.node2groups[node]; !ok {
-		bNewNode = true     // a new node
+		bNewNode = true // a new node
 		dpt.nodes.Add(node)
-		nodeCache := &nodeMemberCache {
+		nodeCache := &nodeMemberCache{
 			node:    node,
 			members: make(map[string]utils.Set),
 		}
@@ -299,7 +300,7 @@ func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.S
 	txn := cluster.Transact()
 	dpt.buildCustomGroups(node, customGrps, txn)
 	if bLeader {
-		if bBuildLocalGroup || bNewGroup || bNewNode {       // add a group on the node
+		if bBuildLocalGroup || bNewGroup || bNewNode { // add a group on the node
 			// log.WithFields(log.Fields{"group": group, "node": node}).Debug("DPT: local group")
 			dpt.copyProfileKeys(node, group, txn)
 		}
@@ -313,8 +314,9 @@ func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.S
 
 // from cacher
 // Two options:
-//    (1) (current) purge the custom groups immediately(it needs the validatation of all other groups/workloads).
-//    (2) a 30-minutes timer to purge the unaffected custom groups
+//
+//	(1) (current) purge the custom groups immediately(it needs the validatation of all other groups/workloads).
+//	(2) a 30-minutes timer to purge the unaffected custom groups
 func (dpt *kvDispatcher) WorkloadLeave(node, group, id string, customGrps utils.Set, bLeader bool) {
 	// log.WithFields(log.Fields{"node": node, "group": group, "id": id, "customs": customGrps.String()}).Debug("DPT:")
 
@@ -361,7 +363,7 @@ func (dpt *kvDispatcher) NodeLeave(node string, bLeader bool) {
 
 	if bLeader {
 		// delete the kv tree under the node
-		cluster.DeleteTree(share.CLUSNodeProfileStoreKey(node))
+		_ = cluster.DeleteTree(share.CLUSNodeProfileStoreKey(node))
 	}
 }
 
@@ -381,7 +383,7 @@ func (dpt *kvDispatcher) CustomGroupUpdate(group string, serviceGrps utils.Set, 
 	// dpt.dump()
 
 	if bLeader {
-		curs, _ := dpt.group2nodes[group]
+		curs := dpt.group2nodes[group]
 		deletes := olds.Difference(curs)
 		creates := curs.Difference(olds)
 
@@ -491,10 +493,10 @@ func (dpt *kvDispatcher) IsGroupAdded(group string) bool {
 	return ok
 }
 
-///////////////////////////////////////////////
+// /////////////////////////////////////////////
 var dispatcher *kvDispatcher
 
-///////////////////////////////////////////////
+// /////////////////////////////////////////////
 func initDispatcher(matcher FuncIsGroupMember, getter FuncGetConfigKVData) {
 	dispatcher = &kvDispatcher{
 		nodes:          utils.NewSet(), // reference
@@ -507,11 +509,11 @@ func initDispatcher(matcher FuncIsGroupMember, getter FuncGetConfigKVData) {
 
 	// like "object/config/group"
 	dispatcher.profileKeys = []keyMappingHelper{
-		keyMappingHelper{obj: share.CLUSConfigGroupStore, prf: share.ProfileGroupStore}, // at first
-		keyMappingHelper{obj: share.CLUSConfigProcessProfileStore, prf: share.ProfileProcessStore},
-		keyMappingHelper{obj: share.CLUSConfigFileAccessRuleStore, prf: share.ProfileFileAccessStore},
-		keyMappingHelper{obj: share.CLUSConfigFileMonitorStore, prf: share.ProfileFileMonitorStore},
-		keyMappingHelper{obj: share.CLUSConfigScriptStore, prf: share.ProfileFileScriptStore},
+		{obj: share.CLUSConfigGroupStore, prf: share.ProfileGroupStore}, // at first
+		{obj: share.CLUSConfigProcessProfileStore, prf: share.ProfileProcessStore},
+		{obj: share.CLUSConfigFileAccessRuleStore, prf: share.ProfileFileAccessStore},
+		{obj: share.CLUSConfigFileMonitorStore, prf: share.ProfileFileMonitorStore},
+		{obj: share.CLUSConfigScriptStore, prf: share.ProfileFileScriptStore},
 	}
 }
 

@@ -20,11 +20,11 @@ func TestRancherIPScopeWithLabel(t *testing.T) {
 	ipnet02 := net.IPNet{IP: net.ParseIP("1.2.3.5"), Mask: net.CIDRMask(16, 32)}
 	ipnet11 := net.IPNet{IP: net.ParseIP("4.3.2.1"), Mask: net.CIDRMask(16, 32)}
 	ports := map[string][]share.CLUSIPAddr{
-		"eth0": []share.CLUSIPAddr{
+		"eth0": {
 			share.CLUSIPAddr{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
 			share.CLUSIPAddr{IPNet: ipnet02, Scope: share.CLUSIPAddrScopeLocalhost},
 		},
-		"eth1": []share.CLUSIPAddr{
+		"eth1": {
 			share.CLUSIPAddr{IPNet: ipnet11, Scope: share.CLUSIPAddrScopeLocalhost},
 		},
 	}
@@ -32,8 +32,8 @@ func TestRancherIPScopeWithLabel(t *testing.T) {
 	driver := &rancher{noop: noop{platform: share.PlatformRancher}}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ := ports["eth0"]
-	eth1, _ := ports["eth1"]
+	eth0 := ports["eth0"]
+	eth1 := ports["eth1"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeLocalhost ||
 		eth0[1].Scope != share.CLUSIPAddrScopeGlobal ||
 		eth1[0].Scope != share.CLUSIPAddrScopeLocalhost {
@@ -53,19 +53,19 @@ func TestRancherIPScopeWithoutLabel(t *testing.T) {
 	ipnet01 := net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(16, 32)}
 	ipnet11 := net.IPNet{IP: net.ParseIP("4.3.2.1"), Mask: net.CIDRMask(16, 32)}
 	ports := map[string][]share.CLUSIPAddr{
-		"eth0": []share.CLUSIPAddr{
-			share.CLUSIPAddr{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
+		"eth0": {
+			{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
 		},
-		"eth1": []share.CLUSIPAddr{
-			share.CLUSIPAddr{IPNet: ipnet11, Scope: share.CLUSIPAddrScopeLocalhost},
+		"eth1": {
+			{IPNet: ipnet11, Scope: share.CLUSIPAddrScopeLocalhost},
 		},
 	}
 
 	driver := &rancher{noop: noop{platform: share.PlatformRancher}}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ := ports["eth0"]
-	eth1, _ := ports["eth1"]
+	eth0 := ports["eth0"]
+	eth1 := ports["eth1"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeGlobal ||
 		eth1[0].Scope != share.CLUSIPAddrScopeLocalhost {
 		t.Errorf("Wrong IP scope set, with container.ip label:\n")
@@ -74,13 +74,13 @@ func TestRancherIPScopeWithoutLabel(t *testing.T) {
 	}
 
 	ports = map[string][]share.CLUSIPAddr{
-		"eth0": []share.CLUSIPAddr{
-			share.CLUSIPAddr{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
+		"eth0": {
+			{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
 		},
 	}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ = ports["eth0"]
+	eth0 = ports["eth0"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeGlobal {
 		t.Errorf("Wrong IP scope set, with container.ip label:\n")
 		t.Errorf("    eth0=%v\n", eth0)
@@ -95,16 +95,16 @@ func TestRancherIPScopeDefault(t *testing.T) {
 	ipnet01 := net.IPNet{IP: net.ParseIP("172.17.0.2"), Mask: net.CIDRMask(16, 32)}
 	ipnet02 := net.IPNet{IP: net.ParseIP("169.254.169.250"), Mask: net.CIDRMask(32, 32)}
 	ports := map[string][]share.CLUSIPAddr{
-		"eth0": []share.CLUSIPAddr{
-			share.CLUSIPAddr{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
-			share.CLUSIPAddr{IPNet: ipnet02, Scope: share.CLUSIPAddrScopeLocalhost},
+		"eth0": {
+			{IPNet: ipnet01, Scope: share.CLUSIPAddrScopeLocalhost},
+			{IPNet: ipnet02, Scope: share.CLUSIPAddrScopeLocalhost},
 		},
 	}
 
 	driver := &rancher{noop: noop{platform: share.PlatformRancher}}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ := ports["eth0"]
+	eth0 := ports["eth0"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeLocalhost ||
 		eth0[1].Scope != share.CLUSIPAddrScopeLocalhost {
 		t.Errorf("Wrong IP scope set, default net mode:\n")

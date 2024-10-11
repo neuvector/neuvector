@@ -18,11 +18,11 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func preTestDebug() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.DebugLevel)
-}
+// func preTestDebug() {
+// 	log.SetOutput(os.Stdout)
+// 	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+// 	log.SetLevel(log.DebugLevel)
+// }
 
 func preTest() {
 	log.SetOutput(os.Stdout)
@@ -77,7 +77,7 @@ func TestRBAC(t *testing.T) {
 	rb := &k8sRoleBinding{
 		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "mike", domain: "", subType: SUBJECT_USER},
+			{name: "mike", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -100,8 +100,8 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "mike", domain: "", subType: SUBJECT_USER},
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
+			{name: "mike", domain: "", subType: SUBJECT_USER},
+			{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -124,7 +124,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "11", name: "admin", domain: "", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
+			{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -156,7 +156,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "12", name: "reader", domain: "", role: k8sObjectRef{name: "view", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
+			{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -179,7 +179,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "13", name: "ns2-reader", domain: "ns2", role: k8sObjectRef{name: "ns2-audit", domain: "ns2"},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "jane", domain: "", subType: SUBJECT_USER},
+			{name: "jane", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -202,7 +202,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -214,7 +214,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -237,7 +237,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -260,7 +260,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -283,7 +283,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.updateResourceCache(rt, rb.uid, rb); ev != "" {
@@ -342,7 +342,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -365,7 +365,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -377,7 +377,7 @@ func TestRBAC(t *testing.T) {
 	rb = &k8sRoleBinding{
 		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
 		users: []k8sSubjectObjRef{
-			k8sSubjectObjRef{name: "gary", domain: "", subType: SUBJECT_USER},
+			{name: "gary", domain: "", subType: SUBJECT_USER},
 		},
 	}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
@@ -586,7 +586,7 @@ func (r *tRbacRancherSSO) verifyNvRolePermits(actualDomainRoles, expectDomainRol
 	actualDomainPerms, expectDomainPerms map[string]share.NvFedPermissions) {
 
 	for d, expectedRole := range expectDomainRoles {
-		if actualRole, _ := actualDomainRoles[d]; expectedRole != actualRole {
+		if actualRole := actualDomainRoles[d]; expectedRole != actualRole {
 			r.t.Logf("<< %s >>\n", r.caseName)
 			var dDisplay string
 			if d == "" {
@@ -600,7 +600,7 @@ func (r *tRbacRancherSSO) verifyNvRolePermits(actualDomainRoles, expectDomainRol
 		}
 	}
 	for d, expectedPermits := range expectDomainPerms {
-		if actualPermits, _ := actualDomainPerms[d]; expectedPermits != actualPermits {
+		if actualPermits := actualDomainPerms[d]; expectedPermits != actualPermits {
 			r.t.Logf("<< %s >>\n", r.caseName)
 			var dDisplay string
 			if d == "" {
@@ -1586,12 +1586,12 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				UID:  genGuid(),
 			},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1.PolicyRule{
+				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
 					Resources: []string{"federation"},
 				},
-				rbacv1.PolicyRule{
+				{
 					Verbs:     []string{"get"},
 					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
@@ -1639,7 +1639,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				UID:  genGuid(),
 			},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1.PolicyRule{
+				{
 					Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 					APIGroups: []string{"read-only.neuvector.api.io"},
 					Resources: []string{"ciscan"},
@@ -1689,7 +1689,7 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				UID:  genGuid(),
 			},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1.PolicyRule{
+				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
@@ -1739,12 +1739,12 @@ func TestRBACRancherSSOMixedClusterRole(t *testing.T) {
 				UID:  genGuid(),
 			},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1.PolicyRule{
+				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"*"},
 				},
-				rbacv1.PolicyRule{
+				{
 					Verbs:     []string{"*"},
 					APIGroups: []string{"permission.neuvector.com"},
 					Resources: []string{"federation"},
@@ -2357,11 +2357,11 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleReader,
 		}
 		domainPermits := map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-11": share.NvFedPermissions{
+			"domain-11": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
@@ -2395,19 +2395,19 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleFedAdmin,
 		}
 		domainPermits = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-11": share.NvFedPermissions{
+			"domain-11": {
 				Local:  share.NvPermissions{ReadValue: share.PERMS_FED_READ},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_FED_READ},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local:  share.NvPermissions{ReadValue: share.PERMS_CLUSTER_READ},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_CLUSTER_WRITE},
 			},
-			"domain-13": share.NvFedPermissions{
+			"domain-13": {
 				Local:  share.NvPermissions{ReadValue: share.PERMS_DOMAIN_WRITE},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_CLUSTER_WRITE},
 			},
@@ -2417,7 +2417,7 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"": api.UserRoleAdmin,
 		}
 		expectDomainPerms = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 			},
@@ -2434,15 +2434,15 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleFedAdmin,
 		}
 		domainPermits = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-11": share.NvFedPermissions{
+			"domain-11": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
@@ -2454,11 +2454,11 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleAdmin,
 		}
 		expectDomainPerms = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 			},
 		}
@@ -2474,15 +2474,15 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleFedAdmin,
 		}
 		domainPermits = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-11": share.NvFedPermissions{
+			"domain-11": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
@@ -2494,11 +2494,11 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleAdmin,
 		}
 		expectDomainPerms = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 			},
 		}
@@ -2514,15 +2514,15 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleFedAdmin,
 		}
 		domainPermits = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-11": share.NvFedPermissions{
+			"domain-11": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			},
@@ -2534,11 +2534,11 @@ func TestConsolidateNvRolePermits(t *testing.T) {
 			"domain-4": api.UserRoleAdmin,
 		}
 		expectDomainPerms = map[string]share.NvFedPermissions{
-			"": share.NvFedPermissions{
+			"": {
 				Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 				Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 			},
-			"domain-12": share.NvFedPermissions{
+			"domain-12": {
 				Local: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 			},
 		}
@@ -2574,15 +2574,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"domain-5": 0,
 	}
 	domainPermits := map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2606,15 +2606,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"domain-5": 0,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2633,15 +2633,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": share.UserRoleAdmin | share.UserRoleFedReader | share.UserRoleReader,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2651,7 +2651,7 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": api.UserRoleAdmin,
 	}
 	expectDomainPerms = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_FED_READ, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_CLUSTER_READ, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 		},
@@ -2665,15 +2665,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": share.UserRoleAdmin | share.UserRoleFedReader | share.UserRoleReader,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2692,15 +2692,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": share.UserRoleFedReader | share.UserRoleReader,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2710,11 +2710,11 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": api.UserRoleFedReader,
 	}
 	expectDomainPerms = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 		},
 	}
@@ -2727,15 +2727,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": share.UserRoleFedReader | share.UserRoleReader,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2745,10 +2745,10 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": api.UserRoleReader,
 	}
 	expectDomainPerms = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local: share.NvPermissions{WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local: share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 		},
 	}
@@ -2761,15 +2761,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": 0,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2779,11 +2779,11 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": api.UserRoleNone,
 	}
 	expectDomainPerms = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 		},
 	}
@@ -2796,15 +2796,15 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": 0,
 	}
 	domainPermits = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-11": share.NvFedPermissions{
+		"domain-11": {
 			Local:  share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL | share.PERM_FED, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local:  share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 			Remote: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN | share.PERM_FED, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES | share.PERM_FED},
 		},
@@ -2814,10 +2814,10 @@ func TestRancherMultiplePrinciples(t *testing.T) {
 		"": api.UserRoleNone,
 	}
 	expectDomainPerms = map[string]share.NvFedPermissions{
-		"": share.NvFedPermissions{
+		"": {
 			Local: share.NvPermissions{ReadValue: share.PERM_ADM_CONTROL, WriteValue: share.PERM_ADM_CONTROL | share.PERMS_RUNTIME_POLICIES},
 		},
-		"domain-12": share.NvFedPermissions{
+		"domain-12": {
 			Local: share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN | share.PERMS_RUNTIME_POLICIES},
 		},
 	}

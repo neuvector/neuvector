@@ -59,9 +59,9 @@ func isPasswordAuthServer(s *share.CLUSServer) bool {
 	return s.LDAP != nil
 }
 
-func isTokenAuthServer(s *share.CLUSServer) bool {
-	return s.SAML != nil || s.OIDC != nil
-}
+// func isTokenAuthServer(s *share.CLUSServer) bool {
+// 	return s.SAML != nil || s.OIDC != nil
+// }
 
 func isAuthServer(s *share.CLUSServer) bool {
 	return s.LDAP != nil || s.SAML != nil || s.OIDC != nil
@@ -209,8 +209,8 @@ func authCallerForFedRoleMapping(oldSettings, newSettings []*share.GroupRoleMapp
 
 	// 2. check whether someone(non-fedAdmin) tries to assign/remove mapped fedAdmin/fedReader role for global domain to/from an existing groups role mapping
 	for grp := range grpMappingToUpdate.Iter() {
-		oldMappedRoles, _ := oldRoleMappings[grp.(string)]
-		newMappedRoles, _ := newRoleMappings[grp.(string)]
+		oldMappedRoles := oldRoleMappings[grp.(string)]
+		newMappedRoles := newRoleMappings[grp.(string)]
 		if fedRoles.Contains(oldMappedRoles.GlobalRole) || fedRoles.Contains(newMappedRoles.GlobalRole) {
 			if oldMappedRoles.GlobalRole != newMappedRoles.GlobalRole { // group's mapped role for global domain is fedAdmin/fedReader-changed
 				return fmt.Errorf("Access denied for roles(old: %s, new: %s) in the role mapping of group '%s'", oldMappedRoles.GlobalRole, newMappedRoles.GlobalRole, grp)
@@ -263,9 +263,7 @@ func checkGroupRolesMapping(oldSettings, newSettings []*share.GroupRoleMapping, 
 
 			// if a groups is mapped to a role for global domain, it's implicitly mapped to that same role for all domains. So remove unnecessary domain role mapping entry
 			if mappedRoles.RoleDomains != nil {
-				if _, ok := mappedRoles.RoleDomains[mappedRoles.GlobalRole]; ok {
-					delete(mappedRoles.RoleDomains, mappedRoles.GlobalRole)
-				}
+				delete(mappedRoles.RoleDomains, mappedRoles.GlobalRole)
 			}
 
 			mappedDomainRole := make(map[string]string, 0) // for each group, each domain can only be mapped to one role
@@ -482,7 +480,6 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 	log.WithField("url", url).Debug("SAML SLO request generated")
 	resp.Redirect = &api.RESTTokenAuthServerRedirect{Name: login.server, Type: api.ServerTypeSAML, RedirectURL: url}
 	restRespSuccess(w, r, &resp, nil, nil, nil, "")
-	return
 }
 
 func handlerTokenAuthServerList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -723,9 +720,7 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 	var groupRoleMappings []*share.GroupRoleMapping
 	if ldap.GroupMappedRoles != nil {
 		copiedMappings := make([]*share.GroupRoleMapping, len(*ldap.GroupMappedRoles))
-		for idx, m := range *ldap.GroupMappedRoles {
-			copiedMappings[idx] = m
-		}
+		copy(copiedMappings, *ldap.GroupMappedRoles)
 		if groupRoleMappings, err = checkGroupRolesMapping(cldap.GroupMappedRoles, copiedMappings, acc); err == nil {
 			cldap.GroupMappedRoles = groupRoleMappings
 		}
@@ -825,9 +820,7 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 	}
 	if saml.X509CertExtra != nil {
 		csaml.X509CertExtra = nil
-		for _, c := range *saml.X509CertExtra {
-			csaml.X509CertExtra = append(csaml.X509CertExtra, c)
-		}
+		csaml.X509CertExtra = append(csaml.X509CertExtra, *saml.X509CertExtra...)
 	}
 	if saml.AuthnSigningEnabled != nil {
 		csaml.AuthnSigningEnabled = *saml.AuthnSigningEnabled
@@ -851,9 +844,7 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 	var groupRoleMappings []*share.GroupRoleMapping
 	if saml.GroupMappedRoles != nil {
 		copiedMappings := make([]*share.GroupRoleMapping, len(*saml.GroupMappedRoles))
-		for idx, m := range *saml.GroupMappedRoles {
-			copiedMappings[idx] = m
-		}
+		copy(copiedMappings, *saml.GroupMappedRoles)
 		if groupRoleMappings, err = checkGroupRolesMapping(csaml.GroupMappedRoles, copiedMappings, acc); err == nil {
 			csaml.GroupMappedRoles = groupRoleMappings
 		}
@@ -978,9 +969,7 @@ func updateOIDCServer(cs *share.CLUSServer, oidc *api.RESTServerOIDCConfig, acc 
 	var groupRoleMappings []*share.GroupRoleMapping
 	if oidc.GroupMappedRoles != nil {
 		copiedMappings := make([]*share.GroupRoleMapping, len(*oidc.GroupMappedRoles))
-		for idx, m := range *oidc.GroupMappedRoles {
-			copiedMappings[idx] = m
-		}
+		copy(copiedMappings, *oidc.GroupMappedRoles)
 		if groupRoleMappings, err = checkGroupRolesMapping(coidc.GroupMappedRoles, copiedMappings, acc); err == nil {
 			coidc.GroupMappedRoles = groupRoleMappings
 		}
@@ -1072,12 +1061,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 		cs := &share.CLUSServer{Name: rs.Name, LDAP: cldap}
 
-		for ok := true; ok; ok = false {
-			if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
-				if err = validateLDAPServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
+			if err = validateLDAPServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.WithFields(log.Fields{"server": rs.Name}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -1103,12 +1093,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 		cs := &share.CLUSServer{Name: rs.Name, SAML: csaml}
 
-		for ok := true; ok; ok = false {
-			if err = updateSAMLServer(cs, rs.SAML, acc, login); err == nil {
-				if err = validateSAMLServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateSAMLServer(cs, rs.SAML, acc, login); err == nil {
+			if err = validateSAMLServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.WithFields(log.Fields{"server": rs.Name}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -1135,12 +1126,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 		cs := &share.CLUSServer{Name: rs.Name, OIDC: coidc}
 
-		for ok := true; ok; ok = false {
-			if err = updateOIDCServer(cs, rs.OIDC, acc, login); err == nil {
-				if err = validateOIDCServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateOIDCServer(cs, rs.OIDC, acc, login); err == nil {
+			if err = validateOIDCServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.WithFields(log.Fields{"server": rs.Name}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -1530,9 +1522,7 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 
 func configOneGroupRolesMapping(groupRoleMapping *share.GroupRoleMapping, clusGroupMappedRoles []*share.GroupRoleMapping, acc *access.AccessControl) ([]*share.GroupRoleMapping, error) {
 	newSettings := make([]*share.GroupRoleMapping, 0, len(clusGroupMappedRoles)+1)
-	for _, m := range clusGroupMappedRoles {
-		newSettings = append(newSettings, m)
-	}
+	newSettings = append(newSettings, clusGroupMappedRoles...)
 
 	foundIdx := -1
 	for idx, m := range newSettings {
@@ -1724,9 +1714,7 @@ func sortGroupRoleMappings(groups []string, groupRoleMappings []*share.GroupRole
 	// Now groupRoleMappingsMap contains only unrequested groups that do not have fedAdmin/fedReader-mapped role for global domain
 
 	// 3. append requested groups that do not have fedAdmin/fedReader-mapped role for global domain to sortedList
-	for _, m := range specifiedNonFedMapped {
-		sortedList = append(sortedList, m)
-	}
+	sortedList = append(sortedList, specifiedNonFedMapped...)
 
 	// 4. append the unrequested groups that do not have fedAdmin/fedReader role mapping for global domain to sortedList
 	for _, m := range groupRoleMappings {
@@ -1962,12 +1950,13 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		}
 
 		// Consider as create so empty attributes can be filled
-		for ok := true; ok; ok = false {
-			if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
-				if err = validateLDAPServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
+			if err = validateLDAPServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return

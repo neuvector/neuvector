@@ -15,7 +15,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-////////
+// //////
 type ProcessRuleIDHelper interface {
 	ResetProcessUuidRuleMap() bool
 	AddProcesProfile(pp *share.CLUSProcessProfile)
@@ -34,12 +34,12 @@ var cfgTypeMap2Api = map[share.TCfgType]string{
 	share.SystemDefined: api.CfgSystemDefined, // reserved
 }
 
-/////////
+// ///////
 const calculateInterval uint32 = 10
 
-/////////
+// ///////
 type uuidPRuleCache struct {
-	bInit   bool
+	// bInit   bool
 	rwMutex sync.RWMutex
 
 	// workitems
@@ -52,13 +52,14 @@ type uuidPRuleCache struct {
 	pMap        *share.ProcRuleMap
 }
 
-////////// global cache stores in this file //////////
+// //////// global cache stores in this file //////////
 var uuidProcCache *uuidPRuleCache
-var procHelper *ProcessRuleIDHelper
+
+// var procHelper *ProcessRuleIDHelper
 
 var funcGetGroupWithoutLock FuncGetGroupWithoutLock
 
-/////////// Operations: basically, it does not require lock ///////////
+// ///////// Operations: basically, it does not require lock ///////////
 func (pc *uuidPRuleCache) setEmptyProcessRuleMap() {
 	pc.pGrpUuidMap = make(map[string]utils.Set)
 	pc.pMap = &share.ProcRuleMap{ // clear all
@@ -80,7 +81,7 @@ func (pc *uuidPRuleCache) findProcessRule(uuid string, acc *access.AccessControl
 	return nil, false
 }
 
-/////
+// ///
 func (pc *uuidPRuleCache) handleProcessProfile(pp *share.CLUSProcessProfile, bDelete bool, acc *access.AccessControl) {
 	log.WithFields(log.Fields{"group": pp.Group}).Debug("UUID: ")
 	pc.rwMutex.Lock()
@@ -189,7 +190,7 @@ func fillSystemResevedProcessRule(uuid string) *api.RESTProcessUuidEntry {
 	}
 }
 
-////////////////////////
+// //////////////////////
 func (pc *uuidPRuleCache) calculte_uuid_rules(acc *access.AccessControl) {
 	pc.pendingCacheLock.Lock()
 	proc_update := pc.pendingProcProfile_u.Clone()
@@ -218,7 +219,7 @@ func (pc *uuidPRuleCache) calculte_uuid_rules(acc *access.AccessControl) {
 	proc_update, proc_delete = nil, nil
 }
 
-/////////////////////////
+// ///////////////////////
 func (pc *uuidPRuleCache) ruleIdTimerLoop() {
 	acc := access.NewFedAdminAccessControl()
 	calculateTicker := time.Tick(time.Second * time.Duration(calculateInterval))
@@ -231,7 +232,7 @@ func (pc *uuidPRuleCache) ruleIdTimerLoop() {
 	}
 }
 
-/////////// External functions: needs lock////////////
+// ///////// External functions: needs lock////////////
 func NewUuid() string {
 	var cnt int
 	var id string
@@ -254,7 +255,7 @@ func SetGetGroupWithoutLockFunc(funcObj FuncGetGroupWithoutLock) {
 	funcGetGroupWithoutLock = funcObj
 }
 
-///// only process cacher for now
+// /// only process cacher for now
 func Init() *uuidPRuleCache {
 	log.Info("UUID: ")
 	pc := new(uuidPRuleCache)
@@ -277,7 +278,7 @@ func (pc *uuidPRuleCache) ResetProcessUuidRuleMap() bool {
 	return true
 }
 
-///// from cacher
+// /// from cacher
 func (pc *uuidPRuleCache) AddProcesProfile(pp *share.CLUSProcessProfile) {
 	profile := *pp // local copy
 	pc.pendingCacheLock.Lock()
@@ -285,7 +286,7 @@ func (pc *uuidPRuleCache) AddProcesProfile(pp *share.CLUSProcessProfile) {
 	pc.pendingProcProfile_u.Add(&profile)
 }
 
-///// from cacher
+// /// from cacher
 func (pc *uuidPRuleCache) DeleteProcesProfile(pp *share.CLUSProcessProfile) {
 	profile := *pp // local copy
 	pc.pendingCacheLock.Lock()
@@ -293,7 +294,7 @@ func (pc *uuidPRuleCache) DeleteProcesProfile(pp *share.CLUSProcessProfile) {
 	pc.pendingProcProfile_d.Add(&profile)
 }
 
-///// REST lookup function
+// /// REST lookup function
 func (pc *uuidPRuleCache) FindProcessRuleToRest(uuid_str string, acc *access.AccessControl) (*api.RESTProcessUuidEntry, error) {
 	// is it a system reserved uuid
 	if entry := fillSystemResevedProcessRule(uuid_str); entry != nil {

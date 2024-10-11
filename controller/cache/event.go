@@ -2,6 +2,7 @@ package cache
 
 import (
 	log "github.com/sirupsen/logrus"
+
 	"github.com/neuvector/neuvector/share/utils"
 )
 

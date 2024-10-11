@@ -177,7 +177,7 @@ var _clusterStatusMap = map[int]string{
 	_fedClusterJoinPending:    api.FedStatusClusterPending,
 }
 
-var ibmSACfg share.CLUSIBMSAConfig
+// var ibmSACfg share.CLUSIBMSAConfig
 
 func LeadChangeNotify(leader bool) {
 	log.WithFields(log.Fields{"isLeader": leader, "_isLeader": _isLeader}).Info()
@@ -377,7 +377,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 
 func isFedRulesCleanupOngoing(w http.ResponseWriter) bool {
 	if m := clusHelper.GetFedMembership(); m != nil && m.FedRole == api.FedRoleNone && m.PendingDismiss {
-		if diff := time.Now().Sub(m.PendingDismissAt); diff.Minutes() <= 5 {
+		if diff := time.Since(m.PendingDismissAt); diff.Minutes() <= 5 {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrOpNotAllowed, "Federate rules cleanup is still ongoing. Please try again later.")
 			return true
 		}
@@ -986,9 +986,7 @@ func revertMappedFedRoles(groupRoleMappings []*share.GroupRoleMapping) {
 			groupRoleMapping.GlobalRole = api.UserRoleReader
 		}
 		if groupRoleMapping.RoleDomains != nil {
-			if _, ok := groupRoleMapping.RoleDomains[groupRoleMapping.GlobalRole]; ok {
-				delete(groupRoleMapping.RoleDomains, groupRoleMapping.GlobalRole)
-			}
+			delete(groupRoleMapping.RoleDomains, groupRoleMapping.GlobalRole)
 		}
 	}
 }
@@ -1281,11 +1279,11 @@ func pingJointClusters() bool {
 		if len(ids) > 0 {
 			if jointNWErrCount == nil {
 				jointNWErrCount = make(map[string]int, len(ids))
-				for id, _ := range ids {
+				for id := range ids {
 					jointNWErrCount[id] = 0
 				}
 			} else if len(jointNWErrCount) != len(ids) {
-				for id, _ := range jointNWErrCount {
+				for id := range jointNWErrCount {
 					if _, ok := ids[id]; !ok {
 						delete(jointNWErrCount, id)
 					}
@@ -1788,7 +1786,7 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	query := restParseQuery(r)
-	str, _ := query.pairs[api.QueryDuration] // in minutes.
+	str := query.pairs[api.QueryDuration] // in minutes.
 	duration, _ := strconv.Atoi(str)
 	if duration <= 0 { // in minute
 		duration = 60
@@ -2525,7 +2523,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 		}
 	} else {
-		for id, _ := range idMap {
+		for id := range idMap {
 			ids = append(ids, id)
 		}
 	}
@@ -2755,7 +2753,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 		reqTo.Revisions = cacher.GetAllFedRulesRevisions()
 		if forcePulling {
-			for ruleType, _ := range reqTo.Revisions {
+			for ruleType := range reqTo.Revisions {
 				reqTo.Revisions[ruleType] = 0
 			}
 		}
@@ -2814,7 +2812,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 								reqTo.Revisions = respTo.Revisions
 								bodyTo, _ := json.Marshal(&reqTo)
-								_, statusCode, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
+								_, _, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
 							}
 						}
 					}
@@ -2866,7 +2864,7 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 			return
 		}
 		if forcePulling {
-			for regName, _ := range cachedScanDataRevs.ScannedRegRevs {
+			for regName := range cachedScanDataRevs.ScannedRegRevs {
 				cachedScanDataRevs.ScannedRegRevs[regName] = 0
 			}
 			cachedScanDataRevs.ScannedRepoRev = 0
@@ -3342,11 +3340,12 @@ func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter
 }
 
 var forbiddenFwUrl = map[string][]string{
-	"/v1/fed_auth": []string{http.MethodPost, http.MethodDelete},
+	"/v1/fed_auth": {http.MethodPost, http.MethodDelete},
 }
-var forbiddenFwUrlPrefix = map[string][]string{
-	"/v1/auth/": []string{http.MethodPost, http.MethodDelete},
-}
+
+// var forbiddenFwUrlPrefix = map[string][]string{
+// 	"/v1/auth/": {http.MethodPost, http.MethodDelete},
+// }
 
 type tForbiddenFwUrlInfo struct {
 	url       string
@@ -3356,12 +3355,12 @@ type tForbiddenFwUrlInfo struct {
 }
 
 var forbiddenFwUrlRegex []tForbiddenFwUrlInfo = []tForbiddenFwUrlInfo{
-	tForbiddenFwUrlInfo{
+	{
 		url:       "/v1/auth/.*",
 		urlPrefix: "/v1/auth/",
 		verbs:     []string{http.MethodPost, http.MethodDelete},
 	},
-	tForbiddenFwUrlInfo{
+	{
 		url:       "/v1/user/.*/password",
 		urlPrefix: "/v1/user/",
 		verbs:     []string{http.MethodPost},

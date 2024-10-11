@@ -65,35 +65,35 @@ func TestProcessProfileShow(t *testing.T) {
 	preTest()
 
 	mc := mockCache{
-		groups:  make(map[string]*api.RESTGroup),
+		groups:   make(map[string]*api.RESTGroup),
 		profiles: make(map[string][]*api.RESTProcessProfileEntry),
 	}
 
-	mc.groups["external"] = &api.RESTGroup {
+	mc.groups["external"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"external",
-			Kind:	share.GroupKindExternal,
+			Name: "external",
+			Kind: share.GroupKindExternal,
 		},
 	}
 
-	mc.groups["containers"] = &api.RESTGroup {
+	mc.groups["containers"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"contrainers",
-			Kind:	share.GroupKindContainer,
+			Name: "contrainers",
+			Kind: share.GroupKindContainer,
 		},
 	}
 
-	mc.groups["nodes"] = &api.RESTGroup {
+	mc.groups["nodes"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"nodes",
-			Kind:	share.GroupKindNode,
+			Name: "nodes",
+			Kind: share.GroupKindNode,
 		},
 	}
 
 	mp := &api.RESTProcessProfileEntry{
-		Name:		"sleep",
-		Path:       "/bin/sleep",
-		Action:     share.PolicyActionAllow,
+		Name:   "sleep",
+		Path:   "/bin/sleep",
+		Action: share.PolicyActionAllow,
 	}
 
 	pp := make([]*api.RESTProcessProfileEntry, 0)
@@ -110,7 +110,7 @@ func TestProcessProfileShow(t *testing.T) {
 		w := restCall("GET", "/v1/process_profile/containers", nil, api.UserRoleAdmin)
 		if w.status == http.StatusOK {
 			var resp api.RESTProcessProfileData
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if !reflect.DeepEqual(resp.Profile.ProcessList, pp) {
 				t.Errorf("Status is OK but a wrong content")
 				t.Logf("  Resp: %+v\n", resp.Profile.ProcessList)
@@ -147,7 +147,7 @@ func TestProcessProfileShow(t *testing.T) {
 		w := restCall("GET", "/v1/process_profile/nodes", nil, api.UserRoleAdmin)
 		if w.status == http.StatusOK {
 			var resp api.RESTProcessProfileData
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if !reflect.DeepEqual(resp.Profile.ProcessList, pp) {
 				t.Errorf("Status is OK but a wrong content")
 				t.Logf("  Resp: %+v\n", resp.Profile.ProcessList)
@@ -166,35 +166,35 @@ func TestProcessProfileConfigAdd(t *testing.T) {
 	preTest()
 
 	mc := mockCache{
-		groups:  make(map[string]*api.RESTGroup),
+		groups:   make(map[string]*api.RESTGroup),
 		profiles: make(map[string][]*api.RESTProcessProfileEntry),
 	}
 
-	mc.groups["external"] = &api.RESTGroup {
+	mc.groups["external"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"external",
-			Kind:	share.GroupKindExternal,
+			Name: "external",
+			Kind: share.GroupKindExternal,
 		},
 	}
 
-	mc.groups["containers"] = &api.RESTGroup {
+	mc.groups["containers"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"contrainers",
-			Kind:	share.GroupKindContainer,
+			Name: "contrainers",
+			Kind: share.GroupKindContainer,
 		},
 	}
 
-	mc.groups["nodes"] = &api.RESTGroup {
+	mc.groups["nodes"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"nodes",
-			Kind:	share.GroupKindNode,
+			Name: "nodes",
+			Kind: share.GroupKindNode,
 		},
 	}
 
-	mp := &api.RESTProcessProfileEntry{		// not used: the data-store was referenced to mock cluster, not cacher
-		Name:		"sleep",
-		Path:       "/bin/sleep",
-		Action:     share.PolicyActionAllow,
+	mp := &api.RESTProcessProfileEntry{ // not used: the data-store was referenced to mock cluster, not cacher
+		Name:   "sleep",
+		Path:   "/bin/sleep",
+		Action: share.PolicyActionAllow,
 	}
 
 	pp := make([]*api.RESTProcessProfileEntry, 0)
@@ -206,14 +206,14 @@ func TestProcessProfileConfigAdd(t *testing.T) {
 
 	//////
 	add := api.RESTProcessProfileEntryConfig{
-		Name:		"top",
-		Path:       "/bin/top",
-		Action:     share.PolicyActionAllow,
+		Name:   "top",
+		Path:   "/bin/top",
+		Action: share.PolicyActionAllow,
 	}
 
 	ppc := make([]api.RESTProcessProfileEntryConfig, 0)
 	ppc = append(ppc, add)
-	conf := api.RESTProcessProfileConfig {ProcessChgList: &ppc}
+	conf := api.RESTProcessProfileConfig{ProcessChgList: &ppc}
 	data := api.RESTProcessProfileConfigData{Config: &conf}
 	body, _ := json.Marshal(data)
 
@@ -264,21 +264,21 @@ func TestProcessProfileConfigDelete(t *testing.T) {
 	preTest()
 
 	mc := mockCache{
-		groups:  make(map[string]*api.RESTGroup),
+		groups:   make(map[string]*api.RESTGroup),
 		profiles: make(map[string][]*api.RESTProcessProfileEntry),
 	}
 
-	mc.groups["containers"] = &api.RESTGroup {
+	mc.groups["containers"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"contrainers",
-			Kind:	share.GroupKindContainer,
+			Name: "contrainers",
+			Kind: share.GroupKindContainer,
 		},
 	}
 
-	mp := &api.RESTProcessProfileEntry{		// not used: the data-store was referenced to mock cluster, not cacher
-		Name:		"sleep",
-		Path:       "/bin/sleep",
-		Action:     share.PolicyActionAllow,
+	mp := &api.RESTProcessProfileEntry{ // not used: the data-store was referenced to mock cluster, not cacher
+		Name:   "sleep",
+		Path:   "/bin/sleep",
+		Action: share.PolicyActionAllow,
 	}
 
 	pp := make([]*api.RESTProcessProfileEntry, 0)
@@ -288,15 +288,14 @@ func TestProcessProfileConfigDelete(t *testing.T) {
 
 	//////
 	del := api.RESTProcessProfileEntryConfig{
-		Name:		"sleep",
-		Path:       "/bin/sleep",
-		Action:     share.PolicyActionAllow,
+		Name:   "sleep",
+		Path:   "/bin/sleep",
+		Action: share.PolicyActionAllow,
 	}
-
 
 	ppc := make([]api.RESTProcessProfileEntryConfig, 0)
 	ppc = append(ppc, del)
-	conf := api.RESTProcessProfileConfig {ProcessDelList: &ppc}
+	conf := api.RESTProcessProfileConfig{ProcessDelList: &ppc}
 	data := api.RESTProcessProfileConfigData{Config: &conf}
 	body, _ := json.Marshal(data)
 
@@ -312,14 +311,14 @@ func TestProcessProfileConfigDelete(t *testing.T) {
 
 	//////
 	del = api.RESTProcessProfileEntryConfig{
-		Name:		"top",
-		Path:       "/bin/top",
-		Action:     share.PolicyActionAllow,
+		Name:   "top",
+		Path:   "/bin/top",
+		Action: share.PolicyActionAllow,
 	}
 
 	ppc = make([]api.RESTProcessProfileEntryConfig, 0)
 	ppc = append(ppc, del)
-	conf = api.RESTProcessProfileConfig {ProcessDelList: &ppc}
+	conf = api.RESTProcessProfileConfig{ProcessDelList: &ppc}
 	data = api.RESTProcessProfileConfigData{Config: &conf}
 	body, _ = json.Marshal(data)
 

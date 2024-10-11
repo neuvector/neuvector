@@ -21,57 +21,62 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-////
 var mLog *log.Logger = log.New()
 
+/*
 const inodeChangeMask = syscall.IN_CLOSE_WRITE |
+
 	syscall.IN_DELETE |
 	syscall.IN_DELETE_SELF |
 	syscall.IN_MOVE |
 	syscall.IN_MOVE_SELF |
 	syscall.IN_MOVED_TO
-
+*/
 const inodeMovedMask = syscall.IN_MOVE | syscall.IN_MOVE_SELF | syscall.IN_MOVED_TO
 
+/*
 var packageFile utils.Set = utils.NewSet(
+
 	"/var/lib/dpkg/status",
 	"/var/lib/rpm/Packages",
 	"/var/lib/rpm/Packages.db",
 	"/lib/apk/db/installed")
-
+*/
 type SendAggregateReportCallback func(fsmsg *MonitorMessage) bool
 
 var ImportantFiles []share.CLUSFileMonitorFilter = []share.CLUSFileMonitorFilter{
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/dpkg/status", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/rpm/Packages", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib/apk/db/installed", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/rpm/Packages.db", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/hosts", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/passwd", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/shadow", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/resolv\\.conf", Regex: ""},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/home/.*/\\.ssh", Regex: ".*"},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib", Regex: "ld-linux\\..*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib", Regex: "libc\\..*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib", Regex: "libpthread.*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib64", Regex: "ld-linux.*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib64", Regex: "libc\\..*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib64", Regex: "libpthread.*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/bin", Regex: ".*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/sbin", Regex: ".*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/bin", Regex: ".*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/sbin", Regex: ".*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/local/bin", Regex: ".*", Recursive: true},
-	share.CLUSFileMonitorFilter{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/local/sbin", Regex: ".*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/dpkg/status", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/rpm/Packages", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib/apk/db/installed", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/var/lib/rpm/Packages.db", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/hosts", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/passwd", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/shadow", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/resolv\\.conf", Regex: ""},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/home/.*/\\.ssh", Regex: ".*"},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib", Regex: "ld-linux\\..*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib", Regex: "libc\\..*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib", Regex: "libpthread.*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib64", Regex: "ld-linux.*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib64", Regex: "libc\\..*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/lib64", Regex: "libpthread.*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/bin", Regex: ".*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/sbin", Regex: ".*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/bin", Regex: ".*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/sbin", Regex: ".*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/local/bin", Regex: ".*", Recursive: true},
+	{Behavior: share.FileAccessBehaviorMonitor, Path: "/usr/local/sbin", Regex: ".*", Recursive: true},
 }
 
 var DefaultContainerConf share.CLUSFileMonitorProfile = share.CLUSFileMonitorProfile{
 	Filters: ImportantFiles,
 }
 
+/*
 const (
 	imonitorFileDelay = 10
 )
+*/
 
 const (
 	fileEventAttr uint32 = (1 << iota)
@@ -377,7 +382,9 @@ func (w *FileWatch) reportLearningRules() {
 	}
 	w.mux.Unlock()
 	if len(learnRules) > 0 {
-		w.sendRule(learnRules)
+		if err := w.sendRule(learnRules); err != nil {
+			log.WithFields(log.Fields{"error": err, "len": len(learnRules)}).Error()
+		}
 	}
 }
 
@@ -492,7 +499,9 @@ func (w *FileWatch) UpdateAccessRules(name string, rootPid int, conf *share.CLUS
 	}
 	w.mux.Unlock()
 
-	w.fanotifier.UpdateAccessRule(rootPid, conf)
+	if err := w.fanotifier.UpdateAccessRule(rootPid, conf); err != nil {
+		log.WithFields(log.Fields{"error": err, "rootPid": rootPid}).Error()
+	}
 }
 
 func (w *FileWatch) Close() {
@@ -634,7 +643,6 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 	return dirList, singleFiles
 }
 
-//
 func isRunTimeAddedFile(path string) bool {
 	return strings.HasSuffix(path, "/root/etc/hosts") ||
 		strings.HasSuffix(path, "/root/etc/hostname") ||
@@ -920,7 +928,7 @@ func (w *FileWatch) ContainerCleanup(rootPid int, bLeave bool) {
 
 	w.mux.Lock()
 	defer w.mux.Unlock()
-	for path, _ := range w.fileEvents {
+	for path := range w.fileEvents {
 		if pid, _ := global.SYS.ParseContainerFilePath(path); pid == rootPid {
 			delete(w.fileEvents, path)
 		}
@@ -951,7 +959,7 @@ func (w *FileWatch) GetAllFileMonitorFile() []*share.CLUSFileMonitorFile {
 	return w.fanotifier.GetWatches()
 }
 
-////////
+// //////
 func (w *FileWatch) GetProbeData() *FmonProbeData {
 	var probeData FmonProbeData
 	if !w.bEnable {
@@ -982,7 +990,7 @@ func (w *FileWatch) SetMonitorTrace(bEnable bool, logLevel string) {
 	}
 }
 
-//////////////////////
+// ////////////////////
 const (
 	dirIterTimeout  = time.Second * 8
 	rootIterTimeout = time.Second * 16
@@ -1165,7 +1173,7 @@ func (w *FileWatch) getSubDirList(pid int, base, cid string) []string {
 	return dirList
 }
 
-////////////
+// //////////
 const (
 	fsNvProtectProcAlert = "NV.Protect: Process alert"
 )

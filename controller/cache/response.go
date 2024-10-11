@@ -49,15 +49,15 @@ type responseActionFunc struct {
 }
 
 var responseFuncs map[string]responseActionFunc = map[string]responseActionFunc{
-	share.EventActivity:   responseActionFunc{logActivity, webhookActivity},
-	share.EventEvent:      responseActionFunc{logEvent, webhookEvent},
-	share.EventCVEReport:  responseActionFunc{logAudit, webhookAudit},
-	share.EventThreat:     responseActionFunc{logThreat, webhookThreat},
-	share.EventIncident:   responseActionFunc{logIncident, webhookIncident},
-	share.EventViolation:  responseActionFunc{logViolation, webhookViolation},
-	share.EventCompliance: responseActionFunc{logAudit, webhookAudit},
-	share.EventAdmCtrl:    responseActionFunc{logAudit, webhookAudit},
-	share.EventServerless: responseActionFunc{logAudit, webhookAudit},
+	share.EventActivity:   {logActivity, webhookActivity},
+	share.EventEvent:      {logEvent, webhookEvent},
+	share.EventCVEReport:  {logAudit, webhookAudit},
+	share.EventThreat:     {logThreat, webhookThreat},
+	share.EventIncident:   {logIncident, webhookIncident},
+	share.EventViolation:  {logViolation, webhookViolation},
+	share.EventCompliance: {logAudit, webhookAudit},
+	share.EventAdmCtrl:    {logAudit, webhookAudit},
+	share.EventServerless: {logAudit, webhookAudit},
 }
 
 type resPolicyCacheType struct {
@@ -119,12 +119,9 @@ func (m CacheMethod) ResponseRule2REST(rule *share.CLUSResponseRule) *api.RESTRe
 		Group:   rule.Group,
 		Disable: rule.Disable,
 	}
-	restRule.CfgType, _ = cfgTypeMapping[rule.CfgType]
-	conditions := make([]share.CLUSEventCondition, len(rule.Conditions))
-	for i := 0; i < len(rule.Conditions); i++ {
-		conditions[i] = rule.Conditions[i]
-	}
-	restRule.Conditions = conditions
+	restRule.CfgType = cfgTypeMapping[rule.CfgType]
+	restRule.Conditions = make([]share.CLUSEventCondition, len(rule.Conditions))
+	copy(restRule.Conditions, rule.Conditions)
 
 	if len(rule.Actions) == 0 {
 		restRule.Actions = make([]string, 0)
@@ -155,7 +152,7 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		if cfgType == share.CLUSResCfgRule {
 			var rule share.CLUSResponseRule
-			json.Unmarshal(value, &rule)
+			_ = json.Unmarshal(value, &rule)
 			if exist, ok := resPolicyCache.ruleMap[rule.ID]; ok {
 				if gc, ok := groupCacheMap[exist.Group]; ok {
 					gc.usedByResponseRules.Remove(exist.ID)
@@ -175,7 +172,7 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 			}
 		} else if cfgType == share.CLUSResCfgRuleList {
 			var heads []*share.CLUSRuleHead
-			json.Unmarshal(value, &heads)
+			_ = json.Unmarshal(value, &heads)
 			resPolicyCache.ruleHeads = heads
 			resPolicyCache.ruleOrderMap = ruleHeads2OrderMap(heads)
 		}
@@ -425,7 +422,7 @@ func responseRuleLookup(desc *eventDesc) {
 						key := share.CLUSUniconfWorkloadKey(wlc.workload.HostID, wlc.workload.ID)
 						value, rev, _ := cluster.GetRev(key)
 						if value != nil {
-							json.Unmarshal(value, &cconf)
+							_ = json.Unmarshal(value, &cconf)
 						} else {
 							cconf.Wire = share.WireDefault
 						}
@@ -451,7 +448,6 @@ func responseRuleLookup(desc *eventDesc) {
 	if !suppressLog && react.logFunc != nil {
 		react.logFunc(desc.arg)
 	}
-	return
 }
 
 func (m CacheMethod) GetResponseRuleCount(scope string, acc *access.AccessControl) int {

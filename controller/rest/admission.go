@@ -30,10 +30,10 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const (
-	_writeHeader   = true
-	_noWriteHeader = false
-)
+// const (
+// 	_writeHeader   = true
+// 	_noWriteHeader = false
+// )
 
 type admissionRequestObject struct {
 	ApiVersion string            `json:"apiVersion,omitempty"`
@@ -155,7 +155,7 @@ func validateAdmCtrlCriteria(criteria []*share.CLUSAdmRuleCriterion, options map
 			}
 			if crt.Name == share.CriteriaKeyCVEScoreCount && len(crt.SubCriteria) == 0 {
 				crt.SubCriteria = []*share.CLUSAdmRuleCriterion{
-					&share.CLUSAdmRuleCriterion{
+					{
 						Name:  share.SubCriteriaCount,
 						Op:    share.CriteriaOpBiggerEqualThan,
 						Value: "1",
@@ -297,7 +297,7 @@ func applyTransact(w http.ResponseWriter, txn *cluster.ClusterTransact) error {
 		if w != nil {
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, e)
 		}
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 	return nil
 }
@@ -475,25 +475,9 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		log.Error("Request contains invalid data")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
-	} else if state.FailurePolicy != nil {
-		/* do not allow admission control webhook's FailurePolicy to be configurable yet
-		invalidFailurePolicy := false
-		if admission.IsNsSelectorSupported() {
-			if *state.FailurePolicy != resource.IgnoreLower && *state.FailurePolicy != resource.FailLower {
-				invalidFailurePolicy = true
-			}
-		} else if state.FailurePolicy != nil && *state.FailurePolicy != *currState.FailurePolicy {
-			invalidFailurePolicy = true
-		}
-		if invalidFailurePolicy {
-			e := fmt.Errorf("Request contains invalid FailurePolicy: %s", *state.FailurePolicy)
-			log.Error(e)
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e.Error())
-		}
-		*/
 	}
 	if state.Mode != nil && *state.Mode == share.AdmCtrlModeProtect {
-		if licenseAllowEnforce() == false {
+		if !licenseAllowEnforce() {
 			e := "The policy mode is not enabled in the license"
 			log.WithFields(log.Fields{"mode": *state.Mode}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
@@ -546,7 +530,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		k8sResInfo := admission.ValidatingWebhookConfigInfo{
 			Name: resource.NvAdmValidatingName,
 			WebhooksInfo: []*admission.WebhookInfo{
-				&admission.WebhookInfo{
+				{
 					Name: resource.NvAdmValidatingWebhookName,
 					ClientConfig: admission.ClientConfig{
 						ClientMode:  admClientMode,
@@ -556,7 +540,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 					FailurePolicy:  failurePolicy,
 					TimeoutSeconds: resource.DefTimeoutSeconds,
 				},
-				&admission.WebhookInfo{
+				{
 					Name: resource.NvStatusValidatingWebhookName,
 					ClientConfig: admission.ClientConfig{
 						ClientMode:  admClientMode,
@@ -991,7 +975,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 	ruleCfg := confData.Config
-	cfgType, _ := cfgTypeMapping[ruleCfg.CfgType]
+	cfgType := cfgTypeMapping[ruleCfg.CfgType]
 	modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 	if (cfgType != share.UserCreated && cfgType != share.FederalCfg) ||
 		(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) ||
@@ -1123,9 +1107,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 	if ruleCfg.Criteria != nil {
 		resp.Rule.Criteria = make([]*api.RESTAdmRuleCriterion, len(ruleCfg.Criteria))
-		for idx, c := range ruleCfg.Criteria {
-			resp.Rule.Criteria[idx] = c
-		}
+		copy(resp.Rule.Criteria, ruleCfg.Criteria)
 	}
 
 	opa.ConvertToRegoRule(clusConf)
@@ -1507,7 +1489,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
 		return nil
 	}
 
@@ -1530,7 +1512,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 		// [1] parse security rule in the yaml file
 		parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdAdmCtrlContent(&secRule, share.ReviewTypeImportAdmCtrl, share.ReviewTypeDisplayAdmission)
 		if errCount > 0 {
-			err = fmt.Errorf(errMsg)
+			err = fmt.Errorf("%s", errMsg)
 		} else {
 			progress += inc
 			importTask.Percentage = int(progress)
@@ -1542,7 +1524,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 				var currState *api.RESTAdmissionState
 				if currState, err = cacher.GetAdmissionState(acc); err == nil {
 					if currState.CfgType == api.CfgTypeGround {
-						err = fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+						err = fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 					} else {
 						err = crdHandler.crdHandleAdmCtrlConfig(scope, parsedCfg.AdmCtrlCfg, nil, share.ReviewTypeImportAdmCtrl)
 					}
@@ -1702,8 +1684,6 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 		}
 	}
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
-
-	return
 }
 
 func validateCustomPathCriteria(crt *share.CLUSAdmRuleCriterion) (bool, bool) {

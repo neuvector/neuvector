@@ -2,19 +2,19 @@ package cache
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
-	"errors"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
-	"github.com/neuvector/neuvector/controller/kv"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +27,7 @@ var dlpGroupSensors map[string]utils.Set = make(map[string]utils.Set)           
 var dlpGroups map[string]*share.CLUSDlpGroup = make(map[string]*share.CLUSDlpGroup)
 var dlpIdRule map[uint32]string = make(map[uint32]string) //key is rule id, value is rule name
 
-//update dlp rule from config
+// update dlp rule from config
 func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	sensor := share.CLUSDlpRuleKey2Name(key)
 	switch nType {
@@ -58,7 +58,7 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 				dlpRuleSensors[cdrename].Add(sensor)
 			}
 		} else {
-			for id, _ := range dlpIdRule {
+			for id := range dlpIdRule {
 				delete(dlpIdRule, id)
 			}
 			if dlpIdRule == nil {
@@ -70,7 +70,7 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 				}
 			}
 			for _, cdrl := range dlpsensor.PreRuleList {
-				if cdrl != nil && len(cdrl) > 0 {
+				if len(cdrl) > 0 {
 					dlpIdRule[cdrl[0].ID] = cdrl[0].Name
 				}
 			}
@@ -79,7 +79,7 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 		//sync with CLUSGroup
 		syncDlpClusGroup(sensor)
 
-		for cg, _ := range dlpsensor.Groups {
+		for cg := range dlpsensor.Groups {
 			//group to sensors map
 			if dlpGroupSensors[cg] == nil {
 				dlpGroupSensors[cg] = utils.NewSet()
@@ -95,7 +95,7 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 		updategrp := false
 		cacheMutexLock()
 		if dlpsensor, ok := dlpSensors[sensor]; ok {
-			for cg, _ := range dlpsensor.Groups {
+			for cg := range dlpsensor.Groups {
 				if dlpGroupSensors[cg] != nil && dlpGroupSensors[cg].Contains(sensor) {
 					updategrp = true
 				}
@@ -206,18 +206,14 @@ func dlpProcessGroupDel(group *share.CLUSDlpGroup) {
 		for sen := range cgs.Iter() {
 			sname := sen.(string)
 			if dr, ok1 := dlpSensors[sname]; ok1 {
-				if _, ok2 := dr.Groups[group.Name]; ok2 {
-					delete(dr.Groups, group.Name)
-				}
+				delete(dr.Groups, group.Name)
 			}
 		}
 		dlpGroupSensors[group.Name].Clear()
 	}
 	for _, sen := range group.Sensors {
 		if dr, ok := dlpSensors[sen.Name]; ok {
-			if _, ok1 := dr.Groups[group.Name]; ok1 {
-				delete(dr.Groups, group.Name)
-			}
+			delete(dr.Groups, group.Name)
 		}
 	}
 }
@@ -226,9 +222,7 @@ func dlpProcessGroup(group *share.CLUSDlpGroup) {
 		for sen := range cgs.Iter() {
 			sname := sen.(string)
 			if dr, ok1 := dlpSensors[sname]; ok1 {
-				if _, ok2 := dr.Groups[group.Name]; ok2 {
-					delete(dr.Groups, group.Name)
-				}
+				delete(dr.Groups, group.Name)
 			}
 		}
 		dlpGroupSensors[group.Name].Clear()
@@ -249,9 +243,7 @@ func dlpProcessGroup(group *share.CLUSDlpGroup) {
 	} else { //delete dlp sensors for group
 		for _, sen := range group.Sensors {
 			if dr, ok := dlpSensors[sen.Name]; ok {
-				if _, ok1 := dr.Groups[group.Name]; ok1 {
-					delete(dr.Groups, group.Name)
-				}
+				delete(dr.Groups, group.Name)
 			}
 		}
 	}
@@ -535,13 +527,11 @@ func listRuleEntriesForSens(dlprulemap map[string][]*share.CLUSDlpRule, dsensors
 						dlprulemap[cdre.Name] = append(dlprulemap[cdre.Name], cdre)
 					} else { //predefined rule
 						cdrelist := getPreDlpRuleFromDefaultSensor(cdrename)
-						if cdrelist != nil {
-							for _, cdre := range cdrelist {
-								if dlprulemap[cdre.Name] == nil {
-									dlprulemap[cdre.Name] = make([]*share.CLUSDlpRule, 0)
-								}
-								dlprulemap[cdre.Name] = append(dlprulemap[cdre.Name], cdre)
+						for _, cdre := range cdrelist {
+							if dlprulemap[cdre.Name] == nil {
+								dlprulemap[cdre.Name] = make([]*share.CLUSDlpRule, 0)
 							}
+							dlprulemap[cdre.Name] = append(dlprulemap[cdre.Name], cdre)
 						}
 					}
 				}
@@ -568,9 +558,7 @@ func reOrgWlRules(wl2rules, outside_wl2rules map[string]map[string]string, outsi
 				}
 			}
 			delete(outside_wl2rules, wlid)
-			if _, ok2 := outside_wl2policies[wlid]; ok2 {
-				delete(outside_wl2policies, wlid)
-			}
+			delete(outside_wl2policies, wlid)
 		}
 	}
 }
@@ -604,6 +592,7 @@ func getWlRules(cgdrs *share.CLUSWorkloadDlpRules, wl2rules map[string]map[strin
 	}
 }
 
+/*
 func printDlpRuleMap(dlprulemap map[string][]*share.CLUSDlpRule) {
 	for _, drelist := range dlprulemap {
 		for _, dre := range drelist {
@@ -611,7 +600,6 @@ func printDlpRuleMap(dlprulemap map[string][]*share.CLUSDlpRule) {
 		}
 	}
 }
-
 func printDefaultDlpRules(cgdrs *share.CLUSWorkloadDlpRules) {
 	for _, rl := range cgdrs.DlpRuleList {
 		log.WithFields(log.Fields{"rl": *rl}).Debug("DlpRuleList")
@@ -623,6 +611,7 @@ func printDefaultDlpRules(cgdrs *share.CLUSWorkloadDlpRules) {
 		}
 	}
 }
+*/
 
 func calculateGroupDlpRulesFromCache() share.CLUSWorkloadDlpRules {
 	log.Debug("")
@@ -674,7 +663,7 @@ func calculateGroupDlpRulesFromCache() share.CLUSWorkloadDlpRules {
 	return cgdrs
 }
 
-//each slot's max size after zip is 500k
+// each slot's max size after zip is 500k
 const maxDlpSlots = 512
 
 func prepareDlpSlots(rules share.CLUSWorkloadDlpRules) ([][]byte, int, int, error) {
@@ -692,10 +681,10 @@ func prepareDlpSlots(rules share.CLUSWorkloadDlpRules) ([][]byte, int, int, erro
 			final_slots = rwl_len
 		}
 		log.WithFields(log.Fields{
-			"r_lens":        r_lens,
-			"wl_lens":        wl_lens,
-			"slots":          slots,
-			"final_slots":    final_slots,
+			"r_lens":      r_lens,
+			"wl_lens":     wl_lens,
+			"slots":       slots,
+			"final_slots": final_slots,
 			"maxDlpSlots": maxDlpSlots,
 		}).Debug("segregate dlpwlrules to slots")
 
@@ -749,7 +738,7 @@ func dlpRulesCleanup(ruleKeys []string) {
 		txn.Delete(key)
 	}
 	//Ignore failure, missed keys will be removed the next update.
-	txn.Apply()
+	_, _ = txn.Apply()
 }
 
 func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
@@ -798,16 +787,19 @@ func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
 	dlpRulesCleanup(oldKeys)
 }
 
-//network/DlpWorkloadRules is listened by enforcers
-func putDlpWorkloadRulesToCluster(rules share.CLUSWorkloadDlpRules) {
-	key := share.CLUSDlpWorkloadRulesKey(share.DlpRulesDefaultName)
-	value, _ := json.Marshal(rules)
-	zb := utils.GzipBytes(value)
-	if err := cluster.PutBinary(key, zb); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")
+/*
+// network/DlpWorkloadRules is listened by enforcers
+
+	func putDlpWorkloadRulesToCluster(rules share.CLUSWorkloadDlpRules) {
+		key := share.CLUSDlpWorkloadRulesKey(share.DlpRulesDefaultName)
+		value, _ := json.Marshal(rules)
+		zb := utils.GzipBytes(value)
+		if err := cluster.PutBinary(key, zb); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")
+		}
+		log.WithFields(log.Fields{"value": string(value), "len": len(value), "zb": len(zb)}).Debug("")
 	}
-	log.WithFields(log.Fields{"value": string(value), "len": len(value), "zb": len(zb)}).Debug("")
-}
+*/
 
 func updateDlpRuleNetwork() {
 	if !isLeader() {
@@ -830,15 +822,15 @@ func scheduleDlpRuleCalculation(fast bool) {
 	}
 }
 
-//if sensor is used by group, it cannot be deleted
-//so delete a sensor no need to propagate to enforcer
+// if sensor is used by group, it cannot be deleted
+// so delete a sensor no need to propagate to enforcer
 func deleteDlpRuleNetwork(sensor string) {
 	if !isLeader() {
 		return
 	}
 	log.WithFields(log.Fields{"sensor": sensor}).Debug("")
 	key := share.CLUSDlpRuleKey(sensor)
-	cluster.Delete(key)
+	_ = cluster.Delete(key)
 }
 
 func getDlpRuleFromDefaultSensor(entry string) *share.CLUSDlpRule {
@@ -890,8 +882,8 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 			return nil, common.ErrObjectAccessDenied
 		}
 		rdre := &api.RESTDlpRule{
-			Name: cdre.Name,
-			ID:   cdre.ID,
+			Name:    cdre.Name,
+			ID:      cdre.ID,
 			CfgType: cfgTypeMapping[cdre.CfgType],
 		}
 		for _, cpt := range cdre.Patterns {
@@ -916,8 +908,8 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 				return nil, common.ErrObjectAccessDenied
 			}
 			rdre := &api.RESTDlpRule{
-				Name: cdre.Name,
-				ID:   cdre.ID,
+				Name:    cdre.Name,
+				ID:      cdre.ID,
 				CfgType: cfgTypeMapping[cdre.CfgType],
 			}
 			for _, cpt := range cdre.Patterns {
@@ -958,9 +950,9 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
 		}
-		resp.CfgType, _ = cfgTypeMapping[cdr.CfgType]
+		resp.CfgType = cfgTypeMapping[cdr.CfgType]
 
-		for name, _ := range cdr.Groups {
+		for name := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
 		}
 
@@ -968,8 +960,8 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 			//user created rule
 			for _, cdre := range cdr.RuleList {
 				rdre := &api.RESTDlpRule{
-					Name: cdre.Name,
-					ID:   cdre.ID,
+					Name:    cdre.Name,
+					ID:      cdre.ID,
 					CfgType: cfgTypeMapping[cdre.CfgType],
 				}
 				for _, cpt := range cdre.Patterns {
@@ -989,8 +981,8 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 			for _, cdrelist := range cdr.PreRuleList {
 				for _, cdre := range cdrelist {
 					rdre := &api.RESTDlpRule{
-						Name: cdre.Name,
-						ID:   cdre.ID,
+						Name:    cdre.Name,
+						ID:      cdre.ID,
 						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
@@ -1012,8 +1004,8 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 				cdre := getDlpRuleFromDefaultSensor(cdrename)
 				if cdre != nil {
 					rdre := &api.RESTDlpRule{
-						Name: common.GetOrigDlpRuleName(cdrename),
-						ID:   cdre.ID,
+						Name:    common.GetOrigDlpRuleName(cdrename),
+						ID:      cdre.ID,
 						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
@@ -1032,8 +1024,8 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 					cdrelist := getPreDlpRuleFromDefaultSensor(cdrename)
 					for _, cdre := range cdrelist {
 						rdre := &api.RESTDlpRule{
-							Name: common.GetOrigDlpRuleName(cdre.Name),
-							ID:   cdre.ID,
+							Name:    common.GetOrigDlpRuleName(cdre.Name),
+							ID:      cdre.ID,
 							CfgType: cfgTypeMapping[cdre.CfgType],
 						}
 						for _, cpt := range cdre.Patterns {
@@ -1060,7 +1052,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 	return nil, common.ErrObjectNotFound
 }
 
-//default sensor contains all dlpruleentries, REST API for GUI
+// default sensor contains all dlpruleentries, REST API for GUI
 func (m *CacheMethod) GetDlpRules(acc *access.AccessControl) ([]*api.RESTDlpRule, error) {
 	if sensor, err := m.GetDlpSensor(share.CLUSDlpDefaultSensor, acc); err != nil {
 		return nil, err
@@ -1089,16 +1081,16 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
 		}
-		resp.CfgType, _ = cfgTypeMapping[cdr.CfgType]
-		for name, _ := range cdr.Groups {
+		resp.CfgType = cfgTypeMapping[cdr.CfgType]
+		for name := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
 		}
 		if cdr.Name == share.CLUSDlpDefaultSensor {
 			//user created rule
 			for _, cdre := range cdr.RuleList {
 				rdre := &api.RESTDlpRule{
-					Name: cdre.Name,
-					ID:   cdre.ID,
+					Name:    cdre.Name,
+					ID:      cdre.ID,
 					CfgType: cfgTypeMapping[cdre.CfgType],
 				}
 				for _, cpt := range cdre.Patterns {
@@ -1118,8 +1110,8 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 			for _, cdrelist := range cdr.PreRuleList {
 				for _, cdre := range cdrelist {
 					rdre := &api.RESTDlpRule{
-						Name: cdre.Name,
-						ID:   cdre.ID,
+						Name:    cdre.Name,
+						ID:      cdre.ID,
 						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
@@ -1141,8 +1133,8 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 				cdre := getDlpRuleFromDefaultSensor(cdrename)
 				if cdre != nil {
 					rdre := &api.RESTDlpRule{
-						Name: common.GetOrigDlpRuleName(cdre.Name),
-						ID:   cdre.ID,
+						Name:    common.GetOrigDlpRuleName(cdre.Name),
+						ID:      cdre.ID,
 						CfgType: cfgTypeMapping[cdre.CfgType],
 					}
 					for _, cpt := range cdre.Patterns {
@@ -1161,8 +1153,8 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 					cdrelist := getPreDlpRuleFromDefaultSensor(cdrename)
 					for _, cdre := range cdrelist {
 						rdre := &api.RESTDlpRule{
-							Name: common.GetOrigDlpRuleName(cdre.Name),
-							ID:   cdre.ID,
+							Name:    common.GetOrigDlpRuleName(cdre.Name),
+							ID:      cdre.ID,
 							CfgType: cfgTypeMapping[cdre.CfgType],
 						}
 						for _, cpt := range cdre.Patterns {
@@ -1194,10 +1186,7 @@ func (m *CacheMethod) IsDlpRuleUsedBySensor(rule string, acc *access.AccessContr
 	defer cacheMutexRUnlock()
 
 	if st, ok := dlpRuleSensors[rule]; ok {
-		if st.Cardinality() == 0 {
-			return false
-		}
-		return true
+		return st.Cardinality() != 0
 	}
 	return false
 }
@@ -1213,7 +1202,7 @@ func GetDlpGrpSensorAction(cg, sn string) string {
 
 func GetDlpOutsideGrpSensorAction(cg, sn string, out2ingrp map[string]map[string]string) string {
 	if tgrps, ok := out2ingrp[cg]; ok {
-		for tg, _ := range tgrps {
+		for tg := range tgrps {
 			otact := GetDlpGrpSensorAction(tg, sn)
 			if otact == share.DlpRuleActionDrop {
 				return share.DlpRuleActionDrop
@@ -1235,7 +1224,7 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 				Status:  cg.Status,
 				Sensors: make([]*api.RESTDlpSetting, 0),
 			}
-			resp.CfgType, _ = cfgTypeMapping[cg.CfgType]
+			resp.CfgType = cfgTypeMapping[cg.CfgType]
 
 			for _, cs := range cg.Sensors {
 				rdsa := &api.RESTDlpSetting{
@@ -1277,7 +1266,7 @@ func (m *CacheMethod) GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGr
 			Status:  cg.Status,
 			Sensors: make([]*api.RESTDlpSetting, 0),
 		}
-		resp.CfgType, _ = cfgTypeMapping[cg.CfgType]
+		resp.CfgType = cfgTypeMapping[cg.CfgType]
 
 		for _, cs := range cg.Sensors {
 			rdsa := &api.RESTDlpSetting{
@@ -1341,7 +1330,7 @@ func (m CacheMethod) GetDlpRuleSensorGroupById(id uint32) (string, string, *[]st
 				sname = sens.ToStringSlice()[0]
 				if cds, ok2 := dlpSensors[sname]; ok2 {
 					if cds != nil {
-						for grp, _ := range cds.Groups {
+						for grp := range cds.Groups {
 							grpname = append(grpname, grp)
 						}
 					}
@@ -1359,11 +1348,11 @@ func (m CacheMethod) GetDlpRuleNames() *[]string {
 
 	if cdr, ok := dlpSensors[share.CLUSDlpDefaultSensor]; ok {
 		//user created rule
-		for rn, _ := range cdr.RuleList {
+		for rn := range cdr.RuleList {
 			dlprulenames = append(dlprulenames, getCombinedDlpSensorRuleName(rn))
 		}
 		//predefined rule
-		for prn, _ := range cdr.PreRuleList {
+		for prn := range cdr.PreRuleList {
 			dlprulenames = append(dlprulenames, getCombinedDlpSensorRuleName(prn))
 		}
 		sort.Slice(dlprulenames, func(i, j int) bool {

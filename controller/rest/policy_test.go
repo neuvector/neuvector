@@ -59,8 +59,8 @@ func TestPolicyRuleList(t *testing.T) {
 	}
 	initRules := []*share.CLUSPolicyRule{&rule1, &rule11, &rule21}
 	initGroups := []*share.CLUSGroup{
-		&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-		&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+		{Name: "fed.gFed1", CfgType: share.FederalCfg},
+		{Name: "g1", CfgType: share.UserCreated},
 	}
 	var mockCluster kv.MockCluster
 	initKvAndCache(&mockCluster, initRules, initGroups)
@@ -68,7 +68,7 @@ func TestPolicyRuleList(t *testing.T) {
 	w := restCall("GET", "/v1/policy/rule?scope=fed", nil, api.UserRoleReader)
 	if w.status == http.StatusOK {
 		var resp api.RESTPolicyRulesData
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 		if len(resp.Rules) != 1 {
 			t.Errorf("List policy rules positive: Status is OK.")
 			t.Logf("  Expect len: 1\n")
@@ -104,7 +104,7 @@ func TestPolicyRuleShow(t *testing.T) {
 		w := restCall("GET", "/v1/policy/rule/10", nil, api.UserRoleAdmin)
 
 		var resp api.RESTPolicyRuleData
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 
 		if !compareRESTRules(&rule, resp.Rule) {
 			t.Errorf("Get existing rule: Not found.")
@@ -124,7 +124,7 @@ func TestPolicyRuleShow(t *testing.T) {
 		}
 
 		var resp api.RESTError
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 
 		if resp.Code != api.RESTErrObjectNotFound {
 			t.Errorf("Get non-existing policy: Incorrect error code.")
@@ -156,7 +156,7 @@ func TestPolicyRuleConfigKeep(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule1},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+				{Name: "g1", CfgType: share.UserCreated},
 			},
 		)
 		clusHelper = &mockCluster
@@ -222,7 +222,7 @@ func TestPolicyRuleConfigKeep(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule1, &rule2},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+				{Name: "g1", CfgType: share.UserCreated},
 			},
 		)
 		clusHelper = &mockCluster
@@ -286,7 +286,7 @@ func TestPolicyRuleConfig(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -363,9 +363,9 @@ func TestPolicyRuleConfigGroup(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1, &rule2},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
-			&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
-			&share.CLUSGroup{Name: "g3", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.UserCreated},
+			{Name: "g2", CfgType: share.UserCreated},
+			{Name: "g3", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -466,7 +466,7 @@ func TestPolicyRuleConfigPort(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -551,7 +551,7 @@ func TestPolicyRuleConfigApp(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -563,11 +563,11 @@ func TestPolicyRuleConfigApp(t *testing.T) {
 
 	{
 		appsPositive := []appMap{
-			appMap{input: []string{}, output: []uint32{}},
-			appMap{input: []string{"http"}, output: []uint32{1001}},
-			appMap{input: []string{"http", "KafkA"}, output: []uint32{1001, 2007}},
-			appMap{input: []string{"http", "KafkA", "MySQL"}, output: []uint32{1001, 2007, 2001}},
-			appMap{input: []string{"http", "anY", "KafkA"}, output: []uint32{}},
+			{input: []string{}, output: []uint32{}},
+			{input: []string{"http"}, output: []uint32{1001}},
+			{input: []string{"http", "KafkA"}, output: []uint32{1001, 2007}},
+			{input: []string{"http", "KafkA", "MySQL"}, output: []uint32{1001, 2007, 2001}},
+			{input: []string{"http", "anY", "KafkA"}, output: []uint32{}},
 		}
 		for _, am := range appsPositive {
 			conf := api.RESTPolicyRuleConfig{ID: 10, Applications: &am.input}
@@ -594,9 +594,9 @@ func TestPolicyRuleConfigApp(t *testing.T) {
 
 	{
 		appsNegative := []appMap{
-			appMap{input: []string{""}, output: []uint32{}},
-			appMap{input: []string{" dummy"}, output: []uint32{}},
-			appMap{input: []string{"http", "KafkA "}, output: []uint32{}},
+			{input: []string{""}, output: []uint32{}},
+			{input: []string{" dummy"}, output: []uint32{}},
+			{input: []string{"http", "KafkA "}, output: []uint32{}},
 		}
 		for _, am := range appsNegative {
 			conf := api.RESTPolicyRuleConfig{ID: 10, Applications: &am.input}
@@ -641,7 +641,7 @@ func TestPolicyRuleConfigNegative(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1, &rule2},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -785,8 +785,8 @@ func TestFedPolicyRuleMove(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule1, &rule2, &rule11, &rule21, &rule22},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+				{Name: "fed.gFed1", CfgType: share.FederalCfg},
+				{Name: "g1", CfgType: share.UserCreated},
 			},
 		)
 		clusHelper = &mockCluster
@@ -807,41 +807,41 @@ func TestFedPolicyRuleMove(t *testing.T) {
 		}
 
 		testCases := []*TCase{
-			&TCase{ID: 100003, After: 110001},
-			&TCase{ID: 100002, NilAfter: true},
-			&TCase{ID: 100003, After: -10001},
-			&TCase{ID: 100003, After: 100002},
-			&TCase{ID: 100003, After: -100002}, //
-			&TCase{ID: 100002, After: 0},
-			&TCase{ID: 10001, After: -100002},
-			&TCase{ID: 10001, After: 110001},
-			&TCase{ID: 10001, After: -10001},
-			&TCase{ID: 10001, After: 100}, //
-			&TCase{ID: 10001, NilAfter: true},
-			&TCase{ID: 100, NilAfter: true},
-			&TCase{ID: 100, After: -110001},
-			&TCase{ID: 100, After: 100003},
-			&TCase{ID: 100, After: 100}, //
-			&TCase{ID: 10001, After: -100},
+			{ID: 100003, After: 110001},
+			{ID: 100002, NilAfter: true},
+			{ID: 100003, After: -10001},
+			{ID: 100003, After: 100002},
+			{ID: 100003, After: -100002}, //
+			{ID: 100002, After: 0},
+			{ID: 10001, After: -100002},
+			{ID: 10001, After: 110001},
+			{ID: 10001, After: -10001},
+			{ID: 10001, After: 100}, //
+			{ID: 10001, NilAfter: true},
+			{ID: 100, NilAfter: true},
+			{ID: 100, After: -110001},
+			{ID: 100, After: 100003},
+			{ID: 100, After: 100}, //
+			{ID: 10001, After: -100},
 		}
 		expected := []TResult{
 			// initial:  []uint32{100002, 100003, 110001, 10001, 100}
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100003, 100002, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100003, 100002, 110001, 10001, 100}}, //
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 100, 10001}}, //
-			TResult{IDs: []uint32{100002, 100003, 110001, 100, 10001}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 100, 10001}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 100, 10001}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 100, 10001}}, //
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100003, 100002, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100003, 100002, 110001, 10001, 100}}, //
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 100, 10001}}, //
+			{IDs: []uint32{100002, 100003, 110001, 100, 10001}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 100, 10001}},
+			{IDs: []uint32{100002, 100003, 110001, 100, 10001}},
+			{IDs: []uint32{100002, 100003, 110001, 100, 10001}}, //
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
 		}
 
 		for idx, testCase := range testCases {
@@ -867,8 +867,6 @@ func TestFedPolicyRuleMove(t *testing.T) {
 					t.Errorf("Move fed policy rule(%d) positive: Status is OK.", idx)
 					t.Logf("  Expect IDs: %d, %d, %d, %d, %d\n", expected[idx].IDs[0], expected[idx].IDs[1], expected[idx].IDs[2], expected[idx].IDs[3], expected[idx].IDs[4])
 					t.Logf("  Actual IDs: %d, %d, %d, %d, %d\n", crhs[0].ID, crhs[1].ID, crhs[2].ID, crhs[3].ID, crhs[4].ID)
-				} else {
-					// t.Logf("  Now IDs(%d): %d, %d, %d, %d, %d\n", idx, crhs[0].ID, crhs[1].ID, crhs[2].ID, crhs[3].ID, crhs[4].ID) //->
 				}
 			} else {
 				t.Errorf("Move fed policy rule(%d) positive: Status is not OK", idx)
@@ -913,8 +911,8 @@ func TestFedPolicyRuleInsert(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule1, &rule2, &rule3},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+				{Name: "fed.gFed1", CfgType: share.FederalCfg},
+				{Name: "g1", CfgType: share.UserCreated},
 			},
 		)
 		clusHelper = &mockCluster
@@ -932,53 +930,53 @@ func TestFedPolicyRuleInsert(t *testing.T) {
 			"fed", "fed", "fed", "fed", "fed", "local", "local",
 		}
 		testCases := []TCase{
-			TCase{
+			{
 				After: -110001, // inser before
-				Rules: []*api.RESTPolicyRule{&api.RESTPolicyRule{ID: 100002, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"}},
+				Rules: []*api.RESTPolicyRule{{ID: 100002, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"}},
 			},
-			TCase{
+			{
 				After: 110001,
-				Rules: []*api.RESTPolicyRule{&api.RESTPolicyRule{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"}},
+				Rules: []*api.RESTPolicyRule{{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"}},
 			},
-			TCase{
+			{
 				After: 0, // inser at the beginning
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
-					&api.RESTPolicyRule{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed2"},
+					{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
+					{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed2"},
 				},
 			},
-			TCase{
+			{
 				After: 100003, // inser after
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
-					&api.RESTPolicyRule{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed2"},
+					{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
+					{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed2"},
 				},
 			},
-			TCase{
+			{
 				NilAfter: true,
-				Rules:    []*api.RESTPolicyRule{&api.RESTPolicyRule{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"}},
+				Rules:    []*api.RESTPolicyRule{{From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"}},
 			},
-			TCase{
+			{
 				After: 100003, // inser after
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "11"},
-					&api.RESTPolicyRule{From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "12"},
+					{From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "11"},
+					{From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "12"},
 				},
 			},
-			TCase{
+			{
 				After: 0, // inser after
-				Rules: []*api.RESTPolicyRule{&api.RESTPolicyRule{From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "21"}},
+				Rules: []*api.RESTPolicyRule{{From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "21"}},
 			},
 		}
 		expected := []TResult{
 			// initial:  []uint32{110001, 10001, 100}
-			TResult{IDs: []uint32{100002, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100004, 100005, 100002, 100003, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 100008, 110001, 10001, 100}},
-			TResult{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 100008, 110001, 101, 102, 10001, 100}},
-			TResult{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 100008, 110001, 103, 101, 102, 10001, 100}},
+			{IDs: []uint32{100002, 110001, 10001, 100}},
+			{IDs: []uint32{100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100004, 100005, 100002, 100003, 110001, 10001, 100}},
+			{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 110001, 10001, 100}},
+			{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 100008, 110001, 10001, 100}},
+			{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 100008, 110001, 101, 102, 10001, 100}},
+			{IDs: []uint32{100004, 100005, 100002, 100003, 100006, 100007, 100008, 110001, 103, 101, 102, 10001, 100}},
 		}
 
 		var after int
@@ -1068,8 +1066,8 @@ func TestFedPolicyRuleInsertNegative(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1, &rule2, &rule3, &rule4},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+			{Name: "fed.gFed1", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1081,60 +1079,60 @@ func TestFedPolicyRuleInsertNegative(t *testing.T) {
 	}
 	testCaseScopes := []string{"fed", "fed", "fed", "local", "local", "local", "fed", "local", "local"}
 	testCases := []*TCase{
-		&TCase{
+		{
 			After: -100, // inser before
 			Rules: []*api.RESTPolicyRule{ // duplicate id
-				&api.RESTPolicyRule{ID: 100001, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
+				{ID: 100001, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
 			},
 		},
-		&TCase{
+		{
 			After: 100009, // inser after
 			Rules: []*api.RESTPolicyRule{ // duplicate id
-				&api.RESTPolicyRule{ID: 100001, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
+				{ID: 100001, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed1"},
 			},
 		},
-		&TCase{
+		{
 			After: 100, // inser after
 			Rules: []*api.RESTPolicyRule{ // not same CfgType in slice
-				&api.RESTPolicyRule{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed11"},
-				&api.RESTPolicyRule{ID: 100004, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "12"},
+				{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed11"},
+				{ID: 100004, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "12"},
 			},
 		},
-		&TCase{
+		{
 			After: 100, // inser after
 			Rules: []*api.RESTPolicyRule{ // not same CfgType in slice
-				&api.RESTPolicyRule{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed11"},
-				&api.RESTPolicyRule{ID: 100004, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "12"},
+				{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "fed11"},
+				{ID: 100004, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "12"},
 			},
 		},
-		&TCase{
+		{
 			After: 110001, // inser after
 			Rules: []*api.RESTPolicyRule{ // FederalCfg policy with UserCreated group
-				&api.RESTPolicyRule{ID: 100003, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "11"},
+				{ID: 100003, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "11"},
 			},
 		},
-		&TCase{
+		{
 			After: 100, // inser after
 			Rules: []*api.RESTPolicyRule{ // FederalCfg policy with UserCreated group
-				&api.RESTPolicyRule{ID: 100003, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "11"},
+				{ID: 100003, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeFederal, Comment: "11"},
 			},
 		},
-		&TCase{
+		{
 			NilAfter: true, // inser at the end
 			Rules: []*api.RESTPolicyRule{ // UserCreated policy with FederalCfg group
-				&api.RESTPolicyRule{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "fed11"},
+				{ID: 100003, From: "fed.gFed1", To: "fed.gFed1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "fed11"},
 			},
 		},
-		&TCase{
+		{
 			NilAfter: true, // inser at the end
 			Rules: []*api.RESTPolicyRule{ // policy id in wrong range
-				&api.RESTPolicyRule{ID: 100013, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "11"},
+				{ID: 100013, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "11"},
 			},
 		},
-		&TCase{
+		{
 			NilAfter: true, // inser at the end
 			Rules: []*api.RESTPolicyRule{ // policy id in wrong range
-				&api.RESTPolicyRule{ID: 110013, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "11"},
+				{ID: 110013, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated, Comment: "11"},
 			},
 		},
 	}
@@ -1195,7 +1193,7 @@ func TestPolicyRuleInsert(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule1, &rule2},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+				{Name: "g1", CfgType: share.UserCreated},
 			},
 		)
 		clusHelper = &mockCluster
@@ -1221,9 +1219,9 @@ func TestPolicyRuleInsert(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rule1.ID, CfgType: rule1.CfgType},
-			&share.CLUSRuleHead{ID: ri1.ID, CfgType: cfgTypeMapping[ri1.CfgType]},
-			&share.CLUSRuleHead{ID: rule2.ID, CfgType: rule2.CfgType},
+			{ID: rule1.ID, CfgType: rule1.CfgType},
+			{ID: ri1.ID, CfgType: cfgTypeMapping[ri1.CfgType]},
+			{ID: rule2.ID, CfgType: rule2.CfgType},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1260,7 +1258,7 @@ func TestPolicyRuleInsert(t *testing.T) {
 		mockCluster.Init(
 			[]*share.CLUSPolicyRule{&rule1, &rule2},
 			[]*share.CLUSGroup{
-				&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+				{Name: "g1", CfgType: share.Learned},
 			},
 		)
 		clusHelper = &mockCluster
@@ -1285,9 +1283,9 @@ func TestPolicyRuleInsert(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rule1.ID, CfgType: rule1.CfgType},
-			&share.CLUSRuleHead{ID: rule2.ID, CfgType: rule2.CfgType},
-			&share.CLUSRuleHead{ID: ri1.ID, CfgType: cfgTypeMapping[ri1.CfgType]},
+			{ID: rule1.ID, CfgType: rule1.CfgType},
+			{ID: rule2.ID, CfgType: rule2.CfgType},
+			{ID: ri1.ID, CfgType: cfgTypeMapping[ri1.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1329,7 +1327,7 @@ func TestPolicyRuleInsertNegative(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1, &rule2},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1356,8 +1354,8 @@ func TestPolicyRuleInsertNegative(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rule1.ID, CfgType: rule1.CfgType},
-			&share.CLUSRuleHead{ID: rule2.ID, CfgType: rule2.CfgType},
+			{ID: rule1.ID, CfgType: rule1.CfgType},
+			{ID: rule2.ID, CfgType: rule2.CfgType},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1396,7 +1394,7 @@ func TestPolicyRuleReplaceTime(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1422,12 +1420,13 @@ func TestPolicyRuleReplaceTime(t *testing.T) {
 		nrule, _ := clusHelper.GetPolicyRule(rule1.ID)
 		if nrule == nil {
 			t.Errorf("Replace policy rules positive: rule1 should not be removed.")
-		}
-		if nrule.CreatedAt != createdAt {
-			t.Errorf("Replace policy rules positive: rule1 created time should not be changed. %+v", nrule)
-		}
-		if nrule.LastModAt == lastModAt {
-			t.Errorf("Replace policy rules positive: rule1 last modify time should be updated. %+v", nrule)
+		} else {
+			if nrule.CreatedAt != createdAt {
+				t.Errorf("Replace policy rules positive: rule1 created time should not be changed. %+v", nrule)
+			}
+			if nrule.LastModAt == lastModAt {
+				t.Errorf("Replace policy rules positive: rule1 last modify time should be updated. %+v", nrule)
+			}
 		}
 	}
 
@@ -1472,9 +1471,9 @@ func TestFedPolicyRuleReplace(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1, &rule4, &rule2, &rule3},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-			&share.CLUSGroup{Name: "external", Reserved: true, CfgType: share.Learned},
+			{Name: "fed.gFed1", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.Learned},
+			{Name: "external", Reserved: true, CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1484,19 +1483,19 @@ func TestFedPolicyRuleReplace(t *testing.T) {
 			Rules []*api.RESTPolicyRule
 		}
 		testCases := []*TCase{
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 10, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated},
+					{ID: 10, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeUserCreated},
 				},
 			},
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 100002, From: "fed.gFed1", To: "external", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
+					{ID: 100002, From: "fed.gFed1", To: "external", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
 				},
 			},
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 100002, From: "fed.gFed1", To: "nodes", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
+					{ID: 100002, From: "fed.gFed1", To: "nodes", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
 				},
 			},
 		}
@@ -1517,9 +1516,9 @@ func TestFedPolicyRuleReplace(t *testing.T) {
 			}
 
 			expcrhs := []*share.CLUSRuleHead{
-				&share.CLUSRuleHead{ID: rule1.ID, CfgType: rule1.CfgType},
-				&share.CLUSRuleHead{ID: rule4.ID, CfgType: rule4.CfgType},
-				&share.CLUSRuleHead{ID: testCase.Rules[0].ID, CfgType: share.UserCreated},
+				{ID: rule1.ID, CfgType: rule1.CfgType},
+				{ID: rule4.ID, CfgType: rule4.CfgType},
+				{ID: testCase.Rules[0].ID, CfgType: share.UserCreated},
 			}
 			crhs := clusHelper.GetPolicyRuleList()
 			if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1552,9 +1551,9 @@ func TestFedPolicyRuleReplace(t *testing.T) {
 			}
 
 			expcrhs := []*share.CLUSRuleHead{
-				&share.CLUSRuleHead{ID: testCase.Rules[0].ID, CfgType: share.FederalCfg},
-				&share.CLUSRuleHead{ID: rule4.ID, CfgType: rule4.CfgType},
-				&share.CLUSRuleHead{ID: rule2.ID, CfgType: rule2.CfgType},
+				{ID: testCase.Rules[0].ID, CfgType: share.FederalCfg},
+				{ID: rule4.ID, CfgType: rule4.CfgType},
+				{ID: rule2.ID, CfgType: rule2.CfgType},
 			}
 			crhs := clusHelper.GetPolicyRuleList()
 			if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1596,8 +1595,8 @@ func TestFedPolicyRuleReplaceNegative(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "fed.gFed1", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1607,24 +1606,24 @@ func TestFedPolicyRuleReplaceNegative(t *testing.T) {
 			Rules []*api.RESTPolicyRule
 		}
 		testCases := []*TCase{
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 10, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
+					{ID: 10, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
 				},
 			},
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 110001, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeGround},
+					{ID: 110001, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny, CfgType: api.CfgTypeGround},
 				},
 			},
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 110002, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
+					{ID: 110002, From: "g1", To: "g1", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
 				},
 			},
-			&TCase{
+			{
 				Rules: []*api.RESTPolicyRule{
-					&api.RESTPolicyRule{ID: 100002, From: "fed.gFed1", To: "containers", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
+					{ID: 100002, From: "fed.gFed1", To: "containers", Action: share.PolicyActionAllow, Ports: api.PolicyPortAny},
 				},
 			},
 		}
@@ -1664,7 +1663,7 @@ func TestPolicyRuleReplace(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1691,7 +1690,7 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1734,8 +1733,8 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: 11, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: 11, CfgType: cfgTypeMapping[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1782,8 +1781,8 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 2, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: 1, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: 2, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: 1, CfgType: cfgTypeMapping[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1830,8 +1829,8 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1895,9 +1894,9 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "fed.gFed2", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "fed.gFed1", CfgType: share.FederalCfg},
+			{Name: "fed.gFed2", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -1948,9 +1947,9 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			&share.CLUSRuleHead{ID: rule1.ID, CfgType: rule1.CfgType},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rule1.ID, CfgType: rule1.CfgType},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2011,8 +2010,8 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: share.FederalCfg},
+			{ID: rr1.ID, CfgType: share.FederalCfg},
+			{ID: rr2.ID, CfgType: share.FederalCfg},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2061,9 +2060,9 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 100003, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: share.FederalCfg},
+			{ID: 100003, CfgType: share.FederalCfg},
+			{ID: rr1.ID, CfgType: share.FederalCfg},
+			{ID: rr2.ID, CfgType: share.FederalCfg},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2097,18 +2096,12 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		data := api.RESTPolicyRuleActionData{Rules: &[]*api.RESTPolicyRule{&rr2, &rr3, &rr4, &rr1}}
 		body, _ := json.Marshal(data)
 
-		w := restCall("PATCH", "/v1/policy/rule?scope=fed", body, api.UserRoleAdmin)
-
-		if w.status == http.StatusOK {
-			/*t.Errorf("Replace to add a new fed rule ID with conflict ID: Status is OK.")
-			t.Logf("  Expect status: %+v\n", http.StatusOK)
-			t.Logf("  Actual status: %+v\n", w.status)*/
-		}
+		restCall("PATCH", "/v1/policy/rule?scope=fed", body, api.UserRoleAdmin)
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 100003, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: 100001, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: 100002, CfgType: share.FederalCfg},
+			{ID: 100003, CfgType: share.FederalCfg},
+			{ID: 100001, CfgType: share.FederalCfg},
+			{ID: 100002, CfgType: share.FederalCfg},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2146,9 +2139,9 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 100002, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: 100001, CfgType: share.FederalCfg},
-			&share.CLUSRuleHead{ID: 100003, CfgType: share.FederalCfg},
+			{ID: 100002, CfgType: share.FederalCfg},
+			{ID: 100001, CfgType: share.FederalCfg},
+			{ID: 100003, CfgType: share.FederalCfg},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2212,7 +2205,7 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 100001, CfgType: share.FederalCfg},
+			{ID: 100001, CfgType: share.FederalCfg},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2272,7 +2265,7 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -2320,8 +2313,8 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rule1.ID, CfgType: rule1.CfgType},
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rule1.ID, CfgType: rule1.CfgType},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2366,8 +2359,8 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			&share.CLUSRuleHead{ID: 11, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 11, CfgType: cfgTypeMapping[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2421,10 +2414,10 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 12, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: 1, CfgType: cfgTypeMapping[rr3.CfgType]},
-			&share.CLUSRuleHead{ID: rr4.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			&share.CLUSRuleHead{ID: rr5.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 12, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: 1, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr4.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: rr5.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2470,10 +2463,10 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 11, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			&share.CLUSRuleHead{ID: 10, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			&share.CLUSRuleHead{ID: 12, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			&share.CLUSRuleHead{ID: 1, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 11, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 10, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 12, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 1, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2525,10 +2518,10 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			&share.CLUSRuleHead{ID: rr4.ID, CfgType: cfgTypeMapping[rr4.CfgType]},
+			{ID: rr1.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr4.ID, CfgType: cfgTypeMapping[rr4.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2611,8 +2604,8 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: 101, CfgType: share.UserCreated},
-			&share.CLUSRuleHead{ID: 102, CfgType: share.UserCreated},
+			{ID: 101, CfgType: share.UserCreated},
+			{ID: 102, CfgType: share.UserCreated},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2702,8 +2695,8 @@ func TestPolicyRuleReplaceDeleteCount(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule0, &rule1, &rule2, &rule3, &rule11, &rule12},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-			&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.Learned},
+			{Name: "g2", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -2751,11 +2744,11 @@ func TestPolicyRuleReplaceDeleteCount(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			&share.CLUSRuleHead{ID: rr11.ID, CfgType: cfgTypeMapping[rr11.CfgType]},
+			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
+			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr11.ID, CfgType: cfgTypeMapping[rr11.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2805,8 +2798,8 @@ func TestPolicyRuleReplaceOrder(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule0, &rule1, &rule2},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-			&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
+			{Name: "g1", CfgType: share.Learned},
+			{Name: "g2", CfgType: share.UserCreated},
 		},
 	)
 	clusHelper = &mockCluster
@@ -2839,9 +2832,9 @@ func TestPolicyRuleReplaceOrder(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			&share.CLUSRuleHead{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
+			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2899,9 +2892,9 @@ func TestPolicyRuleReplaceFedRuleOrder(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule3, &rule0, &rule1, &rule2},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-			&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
-			&share.CLUSGroup{Name: "fed.gFed1", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.Learned},
+			{Name: "g2", CfgType: share.UserCreated},
+			{Name: "fed.gFed1", CfgType: share.FederalCfg},
 		},
 	)
 	clusHelper = &mockCluster
@@ -2939,10 +2932,10 @@ func TestPolicyRuleReplaceFedRuleOrder(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]}, // position of fed policy is not changed
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			&share.CLUSRuleHead{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]}, // position of fed policy is not changed
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
+			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2982,7 +2975,7 @@ func TestPolicyRuleReplaceWrongID(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -3013,7 +3006,7 @@ func TestPolicyRuleReplaceWrongID(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3056,7 +3049,7 @@ func TestPolicyRuleReplaceWrongLearned(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule1},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
+			{Name: "g1", CfgType: share.Learned},
 		},
 	)
 	clusHelper = &mockCluster
@@ -3093,8 +3086,8 @@ func TestPolicyRuleReplaceWrongLearned(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3208,12 +3201,12 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 	var mockCluster kv.MockCluster
 	initRules := []*share.CLUSPolicyRule{&rule100001, &rule100002, &rule10, &rule11, &rule12, &rule13, &rule14, &rule15, &rule10001, &rule10002, &rule10003, &rule10004, &rule10005}
 	initGroups := []*share.CLUSGroup{
-		&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-		&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
-		&share.CLUSGroup{Name: "g3", CfgType: share.UserCreated, CreaterDomains: []string{"domain1", "domain2"}},
-		&share.CLUSGroup{Name: "g4", CfgType: share.UserCreated, CreaterDomains: []string{"domain1", "domain2"}},
-		&share.CLUSGroup{Name: "g5", CfgType: share.FederalCfg},
-		&share.CLUSGroup{Name: "g6", CfgType: share.FederalCfg},
+		{Name: "g1", CfgType: share.Learned},
+		{Name: "g2", CfgType: share.UserCreated},
+		{Name: "g3", CfgType: share.UserCreated, CreaterDomains: []string{"domain1", "domain2"}},
+		{Name: "g4", CfgType: share.UserCreated, CreaterDomains: []string{"domain1", "domain2"}},
+		{Name: "g5", CfgType: share.FederalCfg},
+		{Name: "g6", CfgType: share.FederalCfg},
 	}
 	initKvAndCache(&mockCluster, initRules, initGroups)
 
@@ -3283,9 +3276,9 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 		rNew14Modified.Action = share.PolicyActionDeny
 
 		user1 := makeLocalUserWithRole("user1", "111111", api.UserRoleNone,
-			map[string][]string{api.UserRoleAdmin: []string{"domain1", "domain2"}},
+			map[string][]string{api.UserRoleAdmin: {"domain1", "domain2"}},
 		)
-		clusHelper.CreateUser(user1)
+		_ = clusHelper.CreateUser(user1)
 
 		w := login("user1", "111111")
 		token1 := getLoginToken(w)
@@ -3319,7 +3312,7 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 			t.Errorf("Surprised to replace policy rules successfully: Status is OK.")
 		} else {
 			var resp api.RESTErrorReadOnlyRules
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if len(resp.ReadOnlyRuleIDs) == 2 && ((resp.ReadOnlyRuleIDs[0] == 14 && resp.ReadOnlyRuleIDs[1] == 15) || (resp.ReadOnlyRuleIDs[0] == 15 && resp.ReadOnlyRuleIDs[1] == 14)) {
 			} else {
 				t.Errorf("Wrong error read-only rule IDs: %+v", resp.ReadOnlyRuleIDs)
@@ -3337,7 +3330,7 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 			t.Errorf("Surprised to replace policy rules successfully: Status is OK.")
 		} else {
 			var resp api.RESTErrorReadOnlyRules
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if len(resp.ReadOnlyRuleIDs) == 1 && (resp.ReadOnlyRuleIDs[0] == 14) {
 			} else {
 				t.Errorf("Wrong error read-only rule IDs: %+v", resp.ReadOnlyRuleIDs)
@@ -3358,11 +3351,11 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rNew100001.ID, CfgType: cfgTypeMapping[rNew100001.CfgType]},
-			&share.CLUSRuleHead{ID: rNew100002.ID, CfgType: cfgTypeMapping[rNew100002.CfgType]},
-			&share.CLUSRuleHead{ID: rNew10.ID, CfgType: cfgTypeMapping[rNew10.CfgType]},
-			&share.CLUSRuleHead{ID: rNew11.ID, CfgType: cfgTypeMapping[rNew11.CfgType]},
-			&share.CLUSRuleHead{ID: rNew15.ID, CfgType: cfgTypeMapping[rNew15.CfgType]},
+			{ID: rNew100001.ID, CfgType: cfgTypeMapping[rNew100001.CfgType]},
+			{ID: rNew100002.ID, CfgType: cfgTypeMapping[rNew100002.CfgType]},
+			{ID: rNew10.ID, CfgType: cfgTypeMapping[rNew10.CfgType]},
+			{ID: rNew11.ID, CfgType: cfgTypeMapping[rNew11.CfgType]},
+			{ID: rNew15.ID, CfgType: cfgTypeMapping[rNew15.CfgType]},
 			// Because rule13 cannot be seen by this ns user, its position in the whole list is always the same !
 			// Initially:
 			//		whole list : 100001, 100002, 10, 11, 12, 13, 14, 15, ....
@@ -3377,12 +3370,12 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 			// ->	100001, 100002, 10, 11, [15], 13, [14], [], ....
 			// That's why the final expected order is:
 			//		whole list : 100001, 100002, 10, 11, 15, 13, 14, ....
-			&share.CLUSRuleHead{ID: rNew13.ID, CfgType: cfgTypeMapping[rNew13.CfgType]},
-			&share.CLUSRuleHead{ID: rNew14.ID, CfgType: cfgTypeMapping[rNew14.CfgType]},
-			&share.CLUSRuleHead{ID: rNew10001.ID, CfgType: cfgTypeMapping[rNew10001.CfgType]},
-			&share.CLUSRuleHead{ID: rNew10002.ID, CfgType: cfgTypeMapping[rNew10002.CfgType]},
-			&share.CLUSRuleHead{ID: rNew10004.ID, CfgType: cfgTypeMapping[rNew10004.CfgType]},
-			&share.CLUSRuleHead{ID: rNew10005.ID, CfgType: cfgTypeMapping[rNew10005.CfgType]},
+			{ID: rNew13.ID, CfgType: cfgTypeMapping[rNew13.CfgType]},
+			{ID: rNew14.ID, CfgType: cfgTypeMapping[rNew14.CfgType]},
+			{ID: rNew10001.ID, CfgType: cfgTypeMapping[rNew10001.CfgType]},
+			{ID: rNew10002.ID, CfgType: cfgTypeMapping[rNew10002.CfgType]},
+			{ID: rNew10004.ID, CfgType: cfgTypeMapping[rNew10004.CfgType]},
+			{ID: rNew10005.ID, CfgType: cfgTypeMapping[rNew10005.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3453,10 +3446,10 @@ func TestPolicyRuleAddRuleAssignID(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule21, &rule22, &rule0, &rule1, &rule11, &rule12},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-			&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
-			&share.CLUSGroup{Name: "g5", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "g6", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.Learned},
+			{Name: "g2", CfgType: share.UserCreated},
+			{Name: "g5", CfgType: share.FederalCfg},
+			{Name: "g6", CfgType: share.FederalCfg},
 		},
 	)
 	clusHelper = &mockCluster
@@ -3522,15 +3515,15 @@ func TestPolicyRuleAddRuleAssignID(t *testing.T) {
 		rr3.ID = 13
 		rr4.ID = 14
 		expcrhs := []*share.CLUSRuleHead{
-			&share.CLUSRuleHead{ID: rr21.ID, CfgType: cfgTypeMapping[rr21.CfgType]},
-			&share.CLUSRuleHead{ID: rr22.ID, CfgType: cfgTypeMapping[rr22.CfgType]},
-			&share.CLUSRuleHead{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
-			&share.CLUSRuleHead{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			&share.CLUSRuleHead{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			&share.CLUSRuleHead{ID: rr11.ID, CfgType: cfgTypeMapping[rr11.CfgType]},
-			&share.CLUSRuleHead{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			&share.CLUSRuleHead{ID: rr12.ID, CfgType: cfgTypeMapping[rr12.CfgType]},
-			&share.CLUSRuleHead{ID: rr4.ID, CfgType: cfgTypeMapping[rr4.CfgType]},
+			{ID: rr21.ID, CfgType: cfgTypeMapping[rr21.CfgType]},
+			{ID: rr22.ID, CfgType: cfgTypeMapping[rr22.CfgType]},
+			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
+			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
+			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr11.ID, CfgType: cfgTypeMapping[rr11.CfgType]},
+			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr12.ID, CfgType: cfgTypeMapping[rr12.CfgType]},
+			{ID: rr4.ID, CfgType: cfgTypeMapping[rr4.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3594,10 +3587,10 @@ func TestPolicyRuleReplaceRuleDuplicateID(t *testing.T) {
 	mockCluster.Init(
 		[]*share.CLUSPolicyRule{&rule21, &rule0, &rule1, &rule11, &rule12},
 		[]*share.CLUSGroup{
-			&share.CLUSGroup{Name: "g1", CfgType: share.Learned},
-			&share.CLUSGroup{Name: "g2", CfgType: share.UserCreated},
-			&share.CLUSGroup{Name: "g5", CfgType: share.FederalCfg},
-			&share.CLUSGroup{Name: "g6", CfgType: share.FederalCfg},
+			{Name: "g1", CfgType: share.Learned},
+			{Name: "g2", CfgType: share.UserCreated},
+			{Name: "g5", CfgType: share.FederalCfg},
+			{Name: "g6", CfgType: share.FederalCfg},
 		},
 	)
 	clusHelper = &mockCluster

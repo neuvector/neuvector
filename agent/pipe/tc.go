@@ -5,9 +5,9 @@ import (
 	"net"
 	"strings"
 
+	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 const tcPrefMax uint = 65536
@@ -59,11 +59,15 @@ func (d *tcPipeDriver) retryCmd(cmd string) error {
 }
 
 func (d *tcPipeDriver) addQDisc(port string) {
-	shell(fmt.Sprintf("tc qdisc add dev %v ingress", port))
+	if _, dbgError := shell(fmt.Sprintf("tc qdisc add dev %v ingress", port)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *tcPipeDriver) delQDisc(port string) {
-	shell(fmt.Sprintf("tc qdisc del dev %v ingress", port))
+	if _, dbgError := shell(fmt.Sprintf("tc qdisc del dev %v ingress", port)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *tcPipeDriver) attachPort(port string) uint {
@@ -130,22 +134,34 @@ func (d *tcPipeDriver) ResetPortPair(pid int, pair *InterceptPair) {
 	// cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol all pref %v", pair.exPort, tcPrefBase)
 	// shell(cmd)
 	cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol ip pref %v", pair.exPort, tcPrefBase+1)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol all pref %v", pair.exPort, tcPrefBase+2)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	// Egress --
 	// cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol all pref %v", pair.inPort, tcPrefBase)
 	// shell(cmd)
 	cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol ip pref %v", pair.inPort, tcPrefBase+1)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol all pref %v", pair.inPort, tcPrefBase+2)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol all pref %v", nvVbrPortName, inInfo.pref)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("tc filter del dev %v parent ffff: protocol all pref %v", nvVbrPortName, exInfo.pref)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *tcPipeDriver) TapPortPair(pid int, pair *InterceptPair) {
@@ -236,13 +252,17 @@ func (d *tcPipeDriver) TapPortPair(pid int, pair *InterceptPair) {
 		"action drop",
 		nvVbrPortName, exInfo.pref,
 		pair.UCMAC[0], pair.UCMAC[1], pair.UCMAC[2], pair.UCMAC[3], pair.UCMAC[4], pair.UCMAC[5])
-	shell(cmd)
+	if _, dbgError := shell(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("tc filter add dev %v pref %v parent ffff: protocol all "+
 		"u32 match u32 0x%02x%02x%02x%02x 0xffffffff at -8 match u16 0x%02x%02x 0xffff at -4 "+
 		"action drop",
 		nvVbrPortName, inInfo.pref,
 		pair.UCMAC[0], pair.UCMAC[1], pair.UCMAC[2], pair.UCMAC[3], pair.UCMAC[4], pair.UCMAC[5])
-	shell(cmd)
+	if _, dbgError := shell(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *tcPipeDriver) FwdPortPair(pid int, pair *InterceptPair) {
@@ -330,7 +350,9 @@ func (d *tcPipeDriver) FwdPortPair(pid int, pair *InterceptPair) {
 		pair.UCMAC[0], pair.UCMAC[1], pair.UCMAC[2], pair.UCMAC[3], pair.UCMAC[4], pair.UCMAC[5],
 		pair.MAC[0], pair.MAC[1], pair.MAC[2], pair.MAC[3], pair.MAC[4], pair.MAC[5],
 		pair.inPort)
-	shell(cmd)
+	if _, dbgError := shell(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("tc filter add dev %v pref %v parent ffff: protocol all "+
 		"u32 match u32 0x%02x%02x%02x%02x 0xffffffff at -8 match u16 0x%02x%02x 0xffff at -4 "+
 		"action pedit munge offset -8 u32 set 0x%02x%02x%02x%02x munge offset -4 u16 set 0x%02x%02x pipe "+
@@ -339,7 +361,9 @@ func (d *tcPipeDriver) FwdPortPair(pid int, pair *InterceptPair) {
 		pair.UCMAC[0], pair.UCMAC[1], pair.UCMAC[2], pair.UCMAC[3], pair.UCMAC[4], pair.UCMAC[5],
 		pair.MAC[0], pair.MAC[1], pair.MAC[2], pair.MAC[3], pair.MAC[4], pair.MAC[5],
 		pair.exPort)
-	shell(cmd)
+	if _, dbgError := shell(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (d *tcPipeDriver) GetPortPairRules(pair *InterceptPair) (string, string, string) {
@@ -372,8 +396,12 @@ func (d *tcPipeDriver) Connect(jumboframe bool) {
 	link, _ := netlink.LinkByName(nvVbrPortName)
 	if link != nil {
 		d.delQDisc(nvVbrPortName)
-		netlink.LinkSetDown(link)
-		netlink.LinkDel(link)
+		if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := netlink.LinkDel(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		nap()
 	}
 	createNVPorts(jumboframe)
@@ -386,7 +414,11 @@ func (d *tcPipeDriver) Cleanup() {
 	link, _ := netlink.LinkByName(nvVbrPortName)
 	if link != nil {
 		d.delQDisc(nvVbrPortName)
-		netlink.LinkSetDown(link)
-		netlink.LinkDel(link)
+		if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := netlink.LinkDel(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 }

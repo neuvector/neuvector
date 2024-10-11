@@ -365,18 +365,18 @@ func TestWildcardDomainAccess1(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-2"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-*", "qa"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-*", "qa"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"", "qa"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-dev-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"*-US-dev", "*b"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1", "app-2"}, ExpectedResult: false},
+			{UserDomains: []string{"app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-*", "qa"}, ExpectedResult: true},
+			{UserDomains: []string{"app-*", "qa"}, ExpectedResult: true},
+			{UserDomains: []string{"app-*"}, ExpectedResult: true},
+			{UserDomains: []string{"", "qa"}, ExpectedResult: true},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-dev-*"}, ExpectedResult: false},
+			{UserDomains: []string{"*-US-dev", "*b"}, ExpectedResult: false},
 		}
 		testWildcardDomainAccess("TestWildcardDomainAccess1", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -420,19 +420,19 @@ func TestWildcardDomainAccess2(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-dev"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1", "qa"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-US-dev"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"", "app-JP"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*-dev"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-2", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"*-dev-US"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-dev"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1", "qa"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1", "app-US-dev"}, ExpectedResult: true},
+			{UserDomains: []string{"app-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{"", "app-JP"}, ExpectedResult: true},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: true},
+			{UserDomains: []string{"*-dev"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US"}, ExpectedResult: false},
+			{UserDomains: []string{"app-2", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"*-dev-US"}, ExpectedResult: false},
 		}
 		testWildcardDomainAccess("TestWildcardDomainAccess2", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -474,17 +474,17 @@ func TestWildcardDomainAccess3(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1", "qa"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-*", "app-JP-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-US-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-1", "app-JP-2"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"bpp-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"qa"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"qa", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-UK-1", "app-JP-2"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1", "qa"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-*", "app-JP-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-US-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-1", "app-JP-2"}, ExpectedResult: false},
+			{UserDomains: []string{"bpp-*"}, ExpectedResult: false},
+			{UserDomains: []string{"qa"}, ExpectedResult: false},
+			{UserDomains: []string{"qa", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-UK-1", "app-JP-2"}, ExpectedResult: false},
 		}
 		testWildcardDomainAccess("TestWildcardDomainAccess3", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -513,18 +513,18 @@ func TestWildcardDomainAccess4(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-2"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*", "qa"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-*", "qa"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"", "qa"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: false}, // { role -> "*" } still cannot access global namespace !
-			UserDomainsResult{UserDomains: []string{"app-US-dev-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"*-US-dev", "*b"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1", "app-2"}, ExpectedResult: false},
+			{UserDomains: []string{"app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*", "qa"}, ExpectedResult: false},
+			{UserDomains: []string{"app-*", "qa"}, ExpectedResult: false},
+			{UserDomains: []string{"app-*"}, ExpectedResult: false},
+			{UserDomains: []string{"", "qa"}, ExpectedResult: true},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: false}, // { role -> "*" } still cannot access global namespace !
+			{UserDomains: []string{"app-US-dev-*"}, ExpectedResult: false},
+			{UserDomains: []string{"*-US-dev", "*b"}, ExpectedResult: false},
 		}
 		testWildcardDomainAccess("TestWildcardDomainAccess4", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -620,17 +620,17 @@ func TestDualAccess(t *testing.T) {
 
 // --
 
-type readObject struct {
-	members []string
-}
+// type readObject struct {
+// 	members []string
+// }
 
-func newReadObject(members []string) *readObject {
-	return &readObject{members: members}
-}
+// func newReadObject(members []string) *readObject {
+// 	return &readObject{members: members}
+// }
 
-func (o *readObject) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
-	return o.members, nil
-}
+// func (o *readObject) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
+// 	return o.members, nil
+// }
 
 // --
 
@@ -729,7 +729,7 @@ func TestWildcardOwnAccess(t *testing.T) {
 	}
 	AddRole(userRole1.Name, userRole1)
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
-		domainss := [][]string{[]string{""}, []string{"ns*"}, []string{"ns-*", "ns1"}, []string{"ns1", "ns-qa-*", "ns-dev-*"}}
+		domainss := [][]string{{""}, {"ns*"}, {"ns-*", "ns1"}, {"ns1", "ns-qa-*", "ns-dev-*"}}
 		for _, domains := range domainss {
 			domainRole := DomainRole{}
 			for _, domain := range domains {
@@ -744,7 +744,7 @@ func TestWildcardOwnAccess(t *testing.T) {
 	}
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
-		domainss := [][]string{[]string{"ns-dev-*"}, []string{"ns1*"}, []string{"ns-dev-*", "ns2"}, []string{"ns-dev1-*", "ns1"}}
+		domainss := [][]string{{"ns-dev-*"}, {"ns1*"}, {"ns-dev-*", "ns2"}, {"ns-dev1-*", "ns1"}}
 		for _, domains := range domainss {
 			domainRole := DomainRole{}
 			for _, domain := range domains {
@@ -830,15 +830,15 @@ func TestWildcardOwnAccess1(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-US-*", "app-JP-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-2", "app-US-*", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: true},
+			{UserDomains: []string{"app*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1", "app-US-*", "app-JP-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-2", "app-US-*", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
 		}
 		testWildcardOwnAccess("TestWildcardOwnAccess1", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -867,15 +867,15 @@ func TestWildcardOwnAccess2(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-US-1", "app-JP-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-2", "app-US-*", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: true},
+			{UserDomains: []string{"app*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1", "app-US-1", "app-JP-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-2", "app-US-*", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
 		}
 		testWildcardOwnAccess("TestWildcardOwnAccess2", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -904,16 +904,16 @@ func TestWildcardOwnAccess3(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-JP*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-US-CA-*", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-2", "app-US-1", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*-temp"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: true},
+			{UserDomains: []string{"app*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-JP*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: true},
+			{UserDomains: []string{"app-1", "app-US-CA-*", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-2", "app-US-1", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*-temp"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: true},
 		}
 		testWildcardOwnAccess("TestWildcardOwnAccess3", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -942,15 +942,15 @@ func TestWildcardOwnAccess4(t *testing.T) {
 
 	for _, op := range []AccessOP{AccessOPWrite, AccessOPRead} {
 		userDomainsResultList := []UserDomainsResult{
-			UserDomainsResult{UserDomains: []string{""}, ExpectedResult: true},
-			UserDomainsResult{UserDomains: []string{"*"}, ExpectedResult: false}, // { role -> "*" } still cannot access global namespace !
-			UserDomainsResult{UserDomains: []string{"app*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1", "app-US-1", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-2", "app-US-*", "app-JP-*"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-1"}, ExpectedResult: false},
-			UserDomainsResult{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
+			{UserDomains: []string{""}, ExpectedResult: true},
+			{UserDomains: []string{"*"}, ExpectedResult: false}, // { role -> "*" } still cannot access global namespace !
+			{UserDomains: []string{"app*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1*", "app-US-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1", "app-US-1", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-2", "app-US-*", "app-JP-*"}, ExpectedResult: false},
+			{UserDomains: []string{"app-1"}, ExpectedResult: false},
+			{UserDomains: []string{"app-US-*"}, ExpectedResult: false},
 		}
 		testWildcardOwnAccess("TestWildcardOwnAccess4", t, &obj, req, op, userRole1, userRole2, userDomainsResultList)
 	}
@@ -1153,7 +1153,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 	preTest()
 
 	apiURIsGET := map[int8][]string{
-		CONST_API_NO_AUTH: []string{
+		CONST_API_NO_AUTH: {
 			"v1/partner/ibm_sa/*/setup",
 			"v1/partner/ibm_sa/*/setup/*",
 			"v1/token_auth_server",
@@ -1161,7 +1161,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/eula",
 			"v1/fed/healthcheck",
 		},
-		CONST_API_DEBUG: []string{
+		CONST_API_DEBUG: {
 			"v1/meter",
 			"v1/enforcer/*/probe_summary",
 			"v1/enforcer/*/probe_processes",
@@ -1181,7 +1181,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/usage",
 			"v1/system/alerts",
 		},
-		CONST_API_RT_SCAN: []string{
+		CONST_API_RT_SCAN: {
 			"v1/scan/config",
 			"v1/scan/status",
 			"v1/scan/cache_stat/*",
@@ -1196,7 +1196,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/vulasset",
 			"v1/scan/asset/images",
 		},
-		CONST_API_REG_SCAN: []string{
+		CONST_API_REG_SCAN: {
 			"v1/scan/registry",
 			"v1/scan/registry/*",
 			"v1/scan/registry/*/images",
@@ -1208,13 +1208,13 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/sigstore/root_of_trust/*/verifier",
 			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
-		CONST_API_INFRA: []string{
+		CONST_API_INFRA: {
 			"v1/host",
 			"v1/host/*",
 			"v1/host/*/process_profile",
 			"v1/domain",
 		},
-		CONST_API_NV_RESOURCE: []string{
+		CONST_API_NV_RESOURCE: {
 			"v1/controller",
 			"v1/controller/*",
 			"v1/controller/*/config",
@@ -1227,7 +1227,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/enforcer/*/config",
 			"v1/scan/scanner",
 		},
-		CONST_API_WORKLOAD: []string{
+		CONST_API_WORKLOAD: {
 			"v1/workload",
 			"v2/workload",
 			"v1/workload/*",
@@ -1235,14 +1235,14 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/workload/*/stats",
 			"v1/workload/*/config",
 		},
-		CONST_API_GROUP: []string{
+		CONST_API_GROUP: {
 			"v1/group",
 			"v1/group/*",
 			"v1/service",
 			"v1/service/*",
 			"v1/file/group",
 		},
-		CONST_API_RT_POLICIES: []string{
+		CONST_API_RT_POLICIES: {
 			"v1/workload/*/process",
 			"v1/workload/*/process_history",
 			"v1/workload/*/process_profile",
@@ -1280,7 +1280,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/sniffer/*/pcap",
 			"v1/file/group/config",
 		},
-		CONST_API_ADM_CONTROL: []string{
+		CONST_API_ADM_CONTROL: {
 			"v1/admission/options",
 			"v1/admission/state",
 			"v1/admission/stats",
@@ -1288,7 +1288,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/admission/rule/*",
 			"v1/debug/admission_stats",
 		},
-		CONST_API_COMPLIANCE: []string{
+		CONST_API_COMPLIANCE: {
 			"v1/host/*/compliance",
 			"v1/workload/*/compliance",
 			"v1/bench/host/*/docker",
@@ -1301,10 +1301,10 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/compliance/profile/*",
 			"v1/compliance/available_filter",
 		},
-		CONST_API_AUDIT_EVENTS: []string{
+		CONST_API_AUDIT_EVENTS: {
 			"v1/log/audit",
 		},
-		CONST_API_SECURITY_EVENTS: []string{
+		CONST_API_SECURITY_EVENTS: {
 			"v1/log/incident",
 			"v1/log/threat",
 			"v1/log/threat/*",
@@ -1312,16 +1312,16 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/log/security",
 			"v1/log/violation/workload",
 		},
-		CONST_API_EVENTS: []string{
+		CONST_API_EVENTS: {
 			"v1/log/event",
 			"v1/log/activity",
 		},
-		CONST_API_AUTHENTICATION: []string{
+		CONST_API_AUTHENTICATION: {
 			"v1/server",
 			"v1/server/*",
 			"v1/server/*/user",
 		},
-		CONST_API_AUTHORIZATION: []string{
+		CONST_API_AUTHORIZATION: {
 			"v1/user_role_permission/options",
 			"v1/user_role",
 			"v1/user_role/*",
@@ -1332,11 +1332,11 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/api_key/*",
 			"v1/selfapikey",
 		},
-		CONST_API_PWD_PROFILE: []string{
+		CONST_API_PWD_PROFILE: {
 			"v1/password_profile",
 			"v1/password_profile/*",
 		},
-		CONST_API_SYSTEM_CONFIG: []string{
+		CONST_API_SYSTEM_CONFIG: {
 			"v1/partner/ibm_sa_ep",
 			"v1/partner/ibm_sa_config",
 			"v1/file/config",
@@ -1346,20 +1346,20 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/summary",
 			"v1/internal/system",
 		},
-		CONST_API_FED: []string{
+		CONST_API_FED: {
 			"v1/fed/member",
 			"v1/fed/join_token",
 			"v1/fed/cluster/*/**",
 			"v1/fed/view/*",
 		},
-		CONST_API_VULNERABILITY: []string{
+		CONST_API_VULNERABILITY: {
 			"v1/vulnerability/profile",
 			"v1/vulnerability/profile/*",
 		},
 	}
 
 	apiURIsPOST := map[int8][]string{
-		CONST_API_NO_AUTH: []string{
+		CONST_API_NO_AUTH: {
 			"v1/token_auth_server/*",
 			"v1/fed/ping_internal",
 			"v1/fed/joint_test_internal",
@@ -1368,7 +1368,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/auth/*",
 			"v1/eula",
 		},
-		CONST_API_DEBUG: []string{
+		CONST_API_DEBUG: {
 			"v1/fed/promote",
 			"v1/fed/join",
 			"v1/fed/leave",
@@ -1381,7 +1381,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/csp/file/support",
 			"v1/internal/alert",
 		},
-		CONST_API_RT_SCAN: []string{
+		CONST_API_RT_SCAN: {
 			"v1/scan/workload/*",
 			"v1/scan/host/*",
 			"v1/scan/platform/platform",
@@ -1389,7 +1389,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/assetvul",
 			"v1/scan/asset/images",
 		},
-		CONST_API_REG_SCAN: []string{
+		CONST_API_REG_SCAN: {
 			"v1/scan/registry/*/scan",
 			"v1/scan/registry",
 			"v2/scan/registry",
@@ -1398,16 +1398,16 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/scan/sigstore/root_of_trust",
 			"v1/scan/sigstore/root_of_trust/*/verifier",
 		},
-		CONST_API_CICD_SCAN: []string{
+		CONST_API_CICD_SCAN: {
 			"v1/scan/result/repository",
 			"v1/scan/repository",
 		},
-		CONST_API_GROUP: []string{
+		CONST_API_GROUP: {
 			"v1/group",
 			"v1/file/group", // export group
 			"v1/service",
 		},
-		CONST_API_RT_POLICIES: []string{
+		CONST_API_RT_POLICIES: {
 			"v1/workload/request/*",
 			"v1/dlp/sensor",
 			"v1/waf/sensor",
@@ -1419,48 +1419,48 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/sniffer",
 			"v1/file/group/config", // for providing similar function as crd import but do not rely on crd webhook
 		},
-		CONST_API_ADM_CONTROL: []string{
+		CONST_API_ADM_CONTROL: {
 			"v1/debug/admission/test",
 			"v1/admission/rule",
 			"v1/assess/admission/rule",
 			"v1/file/admission",
 			"v1/file/admission/config", // for providing similar function as crd import but do not rely on crd webhook
 		},
-		CONST_API_COMPLIANCE: []string{
+		CONST_API_COMPLIANCE: {
 			"v1/bench/host/*/docker",
 			"v1/bench/host/*/kubernetes",
 			"v1/file/compliance/profile",
 			"v1/file/compliance/profile/config",
 		},
-		CONST_API_AUTHENTICATION: []string{
+		CONST_API_AUTHENTICATION: {
 			"v1/server",
 			"v1/debug/server/test",
 		},
-		CONST_API_AUTHORIZATION: []string{
+		CONST_API_AUTHORIZATION: {
 			"v1/user_role",
 			"v1/user",
 			"v1/api_key",
 			"v1/user/*/password",
 		},
-		CONST_API_PWD_PROFILE: []string{
+		CONST_API_PWD_PROFILE: {
 			"v1/password_profile",
 		},
-		CONST_API_SYSTEM_CONFIG: []string{
+		CONST_API_SYSTEM_CONFIG: {
 			"v1/system/license/update",
 			"v1/system/config/webhook",
 			"v1/system/config/remote_repository",
 		},
-		CONST_API_IBMSA: []string{
+		CONST_API_IBMSA: {
 			"v1/partner/ibm_sa/*/setup/*",
 		},
-		CONST_API_FED: []string{
+		CONST_API_FED: {
 			"v1/fed/demote",
 			"v1/fed/deploy",
 			"v1/fed/cluster/*/**",
 			"v1/policy/rules/promote",
 			"v1/admission/rule/promote",
 		},
-		CONST_API_VULNERABILITY: []string{
+		CONST_API_VULNERABILITY: {
 			"v1/vulnerability/profile/*/entry",
 			"v1/file/vulnerability/profile",
 			"v1/file/vulnerability/profile/config",
@@ -1468,36 +1468,36 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 	}
 
 	apiURIsPATCH := map[int8][]string{
-		CONST_API_NO_AUTH: []string{
+		CONST_API_NO_AUTH: {
 			"v1/auth",
 		},
-		CONST_API_DEBUG: []string{
+		CONST_API_DEBUG: {
 			"v1/fed/config",
 		},
-		CONST_API_RT_SCAN: []string{
+		CONST_API_RT_SCAN: {
 			"v1/scan/config",
 		},
-		CONST_API_REG_SCAN: []string{
+		CONST_API_REG_SCAN: {
 			"v1/scan/registry/*",
 			"v2/scan/registry/*",
 			"v1/scan/sigstore/root_of_trust/*",
 			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
-		CONST_API_INFRA: []string{
+		CONST_API_INFRA: {
 			"v1/domain",
 			"v1/domain/*",
 		},
-		CONST_API_NV_RESOURCE: []string{
+		CONST_API_NV_RESOURCE: {
 			"v1/controller/*",
 			"v1/enforcer/*",
 		},
-		CONST_API_GROUP: []string{
+		CONST_API_GROUP: {
 			"v1/group/*",
 			"v1/service/config",
 			"v1/service/config/network",
 			"v1/service/config/profile",
 		},
-		CONST_API_RT_POLICIES: []string{
+		CONST_API_RT_POLICIES: {
 			"v1/workload/*",
 			"v1/dlp/sensor/*",
 			"v1/dlp/group/*",
@@ -1512,66 +1512,66 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/response/rule/*",
 			"v1/sniffer/stop/*",
 		},
-		CONST_API_ADM_CONTROL: []string{
+		CONST_API_ADM_CONTROL: {
 			"v1/admission/state",
 			"v1/admission/rule",
 		},
-		CONST_API_COMPLIANCE: []string{
+		CONST_API_COMPLIANCE: {
 			"v1/custom_check/*",
 			"v1/compliance/profile/*",
 			"v1/compliance/profile/*/entry/*",
 		},
-		CONST_API_AUTHENTICATION: []string{
+		CONST_API_AUTHENTICATION: {
 			"v1/server/*",
 			"v1/server/*/role/*",
 			"v1/server/*/group/*",
 			"v1/server/*/groups",
 		},
-		CONST_API_AUTHORIZATION: []string{
+		CONST_API_AUTHORIZATION: {
 			"v1/user_role/*",
 			"v1/user/*",
 			"v1/user/*/role/*",
 		},
-		CONST_API_PWD_PROFILE: []string{
+		CONST_API_PWD_PROFILE: {
 			"v1/password_profile/*",
 		},
-		CONST_API_SYSTEM_CONFIG: []string{
+		CONST_API_SYSTEM_CONFIG: {
 			"v1/system/config",
 			"v2/system/config",
 			"v1/system/config/webhook/*",
 			"v1/system/config/remote_repository/*",
 		},
-		CONST_API_FED: []string{
+		CONST_API_FED: {
 			"v1/fed/cluster/*/**",
 		},
-		CONST_API_VULNERABILITY: []string{
+		CONST_API_VULNERABILITY: {
 			"v1/vulnerability/profile/*",
 			"v1/vulnerability/profile/*/entry/*",
 		},
 	}
 
 	apiURIsDELETE := map[int8][]string{
-		CONST_API_NO_AUTH: []string{
+		CONST_API_NO_AUTH: {
 			"v1/auth",
 		},
-		CONST_API_DEBUG: []string{
+		CONST_API_DEBUG: {
 			"v1/fed_auth",
 			"v1/conversation_endpoint/*",
 			"v1/conversation",
 			"v1/session",
 			"v1/partner/ibm_sa/*/setup/*/*", // not supported by NV/IBMSA yet. Only for internal testing [20200831]
 		},
-		CONST_API_REG_SCAN: []string{
+		CONST_API_REG_SCAN: {
 			"v1/scan/registry/*/scan",
 			"v1/scan/registry/*",
 			"v1/scan/registry/*/test",
 			"v1/scan/sigstore/root_of_trust/*",
 			"v1/scan/sigstore/root_of_trust/*/verifier/*",
 		},
-		CONST_API_GROUP: []string{
+		CONST_API_GROUP: {
 			"v1/group/*",
 		},
-		CONST_API_RT_POLICIES: []string{
+		CONST_API_RT_POLICIES: {
 			"v1/dlp/sensor/*",
 			"v1/waf/sensor/*",
 			"v1/policy/rule/*",
@@ -1581,34 +1581,34 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/response/rule",
 			"v1/sniffer/*",
 		},
-		CONST_API_ADM_CONTROL: []string{
+		CONST_API_ADM_CONTROL: {
 			"v1/admission/rule/*",
 			"v1/admission/rules",
 		},
-		CONST_API_COMPLIANCE: []string{
+		CONST_API_COMPLIANCE: {
 			"v1/compliance/profile/*/entry/*",
 		},
-		CONST_API_AUTHENTICATION: []string{
+		CONST_API_AUTHENTICATION: {
 			"v1/server/*",
 		},
-		CONST_API_AUTHORIZATION: []string{
+		CONST_API_AUTHORIZATION: {
 			"v1/user_role/*",
 			"v1/user/*",
 			"v1/api_key/*",
 		},
-		CONST_API_PWD_PROFILE: []string{
+		CONST_API_PWD_PROFILE: {
 			"v1/password_profile/*",
 		},
-		CONST_API_SYSTEM_CONFIG: []string{
+		CONST_API_SYSTEM_CONFIG: {
 			"v1/system/license",
 			"v1/system/config/webhook/*",
 			"v1/system/config/remote_repository/*",
 		},
-		CONST_API_FED: []string{
+		CONST_API_FED: {
 			"v1/fed/cluster/*",
 			"v1/fed/cluster/*/**",
 		},
-		CONST_API_VULNERABILITY: []string{
+		CONST_API_VULNERABILITY: {
 			"v1/vulnerability/profile/*/entry/*",
 		},
 	}
@@ -1746,20 +1746,20 @@ func TestGetUserPermissions(t *testing.T) {
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
 		gPermitsList, dPermitsList, _ := GetUserPermissions("admin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
 		expectedGPermitsList := []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_CICD_SCAN_ID, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERM_CICD_SCAN_ID, Write: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
@@ -1775,19 +1775,19 @@ func TestGetUserPermissions(t *testing.T) {
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
 		gPermitsList, dPermitsList, _ := GetUserPermissions("reader", nil, share.NvPermissions{}, extraPermitsDomains)
 		expectedGPermitsList := []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
@@ -1808,20 +1808,20 @@ func TestGetUserPermissions(t *testing.T) {
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
 			extraPermitsDomains)
 		expectedGPermitsList := []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_CICD_SCAN_ID, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERM_CICD_SCAN_ID, Write: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
@@ -1845,19 +1845,19 @@ func TestGetUserPermissions(t *testing.T) {
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN},
 			extraPermitsDomains)
 		expectedGPermitsList := []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
@@ -1867,20 +1867,20 @@ func TestGetUserPermissions(t *testing.T) {
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
 			extraPermitsDomains)
 		expectedGPermitsList = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_FED_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 	}
@@ -1892,35 +1892,35 @@ func TestGetUserPermissions(t *testing.T) {
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
 		gPermitsList, dPermitsList, _ := GetUserPermissions(
 			"reader",
-			map[string][]string{"admin": []string{"nv-1"}},
+			map[string][]string{"admin": {"nv-1"}},
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN},
 			extraPermitsDomains)
 		expectedGPermitsList := []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		expectedDPermitsList = map[string][]*api.RESTRolePermission{
-			"nv-1": []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
-				&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-				&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-				&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
-				&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
-				&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
-				&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			"nv-1": {
+				{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+				{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+				{ID: share.PERM_EVENTS_ID, Read: true},
+				{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+				{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+				{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+				{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+				{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+				{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 			},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
@@ -1931,27 +1931,27 @@ func TestGetUserPermissions(t *testing.T) {
 			nil,
 			share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN},
 			[]share.CLUSPermitsAssigned{
-				share.CLUSPermitsAssigned{
+				{
 					Permits: share.NvPermissions{
 						ReadValue:  share.PERMS_RUNTIME_POLICIES,
 						WriteValue: share.PERMS_RUNTIME_POLICIES,
 					},
 					Domains: []string{"nv-1", "nv-2"},
 				},
-				share.CLUSPermitsAssigned{
+				{
 					Permits: share.NvPermissions{
 						ReadValue:  share.PERMS_RUNTIME_SCAN,
 						WriteValue: share.PERMS_RUNTIME_SCAN,
 					},
 					Domains: []string{"nv-2", "nv-3"},
 				},
-				share.CLUSPermitsAssigned{
+				{
 					Permits: share.NvPermissions{
 						ReadValue: share.PERMS_SECURITY_EVENTS,
 					},
 					Domains: []string{"nv-4"},
 				},
-				share.CLUSPermitsAssigned{
+				{
 					Permits: share.NvPermissions{
 						WriteValue: share.PERMS_SECURITY_EVENTS, // ignored because PERMS_SECURITY_EVENTS doesn't support write !
 					},
@@ -1959,33 +1959,33 @@ func TestGetUserPermissions(t *testing.T) {
 				},
 			})
 		expectedGPermitsList = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		expectedDPermitsList = map[string][]*api.RESTRolePermission{
-			"nv-1": []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			"nv-1": {
+				{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
 			},
-			"nv-2": []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			"nv-2": {
+				{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+				{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
 			},
-			"nv-3": []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			"nv-3": {
+				{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
 			},
-			"nv-4": []*api.RESTRolePermission{
-				&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			"nv-4": {
+				{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 			},
 		}
 		//log.SetLevel(log.FatalLevel)
@@ -2003,21 +2003,21 @@ func TestGetUserPermissions(t *testing.T) {
 			share.NvPermissions{ReadValue: share.PERM_FED},
 			extraPermitsDomains)
 		expectedGPermitsList := []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_CICD_SCAN_ID, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_FED_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERM_CICD_SCAN_ID, Write: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true, Write: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true, Write: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true, Write: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true, Write: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true, Write: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
@@ -2030,20 +2030,20 @@ func TestGetUserPermissions(t *testing.T) {
 			extraPermitsDomains,
 		)
 		expectedGPermitsList = []*api.RESTRolePermission{
-			&api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_NV_RESOURCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_REG_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_EVENTS_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHENTICATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_AUTHORIZATION_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERM_VULNERABILITY_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
-			&api.RESTRolePermission{ID: share.PERMS_COMPLIANCE_ID, Read: true},
-			&api.RESTRolePermission{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
+			{ID: share.PERM_FED_ID, Read: true},
+			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
+			{ID: share.PERM_REG_SCAN_ID, Read: true},
+			{ID: share.PERM_ADM_CONTROL_ID, Read: true, Write: true},
+			{ID: share.PERM_AUDIT_EVENTS_ID, Read: true},
+			{ID: share.PERM_EVENTS_ID, Read: true},
+			{ID: share.PERM_AUTHENTICATION_ID, Read: true},
+			{ID: share.PERM_AUTHORIZATION_ID, Read: true},
+			{ID: share.PERM_SYSTEM_CONFIG_ID, Read: true},
+			{ID: share.PERM_VULNERABILITY_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_SCAN_ID, Read: true},
+			{ID: share.PERMS_RUNTIME_POLICIES_ID, Read: true, Write: true},
+			{ID: share.PERMS_COMPLIANCE_ID, Read: true},
+			{ID: share.PERMS_SECURITY_EVENTS_ID, Read: true},
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 	}

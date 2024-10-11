@@ -92,9 +92,9 @@ type OperationResult struct {
 }
 
 func ovsSliceToGoNotation(val interface{}) (interface{}, error) {
-	switch val.(type) {
+	switch tVal := val.(type) {
 	case []interface{}:
-		sl := val.([]interface{})
+		sl := tVal
 		bsliced, err := json.Marshal(sl)
 		if err != nil {
 			return nil, err

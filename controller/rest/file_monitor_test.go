@@ -12,35 +12,35 @@ import (
 
 func TestNormalizeForURL(t *testing.T) {
 	goodFilters := map[string]share.CLUSFileMonitorFilter{
-		"/var/lib/dpkg/status":  share.CLUSFileMonitorFilter{Path: "/var/lib/dpkg/status", Regex: ""},
-		"/var/lib/rpm/Packages": share.CLUSFileMonitorFilter{Path: "/var/lib/rpm/Packages", Regex: ""},
-		"/lib/apk/db/installed": share.CLUSFileMonitorFilter{Path: "/lib/apk/db/installed", Regex: ""},
-		"/etc/hosts":            share.CLUSFileMonitorFilter{Path: "/etc/hosts", Regex: ""},
-		"/etc/passwd":           share.CLUSFileMonitorFilter{Path: "/etc/passwd", Regex: ""},
-		"/etc/resolv.conf":      share.CLUSFileMonitorFilter{Path: "/etc/resolv\\.conf", Regex: ""},
-		"/lib/ld-linux.*":       share.CLUSFileMonitorFilter{Path: "/lib", Regex: "ld-linux\\..*"},
-		"/lib/libc.*":           share.CLUSFileMonitorFilter{Path: "/lib", Regex: "libc\\..*"},
-		"/lib/libpthread*":      share.CLUSFileMonitorFilter{Path: "/lib", Regex: "libpthread.*"},
-		"/lib64/ld-linux*":      share.CLUSFileMonitorFilter{Path: "/lib64", Regex: "ld-linux.*"},
-		"/lib64/libc.*":         share.CLUSFileMonitorFilter{Path: "/lib64", Regex: "libc\\..*"},
-		"/lib64/libpthread*":    share.CLUSFileMonitorFilter{Path: "/lib64", Regex: "libpthread.*"},
-		"/bin/*":                share.CLUSFileMonitorFilter{Path: "/bin", Regex: ".*"},
-		"/sbin/*":               share.CLUSFileMonitorFilter{Path: "/sbin", Regex: ".*"},
-		"/usr/bin/*":            share.CLUSFileMonitorFilter{Path: "/usr/bin", Regex: ".*"},
-		"/usr/sbin/*":           share.CLUSFileMonitorFilter{Path: "/usr/sbin", Regex: ".*"},
-		"/usr/local/bin/*":      share.CLUSFileMonitorFilter{Path: "/usr/local/bin", Regex: ".*"},
-		"/usr/local/sbin/*":     share.CLUSFileMonitorFilter{Path: "/usr/local/sbin", Regex: ".*"},
-		"/home/*/.ssh/*":        share.CLUSFileMonitorFilter{Path: "/home/.*/\\.ssh", Regex: ".*"},
-		"/*/*":                  share.CLUSFileMonitorFilter{Path: "/.*", Regex: ".*"},
-		"/home/opt/*.php":       share.CLUSFileMonitorFilter{Path: "/home/opt", Regex: ".*\\.php"},
-		"/home/opt/lib*.a":      share.CLUSFileMonitorFilter{Path: "/home/opt", Regex: "lib.*\\.a"},
-		"/test":                 share.CLUSFileMonitorFilter{Path: "/test", Regex: ""},
-		"/test/../ab/*":         share.CLUSFileMonitorFilter{Path: "/ab", Regex: ".*"},
-		"/test/./ab/*":          share.CLUSFileMonitorFilter{Path: "/test/ab", Regex: ".*"},
-		"/lib/":                 share.CLUSFileMonitorFilter{Path: "/lib", Regex: ".*"},
+		"/var/lib/dpkg/status":  {Path: "/var/lib/dpkg/status", Regex: ""},
+		"/var/lib/rpm/Packages": {Path: "/var/lib/rpm/Packages", Regex: ""},
+		"/lib/apk/db/installed": {Path: "/lib/apk/db/installed", Regex: ""},
+		"/etc/hosts":            {Path: "/etc/hosts", Regex: ""},
+		"/etc/passwd":           {Path: "/etc/passwd", Regex: ""},
+		"/etc/resolv.conf":      {Path: "/etc/resolv\\.conf", Regex: ""},
+		"/lib/ld-linux.*":       {Path: "/lib", Regex: "ld-linux\\..*"},
+		"/lib/libc.*":           {Path: "/lib", Regex: "libc\\..*"},
+		"/lib/libpthread*":      {Path: "/lib", Regex: "libpthread.*"},
+		"/lib64/ld-linux*":      {Path: "/lib64", Regex: "ld-linux.*"},
+		"/lib64/libc.*":         {Path: "/lib64", Regex: "libc\\..*"},
+		"/lib64/libpthread*":    {Path: "/lib64", Regex: "libpthread.*"},
+		"/bin/*":                {Path: "/bin", Regex: ".*"},
+		"/sbin/*":               {Path: "/sbin", Regex: ".*"},
+		"/usr/bin/*":            {Path: "/usr/bin", Regex: ".*"},
+		"/usr/sbin/*":           {Path: "/usr/sbin", Regex: ".*"},
+		"/usr/local/bin/*":      {Path: "/usr/local/bin", Regex: ".*"},
+		"/usr/local/sbin/*":     {Path: "/usr/local/sbin", Regex: ".*"},
+		"/home/*/.ssh/*":        {Path: "/home/.*/\\.ssh", Regex: ".*"},
+		"/*/*":                  {Path: "/.*", Regex: ".*"},
+		"/home/opt/*.php":       {Path: "/home/opt", Regex: ".*\\.php"},
+		"/home/opt/lib*.a":      {Path: "/home/opt", Regex: "lib.*\\.a"},
+		"/test":                 {Path: "/test", Regex: ""},
+		"/test/../ab/*":         {Path: "/ab", Regex: ".*"},
+		"/test/./ab/*":          {Path: "/test/ab", Regex: ".*"},
+		"/lib/":                 {Path: "/lib", Regex: ".*"},
 	}
 	badFilters := map[string]share.CLUSFileMonitorFilter{
-		"/test/./<ab>/*": share.CLUSFileMonitorFilter{Path: "", Regex: ""},
+		"/test/./<ab>/*": {Path: "", Regex: ""},
 	}
 
 	for k, v := range goodFilters {
@@ -69,17 +69,17 @@ func TestFileRuleShow(t *testing.T) {
 		filters: make(map[string][]*api.RESTFileMonitorFilter),
 	}
 
-	mc.groups["external"] = &api.RESTGroup {
+	mc.groups["external"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"external",
-			Kind:	share.GroupKindExternal,
+			Name: "external",
+			Kind: share.GroupKindExternal,
 		},
 	}
 
-	mc.groups["containers"] = &api.RESTGroup {
+	mc.groups["containers"] = &api.RESTGroup{
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"contrainers",
-			Kind:	share.GroupKindContainer,
+			Name: "contrainers",
+			Kind: share.GroupKindContainer,
 		},
 	}
 
@@ -88,7 +88,7 @@ func TestFileRuleShow(t *testing.T) {
 		Recursive: false,
 		Behavior:  share.FileAccessBehaviorMonitor,
 		CfgType:   api.CfgTypeUserCreated,
-		Apps:	   make([]string, 0),
+		Apps:      make([]string, 0),
 	}
 	ff := make([]*api.RESTFileMonitorFilter, 0)
 	ff = append(ff, mf)

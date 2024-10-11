@@ -69,7 +69,7 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 			if count > 0 {
 				log.WithFields(log.Fields{"theGroup": theGroup, "count": count, "incd_last": incd_last}).Debug("ATMO: Profile")
 			}
-		case atmo.PolicyMode:	// network policy
+		case atmo.PolicyMode: // network policy
 			// suspicious network threats
 			for i := 0; i < curThrtIndex; i++ {
 				thrt := thrtCache[curThrtIndex-i-1]
@@ -135,7 +135,7 @@ func automode_log_event(group, mode string, modeType int) {
 		return
 	}
 	log.WithFields(log.Fields{"group": group, "mode": mode, "modeType": modeType}).Info("ATMO:")
-	cctx.EvQueue.Append(&clog)
+	_ = cctx.EvQueue.Append(&clog)
 }
 
 func automode_promote_mode(group, mode string, modeType int) error {
@@ -200,11 +200,11 @@ func automode_promote_mode(group, mode string, modeType int) error {
 		grp.ProfileMode = mode
 		if pp := clusHelper.GetProcessProfile(group); pp != nil {
 			pp.Mode = mode
-			clusHelper.PutProcessProfile(group, pp)
+			_ = clusHelper.PutProcessProfile(group, pp)
 		}
 		if pp, rev := clusHelper.GetFileMonitorProfile(group); pp != nil {
 			pp.Mode = grp.ProfileMode
-			clusHelper.PutFileMonitorProfile(group, pp, rev)
+			_ = clusHelper.PutFileMonitorProfile(group, pp, rev)
 		}
 		log.WithFields(log.Fields{"group": group, "mode": mode}).Info("ATMO: profile mode upgraded")
 	case atmo.PolicyMode:
@@ -212,7 +212,7 @@ func automode_promote_mode(group, mode string, modeType int) error {
 		log.WithFields(log.Fields{"group": group, "mode": mode}).Info("ATMO: policy mode upgraded")
 	}
 
-	clusHelper.PutGroup(grp, false)
+	_ = clusHelper.PutGroup(grp, false)
 	automode_log_event(group, mode, modeType)
 	return nil
 }
@@ -235,13 +235,13 @@ func automode_decision_func(mover int, group string, err error) error {
 
 	modeType, theGroup := atmoHelper.GetTheGroupType(group)
 	if isLeader() {
-		automode_promote_mode(theGroup, targetMode, modeType)
+		_ = automode_promote_mode(theGroup, targetMode, modeType)
 	} else {
 		go func() {
 			r1 := rand.New(rand.NewSource(time.Now().UnixNano()))
 			wait_sec := 3*60 + r1.Intn(100) // separating controller actions. no promoting when it has been already promoted
 			time.Sleep(time.Second * time.Duration(wait_sec))
-			automode_promote_mode(theGroup, targetMode, modeType)
+			_ = automode_promote_mode(theGroup, targetMode, modeType)
 		}()
 	}
 
@@ -348,7 +348,7 @@ func automodeConfigUpdate(cfg, cache share.CLUSSystemConfig) {
 	}
 }
 
-//////////////////////
+// ////////////////////
 func automodeGroupDelete(name string, param interface{}) {
 	log.WithFields(log.Fields{"group": name}).Debug("ATMO:")
 	if bD2M, bM2P := atmoHelper.Enabled(); bD2M || bM2P {
@@ -388,7 +388,6 @@ func automodeGroupAdd(name string, param interface{}) {
 			cache.atmo_d2m_profile = 0
 		default:
 			newEvent = false
-			break
 		}
 
 		if newEvent {
@@ -416,7 +415,6 @@ func automodeGroupAdd(name string, param interface{}) {
 			cache.atmo_d2m_policy = 0
 		default:
 			newEvent = false
-			break
 		}
 
 		if newEvent {

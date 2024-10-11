@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	log "github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1b1 "k8s.io/api/rbac/v1beta1"
@@ -162,176 +162,176 @@ var riskyRoles = map[string]int{}
 var allRoleBindings = map[string]*k8sRoleBinding{}
 
 var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ // (cluster) role settings required by nv
-	NvAppRole: &k8sRbacRoleInfo{
+	NvAppRole: {
 		name: NvAppRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "",
 				resources: utils.NewSet(k8sResNamespaces, K8sResNodes, K8sResPods, K8sResServices),
 				verbs:     appRoleVerbs,
 			},
 		},
 	},
-	NvRbacRole: &k8sRbacRoleInfo{
+	NvRbacRole: {
 		name: NvRbacRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  k8sRbacApiGroup,
 				resources: utils.NewSet(RscTypeRbacClusterRolebindings, RscTypeRbacClusterRoles, RscTypeRbacRolebindings, RscTypeRbacRoles),
 				verbs:     rbacRoleVerbs,
 			},
 		},
 	},
-	NvAdmCtrlRole: &k8sRbacRoleInfo{
+	NvAdmCtrlRole: {
 		name: NvAdmCtrlRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  k8sAdmApiGroup,
 				resources: utils.NewSet(RscNameMutatingWebhookConfigurations, RscNameValidatingWebhookConfigurations),
 				verbs:     admissionRoleVerbs,
 			},
 		},
 	},
-	nvCrdRole: &k8sRbacRoleInfo{
+	nvCrdRole: {
 		name: nvCrdRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  k8sCrdApiGroup,
 				resources: utils.NewSet(RscNameCustomResourceDefinitions),
 				verbs:     crdRoleVerbs,
 			},
 		},
 	},
-	nvCrdSecRuleRole: &k8sRbacRoleInfo{
+	nvCrdSecRuleRole: {
 		name: nvCrdSecRuleRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  constApiGroupNV,
 				resources: utils.NewSet(RscTypeCrdClusterSecurityRule, RscTypeCrdSecurityRule),
 				verbs:     crdPolicyRoleVerbs,
 			},
 		},
 	},
-	nvCrdAdmCtrlRole: &k8sRbacRoleInfo{
+	nvCrdAdmCtrlRole: {
 		name: nvCrdAdmCtrlRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  constApiGroupNV,
 				resources: utils.NewSet(RscTypeCrdAdmCtrlSecurityRule),
 				verbs:     crdPolicyRoleVerbs,
 			},
 		},
 	},
-	nvCrdDlpRole: &k8sRbacRoleInfo{
+	nvCrdDlpRole: {
 		name: nvCrdDlpRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  constApiGroupNV,
 				resources: utils.NewSet(RscTypeCrdDlpSecurityRule),
 				verbs:     crdPolicyRoleVerbs,
 			},
 		},
 	},
-	nvCrdWafRole: &k8sRbacRoleInfo{
+	nvCrdWafRole: {
 		name: nvCrdWafRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  constApiGroupNV,
 				resources: utils.NewSet(RscTypeCrdWafSecurityRule),
 				verbs:     crdPolicyRoleVerbs,
 			},
 		},
 	},
-	nvCrdVulnProfileRole: &k8sRbacRoleInfo{
+	nvCrdVulnProfileRole: {
 		name: nvCrdVulnProfileRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  constApiGroupNV,
 				resources: utils.NewSet(RscTypeCrdVulnProfile),
 				verbs:     crdPolicyRoleVerbs,
 			},
 		},
 	},
-	nvCrdCompProfileRole: &k8sRbacRoleInfo{
+	nvCrdCompProfileRole: {
 		name: nvCrdCompProfileRole,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  constApiGroupNV,
 				resources: utils.NewSet(RscTypeCrdCompProfile),
 				verbs:     crdPolicyRoleVerbs,
 			},
 		},
 	},
-	NvScannerRole: &k8sRbacRoleInfo{ // it's actually for updater pod
+	NvScannerRole: { // it's actually for updater pod
 		name:      NvScannerRole,
 		namespace: constNvNamespace,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "apps",
 				resources: utils.NewSet(K8sResDeployments),
 				verbs:     utils.NewSet("get", "watch", "patch", "update"),
 			},
 		},
 	},
-	NvSecretRole: &k8sRbacRoleInfo{
+	NvSecretRole: {
 		name:      NvSecretRole,
 		namespace: constNvNamespace,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "",
 				resources: utils.NewSet(k8sResSecrets),
 				verbs:     utils.NewSet("get", "watch", "list"),
 			},
 		},
 	},
-	NvJobCreationRole: &k8sRbacRoleInfo{
+	NvJobCreationRole: {
 		name:      NvJobCreationRole,
 		namespace: constNvNamespace,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "batch",
 				resources: utils.NewSet(K8sResJobs),
 				verbs:     utils.NewSet("create", "get", "delete"),
 			},
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "batch",
 				resources: utils.NewSet(K8sResCronjobs, K8sResCronjobsFinalizer),
 				verbs:     utils.NewSet("update", "patch"),
 			},
 		},
 	},
-	NvCertUpgraderRole: &k8sRbacRoleInfo{
+	NvCertUpgraderRole: {
 		name:      NvCertUpgraderRole,
 		namespace: constNvNamespace,
 		rules: []*k8sRbacRoleRuleInfo{
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "",
 				resources: utils.NewSet(k8sResSecrets),
 				verbs:     utils.NewSet("get", "update", "watch", "list"),
 			},
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "",
 				resources: utils.NewSet(K8sResPods),
 				verbs:     utils.NewSet("get", "list"),
 			},
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "apps",
 				resources: utils.NewSet(K8sResDeployments, K8sResDaemonsets),
 				verbs:     utils.NewSet("get", "list", "watch"),
 			},
-			&k8sRbacRoleRuleInfo{
+			{
 				apiGroup:  "batch",
 				resources: utils.NewSet(K8sResCronjobs),
 				verbs:     utils.NewSet("update"),
 			},
 		},
 	},
-	k8sClusterRoleView: &k8sRbacRoleInfo{
+	k8sClusterRoleView: {
 		k8sReserved:   true,
 		name:          k8sClusterRoleView,
 		supersetRoles: utils.NewSet("cluster-admin", "admin", "edit", "view"),
 	},
-	k8sClusterRoleAdmin: &k8sRbacRoleInfo{
+	k8sClusterRoleAdmin: {
 		k8sReserved:   true,
 		name:          k8sClusterRoleAdmin,
 		supersetRoles: utils.NewSet("cluster-admin", "admin"),
@@ -341,71 +341,71 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 // clusterrolebinding can only binds to clusterrole
 // rolebinding can binds to either role or clusterrole
 var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacBindingInfo{ // cluster rolebindings -> cluster role settings required by nv
-	nvAppRoleBinding: &k8sRbacBindingInfo{
+	nvAppRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[NvAppRole],
 	},
-	nvRbacRoleBinding: &k8sRbacBindingInfo{
+	nvRbacRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[NvRbacRole],
 	},
-	nvAdmCtrlRoleBinding: &k8sRbacBindingInfo{
+	nvAdmCtrlRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[NvAdmCtrlRole],
 	},
-	nvCrdRoleBinding: &k8sRbacBindingInfo{
+	nvCrdRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdRole],
 	},
-	nvCrdSecRoleBinding: &k8sRbacBindingInfo{
+	nvCrdSecRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdSecRuleRole],
 	},
-	nvCrdAdmCtrlRoleBinding: &k8sRbacBindingInfo{
+	nvCrdAdmCtrlRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdAdmCtrlRole],
 	},
-	nvCrdDlpRoleBinding: &k8sRbacBindingInfo{
+	nvCrdDlpRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdDlpRole],
 	},
-	nvCrdWafRoleBinding: &k8sRbacBindingInfo{
+	nvCrdWafRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdWafRole],
 	},
-	nvCrdVulnProfileRoleBinding: &k8sRbacBindingInfo{
+	nvCrdVulnProfileRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdVulnProfileRole],
 	},
-	nvCrdCompProfileRoleBinding: &k8sRbacBindingInfo{
+	nvCrdCompProfileRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[nvCrdCompProfileRole],
 	},
-	nvViewRoleBinding: &k8sRbacBindingInfo{
+	nvViewRoleBinding: {
 		subjects: ctrlerSubjectsWanted,
 		rbacRole: rbacRolesWanted[k8sClusterRoleView],
 	},
-	NvScannerRoleBinding: &k8sRbacBindingInfo{ // for updater pod
+	NvScannerRoleBinding: { // for updater pod
 		namespace: constNvNamespace,
 		subjects:  scannerSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvScannerRole],
 	},
-	nvSecretRoleBinding: &k8sRbacBindingInfo{
+	nvSecretRoleBinding: {
 		namespace: constNvNamespace,
 		subjects:  secretSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvSecretRole],
 	},
-	NvJobCreationRoleBinding: &k8sRbacBindingInfo{
+	NvJobCreationRoleBinding: {
 		namespace: constNvNamespace,
 		subjects:  jobCreationSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvJobCreationRole],
 	},
-	NvCertUpgraderRoleBinding: &k8sRbacBindingInfo{
+	NvCertUpgraderRoleBinding: {
 		namespace: constNvNamespace,
 		subjects:  certUpgraderSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvCertUpgraderRole],
 	},
-	NvAdminRoleBinding: &k8sRbacBindingInfo{ // for updater pod (5.1.x-)
+	NvAdminRoleBinding: { // for updater pod (5.1.x-)
 		namespace: constNvNamespace,
 		subjects:  scannerSubjectsWanted,
 		rbacRole:  rbacRolesWanted[k8sClusterRoleAdmin],
@@ -474,9 +474,7 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 					nvRole = api.UserRoleReader
 				}
 			} else {
-				if strings.HasPrefix(rsc, nvPermRscPrefix) {
-					rsc = rsc[len(nvPermRscPrefix):]
-				}
+				rsc = strings.TrimPrefix(rsc, nvPermRscPrefix)
 				if v, ok := nvPermitsValueSSO[rsc]; ok {
 					if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 						nvPermits.Union(v)
@@ -540,7 +538,7 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 // Rancher's Global/Cluster/Project Role is always represented by k8s clusterrole (param rbacRoleDomain is "")
 func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interface{}) (string, share.NvPermissions) {
 
-	_, getVerbs := rbacRolesWanted[rbacRoleName]
+	// _, getVerbs := rbacRolesWanted[rbacRoleName]
 	ag2r2v := make(map[string]map[string]utils.Set) // apiGroup -> (resource -> verbs)
 	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
@@ -615,7 +613,6 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 						case api.UserRoleFedAdmin:
 							nvRole = api.UserRoleFedAdmin
 							nvPermits.Reset()
-							break
 						case api.UserRoleFedReader:
 							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
 								nvRole = api.UserRoleFedReader
@@ -662,9 +659,9 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 		// Adjustment between fedAdmin/fedReader/admin/reader roles & fed permission
 		nvRole, nvPermits = adjustNvRolePermits(rbacRoleName, nvRole, nvPermits)
 
-		if roleInfo, ok := rbacRolesWanted[rbacRoleName]; !ok || roleInfo.k8sReserved || !getVerbs {
-			ag2r2v = nil
-		}
+		// if roleInfo, ok := rbacRolesWanted[rbacRoleName]; !ok || roleInfo.k8sReserved || !getVerbs {
+		// 	ag2r2v = nil
+		// }
 		return nvRole, nvPermits
 	} else {
 		return api.UserRoleNone, share.NvPermissions{}
@@ -764,7 +761,7 @@ CHECK:
 			break CHECK
 		} else {
 			foundResources := utils.NewSet()
-			for rt, _ := range r2v {
+			for rt := range r2v {
 				foundResources.Add(rt)
 			}
 			if !foundResources.IsSuperset(roleInfoRule.resources) && !foundResources.Contains("*") {
@@ -1363,7 +1360,7 @@ func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainP
 			if nvRoles&share.UserRoleFedReader != 0 && fedRole == api.FedRoleMaster {
 				if d == access.AccessDomainGlobal {
 					// move fedReader to permissions
-					nvPermits, _ := domainPermits[access.AccessDomainGlobal]
+					nvPermits := domainPermits[access.AccessDomainGlobal]
 					nvPermits.Local.ReadValue = share.PERMS_FED_READ
 					nvPermits.Remote.ReadValue = share.PERMS_CLUSTER_READ
 					if nvPermits.Local.WriteValue&share.PERM_FED == 0 {
@@ -1433,7 +1430,7 @@ func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainP
 		nvGlobalRolePermits.Local.ReadValue = share.PERMS_CLUSTER_READ
 	}
 
-	nvGlobalPermits, _ := domainPermits[access.AccessDomainGlobal] // extra permissions on global domain
+	nvGlobalPermits := domainPermits[access.AccessDomainGlobal] // extra permissions on global domain
 	nvGlobalPermits.Local.FilterPermits("", "local", fedRole)
 	nvGlobalPermits.Local.ResetIfSubsetOf(nvGlobalRolePermits.Local)
 	nvGlobalPermits.Remote.FilterPermits("", "remote", fedRole)
@@ -1521,7 +1518,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 		for r := range roleRefs.Iter() {
 			var nvPermits share.NvFedPermissions
 			roleRef := r.(k8sRoleRef)
-			nvRole, _ := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
+			nvRole := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
 			// This k8s (cluster)role is in roleCache (i.e. it has a mpped nv reserved role).
 			// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
 			// It's possible that nvRole is fedAdmin/fedReader even it's Rancher Project Role which is not allowed.
@@ -1537,7 +1534,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 				allDomainRoles[roleRef.domain] = allDomainRoles[roleRef.domain] | reservedRoleMapping[nvRole]
 			}
 
-			k8sRolePermits, _ := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
+			k8sRolePermits := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
 			// Merge this k8s role's local/remote nv permissions into this domain's local/remote nv permissions
 			// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
 			// It's possible that k8sRolePermits contains PERM_FED even it's Rancher Project Role which is not allowed.
@@ -1550,7 +1547,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 				nvPermits.Remote.WriteValue = k8sRolePermits.WriteValue & noPermitFed
 			}
 			if !nvPermits.IsEmpty() {
-				p, _ := domainPermits[roleRef.domain]
+				p := domainPermits[roleRef.domain]
 				p.Local.Union(nvPermits.Local)
 				p.Remote.Union(nvPermits.Remote)
 				domainPermits[roleRef.domain] = p
@@ -1559,8 +1556,8 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 
 		domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster) // assuming it's master cluster for now
 
-		oldDomainRole, _ := d.rbacCache[subj]
-		oldDomainPermits, _ := d.permitsRbacCache[subj]
+		oldDomainRole := d.rbacCache[subj]
+		oldDomainPermits := d.permitsRbacCache[subj]
 
 		// callback
 		if len(domainPermits) > 0 || len(domainRole) > 0 || len(oldDomainPermits) > 0 || len(oldDomainRole) > 0 { // only for reducing debug logs
@@ -1685,7 +1682,7 @@ func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
 			}
 		}
 		if len(domainPermits) > 0 {
-			if userRBAC, _ := allUsers[userRef]; rbac != nil {
+			if userRBAC := allUsers[userRef]; rbac != nil {
 				userRBAC.RBAC2 = domainPermits
 			} else {
 				allUsers[userRef] = &orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC2: domainPermits}
@@ -1952,8 +1949,6 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	getNeuvectorSvcAccount()
 
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
-
-	return
 }
 
 func getSubjectsString(ns string, subjects []string) string {

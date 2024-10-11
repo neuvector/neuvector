@@ -138,7 +138,7 @@ func (ns *NetlinkSocket) ReceiveFrom() ([]syscall.NetlinkMessage, syscall.Sockad
 	return msg, from, err
 }
 
-///////
+// /////
 func (ns *NetlinkSocket) EPollReceive(tv *syscall.Timeval) ([]syscall.NetlinkMessage, error) {
 	const MaxEpollEvents = 16
 	var n int
@@ -168,7 +168,7 @@ func (ns *NetlinkSocket) EPollReceive(tv *syscall.Timeval) ([]syscall.NetlinkMes
 	return nil, nil // timeout-ed
 }
 
-///////
+// /////
 func (ns *NetlinkSocket) EPollReceiveFrom(tv *syscall.Timeval) ([]syscall.NetlinkMessage, syscall.Sockaddr, error) {
 	const MaxEpollEvents = 16
 	var n int

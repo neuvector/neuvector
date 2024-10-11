@@ -154,8 +154,6 @@ func (q *tCrdRequestsMgr) crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) (
 					crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
 					err = clusHelper.PutCrdEventQueue(crdEventQueue)
 					// => TODO : what if it fails again because the key value size is still too big?
-				} else {
-					// => TODO: what if no queue entry is deleted?
 				}
 				if err == nil {
 					return "", nil
@@ -305,7 +303,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					crdHandler.mdName = req.Name
 				} else {
 					errCount = 1
-					errMsg = fmt.Sprintf("CRD Rule format error")
+					errMsg = "CRD Rule format error"
 				}
 			case "CREATE", "UPDATE":
 				if crdSecRule, err = resource.CreateNvCrdObject(rscType); crdSecRule != nil {
@@ -327,7 +325,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 				}
 				if err != nil {
 					errCount = 1
-					errMsg = fmt.Sprintf("CRD Rule format error")
+					errMsg = "CRD Rule format error"
 				} else {
 					if crdHandler.mdName != "" && rscType != "" {
 						if obj, err := global.ORCH.GetResource(rscType, req.Namespace, crdHandler.mdName); err == nil {

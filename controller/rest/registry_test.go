@@ -17,19 +17,71 @@ func TestFilterPositive(t *testing.T) {
 	preTest()
 
 	cases := map[string]share.CLUSRegistryFilter{
-		"neuvector/image:latest":      share.CLUSRegistryFilter{"neuvector", "image", "latest"},
-		"neuvector/image:*":           share.CLUSRegistryFilter{"neuvector", "image", ".*"},
-		"neuvector/*:*":               share.CLUSRegistryFilter{"neuvector", ".*", ".*"},
-		"neuvector/*":                 share.CLUSRegistryFilter{"neuvector", ".*", ".*"},
-		"*:*":                         share.CLUSRegistryFilter{"", ".*", ".*"},
-		"neuvector/[image1|image2]:*": share.CLUSRegistryFilter{"neuvector", "[image1|image2]", ".*"},
-		"neu*:*":                      share.CLUSRegistryFilter{"", "neu.*", ".*"},
-		"neuvector/*:v2.1":            share.CLUSRegistryFilter{"neuvector", ".*", "v2.1"},
-		"neuvector/*:v2.*":            share.CLUSRegistryFilter{"neuvector", ".*", "v2.*"},
-		"neuvector/*:v2.[0]{1,2}":     share.CLUSRegistryFilter{"neuvector", ".*", "v2.[0]{1,2}"},
-		"neuvector/*:v2.[0]*":         share.CLUSRegistryFilter{"neuvector", ".*", "v2.[0]*"},
-		"neuvector/*_20201010_*:*":    share.CLUSRegistryFilter{"neuvector", ".*_20201010_.*", ".*"},
-		"neuvector/.*_20201010_*:*":   share.CLUSRegistryFilter{"neuvector", ".*_20201010_.*", ".*"},
+		"neuvector/image:latest": {
+			Org:  "neuvector",
+			Repo: "image",
+			Tag:  "latest",
+		},
+		"neuvector/image:*": {
+			Org:  "neuvector",
+			Repo: "image",
+			Tag:  ".*",
+		},
+		"neuvector/*:*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  ".*",
+		},
+		"neuvector/*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  ".*",
+		},
+		"*:*": {
+			Org:  "",
+			Repo: ".*",
+			Tag:  ".*",
+		},
+		"neuvector/[image1|image2]:*": {
+			Org:  "neuvector",
+			Repo: "[image1|image2]",
+			Tag:  ".*",
+		},
+		"neu*:*": {
+			Org:  "",
+			Repo: "neu.*",
+			Tag:  ".*",
+		},
+		"neuvector/*:v2.1": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.1",
+		},
+		"neuvector/*:v2.*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.*",
+		},
+		"neuvector/*:v2.[0]{1,2}": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.[0]{1,2}",
+		},
+		"neuvector/*:v2.[0]*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.[0]*",
+		},
+		"neuvector/*_20201010_*:*": {
+			Org:  "neuvector",
+			Repo: ".*_20201010_.*",
+			Tag:  ".*",
+		},
+		"neuvector/.*_20201010_*:*": {
+			Org:  "neuvector",
+			Repo: ".*_20201010_.*",
+			Tag:  ".*",
+		},
 	}
 
 	for k, v := range cases {
@@ -179,17 +231,17 @@ func TestRegistryCreateDelete(t *testing.T) {
 	data.Config.Domains = nil
 	body, _ = json.Marshal(&data)
 
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
 	// r2, r3
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}}); count != 2 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}}); count != 2 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 	// r3
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleReader: []string{"ns2"}}); count != 1 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleReader: {"ns2"}}); count != 1 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 
@@ -198,13 +250,13 @@ func TestRegistryCreateDelete(t *testing.T) {
 	data.Config.Domains = &[]string{"ns1"}
 	body, _ = json.Marshal(&data)
 
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
 	// r2, r3, r4
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}}); count != 3 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}}); count != 3 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 
@@ -213,7 +265,7 @@ func TestRegistryCreateDelete(t *testing.T) {
 	data.Config.Domains = &[]string{"ns1", "ns2"}
 	body, _ = json.Marshal(&data)
 
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1"}, api.UserRoleReader: []string{"ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1"}, api.UserRoleReader: {"ns2"}})
 	if w.status != http.StatusForbidden {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -223,7 +275,7 @@ func TestRegistryCreateDelete(t *testing.T) {
 	data.Config.Domains = &[]string{"ns1", "ns3"}
 	body, _ = json.Marshal(&data)
 
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusForbidden {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -233,7 +285,7 @@ func TestRegistryCreateDelete(t *testing.T) {
 	data.Config.Domains = &[]string{}
 	body, _ = json.Marshal(&data)
 
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -243,11 +295,11 @@ func TestRegistryCreateDelete(t *testing.T) {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 	// r2, r3, r4, r5
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}}); count != 4 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}}); count != 4 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 	// r3, r5
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleReader: []string{"ns2"}}); count != 2 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleReader: {"ns2"}}); count != 2 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 
@@ -267,22 +319,22 @@ func TestRegistryCreateDelete(t *testing.T) {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r2", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r2", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r3", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r3", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1"}})
 	if w.status != http.StatusForbidden {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r3", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r3", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r4", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r4", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -353,28 +405,28 @@ func TestOpenshiftRegistryCreateDelete(t *testing.T) {
 	data.Config.Name = "r11"
 	data.Config.Filters = &[]string{"ns1/image1:latest"}
 	body, _ = json.Marshal(&data)
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
 	// -- allow namespace user to see registry with any filter's namespace or any creator domain that is in the user's namespaces
 	// r1(filter has ns1), r2(filter has ns1, ns2), r11(creatorDomains is ns1, ns2)
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}}); count != 3 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}}); count != 3 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 	// -- allow namespace user to see registry with any filter's namespace or any creator domain that is in the user's namespaces
 	// r1(filter has ns1), r2(filter has ns1, ns2), r11(creatorDomains is ns1, ns2)
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1"}}); count != 3 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1"}}); count != 3 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 	// -- allow namespace user to see registry with any filter's namespace or any creator domain that is in the user's namespaces
 	// r2(filter has ns1, ns2), r11(creatorDomains is ns1, ns2)
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleReader: []string{"ns2"}}); count != 2 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleReader: {"ns2"}}); count != 2 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 	// -- disallow namespace user to see registry when none of the user's namespaces is in registry's filter namespaces or creator domains
-	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"nsA"}}); count != 0 {
+	if count := countRegistry(api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"nsA"}}); count != 0 {
 		t.Errorf("Wrong count: count=%v.", count)
 	}
 
@@ -383,7 +435,7 @@ func TestOpenshiftRegistryCreateDelete(t *testing.T) {
 	data.Config.Name = "r11"
 	data.Config.Filters = &[]string{"ns1/image1:latest", "ns2/image2:latest"}
 	body, _ = json.Marshal(&data)
-	w = restCallWithRole("PATCH", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2", "ns3"}})
+	w = restCallWithRole("PATCH", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2", "ns3"}})
 	if w.status != http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -393,7 +445,7 @@ func TestOpenshiftRegistryCreateDelete(t *testing.T) {
 	data.Config.Name = "r11"
 	data.Config.Filters = &[]string{"nsA/image1:latest"}
 	body, _ = json.Marshal(&data)
-	w = restCallWithRole("PATCH", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("PATCH", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status == http.StatusOK {
 		t.Errorf("Error: unexpected status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -403,7 +455,7 @@ func TestOpenshiftRegistryCreateDelete(t *testing.T) {
 	data.Config.Name = "r11"
 	data.Config.Filters = &[]string{"ns3/image3:latest"}
 	body, _ = json.Marshal(&data)
-	w = restCallWithRole("PATCH", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2", "ns3"}})
+	w = restCallWithRole("PATCH", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2", "ns3"}})
 	if w.status == http.StatusOK {
 		t.Errorf("Error: unexpected status=%v registry=%v.", w.status, string(body[:]))
 	}
@@ -412,33 +464,33 @@ func TestOpenshiftRegistryCreateDelete(t *testing.T) {
 	data.Config.Name = "r12"
 	data.Config.Filters = &[]string{"nsA/image1:latest"}
 	body, _ = json.Marshal(&data)
-	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2"}})
+	w = restCallWithRole("POST", "/v1/scan/registry", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}})
 	if w.status == http.StatusOK {
 		t.Errorf("Error: unexpected status=%v registry=%v.", w.status, string(body[:]))
 	}
 
 	// -- disallow namespace user to delete a registry when any of the registry's creatorDomains is in user's namespaces
 	// r11(creatorDomains is ns1, ns2)
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1"}})
 	if w.status == http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
 	// -- allow namespace user to delete a registry when all the registry's creatorDomains are in user's namespaces
 	// r11(creatorDomains is ns1, ns2)
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2", "nsA"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r11", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2", "nsA"}})
 	if w.status == http.StatusForbidden {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
 	// -- disallow namespace user to delete a registry that has nil creator namespaces
 	// r2(creatorDomains is nil)
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r2", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2", "ns3"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r2", body, api.UserRoleNone, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2", "ns3"}})
 	if w.status == http.StatusOK {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}
 
-	w = restCallWithRole("DELETE", "/v1/scan/registry/r1", body, api.UserRoleAdmin, map[string][]string{api.UserRoleAdmin: []string{"ns1", "ns2", "nsA"}})
+	w = restCallWithRole("DELETE", "/v1/scan/registry/r1", body, api.UserRoleAdmin, map[string][]string{api.UserRoleAdmin: {"ns1", "ns2", "nsA"}})
 	if w.status == http.StatusForbidden {
 		t.Errorf("Error: status=%v registry=%v.", w.status, string(body[:]))
 	}

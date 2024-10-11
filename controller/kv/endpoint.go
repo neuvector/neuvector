@@ -44,15 +44,15 @@ type fedKeyInfo struct {
 
 // for backup/restore filtering of joint-clusters in a fed
 var _fedKeyInfo = map[string]fedKeyInfo{
-	share.CFGEndpointGroup:            fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}}, // filter keys like object/config/group/fed.group-1
-	share.CFGEndpointPolicy:           fedKeyInfo{filterFedObjectType: _filterFedPolicyObjects},
-	share.CFGEndpointProcessProfile:   fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
-	share.CFGEndpointFileMonitor:      fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
-	share.CFGEndpointFileAccessRule:   fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
-	share.CFGEndpointResponseRule:     fedKeyInfo{fedMasterOnlyKeys: []string{share.CLUSConfigFedResponseRuleKey}},
-	share.CFGEndpointAdmissionControl: fedKeyInfo{fedMasterOnlyKeys: []string{share.CLUSConfigFedAdmCtrlKey}},
-	share.CFGEndpointRegistry:         fedKeyInfo{filterSubKeyPrefix: []string{api.FederalGroupPrefix}}, // filter keys like object/config/registry/fed.registry-1
-	share.CFGEndpointFederation: fedKeyInfo{
+	share.CFGEndpointGroup:            {filterSubKeyPrefix: []string{api.FederalGroupPrefix}}, // filter keys like object/config/group/fed.group-1
+	share.CFGEndpointPolicy:           {filterFedObjectType: _filterFedPolicyObjects},
+	share.CFGEndpointProcessProfile:   {filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
+	share.CFGEndpointFileMonitor:      {filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
+	share.CFGEndpointFileAccessRule:   {filterSubKeyPrefix: []string{api.FederalGroupPrefix}},
+	share.CFGEndpointResponseRule:     {fedMasterOnlyKeys: []string{share.CLUSConfigFedResponseRuleKey}},
+	share.CFGEndpointAdmissionControl: {fedMasterOnlyKeys: []string{share.CLUSConfigFedAdmCtrlKey}},
+	share.CFGEndpointRegistry:         {filterSubKeyPrefix: []string{api.FederalGroupPrefix}}, // filter keys like object/config/registry/fed.registry-1
+	share.CFGEndpointFederation: {
 		alwaysFilterKeys:   []string{share.CLUSFedKey(share.CLUSFedClustersStatusSubKey), share.CLUSFedKey(share.CLUSFedToPingPollSubKey)},
 		fedMasterOnlyKeys:  []string{share.CLUSFedKey(share.CFGEndpointSystem)},
 		filterSubKeyPrefix: []string{share.CLUSFedRulesRevisionSubKey},
@@ -61,8 +61,8 @@ var _fedKeyInfo = map[string]fedKeyInfo{
 
 // for import/purge filtering
 var _skipKeyInfo = map[string][]string{
-	share.CFGEndpointAdmissionControl: []string{share.CLUSAdmissionCertKey(share.CLUSConfigAdmissionControlStore, share.DefaultPolicyName)},
-	share.CFGEndpointCrd:              []string{share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName)},
+	share.CFGEndpointAdmissionControl: {share.CLUSAdmissionCertKey(share.CLUSConfigAdmissionControlStore, share.DefaultPolicyName)},
+	share.CFGEndpointCrd:              {share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName)},
 }
 
 var fedCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointFederation, key: share.CLUSConfigFederationStore, isStore: true,
@@ -83,63 +83,63 @@ var sigstoreCfgEndpoint *cfgEndpoint = &cfgEndpoint{name: share.CFGEndpointSigst
 // Order is important
 var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 	fedCfgEndpoint,
-	&cfgEndpoint{name: share.CFGEndpointUserRole, key: share.CLUSConfigUserRoleStore, isStore: true,
+	{name: share.CFGEndpointUserRole, key: share.CLUSConfigUserRoleStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockUserKey},
-	&cfgEndpoint{name: share.CFGEndpointPwdProfile, key: share.CLUSConfigPwdProfileStore, isStore: true,
+	{name: share.CFGEndpointPwdProfile, key: share.CLUSConfigPwdProfileStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockUserKey},
-	&cfgEndpoint{name: share.CFGEndpointUser, key: share.CLUSConfigUserStore, isStore: true,
+	{name: share.CFGEndpointUser, key: share.CLUSConfigUserStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockUserKey},
 
-	&cfgEndpoint{name: share.CFGEndpointApikey, key: share.CLUSConfigApikeyStore, isStore: true,
+	{name: share.CFGEndpointApikey, key: share.CLUSConfigApikeyStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockApikeyKey},
 
-	&cfgEndpoint{name: share.CFGEndpointLicense, key: share.CLUSConfigLicenseKey, isStore: false,
+	{name: share.CFGEndpointLicense, key: share.CLUSConfigLicenseKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointEULA, key: share.CLUSConfigEULAKey, isStore: false,
+	{name: share.CFGEndpointEULA, key: share.CLUSConfigEULAKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 
 	// Not to export uniconf, if the exported config is going to be used on other systems,
 	// uniconf settings are not portable; if the export config is used on the system itself,
 	// the current state is kept, no refresh of uniconf keys.
-	// &cfgEndpoint{name: "uniconf", key: share.CLUSUniconfStore, isStore: true,
+	// {name: "uniconf", key: share.CLUSUniconfStore, isStore: true,
 	//	section: api.ConfEndpointIDConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointServer, key: share.CLUSConfigServerStore, isStore: true,
+	{name: share.CFGEndpointServer, key: share.CLUSConfigServerStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointSystem, key: share.CLUSConfigSystemKey, isStore: false,
+	{name: share.CFGEndpointSystem, key: share.CLUSConfigSystemKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointScan, key: share.CLUSConfigScanKey, isStore: false,
+	{name: share.CFGEndpointScan, key: share.CLUSConfigScanKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 	sigstoreCfgEndpoint,
 	registryCfgEndpoint,
-	&cfgEndpoint{name: share.CFGEndpointAdmissionControl, key: share.CLUSConfigAdmissionControlStore, isStore: true,
+	{name: share.CFGEndpointAdmissionControl, key: share.CLUSConfigAdmissionControlStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockAdmCtrlKey},
 	groupCfgEndpoint,
-	&cfgEndpoint{name: share.CFGEndpointPolicy, key: share.CLUSConfigPolicyStore, isStore: true,
+	{name: share.CFGEndpointPolicy, key: share.CLUSConfigPolicyStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey},
 	pprofileCfgEndpoint,
 	fmonitorCfgEndpoint,
 	faccessCfgEndpoint,
-	&cfgEndpoint{name: share.CFGEndpointResponseRule, key: share.CLUSConfigResponseRuleStore, isStore: true,
+	{name: share.CFGEndpointResponseRule, key: share.CLUSConfigResponseRuleStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey},
-	&cfgEndpoint{name: share.CFGEndpointCrd, key: share.CLUSConfigCrdStore, isStore: true,
+	{name: share.CFGEndpointCrd, key: share.CLUSConfigCrdStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockPolicyKey},
-	&cfgEndpoint{name: share.CFGEndpointDlpRule, key: share.CLUSConfigDlpRuleStore, isStore: true,
+	{name: share.CFGEndpointDlpRule, key: share.CLUSConfigDlpRuleStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey},
-	&cfgEndpoint{name: share.CFGEndpointDlpGroup, key: share.CLUSConfigDlpGroupStore, isStore: true,
+	{name: share.CFGEndpointDlpGroup, key: share.CLUSConfigDlpGroupStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey},
-	&cfgEndpoint{name: share.CFGEndpointWafRule, key: share.CLUSConfigWafRuleStore, isStore: true,
+	{name: share.CFGEndpointWafRule, key: share.CLUSConfigWafRuleStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey},
-	&cfgEndpoint{name: share.CFGEndpointWafGroup, key: share.CLUSConfigWafGroupStore, isStore: true,
+	{name: share.CFGEndpointWafGroup, key: share.CLUSConfigWafGroupStore, isStore: true,
 		section: api.ConfSectionPolicy, lock: share.CLUSLockPolicyKey},
-	&cfgEndpoint{name: share.CFGEndpointScript, key: share.CLUSConfigScriptStore, isStore: true,
+	{name: share.CFGEndpointScript, key: share.CLUSConfigScriptStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointCompliance, key: share.CLUSConfigComplianceStore, isStore: true,
+	{name: share.CFGEndpointCompliance, key: share.CLUSConfigComplianceStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointVulnerability, key: share.CLUSConfigVulnerabilityStore, isStore: true,
+	{name: share.CFGEndpointVulnerability, key: share.CLUSConfigVulnerabilityStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointDomain, key: share.CLUSConfigDomainStore, isStore: true,
+	{name: share.CFGEndpointDomain, key: share.CLUSConfigDomainStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
-	&cfgEndpoint{name: share.CFGEndpointCloud, key: share.CLUSConfigCloudStore, isStore: true,
+	{name: share.CFGEndpointCloud, key: share.CLUSConfigCloudStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 }
 
@@ -192,7 +192,6 @@ func readKeyValue(reader *bufio.Reader) (string, string, error) {
 			return key, value, nil
 		}
 	}
-	return "", "", io.EOF
 }
 
 func isFedObject(filterFedObjectType int, key string, value []byte, restore bool) (bool, []byte) {
@@ -222,7 +221,7 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 					tmpvalue = uzb
 				}
 
-				if err := json.Unmarshal(tmpvalue, &rhs); err == nil {
+				if nvJsonUnmarshal(key, tmpvalue, &rhs) == nil {
 					// because fed policies are always in top, we can simply iterate thru rhs
 					firstNonFedIdx := len(rhs)
 					for idx, rh := range rhs {
@@ -250,9 +249,8 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 	default:
 		//for FedRoleMaster unzip policy rulelist before save to storage
 		if !restore && key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
-			var uzb []byte
 			//do unzip
-			uzb = utils.GunzipBytes(value)
+			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
 				log.Error("Failed to unzip policy rulelist")
 				return true, nil
@@ -390,7 +388,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			subKey := share.CLUSKeyNthToken(key, 3)
 			if subKey == share.CLUSFedMembershipSubKey {
 				var m share.CLUSFedMembership
-				if err := json.Unmarshal([]byte(value), &m); err == nil {
+				if nvJsonUnmarshal(key, []byte(value), &m) == nil {
 					importInfo.fedRole = m.FedRole
 					log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Info()
 				}
@@ -447,7 +445,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 
 		if ep.name == share.CFGEndpointUser {
 			var u share.CLUSUser
-			if err := json.Unmarshal([]byte(value), &u); err == nil {
+			if nvJsonUnmarshal(key, []byte(value), &u) == nil {
 				u.FailedLoginCount = 0
 				u.BlockLoginSince = time.Time{}
 				u.PwdResetTime = time.Now().UTC()
@@ -505,11 +503,11 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			if key == policyZipRuleListKey {
 				applyTransaction(txn, nil, false, 0)
 				//zip rulelist before put to cluster during restore
-				clusHelper.PutPolicyRuleListZip(key, array)
+				_ = clusHelper.PutPolicyRuleListZip(key, array)
 			} else {
-				clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
+				_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
 				//for CLUSConfigSystemKey only
-				clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+				_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
 				if len(array) >= cluster.KVValueSizeMax && strings.HasPrefix(key, share.CLUSConfigCrdStore) { // 512 * 1024
 					zb := utils.GzipBytes(array)
 					txn.PutBinary(key, zb)
@@ -524,9 +522,6 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			count++
 		}
 	}
-
-	log.WithFields(log.Fields{"endpoint": ep.name, "file": source, "keys": count}).Info()
-	return nil
 }
 
 // the written-to-file values are always in text format. If it's in gzip format, unzip it before writing to file for the backup/export

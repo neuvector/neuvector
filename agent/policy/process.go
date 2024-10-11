@@ -55,7 +55,7 @@ func (e *Engine) UpdateProcessPolicy(name string, profile *share.CLUSProcessProf
 
 func (e *Engine) ObtainProcessPolicy(name, id string) (*share.CLUSProcessProfile, bool) {
 	e.Mutex.Lock()
-	profile, _ := e.ProcessPolicy[name]
+	profile := e.ProcessPolicy[name]
 	e.Mutex.Unlock()
 	if profile != nil { // the process policy per group has been fetched
 		if grp_profile, ok := e.getGroupRule(id); ok {
@@ -222,7 +222,7 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 				// log.WithFields(log.Fields{"mode": profile.Mode, "name": name, "proc": proc, "group": group}).Debug("PROC: ")
 				if profile.Mode == share.PolicyModeLearn && group != name {
 					e.Mutex.Lock()
-					prf, _ := e.ProcessPolicy[name]
+					prf := e.ProcessPolicy[name]
 					e.Mutex.Unlock()
 					found := false
 					for _, p := range prf.Process {
@@ -327,7 +327,7 @@ func (e *Engine) IsAllowedByParentApp(service, id, name, pname, ppath string, pg
 	return allowed
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildCustomizedProfile(serviceGroup, mode string, whtLst, blackLst []ProcProfileBrief) *share.CLUSProcessProfile {
 	profile := &share.CLUSProcessProfile{
 		Group:        serviceGroup,
@@ -363,7 +363,7 @@ func buildCustomizedProfile(serviceGroup, mode string, whtLst, blackLst []ProcPr
 	return profile
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildAllowAllProfile(serviceGroup string) *share.CLUSProcessProfile {
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		{"*", "*"},
@@ -371,7 +371,7 @@ func buildAllowAllProfile(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildNotAllowedProfile(serviceGroup string) *share.CLUSProcessProfile {
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
 		{"abcdefg", "ab556677"}, // unexpected item
@@ -379,7 +379,7 @@ func buildNotAllowedProfile(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: manager")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
@@ -410,7 +410,7 @@ func buildManagerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildScannerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: scanner")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
@@ -474,7 +474,7 @@ func buildRegistryAdapterProfileList(serviceGroup string) *share.CLUSProcessProf
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: controller")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
@@ -491,7 +491,7 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"getent", "/usr/bin/getent"},   // get entries from Name Service Switch libraries
 		{"iconv", "/usr/bin/iconv"},     // convert encoding of given files from one encoding to another
 		{"ps", "*"},
-		{"cat", "*"}, // k8s readiness
+		{"cat", "*"},                // k8s readiness
 		{"busybox", "/bin/busybox"}, // k8s readiness: backward compatible
 
 		// bash
@@ -522,7 +522,7 @@ func buildControllerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: enforcer")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
@@ -579,7 +579,7 @@ func buildEnforcerProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-/////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////
 func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	log.WithFields(log.Fields{"serviceGroup": serviceGroup}).Debug("PROC: allInOne")
 	var whtLst []ProcProfileBrief = []ProcProfileBrief{
@@ -615,7 +615,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 		{"jq", "/usr/bin/jq"},                   // cis benchmark
 		{"timeout", "/usr/bin/timeout"},         // could be used by tcpdump
 		{"ps", "*"},
-		{"cat", "*"}, // k8s readiness
+		{"cat", "*"},                // k8s readiness
 		{"busybox", "/bin/busybox"}, // k8s readiness: backward compatible
 
 		// bash
@@ -649,7 +649,7 @@ func buildAllinOneProfileList(serviceGroup string) *share.CLUSProcessProfile {
 	return buildCustomizedProfile(serviceGroup, share.PolicyModeEnforce, whtLst, nil)
 }
 
-///
+// /
 func (e *Engine) InsertNeuvectorProcessProfilePolicy(group, role string) {
 	log.WithFields(log.Fields{"group": group, "role": role}).Debug("PROC:")
 	var profile *share.CLUSProcessProfile

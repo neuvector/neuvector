@@ -57,10 +57,9 @@ func (r *ibmcloud) aquireToken(password, ibmTokenUrl string) error {
 	params.Add("grant_type", grantType)
 	params.Add("apikey", password)
 
-	var data []byte
-	data = []byte(params.Encode())
+	data := []byte(params.Encode())
 
-	request, err := http.NewRequest("POST", ibmTokenUrl, bytes.NewReader(data))
+	request, _ := http.NewRequest("POST", ibmTokenUrl, bytes.NewReader(data))
 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Accept", "application/json")
@@ -105,7 +104,7 @@ func (r *ibmcloud) getImages() ([]ibmImage, error) {
 	ur := r.ibmUrl("api/v1/images")
 	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 
-	request, err := http.NewRequest("GET", ur, nil)
+	request, _ := http.NewRequest("GET", ur, nil)
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.iamOauthToken))
 	request.Header.Set("Account", r.account)
 	resp, err := r.apiClient.Do(request)
@@ -132,9 +131,9 @@ func (r *ibmcloud) GetRepoList(org, name string, limit int) ([]*share.CLUSImage,
 	smd.scanLog.Debug("")
 	if !strings.Contains(name, "*") {
 		if org == "" {
-			return []*share.CLUSImage{&share.CLUSImage{Repo: name}}, nil
+			return []*share.CLUSImage{{Repo: name}}, nil
 		} else {
-			return []*share.CLUSImage{&share.CLUSImage{Repo: fmt.Sprintf("%s/%s", org, name)}}, nil
+			return []*share.CLUSImage{{Repo: fmt.Sprintf("%s/%s", org, name)}}, nil
 		}
 	}
 	images, err := r.getImages()
@@ -156,7 +155,7 @@ func (r *ibmcloud) GetRepoList(org, name string, limit int) ([]*share.CLUSImage,
 			}
 		}
 	}
-	for rep, _ := range r.images {
+	for rep := range r.images {
 		image := &share.CLUSImage{Repo: rep}
 		repos = append(repos, image)
 	}

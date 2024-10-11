@@ -49,7 +49,7 @@ func (o *Event) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
 		return []string{o.WorkloadDomain}, nil
 	} else if o.UserRoles != nil {
 		list := make([]string, 0, len(o.UserRoles))
-		for domain, _ := range o.UserRoles {
+		for domain := range o.UserRoles {
 			list = append(list, domain)
 		}
 		return list, nil

@@ -14,9 +14,9 @@ func TestGroupPosMatch(t *testing.T) {
 	preTest()
 
 	cts := []share.CLUSCriteriaEntry{
-		share.CLUSCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
-		share.CLUSCriteriaEntry{Key: "image", Value: "mysql", Op: share.CriteriaOpEqual},
-		share.CLUSCriteriaEntry{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "redis", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "mysql", Op: share.CriteriaOpEqual},
+		{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
 	}
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
@@ -53,9 +53,9 @@ func TestGroupNegMatch(t *testing.T) {
 	preTest()
 
 	cts := []share.CLUSCriteriaEntry{
-		share.CLUSCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpNotEqual},
-		share.CLUSCriteriaEntry{Key: "image", Value: "mysql", Op: share.CriteriaOpNotEqual},
-		share.CLUSCriteriaEntry{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "redis", Op: share.CriteriaOpNotEqual},
+		{Key: "image", Value: "mysql", Op: share.CriteriaOpNotEqual},
+		{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
 	}
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
@@ -92,9 +92,9 @@ func TestGroupMixMatch(t *testing.T) {
 	preTest()
 
 	cts := []share.CLUSCriteriaEntry{
-		share.CLUSCriteriaEntry{Key: "image", Value: "mysql", Op: share.CriteriaOpEqual},
-		share.CLUSCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpNotEqual},
-		share.CLUSCriteriaEntry{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "mysql", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "redis", Op: share.CriteriaOpNotEqual},
+		{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
 	}
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
@@ -131,9 +131,9 @@ func TestGroupEqualMatch(t *testing.T) {
 	preTest()
 
 	cts := []share.CLUSCriteriaEntry{
-		share.CLUSCriteriaEntry{Key: "image", Value: "redis*", Op: share.CriteriaOpEqual},
-		share.CLUSCriteriaEntry{Key: "image", Value: "mysql", Op: share.CriteriaOpEqual},
-		share.CLUSCriteriaEntry{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "redis*", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "mysql", Op: share.CriteriaOpEqual},
+		{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
 	}
 	wlc := workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
@@ -150,9 +150,9 @@ func TestGroupEqualMatch(t *testing.T) {
 	}
 
 	cts = []share.CLUSCriteriaEntry{
-		share.CLUSCriteriaEntry{Key: "image", Value: "redis*", Op: share.CriteriaOpNotEqual},
-		share.CLUSCriteriaEntry{Key: "image", Value: "*mysql", Op: share.CriteriaOpNotEqual},
-		share.CLUSCriteriaEntry{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
+		{Key: "image", Value: "redis*", Op: share.CriteriaOpNotEqual},
+		{Key: "image", Value: "*mysql", Op: share.CriteriaOpNotEqual},
+		{Key: "domain", Value: "billing", Op: share.CriteriaOpEqual},
 	}
 	wlc = workloadCache{
 		workload: &share.CLUSWorkload{Image: "redis", Domain: "billing"},
@@ -165,25 +165,25 @@ func TestGroupEqualMatch(t *testing.T) {
 
 func TestEqualMatch(t *testing.T) {
 	poss := [][]string{
-		[]string{"*", "nginx"},
-		[]string{".*", ".nginx"},
-		[]string{"nginx", "nginx"},
-		[]string{"nginx.xyz", "nginx.xyz"},
-		[]string{"nginx*", "nginx"},
-		[]string{"nginx*", "nginx-123"},
-		[]string{"nginx.abc*", "nginx.abc-123"},
-		[]string{"nginx?", "nginx."},
-		[]string{"nginx*?", "nginxabc*"},
-		[]string{"nginx*xyz", "nginx.abc.xyz"},
-		[]string{"nginx?xyz", "nginx.xyz"},
-		[]string{"nginx??xyz", "nginx.-xyz"},
-		[]string{"*nginx*", "nginx"},
-		[]string{"*nginx*", "111nginx234"},
-		[]string{"*nginx", "111nginx"},
-		[]string{"**nginx", "111nginx"},
-		[]string{"?nginx", "1nginx"},
-		[]string{"?nginx", "?nginx"},
-		[]string{"?nginx.com", ".nginx.com"},
+		{"*", "nginx"},
+		{".*", ".nginx"},
+		{"nginx", "nginx"},
+		{"nginx.xyz", "nginx.xyz"},
+		{"nginx*", "nginx"},
+		{"nginx*", "nginx-123"},
+		{"nginx.abc*", "nginx.abc-123"},
+		{"nginx?", "nginx."},
+		{"nginx*?", "nginxabc*"},
+		{"nginx*xyz", "nginx.abc.xyz"},
+		{"nginx?xyz", "nginx.xyz"},
+		{"nginx??xyz", "nginx.-xyz"},
+		{"*nginx*", "nginx"},
+		{"*nginx*", "111nginx234"},
+		{"*nginx", "111nginx"},
+		{"**nginx", "111nginx"},
+		{"?nginx", "1nginx"},
+		{"?nginx", "?nginx"},
+		{"?nginx.com", ".nginx.com"},
 	}
 	for _, kv := range poss {
 		if !share.EqualMatch(kv[0], kv[1]) {
@@ -192,22 +192,22 @@ func TestEqualMatch(t *testing.T) {
 	}
 
 	negs := [][]string{
-		[]string{"?", ""},
-		[]string{".*", "nginx"},
-		[]string{"nginx", "nginx1"},
-		[]string{"nginx.xyz", "nginx1xyz"},
-		[]string{"nginx*", "abc-nginx-123"},
-		[]string{"nginx*", "ngin-123"},
-		[]string{"nginx.abc*", "nginx-abc-123"},
-		[]string{"nginx?", "nginx.a"},
-		[]string{"nginx*?", "?nginxabc*"},
-		[]string{"nginx*xyz", "nginx.abc.yz"},
-		[]string{"nginx?xyz", "nginx..xyz"},
-		[]string{"*nginx*", "ngiinx"},
-		[]string{"*nginx", "111nginx-123"},
-		[]string{"?nginx", "12nginx"},
-		[]string{"?nginx", "?nginx1"},
-		[]string{"?nginx.com", ".?nginx-com"},
+		{"?", ""},
+		{".*", "nginx"},
+		{"nginx", "nginx1"},
+		{"nginx.xyz", "nginx1xyz"},
+		{"nginx*", "abc-nginx-123"},
+		{"nginx*", "ngin-123"},
+		{"nginx.abc*", "nginx-abc-123"},
+		{"nginx?", "nginx.a"},
+		{"nginx*?", "?nginxabc*"},
+		{"nginx*xyz", "nginx.abc.yz"},
+		{"nginx?xyz", "nginx..xyz"},
+		{"*nginx*", "ngiinx"},
+		{"*nginx", "111nginx-123"},
+		{"?nginx", "12nginx"},
+		{"?nginx", "?nginx1"},
+		{"?nginx.com", ".?nginx-com"},
 	}
 	for _, kv := range negs {
 		if share.EqualMatch(kv[0], kv[1]) {

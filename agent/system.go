@@ -13,15 +13,15 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/policy"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
-	"github.com/neuvector/neuvector/share/container"
+	log "github.com/sirupsen/logrus"
 )
 
 var policyApplyDir int
@@ -110,7 +110,7 @@ func systemConfigTapProxymesh(tapProxymesh bool) {
 	//proxy mesh status is changed
 	gInfo.tapProxymesh = tapProxymesh
 	for _, c := range gInfo.activeContainers {
-		if tapProxymesh == true {
+		if tapProxymesh {
 			//enable proxy mesh
 			enableTapProxymesh(c)
 		} else {
@@ -167,7 +167,9 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		log.WithFields(log.Fields{"value": string(value)}).Debug("")
 
 		var conf share.CLUSSystemConfig
-		json.Unmarshal(value, &conf)
+		if dbgError := json.Unmarshal(value, &conf); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		systemConfigPolicyMode(conf.NewServicePolicyMode)
 		systemConfigTapProxymesh(conf.TapProxymesh)
 		systemConfigXff(conf.XffEnabled)
@@ -186,7 +188,7 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 
 func isDomainNBE(c *containerData) bool {
 	domNbeMap := pe.GetPolDomNBEMap()
-	if c.role != "" {//system container
+	if c.role != "" { //system container
 		return false
 	}
 	if onbe, ok := domNbeMap[c.domain]; ok {
@@ -196,10 +198,12 @@ func isDomainNBE(c *containerData) bool {
 }
 
 var policyVerVal uint64 = 0
-const polVerMax uint64 = (1<<16-1)
+
+const polVerMax uint64 = (1<<16 - 1)
+
 func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 	policyVerVal++
-	policyVer := uint16(policyVerVal%polVerMax)
+	policyVer := uint16(policyVerVal % polVerMax)
 	workloadPolicyMap := make(map[string]*policy.WorkloadIPPolicyInfo)
 	for wlID, c := range gInfo.activeContainers {
 		//container that has no datapath needs not be
@@ -219,8 +223,8 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 			HostMode:   c.hostMode,
 			CapIntcp:   c.capIntcp,
 			Configured: false,
-			PolVer: policyVer,
-			Nbe: isDomainNBE(c),
+			PolVer:     policyVer,
+			Nbe:        isDomainNBE(c),
 		}
 
 		for _, pair := range c.intcpPairs {
@@ -300,7 +304,7 @@ func systemConfigPolicyVersionNode(s share.CLUSGroupIPPolicyVer) []share.CLUSGro
 	if groupIPPolicy != nil && groupNodeIPPolicy != nil {
 		groupIPPolicy = append(groupIPPolicy, groupNodeIPPolicy...)
 	}
-	if groupIPPolicy != nil && len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
+	if len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
 		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
 	}
 	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
@@ -329,7 +333,7 @@ func systemConfigPolicyVersion(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIP
 	//combine group ip rules from separate slots
 	groupIPPolicy = getPolicyConfig(newRuleKey, s.SlotNo, s.RulesLen)
 
-	if groupIPPolicy != nil && len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
+	if len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
 		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
 	}
 	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
@@ -365,9 +369,9 @@ func printOneEnIPPolicy(p *share.CLUSGroupIPPolicy) {
 
 func printEnIPPolicy(groupIPPolicy []share.CLUSGroupIPPolicy) {
 	/*
-	for _, pol := range groupIPPolicy {
-		printOneEnIPPolicy(&pol)
-	}
+		for _, pol := range groupIPPolicy {
+			printOneEnIPPolicy(&pol)
+		}
 	*/
 }
 
@@ -385,7 +389,7 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 	hostPolicyChangeSet := pe.UpdateNetworkPolicy(groupIPPolicy, wm)
 
 	for id, pInfo := range pe.GetNetworkPolicy() {
-		if pInfo.Configured == false {
+		if !pInfo.Configured {
 			continue
 		}
 		/*
@@ -401,7 +405,7 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 		 * policy/rule is made ready for it and default action is deny.
 		 * solution: for non-hostmode container perform container mode change only when mac/addr is pulled
 		 */
-		if !pInfo.HostMode && (pInfo.Policy.WorkloadMac == nil || len(pInfo.Policy.WorkloadMac) == 0) {
+		if !pInfo.HostMode && len(pInfo.Policy.WorkloadMac) == 0 {
 			continue
 		}
 		updateContainerPolicyMode(id, pInfo.Policy.Mode)
@@ -421,7 +425,7 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 		}).Debug("notify host mode container policy change")
 
 		prober.NotifyPolicyChange(hostPolicyChangeSet)
-		if prober.IsConnectionMonitored() == false {
+		if !prober.IsConnectionMonitored() {
 			prober.StartMonitorConnection()
 		}
 	}
@@ -453,7 +457,7 @@ func hostPolicyLookup(conn *dp.Connection) (uint32, uint8, bool) {
 	if !ok {
 		return 0, C.DP_POLICY_ACTION_OPEN, false
 	} else if c.parentNS != "" {
-		if pc ,exist := gInfoReadActiveContainer(c.parentNS); exist {
+		if pc, exist := gInfoReadActiveContainer(c.parentNS); exist {
 			if pc.pid != 0 {
 				wlID = &c.parentNS
 				c, _ = gInfoReadActiveContainer(*wlID)
@@ -495,15 +499,16 @@ func systemConfigInternalSubnet(nType cluster.ClusterNotifyType, key string, val
 	}
 
 	var subnets []share.CLUSSubnet
-	json.Unmarshal(uzb, &subnets)
-
+	if dbgError := json.Unmarshal(uzb, &subnets); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	newInternalSubnets := make(map[string]share.CLUSSubnet)
 	for _, subnet := range subnets {
 		newInternalSubnets[subnet.Subnet.String()] = subnet
 	}
 	mergeLocalSubnets(newInternalSubnets)
 
-	if reflect.DeepEqual(gInfo.internalSubnets, newInternalSubnets) == false {
+	if !reflect.DeepEqual(gInfo.internalSubnets, newInternalSubnets) {
 		gInfo.internalSubnets = newInternalSubnets
 		dp.DPCtrlConfigInternalSubnet(newInternalSubnets)
 	}
@@ -519,14 +524,15 @@ func systemConfigSpecialSubnet(nType cluster.ClusterNotifyType, key string, valu
 	}
 
 	var subnets []share.CLUSSpecSubnet
-	json.Unmarshal(uzb, &subnets)
-
+	if dbgError := json.Unmarshal(uzb, &subnets); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	newSpecialSubnets := make(map[string]share.CLUSSpecSubnet)
 	for _, subnet := range subnets {
 		newSpecialSubnets[subnet.Subnet.String()] = subnet
 	}
 
-	if reflect.DeepEqual(policy.SpecialSubnets, newSpecialSubnets) == false {
+	if !reflect.DeepEqual(policy.SpecialSubnets, newSpecialSubnets) {
 		policy.SpecialSubnets = newSpecialSubnets
 		dp.DPCtrlConfigSpecialIPSubnet(newSpecialSubnets)
 	}
@@ -548,7 +554,7 @@ func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byt
 
 	switch which {
 	//case share.PolicyIPRulesVersionID:
-		//systemConfigPolicy(nType, key, value)
+	//systemConfigPolicy(nType, key, value)
 	case share.InternalIPNetDefaultName:
 		systemConfigInternalSubnet(nType, key, value)
 	case share.SpecialIPNetDefaultName:
@@ -592,7 +598,9 @@ func profileConfigGroup(nType cluster.ClusterNotifyType, key string, value []byt
 	}
 
 	var pg share.CLUSProcessProfile
-	json.Unmarshal(value, &pg)
+	if dbgError := json.Unmarshal(value, &pg); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	if utils.DoesGroupHavePolicyMode(name) {
 		if updated, last := pe.UpdateProcessPolicy(name, &pg); updated {
 			if pg.Baseline == share.ProfileZeroDrift {
@@ -731,7 +739,7 @@ func reportLearnedProcess() {
 	}
 }
 
-//dlp
+// dlp
 func dlpModeToDefaultAction(mode string, capIntcp bool) uint8 {
 	switch mode {
 	case share.PolicyModeLearn:
@@ -849,7 +857,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 					dlpWlRule.WorkloadMac = append(dlpWlRule.WorkloadMac, lomac_str)
 					wlmacs.Add(lomac_str)
 				}
-				if dlpWlRule.WorkloadMac == nil || len(dlpWlRule.WorkloadMac) == 0 {
+				if len(dlpWlRule.WorkloadMac) == 0 {
 					continue
 				}
 				sort.Slice(dlpWlRule.WorkloadMac, func(i, j int) bool {
@@ -877,7 +885,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 				}
 
 				for _, rid := range dre.RuleIds {
-					if dre.RuleType == share.WafWlRuleIn  || dre.RuleType == share.WafWlRuleOut {
+					if dre.RuleType == share.WafWlRuleIn || dre.RuleType == share.WafWlRuleOut {
 						dlpWlRule.PolWafRuleIds = append(dlpWlRule.PolWafRuleIds, rid)
 						sort.Slice(dlpWlRule.PolWafRuleIds, func(i, j int) bool {
 							return (dlpWlRule.PolWafRuleIds[i] < dlpWlRule.PolWafRuleIds[j])
@@ -916,7 +924,7 @@ func updateWorkloadDlpRuleConfig(DlpWlRules []*share.CLUSDlpWorkloadRule, dlprul
 				dp.DPCtrlConfigDlp(wldre)
 			}
 		} else { //modify
-			if reflect.DeepEqual(wldre, exist_wldre) != true {
+			if !reflect.DeepEqual(wldre, exist_wldre) {
 				updated = true
 				if dpConnected {
 					dp.DPCtrlConfigDlp(wldre)
@@ -982,7 +990,7 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 				}
 				pat := ""
 				if pc.Op == share.CriteriaOpNotRegex {
-					pat = fmt.Sprintf("!")
+					pat = "!"
 				}
 				pat = fmt.Sprintf("%s/%s/is", pat, pc.Value)
 				if pc.Context == "" {
@@ -1040,7 +1048,6 @@ func updateDlpDetectionRules(drlist []*share.CLUSDlpRule,
 	return updated, macUpdated
 }
 
-
 func dlpConfigRule(dlprules share.CLUSWorkloadDlpRules) {
 	var dlprulenames map[string]string = make(map[string]string)
 	var wlmacs utils.Set = utils.NewSet()
@@ -1056,9 +1063,7 @@ func dlpConfigRule(dlprules share.CLUSWorkloadDlpRules) {
 	}
 	//endpoint does not associate with any dlp rules which means we
 	//do not need to push any info to DP
-	if len(dlprules.DlpWlRules) == 0 &&
-		(pe.DlpWlRulesInfo == nil ||
-			len(pe.DlpWlRulesInfo) == 0) {
+	if len(dlprules.DlpWlRules) == 0 && len(pe.DlpWlRulesInfo) == 0 {
 		log.Debug("Empty dlp workload rules info")
 		return
 	}
@@ -1208,7 +1213,9 @@ func systemConfigFileMonitor(nType cluster.ClusterNotifyType, key string, value 
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		// log.WithFields(log.Fields{"value": string(value), "key": key}).Debug("GRP:")
 		var profile share.CLUSFileMonitorProfile
-		json.Unmarshal(value, &profile)
+		if dbgError := json.Unmarshal(value, &profile); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		name := share.CLUSProfileKey2Name(key)
 
 		if name == "nodes" { // reserved group: make it a trigger to file monitor on lost host
@@ -1230,13 +1237,15 @@ func systemConfigFileAccessRule(nType cluster.ClusterNotifyType, key string, val
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		//	log.WithFields(log.Fields{"value": string(value), "key": key}).Debug("")
 		var rule share.CLUSFileAccessRule
-		json.Unmarshal(value, &rule)
+		if dbgError := json.Unmarshal(value, &rule); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		name := share.CLUSProfileKey2Name(key)
 		updateGroupProfileCache(nType, name, rule)
 	}
 }
 
-//////
+// ////
 type groupProfile struct {
 	group  *share.CLUSGroup
 	script *share.CLUSCustomCheckGroup
@@ -1251,7 +1260,9 @@ func systemConfigGroup(nType cluster.ClusterNotifyType, key string, value []byte
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var grp share.CLUSGroup
-		json.Unmarshal(value, &grp)
+		if dbgError := json.Unmarshal(value, &grp); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		updateGroupProfileCache(nType, name, grp)
 
 		// scripts
@@ -1285,7 +1296,9 @@ func getGroup(name string) (*share.CLUSGroup, error) {
 		return nil, err
 	}
 	var grp share.CLUSGroup
-	json.Unmarshal(value, &grp)
+	if dbgError := json.Unmarshal(value, &grp); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	return &grp, nil
 }
 
@@ -1310,7 +1323,9 @@ func systemConfigScript(nType cluster.ClusterNotifyType, key string, value []byt
 		}
 
 		var script share.CLUSCustomCheckGroup
-		json.Unmarshal(value, &script)
+		if dbgError := json.Unmarshal(value, &script); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		gp.script = &script
 
 		if gp.group.Kind == share.GroupKindNode {
@@ -1376,7 +1391,7 @@ func domainConfigNbeDp(c *containerData, newnbe bool) {
 func domainConfigNbe(domain string, newnbe bool) {
 	for _, c := range gInfo.activeContainers {
 		if c.domain == domain {
-			if c.role != "" {//system container
+			if c.role != "" { //system container
 				domainConfigNbeDp(c, false)
 			} else {
 				domainConfigNbeDp(c, newnbe)
@@ -1418,14 +1433,16 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var domain share.CLUSDomain
-		json.Unmarshal(value, &domain)
+		if dbgError := json.Unmarshal(value, &domain); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 
 		domainMutex.Lock()
-		oDomain, _ := domainCacheMap[name]
+		oDomain := domainCacheMap[name]
 		domainCacheMap[name] = &domainCache{domain: &domain}
 		domainMutex.Unlock()
 
-		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels){
+		if oDomain == nil || !reflect.DeepEqual(oDomain.domain.Labels, domain.Labels) {
 			domainChange(domain)
 			//ns-boundary enforcement
 			domainNBEChange(domain)

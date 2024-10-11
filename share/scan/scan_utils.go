@@ -140,7 +140,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 					continue
 				}
 				name := fmt.Sprintf("%s%s", DpkgStatusDir, file.Name())
-				files = append(files, utils.TarFileInfo{name, filedata})
+				files = append(files, utils.TarFileInfo{Name: name, Body: filedata})
 			}
 			hasPackage = true
 			continue
@@ -170,7 +170,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			}
 		}
 
-		files = append(files, utils.TarFileInfo{lib, data})
+		files = append(files, utils.TarFileInfo{Name: lib, Body: data})
 	}
 	return files, hasPackage
 }
@@ -180,7 +180,7 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 	if len(files) == 0 && !hasPkgMgr && objType == share.ScanObjectType_HOST {
 		// In RancherOS, host os-release file is at /host/proc/1/root/usr/etc/os-release
 		// but sometimes this file is not accessible.
-		files, hasPkgMgr = s.readRunningPackages(id, pid, "/usr/", kernel, pidHost)
+		files, _ /*hasPkgMgr*/ = s.readRunningPackages(id, pid, "/usr/", kernel, pidHost)
 	}
 
 	if objType == share.ScanObjectType_CONTAINER {
@@ -190,7 +190,7 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 			log.WithFields(log.Fields{"data": len(data), "error": err}).Error("Error when getting container app packages")
 		}
 		if len(data) > 0 {
-			files = append(files, utils.TarFileInfo{AppFileName, data})
+			files = append(files, utils.TarFileInfo{Name: AppFileName, Body: data})
 		}
 	}
 
@@ -218,9 +218,9 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 	apps := NewScanApps(true)
 	apps.ExtractAppPkg(path, path)
 	pkgs := apps.marshal()
-	files := []utils.TarFileInfo{utils.TarFileInfo{AppFileName, pkgs}}
+	files := []utils.TarFileInfo{{Name: AppFileName, Body: pkgs}}
 	buf, _ := utils.MakeTar(files)
-	appPkgs, _ := apps.Data()[path]
+	appPkgs := apps.Data()[path]
 	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone
 }
 
@@ -476,7 +476,7 @@ func ParseImageName(image string) (string, string, string, error) {
 		tag = "latest"
 	}
 
-	if dockerRegistries.Contains(reg) && strings.Index(repo, "/") == -1 {
+	if dockerRegistries.Contains(reg) && !strings.Contains(repo, "/") {
 		repo = fmt.Sprintf("library/%s", repo)
 	}
 

@@ -14,16 +14,16 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-type testDriver struct {
-	registryDriver
-}
+// type testDriver struct {
+// 	registryDriver
+// }
 
-func (d *testDriver) Login(cfg *share.CLUSRegistryConfig) (bool, error) {
-	return false, nil
-}
+// func (d *testDriver) Login(cfg *share.CLUSRegistryConfig) (bool, error) {
+// 	return false, nil
+// }
 
-func (d *testDriver) Logout() {
-}
+// func (d *testDriver) Logout() {
+// }
 
 func preTest() {
 	log.SetOutput(os.Stdout)
@@ -38,11 +38,11 @@ func preTest() {
 	smd = &scanMethod{isLeader: true, isScanner: true, scanLog: scanLog}
 }
 
-func preTestDebug() {
-	preTest()
-	log.SetLevel(log.DebugLevel)
-	smd.scanLog.Level = log.DebugLevel
-}
+// func preTestDebug() {
+// 	preTest()
+// 	log.SetLevel(log.DebugLevel)
+// 	smd.scanLog.Level = log.DebugLevel
+// }
 
 func postTest() {
 	log.SetLevel(log.DebugLevel)
@@ -79,7 +79,7 @@ func TestImageScanFresh(t *testing.T) {
 
 	// Start scan with some images
 	newm = map[string]*imageMeta{
-		"1": &imageMeta{id: "1", digest: "d1", images: utils.NewSet(
+		"1": {id: "1", digest: "d1", images: utils.NewSet(
 			share.CLUSImage{Repo: "image1", Tag: "latest"},
 			share.CLUSImage{Repo: "image1", Tag: "1.0"},
 		)},
@@ -99,7 +99,7 @@ func TestImageScanFresh(t *testing.T) {
 
 	// Add a new tag but same image
 	newm = map[string]*imageMeta{
-		"1": &imageMeta{id: "1", digest: "d1", images: utils.NewSet(
+		"1": {id: "1", digest: "d1", images: utils.NewSet(
 			share.CLUSImage{Repo: "image1", Tag: "1.1"},
 		)},
 	}
@@ -118,7 +118,7 @@ func TestImageScanFresh(t *testing.T) {
 
 	// Add a new tag and different image
 	newm = map[string]*imageMeta{
-		"2": &imageMeta{id: "2", digest: "d2", images: utils.NewSet(
+		"2": {id: "2", digest: "d2", images: utils.NewSet(
 			share.CLUSImage{Repo: "image1", Tag: "2.0"},
 		)},
 	}
@@ -137,7 +137,7 @@ func TestImageScanFresh(t *testing.T) {
 
 	// Re-start scan instead of add images
 	newm = map[string]*imageMeta{
-		"2": &imageMeta{id: "2", digest: "d2", images: utils.NewSet(
+		"2": {id: "2", digest: "d2", images: utils.NewSet(
 			share.CLUSImage{Repo: "image1", Tag: "2.0"},
 		)},
 	}
@@ -176,23 +176,23 @@ func TestImageScanCont(t *testing.T) {
 	})
 	r.sctx = newTestScanContext()
 	r.summary = map[string]*share.CLUSRegistryImageSummary{
-		"2": &share.CLUSRegistryImageSummary{ImageID: "2", Digest: "d2",
+		"2": {ImageID: "2", Digest: "d2",
 			Status:    api.ScanStatusFinished,
 			ScanFlags: share.ScanFlagCVE | share.ScanFlagFiles,
 			Images: []share.CLUSImage{
-				share.CLUSImage{Repo: "image2", Tag: "latest"},
-				share.CLUSImage{Repo: "image2", Tag: "1.0"},
+				{Repo: "image2", Tag: "latest"},
+				{Repo: "image2", Tag: "1.0"},
 			}},
-		"3": &share.CLUSRegistryImageSummary{ImageID: "3", Digest: "d3",
+		"3": {ImageID: "3", Digest: "d3",
 			Status: api.ScanStatusIdle,
 			Images: []share.CLUSImage{
-				share.CLUSImage{Repo: "image3", Tag: "latest"},
+				{Repo: "image3", Tag: "latest"},
 			}},
 	}
 
 	// Add a new tag but same image
 	newm = map[string]*imageMeta{
-		"1": &imageMeta{id: "1", digest: "d1", images: utils.NewSet(
+		"1": {id: "1", digest: "d1", images: utils.NewSet(
 			share.CLUSImage{Repo: "image1", Tag: "latest"},
 			share.CLUSImage{Repo: "image1", Tag: "1.0"},
 		)},
@@ -212,7 +212,7 @@ func TestImageScanCont(t *testing.T) {
 
 	// Add a finished image
 	newm = map[string]*imageMeta{
-		"2": &imageMeta{id: "2", digest: "d2", images: utils.NewSet(
+		"2": {id: "2", digest: "d2", images: utils.NewSet(
 			share.CLUSImage{Repo: "image2", Tag: "2.0"},
 		)},
 	}

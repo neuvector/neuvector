@@ -22,7 +22,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-//
 func isValidKindProcessProfile(kind string) bool {
 	switch kind {
 	case share.GroupKindContainer: // service or user-defined groups
@@ -80,7 +79,7 @@ func handlerProcessProfileList(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local process profiles
+	scope := query.pairs[api.QueryScope] // empty string means fed & local process profiles
 
 	var resp api.RESTProcessProfilesData
 	resp.Profiles = make([]*api.RESTProcessProfile, 0)
@@ -319,7 +318,6 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 	deleted := make(map[string]*share.CLUSProcessProfileEntry)
 	if conf.ProcessDelList != nil {
 		for _, proc := range *conf.ProcessDelList {
-			var found bool = false
 			p := &share.CLUSProcessProfileEntry{
 				Name:    proc.Name,
 				Path:    proc.Path,

@@ -86,7 +86,7 @@ func handlerPolicyRuleList(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local rules
+	scope := query.pairs[api.QueryScope] // empty string means fed & local rules
 
 	var resp api.RESTPolicyRulesData
 	resp.Rules = make([]*api.RESTPolicyRule, 0)
@@ -354,7 +354,7 @@ func normalizeApps(apps []string) ([]string, error) {
 	i := 0
 	names := make([]string, appSet.Cardinality())
 	for id := range appSet.Iter() {
-		names[i], _ = common.AppNameMap[id.(uint32)]
+		names[i] = common.AppNameMap[id.(uint32)]
 		i++
 	}
 
@@ -467,7 +467,7 @@ func validateRestPolicyRuleConfig(r *api.RESTPolicyRuleConfig) error {
 	}
 
 	if r.Priority != 0 {
-		if r.Priority < 0 || r.Priority > 100 {
+		if r.Priority > 100 {
 			log.WithFields(log.Fields{"id": r.ID, "Priority": r.Priority}).Error("Prioty out of range [0-100]")
 			return errors.New("Priority out of range")
 		}
@@ -504,18 +504,18 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 		Action:       r.Action,
 		Disable:      r.Disable,
 	}
-	rule.CfgType, _ = cfgTypeMapping[r.CfgType]
+	rule.CfgType = cfgTypeMapping[r.CfgType]
 	return rule
 }
 
-func policyRuleConf2Cluster(r *api.RESTPolicyRuleConfig) *share.CLUSPolicyRule {
-	return &share.CLUSPolicyRule{
-		ID:      r.ID,
-		Comment: *r.Comment,
-		From:    *r.From,
-		To:      *r.To,
-	}
-}
+// func policyRuleConf2Cluster(r *api.RESTPolicyRuleConfig) *share.CLUSPolicyRule {
+// 	return &share.CLUSPolicyRule{
+// 		ID:      r.ID,
+// 		Comment: *r.Comment,
+// 		From:    *r.From,
+// 		To:      *r.To,
+// 	}
+// }
 
 func deletePolicyRules(txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {
@@ -584,7 +584,7 @@ func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgTyp
 			if crh.CfgType == share.GroundCfg {
 				e := "Can't move Base Rule"
 				log.WithFields(log.Fields{"move": id}).Error(e)
-				return fmt.Errorf(e) // break from here if the moving item is ground rule. i.e. ground rule cannot be moved
+				return fmt.Errorf("%s", e) // break from here if the moving item is ground rule. i.e. ground rule cannot be moved
 			}
 			moveIdx = i
 		}
@@ -603,14 +603,14 @@ func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgTyp
 	if moveIdx == -1 {
 		e := "Rule to move doesn't exist"
 		log.WithFields(log.Fields{"move": id}).Error(e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	toIdx, af := locatePosition(crhs, after, moveIdx)
 	if toIdx == -1 {
 		e := "Move-to position cannot be found"
 		log.WithFields(log.Fields{"after": af}).Error(e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 	if bottomIdx == -1 {
 		bottomIdx = len(crhs) - 1
@@ -667,7 +667,7 @@ func movePolicyRule(w http.ResponseWriter, r *http.Request, move *api.RESTPolicy
 		e := "Policy rule doesn't exist"
 		log.WithFields(log.Fields{"move": move.ID}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf(e), 0
+		return fmt.Errorf("%s", e), 0
 	}
 
 	if move.After != nil && *move.After != 0 && *move.After == int(move.ID) {
@@ -745,7 +745,7 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"scope": scope, "after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	if toIdx < topIdx {
@@ -768,24 +768,24 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 				rr.CfgType = api.CfgTypeUserCreated
 			}
 		}
-		cfgType, _ := cfgTypeMapping[rr.CfgType]
+		cfgType := cfgTypeMapping[rr.CfgType]
 		if (cfgType == share.FederalCfg && scope == share.ScopeLocal) || (cfgType != share.FederalCfg && scope == share.ScopeFed) {
 			e := "Mismatched rule CfgType with request"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if ids.Contains(rr.ID) {
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if cfgType == share.Learned || cfgType == share.GroundCfg {
 			e := "Cannot create learned/Base policy rule"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if e := isLocalReservedId(rr.ID); e != nil {
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
@@ -938,14 +938,14 @@ func checkReadOnlyRules(scope string, crhs []*share.CLUSRuleHead, rules []*api.R
 	return writableLearnedRules, writableUserCreatedRules, readOnlyRuleIDs, writableRuleIDs, errorIDs
 }
 
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------
 // caller                   rules param                 ignored entries in rules param      note
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------
 // admin(scope=local)       all rules                   fed/ground rules                    fed/ground rules are not affected during replacement
 // nsUser(scope=local)      rules this user can see     fed/ground rules                    namespace-user-non-accessible rules are not affected during replacement
 // fedAdmin(scope=local)    all rules                   fed/ground rules                    fed/ground rules are not affected during replacement
 // fedAdmin(scope=fed)      all rules                   ground/learned/user-created rules   ground/learned/user-created rules are not affected during replacement
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------
 // 1. rules param contains the whole (updated) rules list that this user can see/config. it's from GET("/v1/policy/rule") plus some update/delete/add operations
 // 2. ground(crd) rules cannot be updated/deleted/added by this function
 // 3. accessible learned rules can be deleted, but not updated, by this function
@@ -1009,7 +1009,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	for _, rr := range rules {
 		if rr.CfgType == "" { // CfgType is not specified in new rule. deduce from scope
 			if rr.From == "" && rr.To == "" {
-				rr.CfgType, _ = cfgTypeMap2Api[common.PolicyRuleIdToCfgType(rr.ID)]
+				rr.CfgType = cfgTypeMap2Api[common.PolicyRuleIdToCfgType(rr.ID)]
 			} else {
 				if rr.Learned {
 					rr.CfgType = api.CfgTypeLearned
@@ -1024,8 +1024,8 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		}
 	}
 	sort.SliceStable(rules, func(i, j int) bool {
-		iCfgType, _ := cfgTypeMapping[rules[i].CfgType]
-		jCfgType, _ := cfgTypeMapping[rules[j].CfgType]
+		iCfgType := cfgTypeMapping[rules[i].CfgType]
+		jCfgType := cfgTypeMapping[rules[j].CfgType]
 		switch iCfgType {
 		case share.FederalCfg:
 			if jCfgType != share.FederalCfg {
@@ -1048,7 +1048,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					e := "Duplicate rule ID"
 					log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return fmt.Errorf(e)
+					return fmt.Errorf("%s", e)
 				} else {
 					// for admin/fedAdmin, because they can see all rules, rules param contains all rest-created rules' IDs in use.
 					// but for namespace user, because they cannot see all rules, rules param contains only subset of rest-created rules' IDs in use.
@@ -1116,9 +1116,9 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 				if del.Contains(rr.ID) {
 					del.Remove(rr.ID)
 					existingRule = true
-				} else {
-					// ignore new or unaccessible learned rules in rules param
-				}
+				} // else {
+				// ignore new or unaccessible learned rules in rules param
+				// }
 			} // ignore learned rules when scope=fed
 		} else if rr.CfgType == api.CfgTypeGround {
 			// always ignore ground rules from rest api
@@ -1166,7 +1166,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 				return err
 			}
 			if rr.ID == api.PolicyAutoID {
-				cfgType, _ := cfgTypeMapping[rr.CfgType]
+				cfgType := cfgTypeMapping[rr.CfgType]
 				rr.ID = common.GetAvailablePolicyID(idInUse, cfgType)
 				if rr.ID == 0 {
 					err = fmt.Errorf("Failed to locate available rule ID")
@@ -1294,7 +1294,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					break
 				}
 			}
-			if copied == false {
+			if !copied {
 				break
 			}
 		}
@@ -1451,7 +1451,7 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1800,7 +1800,7 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	query := restParseQuery(r)
-	delScope, _ := query.pairs[api.QueryScope]
+	delScope := query.pairs[api.QueryScope]
 	if delScope == "" {
 		delScope = share.ScopeLocal
 	}
@@ -2279,6 +2279,4 @@ LOOP_ALL_IDS:
 		}
 	}
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
-
-	return
 }

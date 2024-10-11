@@ -62,7 +62,7 @@ func (p *agentDisconnectEvent) Expire() {
 
 	cacheMutexLock()
 	defer cacheMutexUnlock()
-	if ac, _ := agentCacheMap[p.agentID]; ac != nil {
+	if ac := agentCacheMap[p.agentID]; ac != nil {
 		if ac.state == api.StateOnline {
 			log.WithFields(log.Fields{"agentID": p.agentID}).Info("state is online")
 			ac.timerTask = ""
@@ -78,7 +78,7 @@ func (p *controllerDisconnectEvent) Expire() {
 	log.WithFields(log.Fields{"HostID": p.hostID, "ctrlID": p.ctrlID}).Info()
 	cacheMutexLock()
 	defer cacheMutexUnlock()
-	if cc, _ := ctrlCacheMap[p.ctrlID]; cc != nil {
+	if cc := ctrlCacheMap[p.ctrlID]; cc != nil {
 		if cc.state == api.StateOnline {
 			log.WithFields(log.Fields{"ctrlID": p.ctrlID}).Info("state is online")
 			cc.timerTask = ""
@@ -122,7 +122,7 @@ func scheduleHostRemoval(cache *hostCache) {
 		if !cache.timerSched.IsZero() && time.Since(cache.timerSched) > hostRemovalDelay {
 			log.WithFields(log.Fields{"host": cache.host.ID}).Info("Force remove the host")
 			cache.state = api.StateLeft
-			cctx.TimerWheel.RemoveTask(cache.timerTask)
+			_ = cctx.TimerWheel.RemoveTask(cache.timerTask)
 			deleteHostFromCluster(cache.host.ID)
 		}
 		return
@@ -147,7 +147,7 @@ func cancelHostRemoval(cache *hostCache) {
 		log.WithFields(log.Fields{
 			"host": cache.host.ID,
 		}).Info("cancel host removal")
-		cctx.TimerWheel.RemoveTask(cache.timerTask)
+		_ = cctx.TimerWheel.RemoveTask(cache.timerTask)
 		cache.timerTask = ""
 		cache.timerSched = time.Time{}
 	}
@@ -171,7 +171,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 				}
 			}
 		} else {
-			ac, _ = agentCacheMap[agentId]
+			ac = agentCacheMap[agentId]
 		}
 	}
 
@@ -184,7 +184,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 				}
 			}
 		} else {
-			cc, _ = ctrlCacheMap[agentId]
+			cc = ctrlCacheMap[agentId]
 		}
 	}
 	cacheMutexUnlock()
@@ -208,7 +208,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if ac.timerTask != "" {
 				log.Debug("remove old timer")
-				cctx.TimerWheel.RemoveTask(ac.timerTask)
+				_ = cctx.TimerWheel.RemoveTask(ac.timerTask)
 				ac.timerTask = ""
 			}
 
@@ -252,7 +252,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if ac.timerTask != "" {
 				log.Debug("remove old timer")
-				cctx.TimerWheel.RemoveTask(ac.timerTask)
+				_ = cctx.TimerWheel.RemoveTask(ac.timerTask)
 				ac.timerTask = ""
 			}
 
@@ -288,7 +288,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if cc.timerTask != "" {
 				log.Debug("remove old cc timer")
-				cctx.TimerWheel.RemoveTask(cc.timerTask)
+				_ = cctx.TimerWheel.RemoveTask(cc.timerTask)
 				cc.timerTask = ""
 			}
 
@@ -324,7 +324,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if cc.timerTask != "" {
 				log.Debug("remove old cc timer")
-				cctx.TimerWheel.RemoveTask(cc.timerTask)
+				_ = cctx.TimerWheel.RemoveTask(cc.timerTask)
 				cc.timerTask = ""
 			}
 
@@ -346,7 +346,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 }
 
 func deleteHostFromCluster(hostID string) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 
@@ -355,39 +355,39 @@ func deleteHostFromCluster(hostID string) {
 	store := share.CLUSWorkloadHostStore(hostID)
 	keys, _ := cluster.GetStoreKeys(store)
 	for _, key := range keys {
-		cluster.Delete(key)
+		_ = cluster.Delete(key)
 	}
 
 	store = share.CLUSNetworkEPHostStore(hostID)
 	keys, _ = cluster.GetStoreKeys(store)
 	for _, key := range keys {
-		cluster.Delete(key)
+		_ = cluster.Delete(key)
 	}
 
 	//remove wildcard fqdn->ip mapping saved in kv
 	fqdn_store := fmt.Sprintf("%s%s/", share.CLUSFqdnIpStore, hostID)
 	fqdnkeys, _ := cluster.GetStoreKeys(fqdn_store)
 	for _, fqdnkey := range fqdnkeys {
-		cluster.Delete(fqdnkey)
+		_ = cluster.Delete(fqdnkey)
 	}
 
 	key := share.CLUSHostKey(hostID, "agent")
-	cluster.Delete(key)
+	_ = cluster.Delete(key)
 }
 
 func deleteAgentFromCluster(hostID string, agentID string) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 
 	log.WithFields(log.Fields{"hostID": hostID, "enforcer": agentID}).Info()
 
 	key := share.CLUSAgentKey(hostID, agentID)
-	cluster.Delete(key)
+	_ = cluster.Delete(key)
 }
 
 func deleteControllerFromCluster(hostID string, ctrlID string, clusterIP string) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 
@@ -511,10 +511,10 @@ func AgentAdmissionRequest(req *share.CLUSAdmissionRequest) *share.CLUSAdmission
 	var onlineEnforcers int
 	var disallowMsg string
 	cacheMutexLock()
-	if ac, _ = agentCacheMap[req.ID]; ac == nil {
+	if ac = agentCacheMap[req.ID]; ac == nil {
 		if host, ok := hostCacheMap[req.HostID]; ok {
 			for m := range host.agents.Iter() {
-				if ac, _ = agentCacheMap[m.(string)]; ac != nil {
+				if ac = agentCacheMap[m.(string)]; ac != nil {
 					break
 				}
 			}
@@ -531,10 +531,10 @@ func AgentAdmissionRequest(req *share.CLUSAdmissionRequest) *share.CLUSAdmission
 
 			if ac.agent.ID != req.ID {
 				deleteAgentFromCache(ac)
-			} else {
+			} /*else {
 				// Dummy with the same agent id - keep the old place holder in case
 				// there is data in it
-			}
+			} */
 		} else {
 			log.WithFields(log.Fields{
 				"host": req.HostID, "agent": ac.agent.ID, "state": ac.state,
@@ -543,7 +543,7 @@ func AgentAdmissionRequest(req *share.CLUSAdmissionRequest) *share.CLUSAdmission
 			// A host can only have one enforcer on it, so delete the old one
 			if ac.timerTask != "" {
 				log.Debug("remove old timer")
-				cctx.TimerWheel.RemoveTask(ac.timerTask)
+				_ = cctx.TimerWheel.RemoveTask(ac.timerTask)
 				ac.timerTask = ""
 			}
 			if ac.agent.ID != req.ID {

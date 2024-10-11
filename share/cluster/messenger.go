@@ -62,7 +62,7 @@ func (msgr *msgrMethod) unicastRegisterReceiver(expect string, receiver *unicast
 }
 
 func (msgr *msgrMethod) unicastRemoveReceiver(expect string) {
-	Delete(expect)
+	_ = Delete(expect)
 
 	msgr.unicastReceiverMutex.Lock()
 	defer msgr.unicastReceiverMutex.Unlock()
@@ -90,7 +90,7 @@ func (msgr *msgrMethod) unicastNotifyReceiver(expect string, value []byte) {
 	msgr.unicastReceiverMutex.Unlock()
 
 	if notfound {
-		Delete(expect)
+		_ = Delete(expect)
 	}
 }
 
@@ -174,7 +174,7 @@ func (msgr *msgrMethod) unicast(subject, key string, data []byte, cb UnicastCall
 	}
 
 	if delKey {
-		Delete(key)
+		_ = Delete(key)
 	}
 
 	return nil

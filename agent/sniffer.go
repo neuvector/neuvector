@@ -15,8 +15,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
@@ -53,24 +53,32 @@ var snifferMutex sync.RWMutex
 func releaseAllSniffer() {
 	for key, proc := range snifferPidMap {
 		if proc.status == snifferRunning {
-			stopSniffer(key)
+			if dbgError := stopSniffer(key); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
-		removePcapFiles(proc.fileNumber, proc.fileName)
+		if dbgError := removePcapFiles(proc.fileNumber, proc.fileName); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 }
 
 func releaseSniffer(id string) {
 	for key, proc := range snifferPidMap {
 		if proc.workload == id && proc.status == snifferRunning {
-			stopSniffer(key)
+			if dbgError := stopSniffer(key); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 	}
 }
 
-//sniffer ID: (index+rand)(8)+agentID
+// sniffer ID: (index+rand)(8)+agentID
 func generateSnifferID() string {
 	randBytes := make([]byte, share.SnifferIdAgentField/2)
-	rand.Read(randBytes)
+	if _, dbgError := rand.Read(randBytes); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	rstr := hex.EncodeToString(randBytes)
 	str := fmt.Sprintf("%d", snifferIndex)
 	snifferIndex++
@@ -191,7 +199,7 @@ func readTimestamp(f *os.File) (uint64, error) {
 	return (second<<32 + microSecond), nil
 }
 
-//get all the pcap files name in time seqence
+// get all the pcap files name in time seqence
 func getFileList(max uint, path string) []string {
 	//split the list to two half, first half and second half
 	//for example: t3,t4,t0,t1,t2
@@ -318,7 +326,7 @@ func startSniffer(info *share.CLUSSnifferRequest) (string, error) {
 
 	if c, ok := gInfoReadActiveContainer(info.WorkloadID); ok {
 		if c.hostMode {
-			return "", grpc.Errorf(codes.InvalidArgument, "Container packet capture not supported")
+			return "", status.Errorf(codes.InvalidArgument, "Container packet capture not supported")
 		}
 
 		pid = c.pid
@@ -335,12 +343,12 @@ func startSniffer(info *share.CLUSSnifferRequest) (string, error) {
 		}
 		if pid == 0 {
 			err := fmt.Errorf("Container pid zero")
-			return "", grpc.Errorf(codes.InvalidArgument, err.Error())
+			return "", status.Errorf(codes.InvalidArgument, "%s", err.Error())
 
 		}
 	} else {
 		err := fmt.Errorf("Container cannot be found or not running")
-		return "", grpc.Errorf(codes.InvalidArgument, err.Error())
+		return "", status.Errorf(codes.InvalidArgument, "%s", err.Error())
 	}
 
 	proc := &procInfo{
@@ -354,7 +362,7 @@ func startSniffer(info *share.CLUSSnifferRequest) (string, error) {
 	proc.fileName, proc.args = parseArgs(info, key[:share.SnifferIdAgentField])
 	_, err := startSnifferProc(key, proc, pid)
 	if err != nil {
-		return "", grpc.Errorf(codes.Internal, err.Error())
+		return "", status.Errorf(codes.Internal, "%s", err.Error())
 	} else {
 		return key, nil
 	}
@@ -412,8 +420,9 @@ func startSnifferProc(key string, proc *procInfo, pid int) (string, error) {
 
 	pgid := proc.cmd.Process.Pid
 	global.SYS.AddToolProcess(pgid, pid, "sniffer", script)
-
-	io.WriteString(stdin, script)
+	if _, dbgError := io.WriteString(stdin, script); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	stdin.Close()
 
 	time.Sleep(time.Millisecond * 300)
@@ -484,7 +493,7 @@ func stopSniffer(id string) error {
 	snifferMutex.RUnlock()
 	if !ok {
 		log.WithFields(log.Fields{"id": id}).Error("Sniffer not found")
-		return grpc.Errorf(codes.NotFound, "Sniffer not found")
+		return status.Errorf(codes.NotFound, "Sniffer not found")
 	}
 
 	if proc.status == snifferStopped {
@@ -493,7 +502,7 @@ func stopSniffer(id string) error {
 
 	if err := syscall.Kill(-proc.cmd.Process.Pid, syscall.SIGKILL); err != nil {
 		log.WithFields(log.Fields{"id": id, "err": err}).Error("Failed to kill sniffer")
-		return grpc.Errorf(codes.Internal, err.Error())
+		return status.Errorf(codes.Internal, "%s", err.Error())
 	}
 
 	// waitOnSniffer will set the status
@@ -530,10 +539,12 @@ func removeSniffer(id string) error {
 	snifferMutex.RUnlock()
 	if ok {
 		if proc.status == snifferRunning {
-			stopSniffer(id)
+			if dbgError := stopSniffer(id); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 		if err = removePcapFiles(proc.fileNumber, proc.fileName); err != nil {
-			return grpc.Errorf(codes.Internal, err.Error())
+			return status.Errorf(codes.Internal, "%s", err.Error())
 		}
 
 		snifferMutex.Lock()
@@ -543,6 +554,6 @@ func removeSniffer(id string) error {
 		return nil
 	} else {
 		log.WithFields(log.Fields{"id": id}).Error("Sniffer not found")
-		return grpc.Errorf(codes.NotFound, "Sniffer not found")
+		return status.Errorf(codes.NotFound, "Sniffer not found")
 	}
 }

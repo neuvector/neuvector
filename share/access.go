@@ -141,7 +141,7 @@ func (o *CLUSUser) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 
 	domains := make([]string, len(s))
 	i := 0
-	for d, _ := range s {
+	for d := range s {
 		domains[i] = d
 		i++
 	}
@@ -405,7 +405,7 @@ func (o *CLUSRegistryImageSummary) GetDomain(f GetAccessObjectFunc) ([]string, [
 
 	domains := make([]string, len(m))
 	i := 0
-	for d, _ := range m {
+	for d := range m {
 		domains[i] = d
 		i++
 	}
@@ -575,7 +575,7 @@ func (o *CLUSApikey) GetDomain(f GetAccessObjectFunc) ([]string, []string) {
 
 	domains := make([]string, len(s))
 	i := 0
-	for d, _ := range s {
+	for d := range s {
 		domains[i] = d
 		i++
 	}

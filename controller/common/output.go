@@ -225,7 +225,7 @@ func (s *Syslogger) makeDial(prio syslog.Priority, timeout time.Duration) (*sysl
 
 // --
 
-const webhookInfo = "Neuvector webhook is configured."
+// const webhookInfo = "Neuvector webhook is configured."
 const requestTimeout = time.Duration(5 * time.Second)
 const ctypeText = "text/plain; charset=us-ascii"
 const ctypeJSON = "application/json"
