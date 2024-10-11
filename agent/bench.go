@@ -231,7 +231,9 @@ func (b *Bench) logBenchFailure(benchPlat benchPlatform, status share.BenchStatu
 		Msg:        utils.BenchStatusToStr(status),
 	}
 
-	evqueue.Append(&clog)
+	if dbgError := evqueue.Append(&clog); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func (b *Bench) BenchLoop() {
@@ -247,7 +249,9 @@ func (b *Bench) BenchLoop() {
 					log.Info("Alerted: Ignore host bench tests")
 					continue
 				}
-				b.doDockerHostBench()
+				if dbgError := b.doDockerHostBench(); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 			}
 		case <-b.kubeTimer.C:
 			if !agentEnv.autoBenchmark {
@@ -383,8 +387,9 @@ func (b *Bench) BenchLoop() {
 				}
 				b.remediations = b.loadRemediation(remediation)
 			}
-
-			b.doKubeBench(masterScript, workerScript, remediation)
+			if _, dbgError := b.doKubeBench(masterScript, workerScript, remediation); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		case <-b.conTimer.C:
 			containers := b.cloneAllNewContainers()
 			if prober.IsNvProtectAlerted {
@@ -394,7 +399,9 @@ func (b *Bench) BenchLoop() {
 
 			if agentEnv.autoBenchmark {
 				if Host.CapDockerBench {
-					b.doDockerContainerBench(containers)
+					if dbgError := b.doDockerContainerBench(containers); dbgError != nil {
+						log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+					}
 				} else {
 					b.putBenchReport(Host.ID, share.BenchDockerContainer, nil, share.BenchStatusFinished)
 				}
@@ -445,9 +452,17 @@ func (b *Bench) BenchLoop() {
 func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (error, error) {
 	log.WithFields(log.Fields{"master": b.isKubeMaster, "worker": b.isKubeWorker}).Info()
 
-	b.replaceKubeCisCmd(masterScript, masterScriptSh)
-	b.replaceKubeCisCmd(workerScript, workerScriptSh)
-	b.replaceKubeCisCmd(journalScript, journalScriptSh)
+	if dbgError := b.replaceKubeCisCmd(masterScript, masterScriptSh); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
+	if dbgError := b.replaceKubeCisCmd(workerScript, workerScriptSh); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
+	if dbgError := b.replaceKubeCisCmd(journalScript, journalScriptSh); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	defer os.Remove(masterScriptSh)
 	defer os.Remove(workerScriptSh)
@@ -531,7 +546,7 @@ func (b *Bench) triggerHostCustomCheck(script *share.CLUSCustomCheckGroup) {
 }
 
 func (b *Bench) RerunDocker(forced bool) {
-	if agentEnv.autoBenchmark == false && forced == false {
+	if !agentEnv.autoBenchmark && !forced {
 		log.Info("ignored")
 		return
 	}
@@ -550,7 +565,7 @@ func (b *Bench) RerunDocker(forced bool) {
 }
 
 func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
-	if agentEnv.autoBenchmark == false && forced == false {
+	if !agentEnv.autoBenchmark && !forced {
 		log.Info("ignored")
 		return
 	}
@@ -661,7 +676,7 @@ func (b *Bench) parseBenchMsg(line string) (*benchItem, bool) {
 		id = strings.TrimSpace(line[a+3 : c])
 
 		// Ignore the section title
-		if strings.Index(id, ".") == -1 {
+		if !strings.Contains(id, ".") {
 			return nil, false
 		}
 
@@ -722,7 +737,10 @@ func (b *Bench) replaceDockerDaemonCmdline(srcPath, dstPath string, containers [
 	}
 	t := template.New("bench")
 	t.Delims("<<<", ">>>")
-	t.Parse(string(dat))
+
+	if _, dbgError := t.Parse(string(dat)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	if err = t.Execute(f, r); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Executing template error")
@@ -734,6 +752,14 @@ func (b *Bench) replaceDockerDaemonCmdline(srcPath, dstPath string, containers [
 //if enforcer not running in pid host mode, change the audit warn to info
 //because auditctl can not run without the pid host mode
 /*
+func (b *Bench) getContainerName(msg string) string {
+	if i := strings.Index(msg, ": "); i > 0 {
+		return msg[i+2:]
+	} else {
+		return ""
+	}
+}
+
 func (b *Bench) filterResult(list []*benchItem) {
 	for _, l := range list {
 		// TODO: skip all nv container
@@ -777,14 +803,6 @@ func (b *Bench) assignDockerBenchMeta(list []*benchItem) {
 			l.profile = share.BenchProfileL2
 		}
 		l.testNum = fmt.Sprintf("D.%s", l.testNum)
-	}
-}
-
-func (b *Bench) getContainerName(msg string) string {
-	if i := strings.Index(msg, ": "); i > 0 {
-		return msg[i+2:]
-	} else {
-		return ""
 	}
 }
 
@@ -1201,7 +1219,7 @@ func (b *Bench) runScript(script string, pid int) (bool, string, error) {
 		if errb.Len() > 0 {
 			msg = errb.String()
 		}
-		msg += fmt.Sprintf("%s", outb.String())
+		msg += outb.String()
 		result <- err
 	}()
 	select {
@@ -1271,7 +1289,9 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 			key = share.CLUSBenchStateWorkloadKey(id)
 		}
 		value, _ = json.Marshal(&share.CLUSBenchState{RunAt: now})
-		cluster.PutBinary(key, value)
+		if dbgError := cluster.PutBinary(key, value); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 }
 
@@ -1387,6 +1407,7 @@ func (b *Bench) runKubeBench(bench share.BenchType, script, remediationFolder st
 	return out, nil
 }
 
+/* removed by golint
 func (b *Bench) getKubeVersion() string {
 	if !b.bEnable {
 		return ""
@@ -1422,6 +1443,7 @@ func (b *Bench) getKubeVersion() string {
 	log.WithFields(log.Fields{"version": string(out)}).Info("Kubernetes version")
 	return string(out)
 }
+*/
 
 func (b *Bench) loadRemediationFromYAML(path string) map[string]string {
 	remediationMap := make(map[string]string)
@@ -1518,7 +1540,9 @@ func (b *Bench) replaceKubeCisCmd(srcPath, dstPath string) error {
 	}
 	t := template.New("kubecis")
 	t.Delims("<<<", ">>>")
-	t.Parse(string(dat))
+	if _, dbgError := t.Parse(string(dat)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	if err = t.Execute(f, r); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Executing template error")

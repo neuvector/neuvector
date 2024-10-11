@@ -1,8 +1,8 @@
 package policy
 
 import (
-	"sync"
 	"net"
+	"sync"
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/share"
@@ -31,19 +31,19 @@ type DlpBuildInfo struct {
 }
 
 type Engine struct {
-	NetworkPolicy      map[string]*WorkloadIPPolicyInfo
-	ProcessPolicy      map[string]*share.CLUSProcessProfile
-	DlpWlRulesInfo     map[string]*dp.DPWorkloadDlpRule
-	DlpBldInfo         *DlpBuildInfo
-	HostID             string
-	HostIPs            utils.Set
-	TunnelIP           []net.IPNet
-	Mutex              sync.Mutex
-	getGroupRule       GroupProcPolicyCallback
-	PolicyAddrMap      map[string]share.CLUSSubnet
-	HostPolicyAddrMap  map[string]share.CLUSSubnet
-	PolTimerWheel      *utils.TimerWheel
-	PolDomNBEMap       map[string]bool
+	NetworkPolicy     map[string]*WorkloadIPPolicyInfo
+	ProcessPolicy     map[string]*share.CLUSProcessProfile
+	DlpWlRulesInfo    map[string]*dp.DPWorkloadDlpRule
+	DlpBldInfo        *DlpBuildInfo
+	HostID            string
+	HostIPs           utils.Set
+	TunnelIP          []net.IPNet
+	Mutex             sync.Mutex
+	getGroupRule      GroupProcPolicyCallback
+	PolicyAddrMap     map[string]share.CLUSSubnet
+	HostPolicyAddrMap map[string]share.CLUSSubnet
+	PolTimerWheel     *utils.TimerWheel
+	PolDomNBEMap      map[string]bool
 }
 
 func (e *Engine) Init(HostID string, HostIPs utils.Set, TunnelIP []net.IPNet, cb GroupProcPolicyCallback, pad int) {

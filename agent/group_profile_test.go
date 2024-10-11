@@ -11,13 +11,12 @@ import (
 )
 
 type appSample struct {
-	name   string
-	path   string
-	action string
-	good   bool
+	name string
+	path string
+	good bool
 }
 
-////// Utility
+// //// Utility
 func printProfile(profile []*share.CLUSProcessProfileEntry) {
 	fmt.Printf("profile: count %d\n", len(profile))
 	for i, pp := range profile {
@@ -25,7 +24,7 @@ func printProfile(profile []*share.CLUSProcessProfileEntry) {
 	}
 }
 
-////// Utility
+// //// Utility
 func printApps(apps []appSample) {
 	fmt.Printf("apps: count %d\n", len(apps))
 	for i, app := range apps {
@@ -33,7 +32,7 @@ func printApps(apps []appSample) {
 	}
 }
 
-////// Utility
+// //// Utility
 func tester(profile []*share.CLUSProcessProfileEntry, apps []appSample) bool {
 	for _, app := range apps {
 		ppe := &share.CLUSProcessProfileEntry{
@@ -71,16 +70,16 @@ func tester(profile []*share.CLUSProcessProfileEntry, apps []appSample) bool {
 
 func TestWildcardPathEmptyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -106,16 +105,16 @@ func TestWildcardPathEmptyPolicy(t *testing.T) {
 
 func TestAllowAllPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "*", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "*", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -139,16 +138,16 @@ func TestAllowAllPolicy(t *testing.T) {
 
 func TestExactMatchedPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -174,16 +173,16 @@ func TestExactMatchedPolicy(t *testing.T) {
 
 func TestRecursiveMatchedPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ls", Path: "/usr/bin/*", Action: share.PolicyActionAllow},
+		{Name: "ls", Path: "/usr/bin/*", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -211,16 +210,16 @@ func TestRecursiveMatchedPolicy(t *testing.T) {
 
 func TestBusyboxPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -247,16 +246,16 @@ func TestBusyboxPolicy(t *testing.T) {
 
 func TestRecursiveWildcardPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "ls", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/bin/*", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/bin/*", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -283,16 +282,16 @@ func TestRecursiveWildcardPolicy(t *testing.T) {
 
 func TestWildcardNamePolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
 	}
 
 	// merged rules
@@ -320,17 +319,17 @@ func TestWildcardNamePolicy(t *testing.T) {
 
 func TestWildcardPathDenyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "*", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "*", Action: share.PolicyActionDeny},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/usr/bin/ps", Action: share.PolicyActionAllow}, // ignored
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "/usr/bin/ps", Action: share.PolicyActionAllow}, // ignored
 	}
 
 	// merged rules
@@ -358,17 +357,17 @@ func TestWildcardPathDenyPolicy(t *testing.T) {
 
 func TestWildcardNameDenyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionDeny},
+		{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionDeny},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/usr/bin/ps", Action: share.PolicyActionAllow}, // ignored
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionAllow},
+		{Name: "ps", Path: "/usr/bin/ps", Action: share.PolicyActionAllow}, // ignored
 	}
 
 	// merged rules
@@ -396,17 +395,17 @@ func TestWildcardNameDenyPolicy(t *testing.T) {
 
 func TestRecursivePathDenyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/usr/bin/*", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "/usr/bin/*", Action: share.PolicyActionDeny},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/usr/bin/ps", Action: share.PolicyActionAllow}, // ignored
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "/usr/bin/ps", Action: share.PolicyActionAllow}, // ignored
 	}
 
 	// merged rules
@@ -433,17 +432,17 @@ func TestRecursivePathDenyPolicy(t *testing.T) {
 
 func TestWildcardNameRecursivePathDenyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/*", Action: share.PolicyActionDeny},
+		{Name: "*", Path: "/usr/bin/*", Action: share.PolicyActionDeny},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow}, // ignored
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow}, // ignored
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	// merged rules
@@ -471,18 +470,18 @@ func TestWildcardNameRecursivePathDenyPolicy(t *testing.T) {
 
 func TestBashDenyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "", Action: share.PolicyActionDeny},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/*", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/usr/bin/*", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow}, // ignored
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow}, // ignored
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	// merged rules
@@ -507,24 +506,24 @@ func TestBashDenyPolicy(t *testing.T) {
 
 func TestShellhDenyPolicy(t *testing.T) {
 	grp_rule1 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "dash", Path: "", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "ash", Path: "", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "sh", Path: "", Action: share.PolicyActionDeny},
+		{Name: "bash", Path: "", Action: share.PolicyActionDeny},
+		{Name: "dash", Path: "", Action: share.PolicyActionDeny},
+		{Name: "ash", Path: "", Action: share.PolicyActionDeny},
+		{Name: "sh", Path: "", Action: share.PolicyActionDeny},
 	}
 
 	grp_rule2 := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/bin/*", Action: share.PolicyActionAllow},
-		&share.CLUSProcessProfileEntry{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/bin/*", Action: share.PolicyActionAllow},
+		{Name: "*", Path: "/usr/bin/busybox", Action: share.PolicyActionAllow},
 	}
 
 	container_rule := []*share.CLUSProcessProfileEntry{
-		&share.CLUSProcessProfileEntry{Name: "bash", Path: "/bin/bash", Action: share.PolicyActionAllow}, // ignored
-		&share.CLUSProcessProfileEntry{Name: "sh", Path: "/bin/sh", Action: share.PolicyActionAllow},     // ignored
-		&share.CLUSProcessProfileEntry{Name: "ash", Path: "/bin/ash", Action: share.PolicyActionAllow},   // ignored
-		&share.CLUSProcessProfileEntry{Name: "dash", Path: "/bin/dash", Action: share.PolicyActionAllow}, // ignored
-		&share.CLUSProcessProfileEntry{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
-		&share.CLUSProcessProfileEntry{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
+		{Name: "bash", Path: "/bin/bash", Action: share.PolicyActionAllow}, // ignored
+		{Name: "sh", Path: "/bin/sh", Action: share.PolicyActionAllow},     // ignored
+		{Name: "ash", Path: "/bin/ash", Action: share.PolicyActionAllow},   // ignored
+		{Name: "dash", Path: "/bin/dash", Action: share.PolicyActionAllow}, // ignored
+		{Name: "cat", Path: "/usr/bin/cat", Action: share.PolicyActionDeny},
+		{Name: "ps", Path: "/bin/ps", Action: share.PolicyActionAllow},
 	}
 
 	// merged rules
@@ -549,9 +548,9 @@ func TestShellhDenyPolicy(t *testing.T) {
 	}
 }
 
-///////////////////////////////////////////////////////////
-///// File monitor tests	///////////////////////////////
-///////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////
+// /// File monitor tests	///////////////////////////////
+// /////////////////////////////////////////////////////////
 type fileSample struct {
 	path     string
 	behavior string
@@ -563,19 +562,12 @@ type monitorRule struct {
 	behavior string
 }
 
+/* removed by golint
 ////// Utility
 func printFileMonitorProfile(profile []share.CLUSFileMonitorFilter) {
 	fmt.Printf("monitor file profile: count %d\n", len(profile))
 	for i, ff := range profile {
 		fmt.Printf("[%d]: %+v, %+v, %+v, %+v, %+v, %+v\n", i, ff.Filter, ff.Path, ff.Regex, ff.Behavior, ff.Recursive, ff.CustomerAdd)
-	}
-}
-
-////// Utility
-func printFileMonitorRules(rules []*monitorRule) {
-	fmt.Printf("monitor file rules: count %d\n", len(rules))
-	for i, v := range rules {
-		fmt.Printf("[%d]: %+v, %+v\n", i, v.prefix, v.behavior)
 	}
 }
 
@@ -586,8 +578,17 @@ func printFilePaths(files []fileSample) {
 		fmt.Printf("[%d]: %+v, %+v, %+v\n", i, f.path, f.behavior, f.good)
 	}
 }
+*/
 
-////// Utility
+// //// Utility
+func printFileMonitorRules(rules []*monitorRule) {
+	fmt.Printf("monitor file rules: count %d\n", len(rules))
+	for i, v := range rules {
+		fmt.Printf("[%d]: %+v, %+v\n", i, v.prefix, v.behavior)
+	}
+}
+
+// //// Utility
 func printFileAccessRules(rules map[string]*share.CLUSFileAccessFilterRule) {
 	fmt.Printf("access file rules: count %d\n", len(rules))
 	for filter, v := range rules {
@@ -595,7 +596,7 @@ func printFileAccessRules(rules map[string]*share.CLUSFileAccessFilterRule) {
 	}
 }
 
-////// Utility
+// //// Utility
 func buildFileMonitorPrefixRules(profile []share.CLUSFileMonitorFilter) []*monitorRule {
 	var rules []*monitorRule
 	for _, ff := range profile {
@@ -610,7 +611,7 @@ func buildFileMonitorPrefixRules(profile []share.CLUSFileMonitorFilter) []*monit
 	return rules
 }
 
-////// a simplified version to verify FileMonitor entries
+// //// a simplified version to verify FileMonitor entries
 func evalFileMonitor(profile []share.CLUSFileMonitorFilter, files []fileSample) bool {
 	rules := buildFileMonitorPrefixRules(profile)
 	for _, f := range files {
@@ -632,24 +633,24 @@ func evalFileMonitor(profile []share.CLUSFileMonitorFilter, files []fileSample) 
 }
 
 func TestFileMonitorPolicy(t *testing.T) {
-	profile := &share.CLUSFileMonitorProfile{Filters: make([]share.CLUSFileMonitorFilter, 0, 0)}
+	profile := &share.CLUSFileMonitorProfile{Filters: make([]share.CLUSFileMonitorFilter, 0)}
 
 	// grp1
 	grp_rule1 := []share.CLUSFileMonitorFilter{
-		share.CLUSFileMonitorFilter{Filter: "/etc/secret_block", Path: "/etc/secret_block", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorBlock, CustomerAdd: true},
+		{Filter: "/etc/secret_block", Path: "/etc/secret_block", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorBlock, CustomerAdd: true},
 	}
 
 	// grp2
 	grp_rule2 := []share.CLUSFileMonitorFilter{
-		share.CLUSFileMonitorFilter{Filter: "/etc/secret_monitor", Path: "/etc/secret_monitor", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: true},
+		{Filter: "/etc/secret_monitor", Path: "/etc/secret_monitor", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: true},
 	}
 
 	// workload
 	workload_rule := []share.CLUSFileMonitorFilter{
-		share.CLUSFileMonitorFilter{Filter: "/usr/local/sbin/*", Path: "/usr/local/sbin", Regex: ".*", Recursive: true, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: false},
-		share.CLUSFileMonitorFilter{Filter: "/lib/libpthread*", Path: "/lib", Regex: "libpthread.*", Recursive: false, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: false},
-		share.CLUSFileMonitorFilter{Filter: "/tmp/secret_monitor", Path: "/etc/secret_monitor", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: true},
-		share.CLUSFileMonitorFilter{Filter: "/tmp/secret_block", Path: "/tmp/secret_block", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorBlock, CustomerAdd: true},
+		{Filter: "/usr/local/sbin/*", Path: "/usr/local/sbin", Regex: ".*", Recursive: true, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: false},
+		{Filter: "/lib/libpthread*", Path: "/lib", Regex: "libpthread.*", Recursive: false, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: false},
+		{Filter: "/tmp/secret_monitor", Path: "/etc/secret_monitor", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorMonitor, CustomerAdd: true},
+		{Filter: "/tmp/secret_block", Path: "/tmp/secret_block", Regex: "", Recursive: false, Behavior: share.FileAccessBehaviorBlock, CustomerAdd: true},
 	}
 
 	// merged rules
@@ -682,20 +683,20 @@ func TestFileAccessPolicy(t *testing.T) {
 
 	/// group 1
 	grp_rule1 := &share.CLUSFileAccessRule{Filters: map[string]*share.CLUSFileAccessFilterRule{
-		"/tmp/secret_monitor": &share.CLUSFileAccessFilterRule{Apps: []string{"vi", "cat"}, Behavior: share.FileAccessBehaviorMonitor},
+		"/tmp/secret_monitor": {Apps: []string{"vi", "cat"}, Behavior: share.FileAccessBehaviorMonitor},
 	}}
 
 	/// group 2
 	grp_rule2 := &share.CLUSFileAccessRule{Filters: map[string]*share.CLUSFileAccessFilterRule{
-		"/tmp/secret_block": &share.CLUSFileAccessFilterRule{Apps: []string{"cat"}, Behavior: share.FileAccessBehaviorBlock},
-		"/tmp/myfile_m":     &share.CLUSFileAccessFilterRule{Apps: []string{"open", "touch"}, Behavior: share.FileAccessBehaviorMonitor},
+		"/tmp/secret_block": {Apps: []string{"cat"}, Behavior: share.FileAccessBehaviorBlock},
+		"/tmp/myfile_m":     {Apps: []string{"open", "touch"}, Behavior: share.FileAccessBehaviorMonitor},
 	}}
 
 	/// workload
 	workload_rule := &share.CLUSFileAccessRule{Filters: map[string]*share.CLUSFileAccessFilterRule{
-		"/tmp/share":    &share.CLUSFileAccessFilterRule{Apps: []string{"vi"}, Behavior: share.FileAccessBehaviorMonitor},
-		"/tmp/myfile_b": &share.CLUSFileAccessFilterRule{Apps: []string{""}, Behavior: share.FileAccessBehaviorBlock},
-		"/tmp/myfile_m": &share.CLUSFileAccessFilterRule{Apps: []string{"touch", "vi"}, Behavior: share.FileAccessBehaviorBlock},
+		"/tmp/share":    {Apps: []string{"vi"}, Behavior: share.FileAccessBehaviorMonitor},
+		"/tmp/myfile_b": {Apps: []string{""}, Behavior: share.FileAccessBehaviorBlock},
+		"/tmp/myfile_m": {Apps: []string{"touch", "vi"}, Behavior: share.FileAccessBehaviorBlock},
 	}}
 
 	///
@@ -708,7 +709,6 @@ func TestFileAccessPolicy(t *testing.T) {
 	var v *share.CLUSFileAccessFilterRule
 	var apps []string   // correct
 	var behavior string // correct
-	pass := true
 	for filter, v = range profile.Filters {
 		switch filter {
 		case "/tmp/secret_monitor":
@@ -732,7 +732,7 @@ func TestFileAccessPolicy(t *testing.T) {
 		}
 
 		//
-		pass = reflect.DeepEqual(v.Apps, apps) && v.Behavior == behavior
+		pass := reflect.DeepEqual(v.Apps, apps) && v.Behavior == behavior
 		if !pass {
 			fmt.Printf("\nFailed at [%+v]: %+v, %+v, expected: %+v, %+v\n\n", filter, v.Apps, v.Behavior, apps, behavior)
 			printFileAccessRules(profile.Filters)

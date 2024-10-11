@@ -2,16 +2,13 @@
 package resource
 
 import (
-	"sync"
-
 	"github.com/neuvector/neuvector/share"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
 )
 
-type resourceCache map[string]interface{}
+// type resourceCache map[string]interface{}
 type noop struct {
 	platform, flavor string
-	lock             sync.RWMutex
 }
 
 func newNoopDriver(platform, flavor, network string) *noop {

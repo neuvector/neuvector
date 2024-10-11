@@ -13,6 +13,7 @@ import (
 const inetMonitorSocketSize uint = 1024 * 5
 const INET_DIAG_INFO = 2
 
+/* removed by go-lint
 func (p *Probe) isSocketIPv4(d *netlink.InetDiagMsg) bool {
 	if d.IDiagFamily == syscall.AF_INET6 {
 		if utils.IsIPv6(d.Id.SrcIPv6()) || utils.IsIPv6(d.Id.DstIPv6()) {
@@ -22,6 +23,7 @@ func (p *Probe) isSocketIPv4(d *netlink.InetDiagMsg) bool {
 
 	return true
 }
+*/
 
 func (p *Probe) inetGetSockets(family, proto uint8, state uint32) ([]*socket, []*socket, error) {
 	req := netlink.NewNetlinkRequest(netlink.SOCK_DIAG_BY_FAMILY, syscall.NLM_F_DUMP)
@@ -61,7 +63,7 @@ func (p *Probe) inetGetSockets(family, proto uint8, state uint32) ([]*socket, []
 		}
 	}
 
-	return listenList, connectList, nil
+	// return listenList, connectList, nil
 }
 
 func (p *Probe) convertInetDiag(d *netlink.InetDiagMsg, protocol uint8) *socket {

@@ -13,8 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/agent/workerlet"
-	"github.com/neuvector/neuvector/share/utils"
 	"github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 const hostRootMountPoint = "/proc/1/root"
@@ -67,7 +67,7 @@ type FileNotificationCtr struct {
 	rootsByID  map[string]*fsnRootFd // index: container id (ref by probe)
 }
 
-/////
+// ///
 func calculateFileInfo(fi os.FileInfo, path string) (bool, bool, int64, uint32) {
 	var hash uint32
 
@@ -80,7 +80,7 @@ func calculateFileInfo(fi os.FileInfo, path string) (bool, bool, int64, uint32) 
 	return bExec, bJavaPkg, length, hash
 }
 
-////////////
+// //////////
 func NewFsnCenter(p *Probe, rtStorageDriver string) (*FileNotificationCtr, bool) {
 	log.WithFields(log.Fields{"driver": rtStorageDriver}).Debug("FSN:")
 	fsn := &FileNotificationCtr{
@@ -115,8 +115,8 @@ func NewFsnCenter(p *Probe, rtStorageDriver string) (*FileNotificationCtr, bool)
 	return fsn, true
 }
 
-//// No recursive dir mark is for inotify
-//// Add all sub-directories from the top layers
+// // No recursive dir mark is for inotify
+// // Add all sub-directories from the top layers
 func (fsn *FileNotificationCtr) enumFiles(rootPath, id string, bInit bool) (utils.Set, map[string]*fileInfo) {
 	dirs := utils.NewSet()
 	files := make(map[string]*fileInfo)
@@ -197,6 +197,7 @@ func (fsn *FileNotificationCtr) unlockMux() {
 	// log.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("FSN: ")
 }
 
+/* removed by golint
 func (fsn *FileNotificationCtr) dumpDebugData(r *fsnRootFd) {
 	log.WithFields(log.Fields{"id": r.id, "cLayer": r.cLayer, "cLayerLen": r.cLayerLen}).Debug("FSN:")
 	for dir := range r.dirs.Iter() {
@@ -207,6 +208,7 @@ func (fsn *FileNotificationCtr) dumpDebugData(r *fsnRootFd) {
 		log.WithFields(log.Fields{"file": file, "finfo": finfo}).Debug("FSN: \t")
 	}
 }
+*/
 
 func (fsn *FileNotificationCtr) addDir(dir string) error {
 	// log.WithFields(log.Fields{"dir": dir}).Debug("FSN:")
@@ -285,7 +287,7 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 		return
 	}
 
-	finfo = &fileInfo{bExec: bExec,  bJavaPkg: bJavaPkg, hashValue: hash, length: length, fileType: file_changed}
+	finfo = &fileInfo{bExec: bExec, bJavaPkg: bJavaPkg, hashValue: hash, length: length, fileType: file_changed}
 	if bNewFile {
 		finfo.fileType = file_added
 	}
@@ -293,15 +295,16 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 
 	// reporting events
 	// log.WithFields(log.Fields{"id": root.id, "file": file, "finfo": finfo}).Debug("FSN:")
-	go fsn.prober.ProcessFsnEvent(root.id, []string {file}, *finfo)
+	go fsn.prober.ProcessFsnEvent(root.id, []string{file}, *finfo)
 }
 
 // already locked
 func (fsn *FileNotificationCtr) handleRemoveEvent(op string, root *fsnRootFd, path, file string) {
 	// mLog.WithFields(log.Fields{"op": op, "path": path}).Debug("FSN:")
 	if root.dirs.Contains(path) {
-
-		fsn.removeDir(path)
+		if dbgError := fsn.removeDir(path); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		var execs, jars []string
 		for p, fi := range root.files {
 			if fi.bExec {
@@ -323,13 +326,12 @@ func (fsn *FileNotificationCtr) handleRemoveEvent(op string, root *fsnRootFd, pa
 	} else {
 		// mLog.WithFields(log.Fields{"file": file}).Debug("FSN: remove file")
 		if fi, ok := root.files[file]; ok && fi.bJavaPkg {
-			go fsn.prober.ProcessFsnEvent(root.id, []string {file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
+			go fsn.prober.ProcessFsnEvent(root.id, []string{file}, fileInfo{bJavaPkg: true, fileType: file_deleted})
 		}
 		delete(root.files, file)
 	}
 }
 
-//
 func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 	// mLog.WithFields(log.Fields{"event": event}).Debug("FSN:")
 	index := fsn.rootIndex(event.Name)
@@ -380,7 +382,9 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 					continue
 				}
 				// mLog.WithFields(log.Fields{"rdir": dir[root.cLayerLen:]}).Debug("FSN: new dir")
-				fsn.addDir(dir)
+				if dbgError := fsn.addDir(dir); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 				root.dirs.Add(dir)
 			}
 		case fi.Mode().IsRegular():
@@ -415,7 +419,7 @@ func (fsn *FileNotificationCtr) monitorEvents() {
 	defer fsn.Close()
 	defer log.Info("FSN: exit")
 	for {
-		if fsn.bEnabled == false {
+		if !fsn.bEnabled {
 			break
 		}
 
@@ -458,7 +462,7 @@ func (fsn *FileNotificationCtr) skipPathByRole(role, path string) bool {
 		}
 		fallthrough
 	case "enforcer", "scanner":
-		if strings.HasPrefix(path + "/", "/tmp/") {
+		if strings.HasPrefix(path+"/", "/tmp/") {
 			return true
 		}
 	}
@@ -491,7 +495,9 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath, role string, pid int) (b
 	//// existing entry, remove its marks at first
 	if r, ok := fsn.roots[index]; ok {
 		for dir := range r.dirs.Iter() {
-			fsn.removeDir(dir.(string))
+			if dbgError := fsn.removeDir(dir.(string)); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 		r.files = nil
 		r.dirs.Clear()
@@ -564,7 +570,9 @@ func (fsn *FileNotificationCtr) RemoveContainer(id, cPath string) bool {
 	}
 
 	for dir := range root.dirs.Iter() {
-		fsn.removeDir(dir.(string))
+		if dbgError := fsn.removeDir(dir.(string)); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 
 	root.dirs.Clear()
@@ -709,7 +717,7 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.S
 	/// image layer (init)
 	initPath := rootPath + "-init"
 	if _, err := os.Stat(filepath.Join("/proc/1/root", initPath)); os.IsNotExist(err) {
-		path := strings.TrimSuffix(rootPath, "/")	// remove appending "/" if it exists
+		path := strings.TrimSuffix(rootPath, "/") // remove appending "/" if it exists
 		subvol := filepath.Base(path)
 		path = filepath.Dir(path)
 		if imageLayer, err := fsn.lookupBtrfsLayerFile(path, subvol); err == nil {
@@ -776,12 +784,12 @@ func (fsn *FileNotificationCtr) enumBtrfsInitFiles(rootPath, id string) (utils.S
 	return dirs, files, initPath
 }
 
-///////////////////////
+// /////////////////////
 type BtrfsLayerData struct {
-	ID      string     `json:"id"`
-	Parent  string     `json:"parent"`
-	Names    []string  `json:"names"`
-	Created time.Time  `json:"created"`
+	ID      string    `json:"id"`
+	Parent  string    `json:"parent"`
+	Names   []string  `json:"names"`
+	Created time.Time `json:"created"`
 }
 
 func (fsn *FileNotificationCtr) lookupBtrfsLayerFile(rootPath, sublayer string) (string, error) {
@@ -793,7 +801,7 @@ func (fsn *FileNotificationCtr) lookupBtrfsLayerFile(rootPath, sublayer string) 
 		if err = json.Unmarshal(value, &layers); err == nil {
 			for _, layer := range layers {
 				// log.WithFields(log.Fields{"layer": layer}).Debug("FSN:")
-				if layer.ID  == sublayer {
+				if layer.ID == sublayer {
 					return layer.Parent, nil
 				}
 			}

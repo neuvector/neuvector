@@ -19,8 +19,8 @@ import (
 
 	"github.com/codeskyblue/go-sh"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/pipe"
@@ -76,7 +76,9 @@ func (rs *RPCService) Kick(ctx context.Context, k *share.CLUSKick) (*share.RPCVo
 
 func (rs *RPCService) sendSessionList(pm *sessionListParam) {
 	log.WithFields(log.Fields{"count": len(pm.list)}).Debug("")
-	pm.stream.Send(&share.CLUSSessionArray{Sessions: pm.list})
+	if dbgError := pm.stream.Send(&share.CLUSSessionArray{Sessions: pm.list}); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	pm.list = make([]*share.CLUSSession, 0)
 }
 
@@ -123,8 +125,9 @@ func (rs *RPCService) parseSessionListHeader(msg []byte) *C.DPMsgSessionHdr {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &sessHdr)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &sessHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	// Verify total length
 	var sess C.DPMsgSession
 	sessions := int(sessHdr.Sessions)
@@ -233,8 +236,9 @@ func (rs *RPCService) cbSessionList(buf []byte, param interface{}) bool {
 	// Going through session list
 	var sess C.DPMsgSession
 	for i := 0; i < sessions; i++ {
-		binary.Read(r, binary.BigEndian, &sess)
-
+		if dbgError := binary.Read(r, binary.BigEndian, &sess); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		var workload string
 		mac := net.HardwareAddr(C.GoBytes(unsafe.Pointer(&sess.EPMAC[0]), 6))
 		gInfoRLock()
@@ -284,7 +288,9 @@ func (rs *RPCService) GetSessionList(f *share.CLUSFilter, stream share.EnforcerS
 		if pods != nil {
 			// host mode
 			list = prober.GetHostModeSessions(pods)
-			stream.Send(&share.CLUSSessionArray{Sessions: list})
+			if dbgError := stream.Send(&share.CLUSSessionArray{Sessions: list}); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			return nil
 		}
 
@@ -317,7 +323,9 @@ func (rs *RPCService) ClearSession(ctx context.Context, f *share.CLUSFilter) (*s
 
 func (rs *RPCService) sendMeterList(pm *meterListParam) {
 	log.WithFields(log.Fields{"count": len(pm.list)}).Debug("")
-	pm.stream.Send(&share.CLUSMeterArray{Meters: pm.list})
+	if dbgError := pm.stream.Send(&share.CLUSMeterArray{Meters: pm.list}); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	pm.list = make([]*share.CLUSMeter, 0)
 }
 
@@ -364,8 +372,9 @@ func (rs *RPCService) parseMeterListHeader(msg []byte) *C.DPMsgMeterHdr {
 	}
 
 	r := bytes.NewReader(msg)
-	binary.Read(r, binary.BigEndian, &meterHdr)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &meterHdr); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	// Verify total length
 	var meter C.DPMsgMeter
 	meters := int(meterHdr.Meters)
@@ -445,8 +454,9 @@ func (rs *RPCService) cbMeterList(buf []byte, param interface{}) bool {
 	// Going through meter list
 	var meter C.DPMsgMeter
 	for i := 0; i < meters; i++ {
-		binary.Read(r, binary.BigEndian, &meter)
-
+		if dbgError := binary.Read(r, binary.BigEndian, &meter); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		var workload string
 		mac := net.HardwareAddr(C.GoBytes(unsafe.Pointer(&meter.EPMAC[0]), 6))
 		gInfoRLock()
@@ -546,8 +556,9 @@ func cbContainerStats(buf []byte, param interface{}) bool {
 	r := bytes.NewReader(buf[offset:])
 
 	var stats C.DPMsgStats
-	binary.Read(r, binary.BigEndian, &stats)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &stats); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	populateTrafficStats(data, &stats)
 
 	return true
@@ -579,8 +590,9 @@ func cbAgentStats(buf []byte, param interface{}) bool {
 	r := bytes.NewReader(buf[offset:])
 
 	var stats C.DPMsgStats
-	binary.Read(r, binary.BigEndian, &stats)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &stats); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	populateTrafficStats(data, &stats)
 
 	return true
@@ -632,7 +644,7 @@ func (rs *RPCService) GetGroupStats(ctx context.Context, f *share.CLUSWlIDArray)
 		Span60: &share.CLUSMetry{},
 	}
 
-	if f.WlID != nil && len(f.WlID) > 0 {
+	if len(f.WlID) > 0 {
 		var macs []*net.HardwareAddr
 		for _, wld := range f.WlID {
 			tstats := share.CLUSStats{
@@ -687,8 +699,9 @@ func (rs *RPCService) cbSessionCount(buf []byte, param interface{}) bool {
 	r := bytes.NewReader(buf[offset:])
 
 	var count C.DPMsgSessionCount
-	binary.Read(r, binary.BigEndian, &count)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &count); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	pm.count = &share.CLUSSessionCounter{
 		CurSessions:     uint32(count.CurSess),
 		CurTCPSessions:  uint32(count.CurTCPSess),
@@ -737,8 +750,9 @@ func (rs *RPCService) cbAgentCounter(buf []byte, param interface{}) bool {
 	r := bytes.NewReader(buf[offset:])
 
 	var count C.DPMsgDeviceCounter
-	binary.Read(r, binary.BigEndian, &count)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &count); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	pm.count = &share.CLUSDatapathCounter{
 		RXPackets:           uint64(count.RXPackets),
 		RXDropPackets:       uint64(count.RXDropPackets),
@@ -873,7 +887,7 @@ func (rs *RPCService) SnifferCmd(ctx context.Context, req *share.CLUSSnifferRequ
 	} else if req.Cmd == share.SnifferCmd_RemoveSniffer {
 		return &share.CLUSSnifferResponse{}, removeSniffer(req.ID)
 	}
-	return &share.CLUSSnifferResponse{}, grpc.Errorf(codes.InvalidArgument, "Invalid sniffer command")
+	return &share.CLUSSnifferResponse{}, status.Errorf(codes.InvalidArgument, "Invalid sniffer command")
 }
 
 func (rs *RPCService) GetSniffers(ctx context.Context, f *share.CLUSSnifferFilter) (*share.CLUSSnifferArray, error) {
@@ -890,7 +904,7 @@ func (rs *RPCService) GetSnifferPcap(req *share.CLUSSnifferDownload, stream shar
 	proc, ok := snifferPidMap[req.ID]
 	if !ok {
 		log.WithFields(log.Fields{"id": req.ID}).Error("Sniffer not found")
-		return grpc.Errorf(codes.NotFound, "Sniffer not found")
+		return status.Errorf(codes.NotFound, "Sniffer not found")
 	}
 
 	fileList := getFileList(proc.fileNumber, proc.fileName)
@@ -901,7 +915,7 @@ func (rs *RPCService) GetSnifferPcap(req *share.CLUSSnifferDownload, stream shar
 					Pcap: dat,
 				}
 				err := stream.Send(packet)
-				errCode := grpc.Code(err)
+				errCode := status.Code(err)
 				if err != nil {
 					if errCode != codes.Canceled {
 						log.WithFields(log.Fields{"err": err}).Error("GRPC send file fail")
@@ -917,13 +931,13 @@ func (rs *RPCService) GetSnifferPcap(req *share.CLUSSnifferDownload, stream shar
 
 func (rs *RPCService) GetContainerLogs(f *share.CLUSContainerLogReq, stream share.EnforcerService_GetContainerLogsServer) error {
 	log.WithFields(log.Fields{"filter": f}).Debug("")
-	return grpc.Errorf(codes.Unimplemented, "Get container logs not supported")
+	return status.Errorf(codes.Unimplemented, "Get container logs not supported")
 	/*
 		// OpenShift by default using journald log driver so we can't read the file, but still avoid using docker API for now.
 		// data, err := global.RT.GetContainerLogs(Host.Flavor == share.FlavorOpenShift, f.Id, int(f.Start), int(f.Limit))
 		data, err := global.RT.GetContainerLogs(false, f.Id, int(f.Start), int(f.Limit))
 		if err != nil {
-			return grpc.Errorf(codes.Internal, "Get container log fail, error:%v", err)
+			return status.Errorf(codes.Internal, "Get container log fail, error:%v", err)
 		}
 		for i := 0; i < len(data); i += packetSize {
 			var packet share.CLUSContainerLogRes
@@ -932,7 +946,9 @@ func (rs *RPCService) GetContainerLogs(f *share.CLUSContainerLogReq, stream shar
 			} else {
 				packet.LogZb = data[i:]
 			}
-			stream.Send(&packet)
+			if dbgError := stream.Send(&packet); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 		return nil
 	*/
@@ -962,7 +978,7 @@ func (rs *RPCService) GetFileMonitorFile(ctx context.Context, f *share.CLUSFilte
 	} else {
 		c, ok := gInfoReadActiveContainer(f.Workload)
 		if !ok {
-			return nil, grpc.Errorf(codes.NotFound, "Container not found")
+			return nil, status.Errorf(codes.NotFound, "Container not found")
 		}
 
 		files := fileWatcher.GetWatchFileList(c.pid)
@@ -999,9 +1015,7 @@ func (rs *RPCService) convertDlpWlRule(dpWlDlpRule *dp.DPWorkloadDlpRule) *share
 	}
 
 	wlmacs := make([]string, len(dpWlDlpRule.WorkloadMac))
-	for i, m := range dpWlDlpRule.WorkloadMac {
-		wlmacs[i] = m
-	}
+	copy(wlmacs, dpWlDlpRule.WorkloadMac)
 	clusDlpRuleArray.WlMacs = wlmacs
 
 	dlpRuleNames := make([]*share.CLUSDerivedDlpRule, len(dpWlDlpRule.DlpRuleNames))
@@ -1023,15 +1037,11 @@ func (rs *RPCService) convertDlpWlRule(dpWlDlpRule *dp.DPWorkloadDlpRule) *share
 	clusDlpRuleArray.WafRules = wafRuleNames
 
 	rids := make([]uint32, len(dpWlDlpRule.PolicyRuleIds))
-	for i, r := range dpWlDlpRule.PolicyRuleIds {
-		rids[i] = r
-	}
+	copy(rids, dpWlDlpRule.PolicyRuleIds)
 	clusDlpRuleArray.Rids = rids
 
 	wafrids := make([]uint32, len(dpWlDlpRule.PolWafRuleIds))
-	for i, r := range dpWlDlpRule.PolWafRuleIds {
-		wafrids[i] = r
-	}
+	copy(wafrids, dpWlDlpRule.PolWafRuleIds)
 	clusDlpRuleArray.Wafrids = wafrids
 
 	return clusDlpRuleArray
@@ -1063,11 +1073,7 @@ func (rs *RPCService) convertDlpRuleEntry(dlpRule *dp.DPDlpRuleEntry) *share.CLU
 		ID:       dlpRule.ID,
 		Patterns: make([]string, len(dlpRule.Patterns)),
 	}
-
-	for i, pat := range dlpRule.Patterns {
-		derivedDlpRuleEntry.Patterns[i] = pat
-	}
-
+	copy(derivedDlpRuleEntry.Patterns, dlpRule.Patterns)
 	return derivedDlpRuleEntry
 }
 

@@ -3,11 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -18,8 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const clusterCheckInterval time.Duration = time.Second * 2
-
 // const LogFile string = "/var/log/ranger/monitor.log"
 var ClusterEventChan chan *ClusterEvent = make(chan *ClusterEvent, 256)
 
@@ -27,10 +24,8 @@ var selfAddr string
 var leadAddr string
 var leadGrpcPort uint16
 
-var admitChan chan bool = make(chan bool, 1)
-var admitted bool = false
-var errNotAdmitted = errors.New("Enforcer is not able to join the cluster")
-var errCtrlNotReady = errors.New("Controller is not ready")
+var errNotAdmitted = fmt.Errorf("Enforcer is not able to join the cluster")
+var errCtrlNotReady = fmt.Errorf("Controller is not ready")
 
 type workloadInfo struct {
 	wl *share.CLUSWorkload
@@ -125,7 +120,6 @@ func clusterStart(clusterCfg *cluster.ClusterConfig) error {
 		return err
 	}
 
-	admitted = true
 	selfAddr = cluster.GetSelfAddress()
 	return nil
 }
@@ -135,15 +129,17 @@ func s2cConfig(subject, id string, data []byte) {
 	case "workload":
 		// SET-KEY: .../workload/<workload_id>
 		var conf share.CLUSWorkloadConfig
-		json.Unmarshal(data, &conf)
-
+		if dbgError := json.Unmarshal(data, &conf); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		task := ContainerTask{task: TASK_CONFIG_CONTAINER, id: id, macConf: &conf}
 		ContainerTaskChan <- &task
 	case "agent":
 		// SET-KEY: .../agent/<agent_id>
 		var conf share.CLUSAgentConfig
-		json.Unmarshal(data, &conf)
-
+		if dbgError := json.Unmarshal(data, &conf); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		task := ContainerTask{task: TASK_CONFIG_AGENT, agentConf: &conf}
 		ContainerTaskChan <- &task
 	}
@@ -181,7 +177,9 @@ func logAgent(ev share.TLogEvent) {
 		clog.ReportedAt = time.Now().UTC()
 	}
 
-	evqueue.Append(&clog)
+	if dbgError := evqueue.Append(&clog); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func logWorkload(ev share.TLogEvent, wl *share.CLUSWorkload, msg *string) {
@@ -211,17 +209,20 @@ func logWorkload(ev share.TLogEvent, wl *share.CLUSWorkload, msg *string) {
 		clog.ReportedAt = time.Now().UTC()
 	}
 
-	evqueue.Append(&clog)
+	if dbgError := evqueue.Append(&clog); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 var snapshotIndex int
+
 func memorySnapshot(usage uint64) {
 	if agentEnv.autoProfieCapture > 0 {
 		log.WithFields(log.Fields{"usage": usage}).Debug()
 		if usage > agentEnv.peakMemoryUsage {
-			agentEnv.peakMemoryUsage = usage + agentEnv.snapshotMemStep  // level up
-			label := "p"  // peak
-			if snapshotIndex < 4 { // keep atmost 4 copies + an extra peak copy
+			agentEnv.peakMemoryUsage = usage + agentEnv.snapshotMemStep // level up
+			label := "p"                                                // peak
+			if snapshotIndex < 4 {                                      // keep atmost 4 copies + an extra peak copy
 				snapshotIndex++
 				label = strconv.Itoa(snapshotIndex)
 			}
@@ -232,6 +233,7 @@ func memorySnapshot(usage uint64) {
 }
 
 var curMemoryPressure uint64
+
 func memoryPressureNotification(rpt *system.MemoryPressureReport) {
 	if rpt.Level >= 2 { // cap its maximum
 		rpt.Level = 2
@@ -321,7 +323,9 @@ func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool
 	}
 
 	b := new(bytes.Buffer)
-	json.NewEncoder(b).Encode(report)
+	if dbgError := json.NewEncoder(b).Encode(report); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	msg := b.String()
 
 	// log.WithFields(log.Fields{"msg": msg}).Debug()
@@ -335,7 +339,10 @@ func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool
 		ReportedAt: time.Now().UTC(),
 		Msg:        msg,
 	}
-	evqueue.Append(&clog)
+
+	if dbgError := evqueue.Append(&clog); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 // PUT-KEY: /object/host/<host_docker_id>
@@ -387,7 +394,9 @@ func putNetworkEP(nep *share.CLUSNetworkEP) {
 
 func deleteNetworkEP(nepID string) {
 	key := share.CLUSNetworkEPKey(Host.ID, nepID)
-	cluster.Delete(key)
+	if dbgError := cluster.Delete(key); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 // PUT-KEY: object/workload/<host_id>/<id>
@@ -453,7 +462,7 @@ func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *sh
 	if wl.Running {
 		if info.IPAddress != "" {
 			wl.Ifaces["eth0"] = []share.CLUSIPAddr{
-				share.CLUSIPAddr{
+				{
 					IPNet: net.IPNet{
 						IP:   net.ParseIP(info.IPAddress),
 						Mask: net.CIDRMask(info.IPPrefixLen, 32),
@@ -496,7 +505,7 @@ func translateMappedPort(ports map[share.CLUSProtoPort]*share.CLUSMappedPort) ma
 // Translate open port to host port map, only used for host-mode container
 func app2MappedPort(apps map[share.CLUSProtoPort]*share.CLUSApp) map[share.CLUSProtoPort]*share.CLUSMappedPort {
 	ports := make(map[share.CLUSProtoPort]*share.CLUSMappedPort, len(apps))
-	for p, _ := range apps {
+	for p := range apps {
 		cp := share.CLUSProtoPort{
 			Port:    p.Port,
 			IPProto: p.IPProto,
@@ -619,9 +628,18 @@ func clusterStopContainer(ev *ClusterEvent) {
 func clusterDelContainer(id string) {
 	log.WithFields(log.Fields{"container": id}).Debug("")
 
-	cluster.Delete(share.CLUSWorkloadKey(Host.ID, id))
-	cluster.DeleteTree(share.CLUSBenchKey(id))
-	cluster.Delete(share.CLUSBenchStateWorkloadKey(id))
+	if dbgError := cluster.Delete(share.CLUSWorkloadKey(Host.ID, id)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
+	if dbgError := cluster.DeleteTree(share.CLUSBenchKey(id)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
+	if dbgError := cluster.Delete(share.CLUSBenchStateWorkloadKey(id)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
 	// Scan keys are deleted by the controller
 	if cache, ok := wlCacheMap[id]; ok {
 		logWorkload(share.CLUSEvWorkloadRemove, cache.wl, nil)
@@ -648,7 +666,7 @@ func clusterRefreshContainers() {
 
 	// Remove non-existing containers from cluster
 	existing := utils.NewSet()
-	for id, _ := range wlCacheMap {
+	for id := range wlCacheMap {
 		existing.Add(id)
 	}
 
@@ -657,7 +675,9 @@ func clusterRefreshContainers() {
 	for _, key := range keys {
 		id := share.CLUSWorkloadKey2ID(key)
 		if !existing.Contains(id) {
-			cluster.Delete(key)
+			if dbgError := cluster.Delete(key); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 	}
 
@@ -728,7 +748,9 @@ func getControllerFromCluster(ip string) *share.CLUSController {
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			var ctrl share.CLUSController
-			json.Unmarshal(value, &ctrl)
+			if dbgError := json.Unmarshal(value, &ctrl); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			if ctrl.ClusterIP == ip {
 				return &ctrl
 			}
@@ -774,11 +796,9 @@ func clusterLoop(existing utils.Set) {
 				log.Info("Exit cluster worker")
 				break
 			}
-			select {
-			case ev := <-ClusterEventChan:
-				if ev.event != EV_CLUSTER_EXIT {
-					clusterEventHandler(ev)
-				}
+			ev := <-ClusterEventChan
+			if ev.event != EV_CLUSTER_EXIT {
+				clusterEventHandler(ev)
 			}
 		}
 

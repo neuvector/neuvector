@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 	"syscall"
+	"time"
 
 	"github.com/codeskyblue/go-sh"
 	log "github.com/sirupsen/logrus"
@@ -136,11 +136,15 @@ func createNVPorts(jumboframe bool) {
 	}
 	link, _ = waitLinkReady(nvVbrPortName)
 	if link != nil {
-		netlink.LinkSetUp(link)
+		if dbgError := netlink.LinkSetUp(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	link, _ = waitLinkReady(nvVthPortName)
 	if link != nil {
-		netlink.LinkSetUp(link)
+		if dbgError := netlink.LinkSetUp(link); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 }
 
@@ -149,12 +153,16 @@ func getIntcpPortNames(pid int, port string) (exPort, inPort string) {
 	return exPortPrefix + suffix, inPortPrefix + suffix
 }
 
-//func disableOffload(port string) {
+// func disableOffload(port string) {
 func DisableOffload(port string) {
 	log.WithFields(log.Fields{"port": port}).Debug("")
-	shell(fmt.Sprintf("ethtool -K %v tx off", port))
+	if _, dbgError := shell(fmt.Sprintf("ethtool -K %v tx off", port)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	nap()
-	shell(fmt.Sprintf("ethtool -K %v rx off", port))
+	if _, dbgError := shell(fmt.Sprintf("ethtool -K %v rx off", port)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	nap()
 }
 
@@ -188,9 +196,15 @@ func pullContainerPort(
 
 	defer func() {
 		if err != nil {
-			netlink.LinkSetName(link, attrs.Name)
-			netlink.LinkSetHardwareAddr(link, attrs.HardwareAddr)
-			netlink.LinkSetUp(link)
+			if dbgError := netlink.LinkSetName(link, attrs.Name); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
+			if dbgError := netlink.LinkSetHardwareAddr(link, attrs.HardwareAddr); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
+			if dbgError := netlink.LinkSetUp(link); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 	}()
 
@@ -213,7 +227,9 @@ func pullContainerPort(
 	}
 	// Remove IP addresses
 	for _, addr := range addrs {
-		netlink.AddrDel(link, &addr)
+		if dbgError := netlink.AddrDel(link, &addr); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	// Temp. set MAC address
 	tmp, _ := net.ParseMAC("00:01:02:03:04:05")
@@ -241,7 +257,9 @@ func pullContainerPort(
 	}
 	defer func() {
 		if err != nil {
-			netlink.LinkDel(veth)
+			if dbgError := netlink.LinkDel(veth); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 	}()
 
@@ -280,11 +298,15 @@ func pullContainerPort(
 	}
 	for _, addr := range localAddrs {
 		log.WithFields(log.Fields{"addr": addr}).Debug("Delete address")
-		netlink.AddrDel(local, &addr)
+		if dbgError := netlink.AddrDel(local, &addr); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	for _, addr := range addrs {
 		log.WithFields(log.Fields{"addr": addr}).Debug("Add address")
-		netlink.AddrAdd(local, &addr)
+		if dbgError := netlink.AddrAdd(local, &addr); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	// Set local link up
 	if err = netlink.LinkSetUp(local); err != nil {
@@ -337,6 +359,7 @@ func portExists(dstLinks []netlink.Link, portName string) bool {
 	return false
 }
 
+/* removed by golint
 func hasInternalVethPair(name string, links []netlink.Link) bool {
 	idx := getVethPeer(name)
 	if idx == 0 {
@@ -354,6 +377,7 @@ func hasInternalVethPair(name string, links []netlink.Link) bool {
 
 	return false
 }
+*/
 
 func getMaxIfindex(links []netlink.Link) int {
 	var max int
@@ -580,7 +604,7 @@ func pullAllContainerPorts(
 			}
 		}
 		var pair InterceptPair
-		existPair, _ := existPairs[attrs.Name]
+		existPair := existPairs[attrs.Name]
 
 		exPortName, inPortName := getIntcpPortNames(pid, attrs.Name)
 		if portExists(exLinks, exPortName) || portExists(exLinks, inPortName) {
@@ -645,12 +669,14 @@ func pullAllContainerPorts(
 			// the port name on the host at that time, so read it here.
 			var hostPort string
 			peerIndex := getVethPeer(attrs.Name)
-			global.SYS.CallNetNamespaceFuncWithoutLock(1, func(params interface{}) {
+			dbgError := global.SYS.CallNetNamespaceFuncWithoutLock(1, func(params interface{}) {
 				if peerLink, err := netlink.LinkByIndex(peerIndex); err == nil {
 					hostPort = peerLink.Attrs().Name
 				}
 			}, nil)
-
+			if dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			// If the index conflicts with the port in the enforcer, assign a big index.
 			if agentIfindexSet.Contains(peerIndex) {
 				peerIndex = getAvailableInPortIndex(agentIfindexSet)
@@ -700,8 +726,12 @@ func pullAllContainerPorts(
 
 	// Refresh routes if needed
 	if pulled {
-		recoverRoutes(routes, portIdxMap)
-		recoverNeighs(neighs, portIdxMap)
+		if dbgError := recoverRoutes(routes, portIdxMap); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		if dbgError := recoverNeighs(neighs, portIdxMap); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	return intcpPairs, pulled, nil
 }
@@ -766,7 +796,10 @@ func InterceptContainerPorts(pid int, existPairs []*InterceptPair) ([]*Intercept
 
 	intcpPairs, pulled, err := pullAllContainerPorts(pid, int(dstNs), existPairMap, exLinks)
 	if err != nil {
-		netns.Set(curNs)
+
+		if dbgError := netns.Set(curNs); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		log.WithFields(log.Fields{"pairs": intcpPairs, "pid": pid}).Debug("Pull failed")
 		return intcpPairs, err
 	}
@@ -775,8 +808,12 @@ func InterceptContainerPorts(pid int, existPairs []*InterceptPair) ([]*Intercept
 		// New ports added or switching from tap to inline. Switch to destination NS
 		log.WithFields(log.Fields{"ns": dstNs, "pid": pid}).Debug("Switch to dst ns")
 		if err = netns.Set(dstNs); err != nil {
-			netns.Set(curNs)
-			RestoreContainer(pid, intcpPairs)
+			if dbgError := netns.Set(curNs); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
+			if dbgError := RestoreContainer(pid, intcpPairs); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			return intcpPairs, err
 		}
 
@@ -786,10 +823,14 @@ func InterceptContainerPorts(pid int, existPairs []*InterceptPair) ([]*Intercept
 				// Here the driver should make sure port pair does exist
 				pair.UCMAC, pair.BCMAC = piper.AttachPortPair(pair)
 				if link, _ := waitLinkReady(pair.exPort); link != nil {
-					netlink.LinkSetUp(link)
+					if dbgError := netlink.LinkSetUp(link); dbgError != nil {
+						log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+					}
 				}
 				if link, _ := waitLinkReady(pair.inPort); link != nil {
-					netlink.LinkSetUp(link)
+					if dbgError := netlink.LinkSetUp(link); dbgError != nil {
+						log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+					}
 				}
 			}
 		}
@@ -806,8 +847,12 @@ func InterceptContainerPorts(pid int, existPairs []*InterceptPair) ([]*Intercept
 				if !nsChged {
 					log.WithFields(log.Fields{"ns": dstNs, "pid": pid}).Debug("Switch to dst ns")
 					if err = netns.Set(dstNs); err != nil {
-						netns.Set(curNs)
-						RestoreContainer(pid, intcpPairs)
+						if dbgError := netns.Set(curNs); dbgError != nil {
+							log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+						}
+						if dbgError := RestoreContainer(pid, intcpPairs); dbgError != nil {
+							log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+						}
 						return intcpPairs, err
 					}
 					nsChged = true
@@ -867,12 +912,14 @@ func readAllContainerPorts(pid int, existPairs map[string]*InterceptPair) ([]*In
 
 			var peer string
 			peerIndex := getVethPeer(attrs.Name)
-			global.SYS.CallNetNamespaceFuncWithoutLock(1, func(params interface{}) {
+			dbgError := global.SYS.CallNetNamespaceFuncWithoutLock(1, func(params interface{}) {
 				if peerLink, err := netlink.LinkByIndex(peerIndex); err == nil {
 					peer = peerLink.Attrs().Name
 				}
 			}, nil)
-
+			if dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			pair = InterceptPair{Port: attrs.Name, index: attrs.Index, Peer: peer, MAC: attrs.HardwareAddr, tap: true}
 		}
 
@@ -940,7 +987,7 @@ func InspectContainerPorts(pid int, existPairs []*InterceptPair) ([]*InterceptPa
 	}
 
 	var intcpPairs []*InterceptPair
-	intcpPairs, err = readAllContainerPorts(pid, existPairMap)
+	intcpPairs, _ = readAllContainerPorts(pid, existPairMap)
 
 	// Switch back to original NS
 	log.WithFields(log.Fields{"ns": curNs}).Debug("Restore ns")
@@ -970,8 +1017,12 @@ func pushContainerPort(pair *InterceptPair) (int, int, error) {
 
 	log.WithFields(log.Fields{"port": pair.Port}).Debug("Remove port")
 
-	netlink.LinkSetDown(link)
-	netlink.LinkDel(link)
+	if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+	if dbgError := netlink.LinkDel(link); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	log.WithFields(log.Fields{"port": pair.Port}).Debug("Modify port")
 
@@ -1012,11 +1063,15 @@ func pushContainerPort(pair *InterceptPair) (int, int, error) {
 	}
 	for _, addr := range exAddrs {
 		log.WithFields(log.Fields{"addr": addr}).Debug("Delete address")
-		netlink.AddrDel(link, &addr)
+		if dbgError := netlink.AddrDel(link, &addr); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	for _, addr := range addrs {
 		log.WithFields(log.Fields{"addr": addr}).Debug("Add address")
-		netlink.AddrAdd(link, &addr)
+		if dbgError := netlink.AddrAdd(link, &addr); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 
 	// Set link up
@@ -1062,8 +1117,13 @@ func pushAllContainerPorts(pid int, pairs []*InterceptPair) error {
 		portIdxMap[oldPortIdx] = newPortIdx
 	}
 
-	recoverRoutes(routes, portIdxMap)
-	recoverNeighs(neighs, portIdxMap)
+	if dbgError := recoverRoutes(routes, portIdxMap); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
+	if dbgError := recoverNeighs(neighs, portIdxMap); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	return nil
 }
@@ -1141,7 +1201,9 @@ func RestoreContainer(pid int, pairs []*InterceptPair) error {
 		return err
 	}
 
-	pushAllContainerPorts(pid, pairs)
+	if dbgError := pushAllContainerPorts(pid, pairs); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	// Switch back to original NS
 	log.WithFields(log.Fields{"ns": curNs}).Debug("Restore ns")
@@ -1161,7 +1223,7 @@ func CleanupContainer(pid int, intcpPairs []*InterceptPair) error {
 	defer runtime.UnlockOSThread()
 
 	// Switch to namespace where ports are
-	global.SYS.CallNetNamespaceFuncWithoutLock(cfg.workingPid, func(params interface{}) {
+	dbgError := global.SYS.CallNetNamespaceFuncWithoutLock(cfg.workingPid, func(params interface{}) {
 		log.WithFields(log.Fields{"pid": cfg.workingPid}).Debug("Switch to src ns")
 
 		// Remove ports and rules
@@ -1170,28 +1232,41 @@ func CleanupContainer(pid int, intcpPairs []*InterceptPair) error {
 			piper.DetachPortPair(pair)
 
 			if link, err := netlink.LinkByName(pair.exPort); err == nil {
-				netlink.LinkSetDown(link)
-				netlink.LinkDel(link)
+				if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
+				if dbgError := netlink.LinkDel(link); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 
 				if pair.Peer != "" {
 					hostPorts[pair.Peer] = pair.Addrs
 				}
 			}
 			if link, err := netlink.LinkByName(pair.inPort); err == nil {
-				netlink.LinkSetDown(link)
-				netlink.LinkDel(link)
+				if dbgError := netlink.LinkSetDown(link); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
+				if dbgError := netlink.LinkDel(link); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 			}
 		}
 	}, nil)
 
-	global.ORCH.CleanupHostPorts(hostPorts)
+	if dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+	if dbgError := global.ORCH.CleanupHostPorts(hostPorts); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	return nil
 }
 
-
-const nvInputChain  string = "NV_INPUT_PROXYMESH"
+const nvInputChain string = "NV_INPUT_PROXYMESH"
 const nvOutputChain string = "NV_OUTPUT_PROXYMESH"
+
 /*
  * 1. disassociate OUTPUT/INPUT with NV_OUTPUT/NV_INPUT
  * iptables -D OUTPUT -j NV_OUTPUT
@@ -1207,104 +1282,153 @@ func resetIptablesNvRules() {
 	var cmd string
 	//disassociate OUTPUT/INPUT with NV_OUTPUT/NV_INPUT
 	cmd = fmt.Sprintf("iptables -D OUTPUT -j %v", nvOutputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -D INPUT -j %v", nvInputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	//flush custom chain of its rules
 	cmd = fmt.Sprintf("iptables -F %v", nvOutputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -F %v", nvInputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	//delete custom chain
 	cmd = fmt.Sprintf("iptables -X %v", nvOutputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -X %v", nvInputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
-const nvInputQuarChain  string = "NV_INPUT_QUAR_PROXYMESH"
+const nvInputQuarChain string = "NV_INPUT_QUAR_PROXYMESH"
 const nvOutputQuarChain string = "NV_OUTPUT_QUAR_PROXYMESH"
+
 func deleteIptablesNvQuarRules() {
 	var cmd string
 	//disassociate OUTPUT/INPUT with NV_OUTPUT/NV_INPUT
 	cmd = fmt.Sprintf("iptables -D OUTPUT -j %v", nvOutputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -D INPUT -j %v", nvInputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	//flush custom chain of its rules
 	cmd = fmt.Sprintf("iptables -F %v", nvOutputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -F %v", nvInputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	//delete custom chain
 	cmd = fmt.Sprintf("iptables -X %v", nvOutputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -X %v", nvInputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func createIptablesNvQuarRules() {
 	var cmd string
 	//create custom chains
 	cmd = fmt.Sprintf("iptables -N %v", nvInputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -N %v", nvOutputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	//append drop rule
 	cmd = fmt.Sprintf("iptables -I %v -j DROP", nvInputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -I %v -j DROP", nvOutputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	//associate NV_OUTPUT_QUAR/NV_INPUT_QUAR with OUTPUT/INPUT chain
 	cmd = fmt.Sprintf("iptables -I INPUT -j %v", nvInputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -I OUTPUT -j %v", nvOutputQuarChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 	var cmd string
 	if appMap == nil || len(appMap) <= 0 {
 		cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
-		shellCombined(cmd)
+		if _, dbgError := shellCombined(cmd); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, qno)
-		shellCombined(cmd)
+		if _, dbgError := shellCombined(cmd); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		return
 	}
 
-	for p, _ := range appMap {
-		if p.IPProto == syscall.IPPROTO_TCP {//tcp
+	for p := range appMap {
+		if p.IPProto == syscall.IPPROTO_TCP { //tcp
 			//insert to top of rule list in filter table INPUT and OUTPUT chain
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
 			} else {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
 			}
-			shellCombined(cmd)
+			if _, dbgError := shellCombined(cmd); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
 			} else {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
 			}
-			shellCombined(cmd)
-		} else if p.IPProto == syscall.IPPROTO_UDP {//udp
+			if _, dbgError := shellCombined(cmd); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
+		} else if p.IPProto == syscall.IPPROTO_UDP { //udp
 			//insert to top of rule list in filter table INPUT and OUTPUT chain
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
 			} else {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
 			}
-			shellCombined(cmd)
+			if _, dbgError := shellCombined(cmd); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
 			} else {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
 			}
-			shellCombined(cmd)
+			if _, dbgError := shellCombined(cmd); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 	}
 }
@@ -1315,18 +1439,22 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 		cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
 		if _, err := shellCombined(cmd); err != nil {
 			cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
-			shellCombined(cmd)
+			if _, dbgError := shellCombined(cmd); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 		cmd = fmt.Sprintf("iptables -C %v -t filter -o %v -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, qno)
 		if _, err := shellCombined(cmd); err != nil {
 			cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, qno)
-			shellCombined(cmd)
+			if _, dbgError := shellCombined(cmd); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 		}
 		return
 	}
 
-	for p, _ := range appMap {
-		if p.IPProto == syscall.IPPROTO_TCP {//tcp
+	for p := range appMap {
+		if p.IPProto == syscall.IPPROTO_TCP { //tcp
 			//check existence of rule before insert it
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
@@ -1340,7 +1468,9 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 				} else {
 					cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
 				}
-				shellCombined(cmd)
+				if _, dbgError := shellCombined(cmd); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 			}
 			//check existence of rule before insert it
 			if isloopback {
@@ -1355,9 +1485,11 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 				} else {
 					cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
 				}
-				shellCombined(cmd)
+				if _, dbgError := shellCombined(cmd); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 			}
-		} else if p.IPProto == syscall.IPPROTO_UDP {//udp
+		} else if p.IPProto == syscall.IPPROTO_UDP { //udp
 			//check existence of rule before insert it
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
@@ -1371,7 +1503,9 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 				} else {
 					cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --dport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
 				}
-				shellCombined(cmd)
+				if _, dbgError := shellCombined(cmd); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 			}
 			//check existence of rule before insert it
 			if isloopback {
@@ -1386,7 +1520,9 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 				} else {
 					cmd = fmt.Sprintf("iptables -I %v -t filter -o %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvOutputChain, intf, p.Port, qno)
 				}
-				shellCombined(cmd)
+				if _, dbgError := shellCombined(cmd); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+				}
 			}
 		}
 	}
@@ -1410,25 +1546,37 @@ func createIptablesNvRules(intf string, isloopback bool, qno int, appMap map[sha
 	var cmd string
 	//create custom chains
 	cmd = fmt.Sprintf("iptables -N %v", nvInputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -N %v", nvOutputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	//append default rule first
 	cmd = fmt.Sprintf("iptables -A %v -j RETURN", nvInputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -A %v -j RETURN", nvOutputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 
 	insertIptablesNvRules(intf, isloopback, qno, appMap)
 
 	//associate NV_OUTPUT/NV_INPUT with OUTPUT/INPUT chain
 	cmd = fmt.Sprintf("iptables -A INPUT -j %v", nvInputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	cmd = fmt.Sprintf("iptables -A OUTPUT -j %v", nvOutputChain)
-	shellCombined(cmd)
+	if _, dbgError := shellCombined(cmd); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
-//setup iptable rules for quarantine
+// setup iptable rules for quarantine
 func CreateNfqQuarRules(pid int, create bool) error {
 	log.WithFields(log.Fields{"pid": pid}).Debug("")
 
@@ -1468,7 +1616,7 @@ func CreateNfqQuarRules(pid int, create bool) error {
 	return err
 }
 
-//setup iptable rules with NFQUEUE target
+// setup iptable rules with NFQUEUE target
 func CreateNfqRules(pid, qno int, create, isloopback bool, intf string, appMap map[share.CLUSProtoPort]*share.CLUSApp) error {
 	log.WithFields(log.Fields{"pid": pid}).Debug("")
 
@@ -1512,7 +1660,7 @@ func CreateNfqRules(pid, qno int, create, isloopback bool, intf string, appMap m
 	return err
 }
 
-//setup iptable rules with NFQUEUE target
+// setup iptable rules with NFQUEUE target
 func DeleteNfqRules(pid int) error {
 	log.WithFields(log.Fields{"pid": pid}).Debug("")
 
@@ -1564,7 +1712,9 @@ func cbTapPortPair(param interface{}) {
 }
 
 func TapPortPair(pid int, pair *InterceptPair) {
-	global.SYS.CallNetNamespaceFunc(cfg.workingPid, cbTapPortPair, &pipeParam{pid: pid, pair: pair})
+	if dbgError := global.SYS.CallNetNamespaceFunc(cfg.workingPid, cbTapPortPair, &pipeParam{pid: pid, pair: pair}); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func cbFwdPortPair(param interface{}) {
@@ -1574,7 +1724,9 @@ func cbFwdPortPair(param interface{}) {
 }
 
 func FwdPortPair(pid int, pair *InterceptPair) {
-	global.SYS.CallNetNamespaceFunc(cfg.workingPid, cbFwdPortPair, &pipeParam{pid: pid, pair: pair})
+	if dbgError := global.SYS.CallNetNamespaceFunc(cfg.workingPid, cbFwdPortPair, &pipeParam{pid: pid, pair: pair}); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func cbResetPortPair(param interface{}) {
@@ -1583,7 +1735,9 @@ func cbResetPortPair(param interface{}) {
 }
 
 func ResetPortPair(pid int, pair *InterceptPair) {
-	global.SYS.CallNetNamespaceFunc(cfg.workingPid, cbResetPortPair, &pipeParam{pid: pid, pair: pair})
+	if dbgError := global.SYS.CallNetNamespaceFunc(cfg.workingPid, cbResetPortPair, &pipeParam{pid: pid, pair: pair}); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 }
 
 func GetPortPairDebug(pair *InterceptPair) *share.CLUSWorkloadInterceptPort {

@@ -1,15 +1,16 @@
 // package ringbuffer implements a sequential compact FIFO and LILO. Also called a Queue.
 // To Use:
-//          type myThing ringbuffer.RingElement
-//          var whatever == myThing("whatever") // Assuming a conversion from string.
-//          rb := RingBuffer.New(40)
-//          rb.Write(myThing) // Et cetera
-//          aThing := rb.Read()
-//          for 0 < rb.Size() {
-//              doSomethingWith(rb.Read())
-//          }
 //
-//  THIS IS NOT CONCURRENT —— ONE GOROUTINE ONLY.
+//	        type myThing ringbuffer.RingElement
+//	        var whatever == myThing("whatever") // Assuming a conversion from string.
+//	        rb := RingBuffer.New(40)
+//	        rb.Write(myThing) // Et cetera
+//	        aThing := rb.Read()
+//	        for 0 < rb.Size() {
+//	            doSomethingWith(rb.Read())
+//	        }
+//
+//	THIS IS NOT CONCURRENT —— ONE GOROUTINE ONLY.
 package ringbuffer
 
 import (
@@ -34,7 +35,7 @@ func (e *RingBufferError) Error() string {
 	return e.What
 }
 
-///// Inspect the internal state of the ring buffer and complain if not ok. ////
+// /// Inspect the internal state of the ring buffer and complain if not ok. ////
 var invNum int // invNum is an error code.
 
 // New() allocates and initializes a new ring buffer of specified size

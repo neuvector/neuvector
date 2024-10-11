@@ -27,7 +27,6 @@ import (
 
 const procRootMountPoint = "/proc/%d/root"
 
-//
 func usage() {
 	fmt.Fprintf(os.Stderr, "usage: pathWalker [OPTIONS]\n")
 	flag.PrintDefaults()
@@ -42,13 +41,12 @@ type taskMain struct {
 	done     chan error
 }
 
-//
 func isPidValid(pid int) bool {
 	_, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
 	return err == nil
 }
 
-/////////////
+// ///////////
 func InitTaskMain(workPath string, done chan error, sys *system.SystemTools) *taskMain {
 	tm := &taskMain{
 		ctx:      context.Background(),
@@ -59,7 +57,7 @@ func InitTaskMain(workPath string, done chan error, sys *system.SystemTools) *ta
 	return tm
 }
 
-////////////////////////
+// //////////////////////
 func main() {
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.InfoLevel)
@@ -81,7 +79,9 @@ func main() {
 
 	// create a working path from the input file
 	workPath := filepath.Join(workerlet.WalkerBasePath, *uuid)
-	os.MkdirAll(workPath, os.ModePerm)
+	if dbgError := os.MkdirAll(workPath, os.ModePerm); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	log.WithFields(log.Fields{"workPath": workPath, "cid": *cid}).Debug()
 
 	pass := false
@@ -124,10 +124,10 @@ func main() {
 	}
 
 	err := <-done
-	log.WithFields(log.Fields{"workPath": workPath, "used": time.Now().Sub(start).Seconds(), "error": err}).Info("Exit")
+	log.WithFields(log.Fields{"workPath": workPath, "used": time.Since(start).Seconds(), "error": err}).Info("Exit")
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (tm *taskMain) ProcessRequest(walkType string) error {
 	jsonFile, err := os.Open(filepath.Join(tm.workPath, workerlet.RequestJson))
 	if err != nil {
@@ -142,7 +142,7 @@ func (tm *taskMain) ProcessRequest(walkType string) error {
 		var req workerlet.WalkPathRequest
 		if err = json.Unmarshal(byteValue, &req); err == nil {
 			if req.Pid == 0 {
-				return errors.New(fmt.Sprintf("%s: Invalid request Pid[%d]", walkType, req.Pid))
+				return fmt.Errorf("%s: Invalid request Pid[%d]", walkType, req.Pid)
 			}
 			go tm.WalkPathTask(req)
 			return nil
@@ -151,7 +151,7 @@ func (tm *taskMain) ProcessRequest(walkType string) error {
 		var req workerlet.WalkGetPackageRequest
 		if err = json.Unmarshal(byteValue, &req); err == nil {
 			if req.Pid == 0 {
-				return errors.New(fmt.Sprintf("%s: Invalid request Pid[%d]", walkType, req.Pid))
+				return fmt.Errorf("%s: Invalid request Pid[%d]", walkType, req.Pid)
 			}
 			go tm.WalkPackageTask(req)
 			return nil
@@ -160,7 +160,7 @@ func (tm *taskMain) ProcessRequest(walkType string) error {
 		var req workerlet.WalkSecretRequest
 		if err = json.Unmarshal(byteValue, &req); err == nil {
 			if req.Pid == 0 {
-				return errors.New(fmt.Sprintf("%s: Invalid request Pid[%d]", walkType, req.Pid))
+				return fmt.Errorf("%s: Invalid request Pid[%d]", walkType, req.Pid)
 			}
 			go tm.ScanSecretTask(req)
 			return nil
@@ -168,10 +168,10 @@ func (tm *taskMain) ProcessRequest(walkType string) error {
 	default:
 		return errors.New("Invalid type")
 	}
-	return errors.New(fmt.Sprintf("Invalid request: %s", string(byteValue)))
+	return fmt.Errorf("Invalid request: %s", string(byteValue))
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 	var errorCnt int
 	var res = &workerlet.WalkPathResult{
@@ -200,7 +200,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 
 		if err != nil {
 			if isPidValid(req.Pid) { // abort
-				errors.New(fmt.Sprintf("Invalid pid: %d", req.Pid))
+				// fmt.Errorf("Invalid pid: %d", req.Pid)
 				return nil
 			}
 
@@ -275,7 +275,9 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 
 	// outputs
 	if data, err := json.Marshal(res); err == nil {
-		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), data, 0644)
+		if dbgError := os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), data, 0644); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	} else {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
@@ -291,7 +293,7 @@ func (tm *taskMain) WalkPackageTask(req workerlet.WalkGetPackageRequest) {
 	// outputs:
 	output, err := json.Marshal(data)
 	if err == nil {
-		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
+		err = os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
 	}
 	tm.done <- err
 }
@@ -317,14 +319,18 @@ func (tm *taskMain) ScanSecretTask(req workerlet.WalkSecretRequest) {
 
 	// outputs: perm
 	if output, err := json.Marshal(perms); err == nil {
-		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644)
+		if dbgError := os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson), output, 0644); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	} else {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
 
 	// outputs: secret
 	if output, err := json.Marshal(logs); err == nil {
-		os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson2), output, 0644)
+		if dbgError := os.WriteFile(filepath.Join(tm.workPath, workerlet.ResultJson2), output, 0644); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	} else {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}

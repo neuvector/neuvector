@@ -67,7 +67,7 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 	gInfoRLock()
 	if req.Type == share.ScanObjectType_HOST {
 		pid = 1
-		pidHost = true   // default
+		pidHost = true // default
 		if gInfo.hostScanCache != nil {
 			data.Buffer = gInfo.hostScanCache
 			data.Error = share.ScanErrorCode_ScanErrNone
@@ -179,8 +179,11 @@ func getControllerServiceClient() (share.ControllerAgentServiceClient, error) {
 		return nil, fmt.Errorf("Controller endpoint is not ready")
 	}
 	if cluster.GetGRPCClientEndpoint(ctrlEndpoint) == "" {
-		cluster.CreateGRPCClient(ctrlEndpoint, ctrlEndpoint, true,
+		dbgError := cluster.CreateGRPCClient(ctrlEndpoint, ctrlEndpoint, true,
 			createControllerAgentServiceWrapper)
+		if dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	c, err := cluster.GetGRPCClient(ctrlEndpoint, cluster.IsControllerGRPCCommpressed, nil)
 	if err == nil {

@@ -20,8 +20,8 @@ const (
 	posExitProcessTgid = posProcEventData + uint32(unsafe.Offsetof(netlink.ProcEventExit{}.ProcessTgid))
 )
 
-//berkeley packet filter (BPF)
-//Filter out unused fork/exit thread's packets
+// berkeley packet filter (BPF)
+// Filter out unused fork/exit thread's packets
 var ProcFilters = []bpf.Instruction{
 	bpf.LoadAbsolute{Off: posProcEventWhat, Size: 4}, // load event id
 	// FORK

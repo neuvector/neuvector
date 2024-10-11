@@ -25,7 +25,9 @@ func (d *dummyRTDriver) MonitorEvent(cb container.EventCallback, cpath bool) err
 }
 func (d *dummyRTDriver) StopMonitorEvent()                 {}
 func (d *dummyRTDriver) GetHost() (*share.CLUSHost, error) { return nil, nil }
-func (d *dummyRTDriver) GetSelfID() string { return "a361929b15729277ed89f11da44b0882e82fe9cc9587f1f5f8ebed49802f8834" }
+func (d *dummyRTDriver) GetSelfID() string {
+	return "a361929b15729277ed89f11da44b0882e82fe9cc9587f1f5f8ebed49802f8834"
+}
 func (d *dummyRTDriver) GetDevice(id string) (*share.CLUSDevice, *container.ContainerMetaExtra, error) {
 	return nil, nil, nil
 }
@@ -95,39 +97,39 @@ func (d *dummyRTDriver) ListServices() ([]*container.Service, error) {
 func TestIsShellSCript(t *testing.T) {
 	apps := map[uint32]*procInternal{
 		// non-shell-script
-		1: &procInternal{name: "name", path: "path", cmds: []string{"name", "param"}},
-		2: &procInternal{name: "name", path: "/bin/bash", cmds: []string{"/bin/bash", "param"}},
-		3: &procInternal{name: "name", path: "/bin/bash", cmds: []string{"name"}},
-		4: &procInternal{name: "name", path: "/bin/bash", cmds: []string{"anotherName"}},
-		5: &procInternal{name: "bash", path: "/bin/bash", cmds: []string{"bash"}},
-		6: &procInternal{name: "cp", path: "/bin/busybox", cmds: []string{"cp"}},
-		7: &procInternal{name: "cp", path: "/bin/busybox", cmds: []string{"/bin/busybox cp"}},
+		1: {name: "name", path: "path", cmds: []string{"name", "param"}},
+		2: {name: "name", path: "/bin/bash", cmds: []string{"/bin/bash", "param"}},
+		3: {name: "name", path: "/bin/bash", cmds: []string{"name"}},
+		4: {name: "name", path: "/bin/bash", cmds: []string{"anotherName"}},
+		5: {name: "bash", path: "/bin/bash", cmds: []string{"bash"}},
+		6: {name: "cp", path: "/bin/busybox", cmds: []string{"cp"}},
+		7: {name: "cp", path: "/bin/busybox", cmds: []string{"/bin/busybox cp"}},
 
-		11: &procInternal{name: "scxuPiwXl", path: "/usr/bin/bash", cmds: []string{"/usr/bin/ps", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
-		12: &procInternal{name: "scxuPiwXl", path: "/usr/local/bin/bash", cmds: []string{"/usr/bin/ls", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
+		11: {name: "scxuPiwXl", path: "/usr/bin/bash", cmds: []string{"/usr/bin/ps", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
+		12: {name: "scxuPiwXl", path: "/usr/local/bin/bash", cmds: []string{"/usr/bin/ls", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
 
 		// no-harm: false-negative
-		50: &procInternal{name: "bash", path: "/bin/bash", cmds: []string{"/bin/bash", "psloop.sh"}},
-		51: &procInternal{name: "dash", path: "/bin/dash", cmds: []string{"/bin/bash", "psloop.sh"}},
+		50: {name: "bash", path: "/bin/bash", cmds: []string{"/bin/bash", "psloop.sh"}},
+		51: {name: "dash", path: "/bin/dash", cmds: []string{"/bin/bash", "psloop.sh"}},
 
 		// above: identified as not-shell-script
 		// ------------------------------------------------------------------------------
 		// below: shell scripts
 
-		100: &procInternal{name: "psloop.sh", path: "/bin/bash", cmds: []string{"/bin/bash", "psloop.sh"}},
-		101: &procInternal{name: "psloop.sh", path: "/bin/bash", cmds: []string{"/bin/sh", "psloop.sh"}},
-		102: &procInternal{name: "name", path: "/bin/bash", cmds: []string{"/bin/bash", "name"}},
-		103: &procInternal{name: "name", path: "/bin/dash", cmds: []string{"/bin/sh", "name"}},
-		104: &procInternal{name: "1.sh", path: "/bin/dash", cmds: []string{"/bin/sh", "1.sh"}},
+		100: {name: "psloop.sh", path: "/bin/bash", cmds: []string{"/bin/bash", "psloop.sh"}},
+		101: {name: "psloop.sh", path: "/bin/bash", cmds: []string{"/bin/sh", "psloop.sh"}},
+		102: {name: "name", path: "/bin/bash", cmds: []string{"/bin/bash", "name"}},
+		103: {name: "name", path: "/bin/dash", cmds: []string{"/bin/sh", "name"}},
+		104: {name: "1.sh", path: "/bin/dash", cmds: []string{"/bin/sh", "1.sh"}},
 
 		// possible sample combinations from "Microsoft System Center - Operations Manager"
-		110: &procInternal{name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1 if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ] then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
-		111: &procInternal{name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ] then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
-		112: &procInternal{name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
-		113: &procInternal{name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then", "/etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
-		114: &procInternal{name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
-		115: &procInternal{name: "scxuPiwXl", path: "/usr/bin/bash", cmds: []string{"/usr/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
-		116: &procInternal{name: "scxuPiwXl", path: "/usr/local/bin/bash", cmds: []string{"/usr/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
+		110: {name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1 if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ] then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
+		111: {name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ] then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
+		112: {name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
+		113: {name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then", "/etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl ocpmaster5102.rbgooe.at"}},
+		114: {name: "scxuPiwXl", path: "/bin/bash", cmds: []string{"/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
+		115: {name: "scxuPiwXl", path: "/usr/bin/bash", cmds: []string{"/usr/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
+		116: {name: "scxuPiwXl", path: "/usr/local/bin/bash", cmds: []string{"/usr/bin/bash", "server=$1", "if [ `systemctl list-unit-files | grep -i \"atomic-openshift-master-api.service\" | wc -l` -gt 0 ]", "then /etc/opt/microsoft/scx/conf/tmpdir/scxuPiwXl", "ocpmaster5102.rbgooe.at"}},
 	}
 
 	p := &Probe{}
@@ -147,46 +149,46 @@ func TestIsShellSCript(t *testing.T) {
 }
 
 /*
- "ip":
-     Show / manipulate routing, devices, policy routing and tunnels
+"ip":
 
- ip [ OPTIONS ] OBJECT { COMMAND | help }
- ip link set DEVICE { up | down | arp { on | off } | ......
- ip link show [ DEVICE ]
- ip address { add | del } IFADDR dev STRING
- ip address { show | flush } [ dev STRING ] [ scope SCOPE-ID ] [ to PREFIX ] [ FLAG-LIST ] [ label PATTERN ]
- ip addrlabel { add | del } prefix PREFIX [ dev DEV ] [ label NUMBER ]
- ip addrlabel { list | flush }
- ip route get ADDRESS [ from ADDRESS iif STRING ] [ oif STRING ] [ tos TOS ]
- ip route { add | del | change | append | replace | monitor } ROUTE
- ip rule [ list | add | del | flush ] SELECTOR ACTION
- ip tunnel { add | change | del | show | prl } [ NAME ] [ mode MODE ] [ remote ADDR ]
- ip maddr [ add | del ] MULTIADDR dev STRING
- ip neighbour { add | del | change | replace } { ADDR [ lladdr LLADDR ]
- ip maddr [ add | del ] MULTIADDR dev STRING
- ip xfrm state { add | update } ID [ XFRM_OPT ] [ mode MODE ] [ reqid REQID ] [ seq SEQ ] [ replay-window SIZE ]
- ip monitor [ all | LISTofOBJECTS ]   ???
+	Show / manipulate routing, devices, policy routing and tunnels
 
+ip [ OPTIONS ] OBJECT { COMMAND | help }
+ip link set DEVICE { up | down | arp { on | off } | ......
+ip link show [ DEVICE ]
+ip address { add | del } IFADDR dev STRING
+ip address { show | flush } [ dev STRING ] [ scope SCOPE-ID ] [ to PREFIX ] [ FLAG-LIST ] [ label PATTERN ]
+ip addrlabel { add | del } prefix PREFIX [ dev DEV ] [ label NUMBER ]
+ip addrlabel { list | flush }
+ip route get ADDRESS [ from ADDRESS iif STRING ] [ oif STRING ] [ tos TOS ]
+ip route { add | del | change | append | replace | monitor } ROUTE
+ip rule [ list | add | del | flush ] SELECTOR ACTION
+ip tunnel { add | change | del | show | prl } [ NAME ] [ mode MODE ] [ remote ADDR ]
+ip maddr [ add | del ] MULTIADDR dev STRING
+ip neighbour { add | del | change | replace } { ADDR [ lladdr LLADDR ]
+ip maddr [ add | del ] MULTIADDR dev STRING
+ip xfrm state { add | update } ID [ XFRM_OPT ] [ mode MODE ] [ reqid REQID ] [ seq SEQ ] [ replay-window SIZE ]
+ip monitor [ all | LISTofOBJECTS ]   ???
 */
 func TestIpRuntimeReadOnlyCmd(t *testing.T) {
 	apps := map[uint32]*procInternal{
 		// positive
-		1: &procInternal{cmds: []string{"ip", "-a", "-o", "link"}},
-		2: &procInternal{cmds: []string{"ip", "address"}},
-		3: &procInternal{cmds: []string{"ip", "address", "show"}},
-		4: &procInternal{cmds: []string{"ip", "route", "get", "google.com"}},
-		5: &procInternal{cmds: []string{"ip", "rule", "list", "selector"}},
+		1: {cmds: []string{"ip", "-a", "-o", "link"}},
+		2: {cmds: []string{"ip", "address"}},
+		3: {cmds: []string{"ip", "address", "show"}},
+		4: {cmds: []string{"ip", "route", "get", "google.com"}},
+		5: {cmds: []string{"ip", "rule", "list", "selector"}},
 
 		// negative
-		10: &procInternal{cmds: []string{"cip", "address"}}, // wrong exec
-		11: &procInternal{cmds: []string{"ip", "address", "flush", "eth1"}},
-		12: &procInternal{cmds: []string{"ip", "route", "change", "toAbcRoute"}},
-		13: &procInternal{cmds: []string{"ip", "route", "replace", "toAbcRoute"}},
-		14: &procInternal{cmds: []string{"ip", "rule", "add", "selector"}},
-		15: &procInternal{cmds: []string{"ip", "tunnel", "del", "myTunnel", "127.0.0.1"}},
-		16: &procInternal{cmds: []string{"ip", "link", "set", "eth4", "down"}},
-		17: &procInternal{cmds: []string{"ip", "link", "truncate", "eth4", "down"}}, // unknown operator
-		18: &procInternal{cmds: []string{"ip", "link", "eth4", "down"}},             // missing object
+		10: {cmds: []string{"cip", "address"}}, // wrong exec
+		11: {cmds: []string{"ip", "address", "flush", "eth1"}},
+		12: {cmds: []string{"ip", "route", "change", "toAbcRoute"}},
+		13: {cmds: []string{"ip", "route", "replace", "toAbcRoute"}},
+		14: {cmds: []string{"ip", "rule", "add", "selector"}},
+		15: {cmds: []string{"ip", "tunnel", "del", "myTunnel", "127.0.0.1"}},
+		16: {cmds: []string{"ip", "link", "set", "eth4", "down"}},
+		17: {cmds: []string{"ip", "link", "truncate", "eth4", "down"}}, // unknown operator
+		18: {cmds: []string{"ip", "link", "eth4", "down"}},             // missing object
 	}
 
 	p := &Probe{}
@@ -207,18 +209,18 @@ func TestIpRuntimeReadOnlyCmd(t *testing.T) {
 func TestAzureCniCmd(t *testing.T) {
 	apps := map[uint32]*procInternal{
 		// positive
-		1: &procInternal{name: "azure-vnet", pname: "runc", path: "/opt/cni/bin/azure-vnet"},
-		2: &procInternal{name: "uptime", pname: "azure-vnet", ppath: "/opt/cni/bin/azure-vnet"},
-		3: &procInternal{name: "tuning", pname: "azure-vnet", ppath: "/opt/cni/bin/azure-vnet", path: "/opt/cni/bin/tuning"},
+		1: {name: "azure-vnet", pname: "runc", path: "/opt/cni/bin/azure-vnet"},
+		2: {name: "uptime", pname: "azure-vnet", ppath: "/opt/cni/bin/azure-vnet"},
+		3: {name: "tuning", pname: "azure-vnet", ppath: "/opt/cni/bin/azure-vnet", path: "/opt/cni/bin/tuning"},
 
 		// negative
-		10: &procInternal{name: "azure-vnet", pname: "bash", path: "/opt/cni/bin/azure-vnet"},
-		11: &procInternal{name: "NotUptime", pname: "azure-vnet", ppath: "/opt/cni/bin/azure-vnet"},
-		12: &procInternal{name: "tuning", pname: "azure-vnet", ppath: "/opt/cni/bin/attack/azure-vnet", path: "/opt/cni/bin/tuningX"},
+		10: {name: "azure-vnet", pname: "bash", path: "/opt/cni/bin/azure-vnet"},
+		11: {name: "NotUptime", pname: "azure-vnet", ppath: "/opt/cni/bin/azure-vnet"},
+		12: {name: "tuning", pname: "azure-vnet", ppath: "/opt/cni/bin/attack/azure-vnet", path: "/opt/cni/bin/tuningX"},
 	}
 
 	global.RT = &dummyRTDriver{cmd: "runc"}
-	p := &Probe{bKubePlatform: true, agentPid: 100, }
+	p := &Probe{bKubePlatform: true, agentPid: 100}
 	for k, v := range apps {
 		res := p.isProcessException(v, share.GroupNVProtect, "1234567890", true, false)
 		if k < 10 {

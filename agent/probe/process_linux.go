@@ -73,7 +73,9 @@ func (p *Probe) establishNetLinkProcCommunication() error {
 		op := netlink.PROC_CN_MCAST_IGNORE
 		req.AddData(netlink.NewCnMsg())
 		req.AddData(&op)
-		p.nsProc.Write(req)
+		if dbgError := p.nsProc.Write(req); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 		p.nsProc.Close()
 		return err
 	}
@@ -83,7 +85,7 @@ func (p *Probe) establishNetLinkProcCommunication() error {
 func (p *Probe) checkProcessNetlinkSocket() error {
 	// inspect the first 4 packets, timeout interval=1sec
 	for i := 0; i < 4; i++ {
-		msgs, from, err := p.nsProc.EPollReceiveFrom(&syscall.Timeval{1, 0})
+		msgs, from, err := p.nsProc.EPollReceiveFrom(&syscall.Timeval{Sec: 1, Usec: 0})
 		if err != nil {
 			return err
 		}
@@ -104,6 +106,9 @@ func (p *Probe) checkProcessNetlinkSocket() error {
 			switch msg.Header.Type {
 			case syscall.NLMSG_DONE:
 				cnmsg := (*netlink.CnMsg)(unsafe.Pointer(&msg.Data[0])) // connector message header
+				if cnmsg.Len() == 0 {
+					break
+				}
 				msgLen := unsafe.Sizeof(*cnmsg)
 				hdr := (*netlink.ProcEvent)(unsafe.Pointer(&msg.Data[msgLen]))
 				if hdr.What == netlink.PROC_EVENT_NONE {
@@ -156,6 +161,9 @@ func (p *Probe) parseNetLinkProcEvent(msg *syscall.NetlinkMessage) *netlinkProcE
 	}
 
 	cnmsg := (*netlink.CnMsg)(unsafe.Pointer(&msg.Data[0])) // connector message header
+	if cnmsg.Len() == 0 {
+		return nil
+	}
 	msgLen := unsafe.Sizeof(*cnmsg)
 	hdr := (*procEventHdr)(unsafe.Pointer(&msg.Data[msgLen]))
 	msgLen += unsafe.Sizeof(*hdr)
@@ -201,13 +209,14 @@ func (p *Probe) cleanupProc() {
 	pidSetNew := osutil.GetAllProcesses()
 	p.lockProcMux()
 	defer p.unlockProcMux()
-	for pid, _ := range p.pidProcMap {
+	for pid := range p.pidProcMap {
 		if !pidSetNew.Contains(pid) {
 			p.handleProcExit(pid) // w/ netlink
 		}
 	}
 }
 
+/* removed by golint
 func (p *Probe) reBuiltProcessTables() {
 	p.lockProcMux()
 	defer p.unlockProcMux()
@@ -222,6 +231,7 @@ func (p *Probe) reBuiltProcessTables() {
 		p.addContainerCandidate(proc, true)
 	}
 }
+*/
 
 func (p *Probe) patchProcessTables() {
 	p.lockProcMux()
@@ -231,7 +241,7 @@ func (p *Probe) patchProcessTables() {
 	pidSet := osutil.GetAllProcesses()
 
 	// exit processes
-	for pid, _ := range p.pidProcMap {
+	for pid := range p.pidProcMap {
 		if !pidSet.Contains(pid) {
 			p.handleProcExit(pid) // exit
 		}
@@ -274,35 +284,31 @@ func (p *Probe) netlinkProcMonitor() {
 	ticker := time.Tick(time.Second * ticker_unit_in_seconds)
 	log.Info("PROC: Start real-time process listener")
 	for {
-		select {
-		case <-ticker:
-			counter++
-			p.processContainerAppPortChanges()
-			if counter%5 == 0 {
-				p.monitorProcessChanges() // every 2*5 seconds
-			}
-			if counter > cleanupCounter {
-				// In case we miss some events, we should periodically clean up process map
-				p.cleanupProc()
-				counter = 0 // reset here
-			}
+		<-ticker
+		counter++
+		p.processContainerAppPortChanges()
+		if counter%5 == 0 {
+			p.monitorProcessChanges() // every 2*5 seconds
+		}
+		if counter > cleanupCounter {
+			// In case we miss some events, we should periodically clean up process map
+			p.cleanupProc()
+			counter = 0 // reset here
+		}
 
-			// time consuming process, reducing its usage
-			if p.resetProcTbl {
-				p.resetProcTbl = false
-				if p.deferCStartRpt { // crio: timimg is critical
-					rebuildCounter = counter + 1 // quick recovery: 2 sec
-				} else {
-					rebuildCounter = counter + 10 // delay 20 sec for normal condition
-				}
+		// time consuming process, reducing its usage
+		if p.resetProcTbl {
+			p.resetProcTbl = false
+			if p.deferCStartRpt { // crio: timimg is critical
+				rebuildCounter = counter + 1 // quick recovery: 2 sec
+			} else {
+				rebuildCounter = counter + 10 // delay 20 sec for normal condition
 			}
+		}
 
-			if counter == rebuildCounter {
-				rebuildCounter = -1
-				p.patchProcessTables()
-				// p.reBuiltProcessTables()
-				// p.profileFuncTime(p.reBuiltProcessTables, 100)
-			}
+		if counter == rebuildCounter {
+			rebuildCounter = -1
+			p.patchProcessTables()
 		}
 	}
 }

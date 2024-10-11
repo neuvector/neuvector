@@ -13,12 +13,12 @@ type appSample struct {
 	good bool
 }
 
-////// Utility
+// //// Utility
 func printProfile(pp *share.CLUSProcessProfileEntry) {
 	fmt.Printf("profile: %+v, %+v, %+v\n", pp.Name, pp.Path, pp.Action)
 }
 
-////// Utility
+// //// Utility
 func printApps(apps []appSample) {
 	fmt.Printf("apps: count %d\n", len(apps))
 	for i, app := range apps {
@@ -26,7 +26,7 @@ func printApps(apps []appSample) {
 	}
 }
 
-////// Utility
+// //// Utility
 func tester(pp *share.CLUSProcessProfileEntry, apps []appSample) bool {
 	for _, app := range apps {
 		ppe := &share.CLUSProcessProfileEntry{

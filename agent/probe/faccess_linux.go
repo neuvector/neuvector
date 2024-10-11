@@ -85,7 +85,7 @@ func (fa *FileAccessCtrl) unlockMux() {
 	// log.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("FA: ")
 }
 
-/////
+// ///
 func appendDirPath(dirs []string, path string) []string {
 	// append monitor directory
 	dir := filepath.Dir(path)
@@ -105,7 +105,7 @@ func appendDirPath(dirs []string, path string) []string {
 	return dirs
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) enumExecutables(rootpid int, id string) (map[string]int, []string) {
 	var dirs []string
 	execs := make(map[string]int)
@@ -149,7 +149,7 @@ func (fa *FileAccessCtrl) enumExecutables(rootpid int, id string) (map[string]in
 	return execs, dirs
 }
 
-////////////
+// //////////
 func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 	log.Debug("FA: ")
 	fa := &FileAccessCtrl{
@@ -190,7 +190,7 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 	return fa, true
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, dir := range dirs {
@@ -205,22 +205,27 @@ func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 	return true, len(dirs)
 }
 
-///// remove all marks even if we did not mark it (whitelist) before
-//  note: ibm cloud does not support the FAN_MARK_FLUSH flag
+// /// remove all marks even if we did not mark it (whitelist) before
+//
+//	note: ibm cloud does not support the FAN_MARK_FLUSH flag
 func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, dir := range dirs {
 		path := ppath + dir
-		fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fa.cflag|fsmon.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path)
+		if dbgError := fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fa.cflag|fsmon.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
 	}
 	return len(dirs)
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 	path := fmt.Sprintf(procRootMountPoint, 1)
 	err := fa.fanfd.Mark(fsmon.FAN_MARK_ADD, fsmon.FAN_OPEN_PERM, unix.AT_FDCWD, path)
-	fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fsmon.FAN_OPEN_PERM, unix.AT_FDCWD, path)
+	if dbgError := fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fsmon.FAN_OPEN_PERM, unix.AT_FDCWD, path); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("FA: not supported")
 		return false
@@ -231,7 +236,9 @@ func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 func (fa *FileAccessCtrl) isSupportExecPerm() bool {
 	path := fmt.Sprintf(procRootMountPoint, 1)
 	err := fa.fanfd.Mark(fsmon.FAN_MARK_ADD, fsmon.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path)
-	fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fsmon.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path)
+	if dbgError := fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fsmon.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("FA: not supported")
 		return false
@@ -239,7 +246,7 @@ func (fa *FileAccessCtrl) isSupportExecPerm() bool {
 	return true
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) monitorExit() {
 	if fa.fanfd != nil {
 		fa.fanfd.Close()
@@ -250,7 +257,7 @@ func (fa *FileAccessCtrl) monitorExit() {
 	}
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) Close() {
 	log.Debug("FA:")
 	if !fa.bEnabled {
@@ -276,13 +283,13 @@ func (fa *FileAccessCtrl) Close() {
 	}()
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) isRecursiveDirectoryList(root *rootFd, name, path string, bAllow, updateAlert bool) bool {
 	decision := fa.decision_maker(bAllow, updateAlert)
 	if name == "*" && strings.HasSuffix(path, "/*") {
 		dir := filepath.Dir(path)
 		// log.WithFields(log.Fields{"dir": dir, "path": path, "allow": bAllow}).Debug("FA:")
-		for p, _ := range root.whlst {
+		for p := range root.whlst {
 			if strings.HasPrefix(p, dir) && root.whlst[p] == rule_not_defined { // "" is an impossible entry here
 				root.whlst[p] = decision
 				log.WithFields(log.Fields{"path": p, "allow": bAllow}).Debug("FA:")
@@ -299,7 +306,7 @@ func (fa *FileAccessCtrl) isRecursiveDirectoryList(root *rootFd, name, path stri
 	return false
 }
 
-/////  application match for applications
+// ///  application match for applications
 func (fa *FileAccessCtrl) isApplicationMatched(root *rootFd, name, path string, bAllow, updateAlert bool) bool {
 	if name != "*" && (strings.HasSuffix(path, "*") || path == "") {
 		dir := path
@@ -310,7 +317,7 @@ func (fa *FileAccessCtrl) isApplicationMatched(root *rootFd, name, path string, 
 			dir = "/"
 		}
 
-		for p, _ := range root.whlst {
+		for p := range root.whlst {
 			i := strings.LastIndex(p, "/")
 			n := p[i+1:]
 			if strings.HasPrefix(p, dir) && n == name && root.whlst[p] == rule_not_defined {
@@ -323,7 +330,7 @@ func (fa *FileAccessCtrl) isApplicationMatched(root *rootFd, name, path string, 
 	return false
 }
 
-///// regular or user defined, adding it into list
+// /// regular or user defined, adding it into list
 func (fa *FileAccessCtrl) addToMonitorList(root *rootFd, path string, bAllow, updateAlert bool) {
 	if state, ok := root.whlst[path]; ok {
 		if state != rule_not_defined {
@@ -353,12 +360,12 @@ func (fa *FileAccessCtrl) decision_maker(bAllow, updateAlert bool) int {
 	return decision
 }
 
-/////// Merge Monitor Lists
+// ///// Merge Monitor Lists
 func (fa *FileAccessCtrl) mergeMonitorRuleList(root *rootFd, list []string, bAllow, updateAlert bool) {
 	if len(list) > 0 {
 		if list[0] == "*:*" {
 			// allow all applications
-			for p, _ := range root.whlst {
+			for p := range root.whlst {
 				if root.whlst[p] == rule_not_defined {
 					root.whlst[p] = fa.decision_maker(bAllow, updateAlert)
 				}
@@ -403,7 +410,7 @@ func (fa *FileAccessCtrl) mergeMonitorRuleList(root *rootFd, list []string, bAll
 	}
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup string, rootpid int, ppe_list []*share.CLUSProcessProfileEntry) bool {
 	if !fa.bEnabled {
 		log.Debug("FA: not supported")
@@ -518,7 +525,7 @@ func (fa *FileAccessCtrl) RemoveContainerControl(id string) bool {
 	return true
 }
 
-/////
+/* removed by golint
 func (fa *FileAccessCtrl) AddBlackListOnTheFly(id string, list []string) bool {
 	if !fa.bEnabled {
 		log.Debug("FA: not supported")
@@ -566,6 +573,7 @@ func (fa *FileAccessCtrl) AddBlackListOnTheFly(id string, list []string) bool {
 	log.WithFields(log.Fields{"marks": cnt, "total_marks": fa.marks}).Debug("FA:")
 	return true
 }
+*/
 
 func (fa *FileAccessCtrl) isAllowedByParentApp(cRoot *rootFd, pid int) (bool, string, string, int) {
 	if len(cRoot.allowProcList) == 0 {
@@ -692,9 +700,9 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 				}
 			}
 			return id, profileSetting, svcGroup, rres
-		} else {
-			//	log.Debug("FA: not in the whtlst")
-		}
+		} /*else {
+			log.Debug("FA: not in the whtlst")
+		} */
 	}
 	return id, profileSetting, svcGroup, res
 }
@@ -728,7 +736,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 			}
 
 			// NVSHAS-8053 - Get the parent pid's path. We need this to determine Parent exception
-			if parentPath, err :=  global.SYS.GetFilePath(parentPid); err == nil && parentPath != "" {
+			if parentPath, err := global.SYS.GetFilePath(parentPid); err == nil && parentPath != "" {
 				ppath = parentPath
 			}
 
@@ -816,7 +824,9 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 func (fa *FileAccessCtrl) handleEvents() {
 	if events, err := fa.fanfd.GetEvents(); err == nil {
 		for _, ev := range events {
-			fa.fanfd.Response(ev, fa.processEvent(ev))
+			if dbgError := fa.fanfd.Response(ev, fa.processEvent(ev)); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			ev.File.Close()
 		}
 	}
@@ -856,7 +866,7 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 	log.Info("FA: exit")
 }
 
-/////
+// ///
 func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 	var probeData FileAccessProbeData
 
@@ -882,17 +892,16 @@ func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 // (no idea which symbolic-link app is going to run at next, like "ps in the busybox shell").
 // Definitively, we want to bypass "ps" here and screen them at the process killer
 // For example, the "ps" commands (opening "/bin/busybox") for runtime services:
-//     crio uses "docker-runc-current", but docker-native uses "docker"
+//
+//	crio uses "docker-runc-current", but docker-native uses "docker"
 func (fa *FileAccessCtrl) isParentProcessException(ppath, path, name string) bool {
 	// mlog.WithFields(log.Fields{"ppath": ppath, "path": path}).Debug("FA:")
 
 	// parent: matching only from binary
 	pname := filepath.Base(ppath)
 	if name == "ps" {
-		if global.RT.IsRuntimeProcess(pname, nil) {
-			return true
-		}
-		return false // common service call
+		// common service call
+		return global.RT.IsRuntimeProcess(pname, nil)
 	}
 
 	if fa.bKubePlatform {

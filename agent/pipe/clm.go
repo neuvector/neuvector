@@ -1,10 +1,8 @@
 package pipe
 
 import (
-	"fmt"
 	"net"
 )
-
 
 type clmPipeDriver struct {
 }
@@ -13,11 +11,8 @@ var clmPipe clmPipeDriver = clmPipeDriver{}
 
 func (d *clmPipeDriver) AttachPortPair(pair *InterceptPair) (net.HardwareAddr, net.HardwareAddr) {
 	// 4e:65:75:56 - NeuV
-	var mac_str string
-	mac_str = fmt.Sprintf("4e:65:75:56:00:00")
-	ucmac, _ := net.ParseMAC(mac_str)
-	mac_str = fmt.Sprintf("ff:ff:ff:00:00:00")
-	bcmac, _ := net.ParseMAC(mac_str)
+	ucmac, _ := net.ParseMAC("4e:65:75:56:00:00")
+	bcmac, _ := net.ParseMAC("ff:ff:ff:00:00:00")
 	return ucmac, bcmac
 }
 
