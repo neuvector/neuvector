@@ -22,7 +22,7 @@ func TestCertManager(t *testing.T) {
 	cm := NewCertManager(CertManagerConfig{
 		ExpiryCheckPeriod: time.Second * 10,
 	})
-	cm.Register(CN, &CertManagerCallback{
+	_ = cm.Register(CN, &CertManagerCallback{
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := GenTlsKeyCert(CN, "", "", ValidityPeriod{}, x509.ExtKeyUsageAny)
 			if err != nil {

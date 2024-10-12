@@ -93,7 +93,7 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 	m.ScanRpts = make(map[string]*share.CLUSScanReport, 0)
 
 	m.complianceProfiles = map[string]*share.CLUSComplianceProfile{
-		"default": &share.CLUSComplianceProfile{
+		"default": {
 			Name:          "default",
 			DisableSystem: false,
 			Entries:       make(map[string]share.CLUSComplianceProfileEntry),
@@ -109,8 +109,7 @@ func (m *MockCluster) AcquireLock(key string, wait time.Duration) (cluster.LockI
 	return &mockLock{}, nil
 }
 
-func (m *MockCluster) ReleaseLock(lock cluster.LockInterface) error {
-	return nil
+func (m *MockCluster) ReleaseLock(lock cluster.LockInterface) {
 }
 
 func (m *MockCluster) GetInstallationID() (string, error) {
@@ -210,7 +209,7 @@ func (m *MockCluster) GetUserRev(fullname string, acc *access.AccessControl) (*s
 		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
 		var clone share.CLUSUser
 		value, _ := json.Marshal(user)
-		json.Unmarshal(value, &clone)
+		_ = json.Unmarshal(value, &clone)
 		if !acc.Authorize(&clone, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
 		}
@@ -444,8 +443,8 @@ func (m *MockCluster) GetProcessProfile(group string) *share.CLUSProcessProfile 
 		HashEnable:   false,
 		Mode:         share.PolicyActionLearn,
 		Process: []*share.CLUSProcessProfileEntry{
-			&share.CLUSProcessProfileEntry{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
-			&share.CLUSProcessProfileEntry{Name: "sleep", Path: "/bin/sleep", Action: share.PolicyActionAllow},
+			{Name: "bash", Path: "/usr/bin/bash", Action: share.PolicyActionAllow},
+			{Name: "sleep", Path: "/bin/sleep", Action: share.PolicyActionAllow},
 		},
 	}
 }
@@ -535,7 +534,7 @@ func (m *MockCluster) GetApikeyRev(fullname string, acc *access.AccessControl) (
 		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
 		var clone share.CLUSApikey
 		value, _ := json.Marshal(user)
-		json.Unmarshal(value, &clone)
+		_ = json.Unmarshal(value, &clone)
 		if !acc.Authorize(&clone, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
 		}

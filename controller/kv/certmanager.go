@@ -71,9 +71,9 @@ func (c *CertManager) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			c.CheckAndRenewCerts()
+			_ = c.CheckAndRenewCerts()
 		case cn := <-c.notifyChan:
-			c.UpdateCerts(cn)
+			_ = c.UpdateCerts(cn)
 		case <-ctx.Done():
 			goto end
 		}
@@ -239,7 +239,7 @@ func (c *CertManager) CheckAndRenewCerts() error {
 	defer c.mutex.Unlock()
 
 	for cn, callback := range c.callbacks {
-		c.checkAndRotateCert(cn, callback)
+		_ = c.checkAndRotateCert(cn, callback)
 	}
 
 	log.Debug("CheckAndRenewCerts() completes.")
