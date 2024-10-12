@@ -2,11 +2,12 @@ package main
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -64,7 +65,7 @@ func ErrorInjector(t *testing.T, clientInit func() *fake.FakeDynamicClient, f fu
 
 		ctx := cli.NewContext(nil, nil, nil)
 
-		batchv1.AddToScheme(scheme.Scheme)
+		require.NoError(t, batchv1.AddToScheme(scheme.Scheme))
 
 		if cont := f(ctx, client, &injected); !cont {
 			break
@@ -74,7 +75,7 @@ func ErrorInjector(t *testing.T, clientInit func() *fake.FakeDynamicClient, f fu
 
 func loadJob(t *testing.T, filename string) *batchv1.Job {
 	var ret batchv1.Job
-	content, err := ioutil.ReadFile(path.Join("./testdata", filename))
+	content, err := os.ReadFile(path.Join("./testdata", filename))
 	assert.Nil(t, err)
 	err = yaml.Unmarshal(content, &ret)
 	assert.Nil(t, err)
@@ -83,7 +84,7 @@ func loadJob(t *testing.T, filename string) *batchv1.Job {
 
 func loadObject(t *testing.T, filename string) runtime.Object {
 	var obj map[string]interface{}
-	content, err := ioutil.ReadFile(path.Join("./testdata", filename))
+	content, err := os.ReadFile(path.Join("./testdata", filename))
 	assert.Nil(t, err)
 
 	err = yaml.Unmarshal(content, &obj)
@@ -97,7 +98,7 @@ func loadObject(t *testing.T, filename string) runtime.Object {
 func loadObjectList(t *testing.T, filename string) []runtime.Object {
 	var obj map[string]interface{}
 	var ret []runtime.Object
-	content, err := ioutil.ReadFile(path.Join("./testdata", filename))
+	content, err := os.ReadFile(path.Join("./testdata", filename))
 	assert.Nil(t, err)
 
 	err = yaml.Unmarshal(content, &obj)
@@ -113,7 +114,7 @@ func loadObjectList(t *testing.T, filename string) []runtime.Object {
 }
 
 func TestIsFreshInstall(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 
 	for _, tc := range []struct {
 		TestData    string
@@ -162,8 +163,8 @@ func TestIsFreshInstall(t *testing.T) {
 }
 
 func TestCreateJob(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
-	batchv1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme.Scheme))
 
 	for _, tc := range []struct {
 		TestData     string
@@ -201,9 +202,9 @@ func TestCreateJob(t *testing.T) {
 		expectedJob.CreationTimestamp = v1.Time{}
 
 		if tc.ExpectedErr {
-			assert.NotNil(t, err)
+			require.Error(t, err)
 		} else {
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, expectedJob, job)
 		}
 	}
@@ -219,7 +220,7 @@ func TestCreateJobWithForcedK8sError(t *testing.T) {
 			assert.ErrorIs(t, err, ErrInjected)
 		} else {
 			assert.NotNil(t, job)
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			return false
 		}
 		return true
