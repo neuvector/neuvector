@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -319,7 +320,7 @@ var (
 )
 
 func TestGenerateCertificateFreshInstall(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	client := fake.NewSimpleDynamicClient(scheme.Scheme,
 		loadObject(t, "05-should-upgrade-certs/02-empty-secret.yaml"),
 	)
@@ -410,7 +411,7 @@ func TestGenerateCertificateFreshInstall(t *testing.T) {
 }
 
 func TestGenerateCertificateUpgrade(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	client := fake.NewSimpleDynamicClient(scheme.Scheme,
 		loadObject(t, "05-should-upgrade-certs/02-empty-secret.yaml"),
 	)
@@ -450,7 +451,7 @@ func TestGenerateCertificateUpgrade(t *testing.T) {
 }
 
 func TestGenerateCertificateUpgradeWithRotationDisabled(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	client := fake.NewSimpleDynamicClient(scheme.Scheme,
 		loadObject(t, "05-should-upgrade-certs/02-empty-secret.yaml"),
 	)
@@ -488,7 +489,7 @@ func TestGenerateCertificateUpgradeWithRotationDisabled(t *testing.T) {
 }
 
 func TestUpdateInitialSecretIfRequired(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	client := fake.NewSimpleDynamicClient(scheme.Scheme,
 		loadObject(t, "05-should-upgrade-certs/02-empty-secret.yaml"),
 	)
@@ -535,7 +536,7 @@ func TestUpdateInitialSecretIfRequired(t *testing.T) {
 }
 
 func TestUpdateInitialSecretIfRequiredWithRotationDisabled(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	client := fake.NewSimpleDynamicClient(scheme.Scheme,
 		loadObject(t, "05-should-upgrade-certs/02-empty-secret.yaml"),
 	)
@@ -579,7 +580,7 @@ func TestUpdateInitialSecretIfRequiredWithRotationDisabled(t *testing.T) {
 }
 
 func TestTriggerRotation(t *testing.T) {
-	corev1.AddToScheme(scheme.Scheme)
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	client := fake.NewSimpleDynamicClient(scheme.Scheme,
 		loadObject(t, "05-should-upgrade-certs/02-empty-secret.yaml"),
 	)

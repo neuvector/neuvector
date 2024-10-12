@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -212,13 +212,13 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 			Name:              UPGRADER_JOB_NAME,
 			Namespace:         namespace,
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			OwnerReferences: []metav1.OwnerReference{metav1.OwnerReference{
+			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion:         cronjob.GetAPIVersion(),
 				Kind:               cronjob.GetKind(),
 				Name:               cronjob.GetName(),
 				UID:                cronjob.GetUID(),
-				BlockOwnerDeletion: pointer.Bool(true),
-				Controller:         pointer.Bool(true),
+				BlockOwnerDeletion: ptr.To(true),
+				Controller:         ptr.To(true),
 			}},
 		},
 		Spec: *jobSpec,
