@@ -14,13 +14,13 @@ import (
 	"time"
 	"unsafe"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // TODO: The workflow need to be reworked.
-//       1. Disconnect condition of both sides should be handled.
+//  1. Disconnect condition of both sides should be handled.
 const dpClient string = "/tmp/dp_client.%d"
 const ctrlServer string = "/tmp/ctrl_listen.sock"
 
@@ -59,7 +59,10 @@ func dpSendMsgExSilent(msg []byte, timeout int, cb DPCallback, param interface{}
 		return -1
 	}
 
-	dpConn.SetWriteDeadline(time.Now().Add(time.Second * 2))
+	if dbgError := dpConn.SetWriteDeadline(time.Now().Add(time.Second * 2)); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+
 	_, err := dpConn.Write(msg)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Send error")
@@ -81,7 +84,9 @@ func dpSendMsgExSilent(msg []byte, timeout int, cb DPCallback, param interface{}
 		var buf []byte = make([]byte, C.DP_MSG_SIZE)
 
 		for !done {
-			dpConn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
+			if dbgError := dpConn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout))); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			n, err := dpConn.Read(buf)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Read error")
@@ -265,7 +270,7 @@ func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr
 			BCMAC:  bcmac.String(),
 			OldMAC: oldmac.String(),
 			PMAC:   pmac.String(),
-			PIPS:	tpips,
+			PIPS:   tpips,
 		},
 	}
 	if pips == nil || len(pips) <= 0 {
@@ -307,7 +312,7 @@ func DPCtrlConfigMAC(MACs []string, tap *bool, appMap map[share.CLUSProtoPort]*s
 	if tap != nil {
 		data.Cfg.Tap = tap
 	}
-	if appMap != nil && len(appMap) > 0 {
+	if len(appMap) > 0 {
 		apps := make([]DPProtoPortApp, len(appMap))
 		i := 0
 		for p, app := range appMap {
@@ -325,7 +330,7 @@ func DPCtrlConfigMAC(MACs []string, tap *bool, appMap map[share.CLUSProtoPort]*s
 }
 
 func DPCtrlConfigNBE(MACs []string, nbe *bool) {
-	data := DPConfigNbeReq {
+	data := DPConfigNbeReq{
 		Cfg: &DPNbeConfig{
 			MACs: MACs,
 		},
@@ -466,7 +471,7 @@ func DPCtrlConfigPolicy(policy *DPWorkloadIPPolicy, cmd uint) int {
 		"workload": policy.WlID, "mac": policy.WorkloadMac, "num": num,
 	}).Debug("")
 
-	for num > 0 || first == true {
+	for num > 0 || first {
 		var flag uint = 0
 
 	retry:
@@ -541,17 +546,17 @@ func DPCtrlDeleteFqdn(names []string) int {
 func DPCtrlSetFqdnIp(fqdnip *share.CLUSFqdnIp) int {
 	fips := make([]net.IP, 0, len(fqdnip.FqdnIP))
 	for _, fip := range fqdnip.FqdnIP {
-		if utils.IsIPv4(fip) == false {
+		if !utils.IsIPv4(fip) {
 			continue
 		}
 		fips = append(fips, fip)
 	}
 	Vhost := fqdnip.Vhost
-	data := DPFqdnIpSetReq {
+	data := DPFqdnIpSetReq{
 		Fqdns: &DPFqdnIps{
-			FqdnName:    fqdnip.FqdnName,
-			FqdnIps:     fips,
-			Vhost:		 &Vhost,
+			FqdnName: fqdnip.FqdnName,
+			FqdnIps:  fips,
+			Vhost:    &Vhost,
 		},
 	}
 	msg, _ := json.Marshal(data)
@@ -564,7 +569,7 @@ func DPCtrlSetFqdnIp(fqdnip *share.CLUSFqdnIp) int {
 func DPCtrlConfigPolicyAddr(subnets map[string]share.CLUSSubnet) {
 	data_subnet := make([]DPSubnet, 0, len(subnets))
 	for _, addr := range subnets {
-		if utils.IsIPv4(addr.Subnet.IP) == false {
+		if !utils.IsIPv4(addr.Subnet.IP) {
 			continue
 		}
 		subnet := DPSubnet{
@@ -582,7 +587,7 @@ func DPCtrlConfigPolicyAddr(subnets map[string]share.CLUSSubnet) {
 	num := len(data_subnet)
 	log.WithFields(log.Fields{"policy_address_num": num}).Debug("config policy address")
 
-	for num > 0 || first == true {
+	for num > 0 || first {
 		var flag uint = 0
 
 	retry:
@@ -632,7 +637,7 @@ func DPCtrlConfigPolicyAddr(subnets map[string]share.CLUSSubnet) {
 func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet) {
 	data_subnet := make([]DPSubnet, 0, len(subnets))
 	for _, addr := range subnets {
-		if utils.IsIPv4(addr.Subnet.IP) == false {
+		if !utils.IsIPv4(addr.Subnet.IP) {
 			continue
 		}
 		subnet := DPSubnet{
@@ -650,7 +655,7 @@ func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet) {
 	num := len(data_subnet)
 	log.WithFields(log.Fields{"internal_subnet_num": num}).Debug("config internal subnet")
 
-	for num > 0 || first == true {
+	for num > 0 || first {
 		var flag uint = 0
 
 	retry:
@@ -700,7 +705,7 @@ func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet) {
 func DPCtrlConfigSpecialIPSubnet(subnets map[string]share.CLUSSpecSubnet) {
 	data_subnet := make([]DPSpecSubnet, 0, len(subnets))
 	for _, addr := range subnets {
-		if utils.IsIPv4(addr.Subnet.IP) == false {
+		if !utils.IsIPv4(addr.Subnet.IP) {
 			continue
 		}
 		subnet := DPSpecSubnet{
@@ -718,7 +723,7 @@ func DPCtrlConfigSpecialIPSubnet(subnets map[string]share.CLUSSpecSubnet) {
 	num := len(data_subnet)
 	log.WithFields(log.Fields{"special_net_num": num}).Debug("config special subnet")
 
-	for num > 0 || first == true {
+	for num > 0 || first {
 		var flag uint = 0
 
 	retry:
@@ -776,14 +781,14 @@ func DPCtrlConfigDlp(wldlprule *DPWorkloadDlpRule) int {
 	total := num + num1
 	log.WithFields(log.Fields{
 		"workload": wldlprule.WlID, "mac": wldlprule.WorkloadMac,
-		"policyids": wldlprule.PolicyRuleIds,
-		"polwafids": wldlprule.PolWafRuleIds,
+		"policyids":  wldlprule.PolicyRuleIds,
+		"polwafids":  wldlprule.PolWafRuleIds,
 		"dlprulenum": num,
 		"wafrulenum": num1,
-		"total": total,
+		"total":      total,
 	}).Debug("config dlp")
 
-	for total > 0 || first == true {
+	for total > 0 || first {
 		var flag uint = 0
 
 	retry:
@@ -796,7 +801,7 @@ func DPCtrlConfigDlp(wldlprule *DPWorkloadDlpRule) int {
 			end = start + num
 			end1 = start1 + num1
 		} else {
-			tlen := rulesPerMsg/2
+			tlen := rulesPerMsg / 2
 			if num <= tlen {
 				end = start + num
 				if num1 > (rulesPerMsg - num) {
@@ -887,7 +892,7 @@ func DPCtrlBldDlp(dlpRulesInfo []*DPDlpRuleEntry, dlpDpMacs utils.Set, delmacs u
 		"dlpRuleNum": num, "macNum": macNum, "delmacNum": delmacNum,
 	}).Debug("build dlp")
 
-	for num > 0 || first == true {
+	for num > 0 || first {
 		var flag uint = 0
 
 	retry:
@@ -1006,8 +1011,9 @@ func cbKeepAlive(buf []byte, param interface{}) bool {
 	var received uint32
 	offset := int(unsafe.Sizeof(*hdr))
 	r := bytes.NewReader(buf[offset:])
-	binary.Read(r, binary.BigEndian, &received)
-
+	if dbgError := binary.Read(r, binary.BigEndian, &received); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	if received == keepAliveSeq {
 		// Matched response
 		return true
@@ -1035,52 +1041,50 @@ func monitorDP() {
 	dpConnJamRetry := 0
 
 	for {
-		select {
-		case <-dpTicker:
-			// Connect to DP if not; keep alive is connected.
-			if dpConn == nil {
-				if dpConnJamRetry > dpConnJamRetryMax {
-					log.WithFields(log.Fields{"retry": dpConnJamRetry}).Error("dp socket congestion.")
-					// log.WithFields(log.Fields{"retry": dpConnJamRetry}).Error("dp socket congestion. Exit!")
-					// restartChan <- nil
-					// break
-				}
+		<-dpTicker
+		// Connect to DP if not; keep alive is connected.
+		if dpConn == nil {
+			if dpConnJamRetry > dpConnJamRetryMax {
+				log.WithFields(log.Fields{"retry": dpConnJamRetry}).Error("dp socket congestion.")
+				// log.WithFields(log.Fields{"retry": dpConnJamRetry}).Error("dp socket congestion. Exit!")
+				// restartChan <- nil
+				// break
+			}
 
-				log.WithFields(log.Fields{"retry": dpConnJamRetry}).Info("Connecting to DP socket ...")
-				newConn := connectDP()
-				if newConn != nil {
-					dpClientLock()
-					dpConn = newConn
-					// align msg with DP using keep alive
-					dpKeepAlive()
-					dpClientUnlock()
-
-					if dpConn != nil {
-						log.Info("DP Connected")
-						dpConnJamRetry = 0
-						statusChan <- true
-					} else {
-						// This is to detect communication socket congestion, so only increment when
-						// connection is made.
-						dpConnJamRetry++
-					}
-				} else {
-					dpConnJamRetry = 0
-				}
-			} else if dpAliveMsgCnt == 0 {
-				// Only a best effort to avoid unecessary keep alive.
+			log.WithFields(log.Fields{"retry": dpConnJamRetry}).Info("Connecting to DP socket ...")
+			newConn := connectDP()
+			if newConn != nil {
 				dpClientLock()
+				dpConn = newConn
+				// align msg with DP using keep alive
 				dpKeepAlive()
 				dpClientUnlock()
 
-				// Cannot send notify in closeDP() as it holds dpClientMutex, at the same time docker
-				// goroutine can send dp message but cannot get the mutex -> deadlock
-				if dpConn == nil {
-					statusChan <- false
+				if dpConn != nil {
+					log.Info("DP Connected")
+					dpConnJamRetry = 0
+					statusChan <- true
+				} else {
+					// This is to detect communication socket congestion, so only increment when
+					// connection is made.
+					dpConnJamRetry++
 				}
 			} else {
-				dpAliveMsgCnt = 0
+				dpConnJamRetry = 0
 			}
+		} else if dpAliveMsgCnt == 0 {
+			// Only a best effort to avoid unecessary keep alive.
+			dpClientLock()
+			dpKeepAlive()
+			dpClientUnlock()
+
+			// Cannot send notify in closeDP() as it holds dpClientMutex, at the same time docker
+			// goroutine can send dp message but cannot get the mutex -> deadlock
+			if dpConn == nil {
+				statusChan <- false
+			}
+		} else {
+			dpAliveMsgCnt = 0
 		}
 	}
 }
@@ -1090,8 +1094,8 @@ func connectDP() *net.UnixConn {
 	var err error
 	kind := "unixgram"
 	lpath := getDPCtrlClientAddr()
-	laddr := net.UnixAddr{lpath, kind}
-	raddr := net.UnixAddr{DPServer, kind}
+	laddr := net.UnixAddr{Name: lpath, Net: kind}
+	raddr := net.UnixAddr{Name: DPServer, Net: kind}
 
 	conn, err = net.DialUnix(kind, &laddr, &raddr)
 	if err != nil {

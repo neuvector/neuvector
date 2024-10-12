@@ -14,7 +14,6 @@ type AgentEnvInfo struct {
 	runWithController    bool
 	containerInContainer bool
 	containerShieldMode  bool
-	dockerDaemonPid      int
 	cgroupMemory         string
 	cgroupCPUAcct        string
 	kvCongestCtrl        bool
@@ -53,18 +52,18 @@ type ClusterEvent struct {
 	info  *container.ContainerMetaExtra
 
 	// applications map[share.CLUSProtoPort]*share.CLUSApp
-	apps       map[string]share.CLUSApp
-	ports      map[string]share.CLUSMappedPort
-	ifaces     map[string][]share.CLUSIPAddr
-	role       *string
-	service    *string
-	domain     *string
-	shareNetNS *string
-	inline     *bool
-	quar       *bool
-	quarReason *string
-	capIntcp   *bool
-	capSniff   *bool
+	apps        map[string]share.CLUSApp
+	ports       map[string]share.CLUSMappedPort
+	ifaces      map[string][]share.CLUSIPAddr
+	role        *string
+	service     *string
+	domain      *string
+	shareNetNS  *string
+	inline      *bool
+	quar        *bool
+	quarReason  *string
+	capIntcp    *bool
+	capSniff    *bool
 	hasDatapath *bool
 }
 
@@ -101,11 +100,11 @@ type taskHandler interface {
 }
 
 type ContainerTask struct {
-	task   int
-	id     string
-	pid    int
-	info   *container.ContainerMetaExtra
-	expect string
+	task int
+	id   string
+	pid  int
+	info *container.ContainerMetaExtra
+	//	expect string
 
 	// APP update
 	mac  net.HardwareAddr

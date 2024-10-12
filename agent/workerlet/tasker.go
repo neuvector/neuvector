@@ -18,7 +18,7 @@ import (
 	"github.com/neuvector/neuvector/share/system"
 )
 
-/////
+// ///
 type Tasker struct {
 	bEnable     bool
 	bShowDebug  bool
@@ -28,10 +28,12 @@ type Tasker struct {
 	sys         *system.SystemTools
 }
 
-/////
+// ///
 func NewWalkerTask(showDebug bool, sys *system.SystemTools) *Tasker {
 	log.WithFields(log.Fields{"showDebug": showDebug}).Info()
-	os.MkdirAll(WalkerBasePath, os.ModePerm)
+	if dbgError := os.MkdirAll(WalkerBasePath, os.ModePerm); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
 	ts := &Tasker{
 		bEnable:     true,
 		taskPath:    WalkerApp,
@@ -42,22 +44,22 @@ func NewWalkerTask(showDebug bool, sys *system.SystemTools) *Tasker {
 	return ts
 }
 
-//////
+// ////
 func (ts *Tasker) putInputFile(request interface{}) (string, []string, error) {
 	var workingPath string
 	var args []string
 	var data []byte
 
-	switch request.(type) {
+	switch req := request.(type) {
 	case WalkPathRequest:
 		args = append(args, "-t", "path")
-		data, _ = json.Marshal(request.(WalkPathRequest))
+		data, _ = json.Marshal(req)
 	case WalkGetPackageRequest:
 		args = append(args, "-t", "pkg")
-		data, _ = json.Marshal(request.(WalkGetPackageRequest))
+		data, _ = json.Marshal(req)
 	case WalkSecretRequest:
 		args = append(args, "-t", "scrt")
-		data, _ = json.Marshal(request.(WalkSecretRequest))
+		data, _ = json.Marshal(req)
 	default:
 		return "", args, errors.New("Invalid type")
 	}
@@ -74,7 +76,9 @@ func (ts *Tasker) putInputFile(request interface{}) (string, []string, error) {
 		workingPath = filepath.Join(ts.workingPath, uid)
 		if _, err := os.Stat(workingPath); err != nil { // not existed
 			args = append(args, "-u", uid)
-			os.MkdirAll(workingPath, os.ModePerm)
+			if dbgError := os.MkdirAll(workingPath, os.ModePerm); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
 			if err = os.WriteFile(filepath.Join(workingPath, RequestJson), data, 0644); err == nil {
 				return workingPath, args, nil
 			}
@@ -93,7 +97,7 @@ func (ts *Tasker) openResult(workingFolder, file string) ([]byte, error) {
 	return nil, err
 }
 
-/////
+// ///
 func (ts *Tasker) getResultFile(request interface{}, workingFolder string) ([]byte, []byte, error) {
 	// primary result
 	byteValue, err := ts.openResult(workingFolder, ResultJson)
@@ -116,8 +120,7 @@ func (ts *Tasker) getResultFile(request interface{}, workingFolder string) ([]by
 	return nil, nil, errors.New("Invalid type")
 }
 
-
-//////
+// ////
 func (ts *Tasker) Run(request interface{}, cid string) ([]byte, []byte, error) {
 	if !ts.bEnable {
 		return nil, nil, fmt.Errorf("session ended")
@@ -128,7 +131,7 @@ func (ts *Tasker) Run(request interface{}, cid string) ([]byte, []byte, error) {
 		log.WithFields(log.Fields{"err": err}).Error()
 		return nil, nil, err
 	}
-	args = append(args, "-cid", cid)	// reference only
+	args = append(args, "-cid", cid) // reference only
 
 	// remove working folder
 	defer os.RemoveAll(workingFolder)
@@ -160,7 +163,7 @@ func (ts *Tasker) Run(request interface{}, cid string) ([]byte, []byte, error) {
 	return ts.getResultFile(request, workingFolder)
 }
 
-//////
+// ////
 func (ts *Tasker) RunWithTimeout(request interface{}, cid string, timeout time.Duration) ([]byte, []byte, error) {
 	if !ts.bEnable {
 		return nil, nil, fmt.Errorf("session ended")
@@ -171,7 +174,7 @@ func (ts *Tasker) RunWithTimeout(request interface{}, cid string, timeout time.D
 		log.WithFields(log.Fields{"err": err}).Error()
 		return nil, nil, err
 	}
-	args = append(args, "-cid", cid)	// reference only
+	args = append(args, "-cid", cid) // reference only
 
 	// remove working folder
 	defer os.RemoveAll(workingFolder)
@@ -211,14 +214,14 @@ func (ts *Tasker) RunWithTimeout(request interface{}, cid string, timeout time.D
 				}
 			}
 		}
-	case <-time.After(timeout + time.Duration(10*time.Second)):	// Set a hard limit + 10 seconds
+	case <-time.After(timeout + time.Duration(10*time.Second)): // Set a hard limit + 10 seconds
 		ts.sys.RemoveToolProcess(pgid, true)
 		return nil, nil, fmt.Errorf("pathwalker: timeout")
 	}
-	return nil, nil, fmt.Errorf(msg)
+	return nil, nil, errors.New(msg)
 }
 
-/////
+// ///
 func (ts *Tasker) Close() {
 	log.Info()
 

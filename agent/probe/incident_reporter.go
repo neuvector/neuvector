@@ -15,7 +15,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-//////////////////////
+// ////////////////////
 type probeMsgAggregate struct {
 	// state machine
 	triggerCnt int
@@ -151,7 +151,7 @@ func (p *Probe) SendAggregateProbeReport(pmsg *ProbeMessage, bExtOp bool) bool {
 	return true // send immediately
 }
 
-/////
+// ///
 // dpkg[ubuntu, debian], yum[centos,fedora] , dnf[centos, coreos,fedora], rpm[redhat], apk[busybox], zypper[bci]
 var pkgCmds utils.Set = utils.NewSet("dpkg", "yum", "dnf", "rpm", "apk", "zypper")
 
@@ -162,7 +162,7 @@ const (
 	fsNvProtectProcAlert = "NV.Protect: Process alert"
 )
 
-/////
+// ///
 func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 	if pmsg.Msg == fsNvProtectProcAlert {
 		p.sendFsmonNVProtectProbeReport(pmsg)
@@ -280,7 +280,7 @@ func (p *Probe) SendAggregateFsMonReport(pmsg *fsmon.MonitorMessage) bool {
 	return true // send immediately
 }
 
-/// aggregate worker
+// / aggregate worker
 func (p *Probe) processAggregateProbeReports() int {
 	var cnt int
 

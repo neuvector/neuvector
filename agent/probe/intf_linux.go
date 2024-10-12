@@ -70,7 +70,7 @@ func (m *netlinkIntfMonitor) WaitAddrChange(intval *syscall.Timeval) (bool, erro
 		// select() changes timer value, so reinitiate every time.
 		tv := *intval
 		if msgs, err := m.ns.EPollReceive(&tv); err != nil {
-			if err == syscall.EINTR || err == syscall.EAGAIN {		// interrupted by a signal, return, make a yield
+			if err == syscall.EINTR || err == syscall.EAGAIN { // interrupted by a signal, return, make a yield
 				// log.WithFields(log.Fields{"error": err}).Debug("Receive signal")
 				return false, nil
 			}
@@ -110,7 +110,7 @@ func (m *netlinkIntfMonitor) WaitHostAddrChange(intval *syscall.Timeval) (bool, 
 		// select() changes timer value, so reinitiate every time.
 		tv := *intval
 		if msgs, err := m.ns.EPollReceive(&tv); err != nil {
-			if err == syscall.EINTR || err == syscall.EAGAIN {		// interrupted by a signal, return, make a yield
+			if err == syscall.EINTR || err == syscall.EAGAIN { // interrupted by a signal, return, make a yield
 				// log.WithFields(log.Fields{"error": err}).Debug("Receive signal")
 				return false, nil
 			}

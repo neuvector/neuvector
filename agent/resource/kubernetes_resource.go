@@ -7,14 +7,14 @@ import (
 	"sync"
 
 	"github.com/neuvector/k8s"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type resourceMaker struct {
 	apiVersion string
-	newObject  func() metav1.Object
-	newList    func() metav1.ListInterface
-	xlate      func(obj metav1.Object) (string, interface{})
+	//	newObject  func() metav1.Object
+	//	newList    func() metav1.ListInterface
+	//  xlate func(obj metav1.Object) (string, interface{})
 }
 
 type k8sResource struct {
@@ -22,19 +22,16 @@ type k8sResource struct {
 	makers   []*resourceMaker
 }
 
-//----------------------------------------------------------
+// ----------------------------------------------------------
 var resourceMakers map[string]k8sResource = map[string]k8sResource{
-	RscTypeImage: k8sResource{
-		apiGroup: "image.openshift.io",
-		makers: []*resourceMaker{
-			&resourceMaker{
-				"v1",
-				func() metav1.Object { return new(ocImageStream) },
-				func() metav1.ListInterface { return new(ocImageStreamList) },
-				nil,
-			},
+	RscTypeImage: {apiGroup: "image.openshift.io", makers: []*resourceMaker{
+		{
+			"v1",
+			//	func() metav1.Object { return new(ocImageStream) },
+			//	func() metav1.ListInterface { return new(ocImageStreamList) },
+			//  nil,
 		},
-	},
+	}},
 }
 
 type kubernetes struct {

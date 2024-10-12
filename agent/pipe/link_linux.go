@@ -97,19 +97,18 @@ func vethAdd(link netlink.Link) error {
 	}
 
 	linkInfo := nl.NewRtAttr(syscall.IFLA_LINKINFO, nil)
-	nl.NewRtAttrChild(linkInfo, nl.IFLA_INFO_KIND, nl.NonZeroTerminated(link.Type()))
-
+	linkInfo.AddRtAttr(nl.IFLA_INFO_KIND, nl.NonZeroTerminated(link.Type()))
 	if veth, ok := link.(*linkVeth); ok {
-		data := nl.NewRtAttrChild(linkInfo, nl.IFLA_INFO_DATA, nil)
-		peer := nl.NewRtAttrChild(data, nl.VETH_INFO_PEER, nil)
+		data := linkInfo.AddRtAttr(nl.IFLA_INFO_DATA, nil)
+		peer := data.AddRtAttr(nl.VETH_INFO_PEER, nil)
 		peerMsg := nl.NewIfInfomsgChild(peer, syscall.AF_UNSPEC)
 		peerMsg.Index = int32(veth.PeerIndex)
-		nl.NewRtAttrChild(peer, syscall.IFLA_IFNAME, nl.ZeroTerminated(veth.PeerName))
+		peer.AddRtAttr(syscall.IFLA_IFNAME, nl.ZeroTerminated(veth.PeerName))
 		if base.TxQLen >= 0 {
-			nl.NewRtAttrChild(peer, syscall.IFLA_TXQLEN, nl.Uint32Attr(uint32(base.TxQLen)))
+			peer.AddRtAttr(syscall.IFLA_TXQLEN, nl.Uint32Attr(uint32(base.TxQLen)))
 		}
 		if base.MTU > 0 {
-			nl.NewRtAttrChild(peer, syscall.IFLA_MTU, nl.Uint32Attr(uint32(base.MTU)))
+			peer.AddRtAttr(syscall.IFLA_MTU, nl.Uint32Attr(uint32(base.MTU)))
 		}
 	}
 

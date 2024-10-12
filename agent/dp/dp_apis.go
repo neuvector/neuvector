@@ -32,11 +32,11 @@ type DPDelTapPortReq struct {
 }
 
 type DPNfqPort struct {
-	NetNS 		string `json:"netns"`
-	Iface 		string `json:"iface"`
-	Qnum		int    `json:"qnum"`
-	EPMAC 		string `json:"epmac"`
-	JumboFrame	*bool  `json:"jumboframe,omitempty"`
+	NetNS      string `json:"netns"`
+	Iface      string `json:"iface"`
+	Qnum       int    `json:"qnum"`
+	EPMAC      string `json:"epmac"`
+	JumboFrame *bool  `json:"jumboframe,omitempty"`
 }
 
 type DPAddNfqPortReq struct {
@@ -48,8 +48,8 @@ type DPDelNfqPortReq struct {
 }
 
 type DPSrvcPort struct {
-	Iface 		string `json:"iface"`
-	JumboFrame	*bool  `json:"jumboframe,omitempty"`
+	Iface      string `json:"iface"`
+	JumboFrame *bool  `json:"jumboframe,omitempty"`
 }
 
 type DPAddSrvcPortReq struct {
@@ -124,8 +124,8 @@ type DPConfigMACReq struct {
 }
 
 type DPNbeConfig struct {
-	MACs []string          `json:"macs"`
-	Nbe  *bool             `json:"nbe,omitempty"`
+	MACs []string `json:"macs"`
+	Nbe  *bool    `json:"nbe,omitempty"`
 }
 
 type DPConfigNbeReq struct {
@@ -140,7 +140,7 @@ type DPRefreshAppReq struct {
 }
 
 type DPSysConf struct {
-	XffEnabled	*bool  `json:"xff_enabled"`
+	XffEnabled *bool `json:"xff_enabled"`
 }
 
 type DPSysConfReq struct {
@@ -148,7 +148,7 @@ type DPSysConfReq struct {
 }
 
 type DPDisableNetPolicy struct {
-	DisableNetPolicy	*bool  `json:"disable_net_policy"`
+	DisableNetPolicy *bool `json:"disable_net_policy"`
 }
 
 type DPDisableNetPolicyReq struct {
@@ -156,7 +156,7 @@ type DPDisableNetPolicyReq struct {
 }
 
 type DPDetectUnmanagedWl struct {
-	DetectUnmanagedWl	*bool  `json:"detect_unmanaged_wl"`
+	DetectUnmanagedWl *bool `json:"detect_unmanaged_wl"`
 }
 
 type DPDetectUnmanagedWlReq struct {
@@ -164,7 +164,7 @@ type DPDetectUnmanagedWlReq struct {
 }
 
 type DPEnableIcmpPolicy struct {
-	EnableIcmpPolicy	*bool  `json:"enable_icmp_policy"`
+	EnableIcmpPolicy *bool `json:"enable_icmp_policy"`
 }
 
 type DPEnableIcmpPolicyReq struct {
@@ -239,7 +239,7 @@ type DPPolicyIPRule struct {
 	Action  uint8          `json:"action"`
 	Ingress bool           `json:"ingress"`
 	Fqdn    string         `json:"fqdn,omitempty"`
-	Vhost	bool           `json:"vhost,omitempty"`
+	Vhost   bool           `json:"vhost,omitempty"`
 	Apps    []*DPPolicyApp `json:"apps,omitempty"`
 }
 
@@ -274,9 +274,9 @@ type DPFqdnDeleteReq struct {
 }
 
 type DPFqdnIps struct {
-	FqdnName string    `json:"fqdn_name"`
-	FqdnIps   []net.IP  `json:"fqdn_ips"`
-	Vhost    *bool  	`json:"vhost,omitempty"`
+	FqdnName string   `json:"fqdn_name"`
+	FqdnIps  []net.IP `json:"fqdn_ips"`
+	Vhost    *bool    `json:"vhost,omitempty"`
 }
 
 type DPFqdnIpSetReq struct {
@@ -316,7 +316,7 @@ type DPPolicyAddressCfgReq struct {
 	PolicyAddrCfg *DPInternalSubnetCfg `json:"ctrl_cfg_policy_addr"`
 }
 
-//dlp
+// dlp
 type DPDlpSetting struct {
 	Name   string `json:"name"`
 	ID     uint32 `json:"id"`
@@ -329,17 +329,17 @@ type DPDlpRidSetting struct {
 }
 
 type DPWorkloadDlpRule struct {
-	WlID          string            `json:"wl_id"`
-	Mode          string            `json:"mode"`
-	DefAction     uint8             `json:"defact"`
-	ApplyDir      int               `json:"apply_dir"`
-	WorkloadMac   []string          `json:"mac"`
-	DlpRuleNames  []*DPDlpSetting   `json:"dlp_rule_names"`
-	WafRuleNames  []*DPDlpSetting   `json:"waf_rule_names"`
-	PolicyRuleIds []uint32          `json:"policy_rule_ids"`
-	PolWafRuleIds []uint32          `json:"polwaf_rule_ids"`
-	RuleType      string            `json:"ruletype"`
-	WafRuleType   string            `json:"wafruletype"`
+	WlID          string          `json:"wl_id"`
+	Mode          string          `json:"mode"`
+	DefAction     uint8           `json:"defact"`
+	ApplyDir      int             `json:"apply_dir"`
+	WorkloadMac   []string        `json:"mac"`
+	DlpRuleNames  []*DPDlpSetting `json:"dlp_rule_names"`
+	WafRuleNames  []*DPDlpSetting `json:"waf_rule_names"`
+	PolicyRuleIds []uint32        `json:"policy_rule_ids"`
+	PolWafRuleIds []uint32        `json:"polwaf_rule_ids"`
+	RuleType      string          `json:"ruletype"`
+	WafRuleType   string          `json:"wafruletype"`
 }
 
 type DPDlpRuleEntry struct {
@@ -349,14 +349,14 @@ type DPDlpRuleEntry struct {
 }
 
 type DPDlpCfg struct {
-	Flag         uint                `json:"flag"`
-	WorkloadMac  []string            `json:"mac"`
-	DlpRuleNames []*DPDlpRidSetting  `json:"dlp_rule_names"`
-	WafRuleNames []*DPDlpRidSetting  `json:"waf_rule_names"`
-	RuleIds      []uint32            `json:"rule_ids"`
-	WafRuleIds   []uint32            `json:"waf_rule_ids"`
-	RuleType     string              `json:"ruletype"`
-	WafRuleType  string              `json:"wafruletype"`
+	Flag         uint               `json:"flag"`
+	WorkloadMac  []string           `json:"mac"`
+	DlpRuleNames []*DPDlpRidSetting `json:"dlp_rule_names"`
+	WafRuleNames []*DPDlpRidSetting `json:"waf_rule_names"`
+	RuleIds      []uint32           `json:"rule_ids"`
+	WafRuleIds   []uint32           `json:"waf_rule_ids"`
+	RuleType     string             `json:"ruletype"`
+	WafRuleType  string             `json:"wafruletype"`
 }
 
 type DPDlpCfgReq struct {

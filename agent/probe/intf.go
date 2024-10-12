@@ -10,8 +10,8 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-var intfMonitorPollTimeoutLong = syscall.Timeval{5, 0}
-var intfMonitorPollTimeoutShort = syscall.Timeval{0, 500000}
+var intfMonitorPollTimeoutLong = syscall.Timeval{Sec: 5, Usec: 0}
+var intfMonitorPollTimeoutShort = syscall.Timeval{Sec: 0, Usec: 500000}
 
 type intfMonitorInterface interface {
 	WaitAddrChange(*syscall.Timeval) (bool, error)

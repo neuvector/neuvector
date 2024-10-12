@@ -1,24 +1,11 @@
 package main
 
+/*
 //// Use tests locally by replacing the first character of function name, "t", with "T"
 
-import (
-	"bytes"
-	"fmt"
-	"os"
-	"strings"
-	"testing"
-
-	log "github.com/sirupsen/logrus"
-
-	"github.com/neuvector/neuvector/agent/workerlet"
-	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/system"
-)
-
-//// need to "sudo -i" is required to run these testssudo -i
+// // need to "sudo -i" is required to run these testssudo -i
 const workPath = "/tmp/walk/test"
-const rootPid = 61762			//  INPUT the root PID and container ID for a running container
+const rootPid = 61762 //  INPUT the root PID and container ID for a running container
 const cid = "2d57dbe19bebd146928242e479f2e5a6c8cca99fd2d15545448d1c41e1868669"
 
 // -- Logger
@@ -46,7 +33,9 @@ func (f *logFormatter) Format(entry *log.Entry) ([]byte, error) {
 
 func initEnv() *taskMain {
 	os.RemoveAll(workPath)
-	os.MkdirAll(workPath, 0755)
+	if dbgError := os.MkdirAll(workPath, 0755); dbgError != nil {
+	log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+}
 
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.DebugLevel) // change it later: log.InfoLevel
@@ -61,68 +50,69 @@ func initEnv() *taskMain {
 func testWalkPathExecOnly(t *testing.T) {
 	fmt.Printf("TestWalkPathExecOnly: Start ...\n")
 	tm := initEnv()
-	req := workerlet.WalkPathRequest {
-		Pid: rootPid,
-		Path: "",
+	req := workerlet.WalkPathRequest{
+		Pid:      rootPid,
+		Path:     "",
 		ExecOnly: true,
 	}
 
 	go tm.WalkPathTask(req)
-	err := <- tm.done
+	err := <-tm.done
 	if err != nil {
 		t.Errorf("")
 	}
-	fmt.Printf("TestWalkPathExecOnly: Done\n\n",)
+	fmt.Printf("TestWalkPathExecOnly: Done\n\n")
 }
 
 func testWalkPath_bin(t *testing.T) {
 	fmt.Printf("TestWalkPath_bin: Start ...\n")
 	tm := initEnv()
-	req := workerlet.WalkPathRequest {
-		Pid: rootPid,
-		Path: "bin",
+	req := workerlet.WalkPathRequest{
+		Pid:      rootPid,
+		Path:     "bin",
 		ExecOnly: false,
 	}
 
 	go tm.WalkPathTask(req)
-	err := <- tm.done
+	err := <-tm.done
 	if err != nil {
 		t.Errorf("")
 	}
-	fmt.Printf("TestWalkPath_bin: Done\n\n",)
+	fmt.Printf("TestWalkPath_bin: Done\n\n")
 }
 
 func testWalkPakcages(t *testing.T) {
 	fmt.Printf("TestWalkPakcages: Start ...\n")
 	tm := initEnv()
-	req := workerlet.WalkGetPackageRequest {
-		Pid: rootPid,
-		Id: cid,
+	req := workerlet.WalkGetPackageRequest{
+		Pid:     rootPid,
+		Id:      cid,
 		ObjType: share.ScanObjectType_CONTAINER,
 	}
 
 	go tm.WalkPackageTask(req)
-	err := <- tm.done
+	err := <-tm.done
 	if err != nil {
 		t.Errorf("")
 	}
-	fmt.Printf("testWalkPakcages: Done\n\n",)
+	fmt.Printf("testWalkPakcages: Done\n\n")
 }
 
 func testWalkSecrets(t *testing.T) {
 	fmt.Printf("TestWalkSecrets: Start ...\n")
 	tm := initEnv()
-	req := workerlet.WalkSecretRequest {
-		Pid: rootPid,
+	req := workerlet.WalkSecretRequest{
+		Pid:         rootPid,
 		MaxFileSize: 0,
-		MiniWeight: 0.1,
-		TimeoutSec: 3 * 60,
+		MiniWeight:  0.1,
+		TimeoutSec:  3 * 60,
 	}
 
 	go tm.ScanSecretTask(req)
-	err := <- tm.done
+	err := <-tm.done
 	if err != nil {
 		t.Errorf("")
 	}
-	fmt.Printf("TestWalkSecrets: Done\n\n",)
+	fmt.Printf("TestWalkSecrets: Done\n\n")
 }
+*/
