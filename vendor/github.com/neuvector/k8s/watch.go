@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 
 	"github.com/golang/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,7 +69,7 @@ func (w *watcherJSON) Next(r metav1.Object) (string, error) {
 			return "", fmt.Errorf("decoding event error: %v", err)
 		}
 		return event.Type, &APIError{
-			Status: &jsonStatus{Status: *status},
+			Status: status,
 			Code:   int(status.Code),
 		}
 	}
@@ -100,7 +101,7 @@ func (w *watcherPB) Next(r metav1.Object) (string, error) {
 			return "", fmt.Errorf("decoding event error: %v", err)
 		}
 		return event.Type, &APIError{
-			Status: &jsonStatus{Status: *status},
+			Status: status,
 			Code:   int(status.Code),
 		}
 	}
@@ -162,22 +163,23 @@ func parseUnknown(b []byte) (*runtime.Unknown, error) {
 // Watch does not automatically reconnect. If a watch fails, a new watch must
 // be initialized.
 //
-//	// Watch configmaps in the "kube-system" namespace
-//	var configMap corev1.ConfigMap
-//	watcher, err := client.Watch(ctx, "kube-system", &configMap)
-//	if err != nil {
-//		// handle error
-//	}
-//	defer watcher.Close() // Always close the returned watcher.
-//
-//	for {
-//		cm := new(corev1.ConfigMap)
-//		eventType, err := watcher.Next(cm)
+// 		// Watch configmaps in the "kube-system" namespace
+//		var configMap corev1.ConfigMap
+//		watcher, err := client.Watch(ctx, "kube-system", &configMap)
 //		if err != nil {
-//			// watcher encountered and error, exit or create a new watcher
+//			// handle error
 //		}
-//		fmt.Println(eventType, *cm.Metadata.Name)
-//	}
+//		defer watcher.Close() // Always close the returned watcher.
+//
+//		for {
+//			cm := new(corev1.ConfigMap)
+//			eventType, err := watcher.Next(cm)
+//			if err != nil {
+//				// watcher encountered and error, exit or create a new watcher
+//			}
+//			fmt.Println(eventType, *cm.Metadata.Name)
+//		}
+//
 func (c *Client) Watch(ctx context.Context, namespace string, r metav1.Object, options ...Option) (*Watcher, error) {
 	url, err := resourceWatchURL(c.Endpoint, namespace, r, options...)
 	if err != nil {
@@ -198,7 +200,7 @@ func (c *Client) Watch(ctx context.Context, namespace string, r metav1.Object, o
 	}
 
 	if resp.StatusCode/100 != 2 {
-		body, err := io.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			return nil, err

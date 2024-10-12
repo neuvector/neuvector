@@ -20,6 +20,7 @@ Package k8s implements a Kubernetes client.
 		}
 		return deployments, nil
 	}
+
 */
 package k8s
 
@@ -29,10 +30,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -216,7 +217,7 @@ func NewInClusterClient() (*Client, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 	}
-	namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	namespace, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func NewInClusterClient() (*Client, error) {
 
 func load(filepath string, data []byte) (out []byte, err error) {
 	if filepath != "" {
-		data, err = os.ReadFile(filepath)
+		data, err = ioutil.ReadFile(filepath)
 	}
 	return data, err
 }
@@ -283,7 +284,7 @@ func newClient(cluster Cluster, user AuthInfo, namespace string) (*Client, error
 
 	token := user.Token
 	if user.TokenFile != "" {
-		data, err := os.ReadFile(user.TokenFile)
+		data, err := ioutil.ReadFile(user.TokenFile)
 		if err != nil {
 			return nil, fmt.Errorf("load token file: %v", err)
 		}
@@ -331,33 +332,10 @@ func newClient(cluster Cluster, user AuthInfo, namespace string) (*Client, error
 	return client, nil
 }
 
-// [2024/June]
-type jsonStatus struct {
-	metav1.Status
-}
-
-func (s *jsonStatus) UnmarshalJSON(data []byte) error {
-	var j metav1.Status
-	if err := json.Unmarshal(data, &j); err != nil {
-		return err
-	}
-	s.Status = j
-	return nil
-}
-
 // APIError is an error from a unexpected status code.
 type APIError struct {
-	// [2024/June]
-	// unmarshal() in codec.go checks whether the type implements json.Unmarshaler but metav1.Status doesn't implement json.Unmarshaler
-	// we don't want to change unmarshal() behavior simply because of type metav1.Status
-	// neither do we want to change k8s.io/apimachinery/pkg/apis/meta/v1 for this issue
-	// so we define type jsonStatus backed by metav1.Status & implement json.Unmarshaler for jsonStatus
-	//
-	//Status *metav1.Status
-	//
 	// The status object returned by the Kubernetes API,
-
-	Status *jsonStatus
+	Status *metav1.Status
 
 	// Status code returned by the HTTP request.
 	//
@@ -369,8 +347,7 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	if e.Status != nil {
-		//return fmt.Sprintf("kubernetes api: %s %d %s", e.Status.Status, e.Code, e.Status.Message)
-		return fmt.Sprintf("kubernetes api: Failure %d %s", e.Code, e.Status.Message)
+		return fmt.Sprintf("kubernetes api: %s %d %s", e.Status.Status, e.Code, e.Status.Message)
 	}
 	return fmt.Sprintf("%#v", e)
 }
@@ -384,7 +361,7 @@ func checkStatusCode(contentType string, statusCode int, body []byte) error {
 }
 
 func newAPIError(contentType string, statusCode int, body []byte) error {
-	status := new(jsonStatus)
+	status := new(metav1.Status)
 	if err := unmarshal(body, contentType, status); err != nil {
 		return fmt.Errorf("decode error status %d: %v", statusCode, err)
 	}
@@ -402,20 +379,21 @@ func (c *Client) client() *http.Client {
 // type is determined by the type of the req argument. The result is unmarshaled
 // into req.
 //
-//	configMap := corev1.ConfigMap{
-//		Metadata: &metav1.ObjectMeta{
-//			Name:      k8s.String("my-configmap"),
-//			Namespace: k8s.String("my-namespace"),
-//		},
-//		Data: map[string]string{
-//			"my-key": "my-val",
-//		},
-//	}
-//	if err := client.Create(ctx, &configMap); err != nil {
-//		// handle error
-//	}
-//	// resource is updated with response of create request
-//	fmt.Println(conifgMap.Metaata.GetCreationTimestamp())
+//		configMap := corev1.ConfigMap{
+//			Metadata: &metav1.ObjectMeta{
+//				Name:      k8s.String("my-configmap"),
+//				Namespace: k8s.String("my-namespace"),
+//			},
+//			Data: map[string]string{
+//				"my-key": "my-val",
+//			},
+//		}
+//		if err := client.Create(ctx, &configMap); err != nil {
+//			// handle error
+//		}
+//		// resource is updated with response of create request
+//		fmt.Println(conifgMap.Metaata.GetCreationTimestamp())
+//
 func (c *Client) Create(ctx context.Context, req metav1.Object, options ...Option) error {
 	url, err := resourceURL(c.Endpoint, req, false, options...)
 	if err != nil {
@@ -498,7 +476,7 @@ func (c *Client) do(ctx context.Context, verb, url string, req, resp interface{}
 	}
 	defer re.Body.Close()
 
-	respBody, err := io.ReadAll(re.Body)
+	respBody, err := ioutil.ReadAll(re.Body)
 	if err != nil {
 		return fmt.Errorf("read body: %v", err)
 	}
