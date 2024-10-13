@@ -1261,7 +1261,7 @@ func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
 			txn.Put(share.CLUSRegistryConfigKey(n.Name), value)
 		}
 	}
-	for name, _ := range oldRegs {
+	for name := range oldRegs {
 		txn.Delete(share.CLUSRegistryConfigKey(name))
 	}
 

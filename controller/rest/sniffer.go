@@ -3,8 +3,8 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"mime/multipart"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"sort"
@@ -38,7 +38,7 @@ func parseSnifferStatus(status share.SnifferStatus) string {
 	}
 }
 
-//sniffer ID: sniffer(8)+agentID
+// sniffer ID: sniffer(8)+agentID
 func getAgentBySniffer(sniffer string) string {
 	if len(sniffer) <= share.SnifferIdAgentField ||
 		cacher.GetAgent(sniffer[share.SnifferIdAgentField:], access.NewReaderAccessControl()) == nil {

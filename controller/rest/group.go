@@ -1485,7 +1485,7 @@ func deleteFedGroupPolicy() { // delete all fed groups(caller must be fedAdmin),
 	kv.DeletePolicyByCfgTypeTxn(txn, share.FederalCfg)
 
 	gpsMap := clusHelper.GetAllGroups(share.ScopeFed, access.NewFedAdminAccessControl())
-	for name, _ := range gpsMap {
+	for name := range gpsMap {
 		kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
 		if name == api.LearnedExternal {
 			continue

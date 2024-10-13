@@ -72,7 +72,7 @@ func (ss *ScanService) prepareDBSlots(data *share.ScannerRegisterData, cvedb map
 		enlarge := false
 		dbs := make([]*share.CLUSScannerDB, slots)
 		zbs := make([][]byte, slots)
-		for i, _ := range dbs {
+		for i := range dbs {
 			dbs[i] = &share.CLUSScannerDB{
 				CVEDBVersion:    data.CVEDBVersion,
 				CVEDBCreateTime: data.CVEDBCreateTime,

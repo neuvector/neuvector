@@ -8,23 +8,23 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-////////////////////
+// //////////////////
 type probeFunc func(mover int, id string, probeDuration time.Duration) (bool, error)
 type lifeCntFunc func(mover int) int
 type completeFunc func(mover int, group string, err error) error
 type task struct {
-	mover		int
-	id       	string			// group name
-	timer    	string
-	timerWheel 	*utils.TimerWheel
-	runs     	int				// good counter
-	interval 	time.Duration	// probe interval
-	testFunc 	probeFunc
-	lifeFunc    lifeCntFunc
-	cmplFunc 	completeFunc
+	mover      int
+	id         string // group name
+	timer      string
+	timerWheel *utils.TimerWheel
+	runs       int           // good counter
+	interval   time.Duration // probe interval
+	testFunc   probeFunc
+	lifeFunc   lifeCntFunc
+	cmplFunc   completeFunc
 }
 
-///////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////
 func (t *task) StartTimer() {
 	t.timer, _ = t.timerWheel.AddTask(t, t.interval)
 }
@@ -52,7 +52,7 @@ func (t *task) Expire() {
 	} else {
 		//log.WithFields(log.Fields{"group": t.id}).Debug("ATMO:")
 		if t.mover == Monitor2Protect {
-			t.runs = 0		// reset counters
+			t.runs = 0 // reset counters
 		}
 	}
 
@@ -66,7 +66,7 @@ func (t *task) Expire() {
 	}
 }
 
-///////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////
 func (ctx *automode_ctx) prober(mover int, group string, dur time.Duration) (bool, error) {
 	return ctx.testfn(mover, group, dur)
 }
@@ -102,24 +102,24 @@ func (ctx *automode_ctx) addMember(mover int, group string) bool {
 	switch mover {
 	case Discover2Monitor:
 		members = ctx.d2m_members
-		interval =  ctx.d2m_itl
+		interval = ctx.d2m_itl
 	case Monitor2Protect:
 		members = ctx.m2p_members
-		interval =  ctx.m2p_itl
+		interval = ctx.m2p_itl
 	default:
 		return false
 	}
 
 	if _, ok := members[group]; !ok {
 		log.WithFields(log.Fields{"group": group, "mover": mover}).Debug("ATMO:")
-		t := &task {
-			id:	      	group,
-			mover:    	mover,
-			interval: 	interval,
+		t := &task{
+			id:         group,
+			mover:      mover,
+			interval:   interval,
 			timerWheel: ctx.timerWheel,
-			testFunc: 	ctx.prober,
+			testFunc:   ctx.prober,
 			lifeFunc:   ctx.life,
-			cmplFunc: 	ctx.finisher,
+			cmplFunc:   ctx.finisher,
 		}
 		members[group] = t
 		t.StartTimer()

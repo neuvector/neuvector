@@ -315,8 +315,8 @@ func validateWafRuleConfig(list []api.RESTWafRule) error {
 	return nil
 }
 
-//lock is alreay hold when call this function
-//clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+// lock is alreay hold when call this function
+// clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 func createDefaultWafSensor() {
 	kv.CreateDefWafRules(true)
 	kv.CreatePreWafSensor(true)
@@ -1067,7 +1067,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 
 		ruleList := make([]*resource.NvSecurityWafRule, 0, len(sensor.RuleListNames))
-		for rName, _ := range sensor.RuleListNames {
+		for rName := range sensor.RuleListNames {
 			if r, ok := defSensor.RuleList[rName]; ok {
 				patterns := make([]api.RESTWafCriteriaEntry, len(r.Patterns))
 				for idx, p := range r.Patterns {

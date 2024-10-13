@@ -897,7 +897,7 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 					log.WithFields(log.Fields{"key": key, "behavior": ffp.Behavior}).Debug("CRD: new entry")
 					if _, exist := far.Filters[key]; exist {
 						if _, ok := cacher.IsPrdefineFileGroup(ffp.Filter, ffp.Recursive); ok {
-							for i, _ := range mon.Filters {
+							for i := range mon.Filters {
 								if mon.Filters[i].Filter == ffp.Filter && mon.Filters[i].CustomerAdd == false {
 									// remove the predefined from the main filters
 									delete(far.Filters, key)

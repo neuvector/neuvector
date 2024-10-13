@@ -421,8 +421,8 @@ func handlerControllerConfig(w http.ResponseWriter, r *http.Request, ps httprout
 		if rconf.Config.LogLevel != nil {
 			cconf.LogLevel = *rconf.Config.LogLevel
 			if cconf.LogLevel == share.LogLevel_Error ||
-			   cconf.LogLevel == share.LogLevel_Warn ||
-			   cconf.LogLevel == share.LogLevel_Info {
+				cconf.LogLevel == share.LogLevel_Warn ||
+				cconf.LogLevel == share.LogLevel_Info {
 				cconf.Debug = nil
 			} else if cconf.LogLevel == share.LogLevel_Debug {
 				if cconf.Debug == nil {
@@ -538,8 +538,8 @@ func handlerAgentConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		if rconf.Config.LogLevel != nil {
 			cconf.LogLevel = *rconf.Config.LogLevel
 			if cconf.LogLevel == share.LogLevel_Error ||
-			   cconf.LogLevel == share.LogLevel_Warn ||
-			   cconf.LogLevel == share.LogLevel_Info {
+				cconf.LogLevel == share.LogLevel_Warn ||
+				cconf.LogLevel == share.LogLevel_Info {
 				cconf.Debug = nil
 			} else if cconf.LogLevel == share.LogLevel_Debug {
 				if cconf.Debug == nil {

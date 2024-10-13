@@ -782,7 +782,7 @@ func (rs *Registry) getScanImages(sctx *scanContext, drv registryDriver, dryrun 
 		if allImages != nil {
 			prefix := fmt.Sprintf("%s/", filter.Org)
 			matchAll := (filter.Org == "" && filter.Repo == ".*")
-			for r, _ := range allImages {
+			for r := range allImages {
 				if matchAll || (filter.Org != "" && strings.HasPrefix(r.Repo, prefix)) {
 					// create a new CLUSImage because &r points one same location
 					repos = append(repos, &share.CLUSImage{Repo: r.Repo, RegMod: r.RegMod})
@@ -1368,7 +1368,7 @@ func (rs *Registry) cleanupOneImage(id string) {
 
 func (rs *Registry) cleanupImages(sctx *scanContext, imageMap map[string]utils.Set) {
 	// remove the out-of-date repository
-	for id, _ := range rs.summary {
+	for id := range rs.summary {
 		if _, ok := imageMap[id]; !ok {
 			rs.cleanupOneImage(id)
 		}

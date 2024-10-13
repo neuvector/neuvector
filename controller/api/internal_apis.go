@@ -151,16 +151,16 @@ type RESTRiskScoreMetricsWL struct {
 }
 
 type RESTRiskScoreMetricsGroup struct {
-	Groups                  int `json:"groups"`
-	DiscoverGroups          int `json:"discover_groups"`
-	MonitorGroups           int `json:"monitor_groups"`
-	ProtectGroups           int `json:"protect_groups"`
-	ProfileDiscoverGroups   int `json:"profile_discover_groups"`
-	ProfileMonitorGroups    int `json:"profile_monitor_groups"`
-	ProfileProtectGroups    int `json:"profile_protect_groups"`
-	DiscoverGroupsZD        int `json:"discover_groups_zero_drift"`
-	MonitorGroupsZD         int `json:"monitor_groups_zero_drift"`
-	ProtectGroupsZD         int `json:"protect_groups_zero_drift"`
+	Groups                int `json:"groups"`
+	DiscoverGroups        int `json:"discover_groups"`
+	MonitorGroups         int `json:"monitor_groups"`
+	ProtectGroups         int `json:"protect_groups"`
+	ProfileDiscoverGroups int `json:"profile_discover_groups"`
+	ProfileMonitorGroups  int `json:"profile_monitor_groups"`
+	ProfileProtectGroups  int `json:"profile_protect_groups"`
+	DiscoverGroupsZD      int `json:"discover_groups_zero_drift"`
+	MonitorGroupsZD       int `json:"monitor_groups_zero_drift"`
+	ProtectGroupsZD       int `json:"protect_groups_zero_drift"`
 }
 
 type RESTRiskScoreMetricsCVE struct {
@@ -229,9 +229,9 @@ type RESTK8sNvAcceptableAlerts struct {
 }
 
 type RESTNvAlerts struct {
-	NvUpgradeInfo            *RESTCheckUpgradeInfo   `json:"neuvector_upgrade_info"`
-	AcceptableAlerts         *RESTNvAcceptableAlerts `json:"acceptable_alerts,omitempty"` // acceptable controller-generated alerts
-	AcceptedAlerts           []string                `json:"accepted_alerts,omitempty"`   // keys of accepted manager-generated/user alerts
+	NvUpgradeInfo    *RESTCheckUpgradeInfo   `json:"neuvector_upgrade_info"`
+	AcceptableAlerts *RESTNvAcceptableAlerts `json:"acceptable_alerts,omitempty"` // acceptable controller-generated alerts
+	AcceptedAlerts   []string                `json:"accepted_alerts,omitempty"`   // keys of accepted manager-generated/user alerts
 }
 
 type RESTNvAcceptableAlerts struct {
@@ -257,8 +257,8 @@ type RESTNvAlertGroup struct {
 }
 
 type RESTNvAlert struct {
-	ID       string `json:"id"`      // ID is md5 of the English message
-	Message  string `json:"message"`
+	ID      string `json:"id"` // ID is md5 of the English message
+	Message string `json:"message"`
 }
 
 type RESTAcceptedAlerts struct {

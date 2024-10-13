@@ -608,7 +608,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 
 	// 2-3. merge #2-1 & #2-2 to get the top-level permissions list for each domain
 	dPermitsList := make(map[string][]*api.RESTRolePermission, len(allDomains)) // domain -> list of permissions
-	for domain, _ := range allDomains {
+	for domain := range allDomains {
 		roles, _ := domainRoles[domain]
 		extraPermits, _ := domainPermits[domain]
 		if permitsList := getDomainPermissions(domain, roles, extraPermits); len(permitsList) > 0 {

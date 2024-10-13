@@ -1281,11 +1281,11 @@ func pingJointClusters() bool {
 		if len(ids) > 0 {
 			if jointNWErrCount == nil {
 				jointNWErrCount = make(map[string]int, len(ids))
-				for id, _ := range ids {
+				for id := range ids {
 					jointNWErrCount[id] = 0
 				}
 			} else if len(jointNWErrCount) != len(ids) {
-				for id, _ := range jointNWErrCount {
+				for id := range jointNWErrCount {
 					if _, ok := ids[id]; !ok {
 						delete(jointNWErrCount, id)
 					}
@@ -2525,7 +2525,7 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 		}
 	} else {
-		for id, _ := range idMap {
+		for id := range idMap {
 			ids = append(ids, id)
 		}
 	}

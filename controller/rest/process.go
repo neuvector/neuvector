@@ -22,7 +22,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-//
 func isValidKindProcessProfile(kind string) bool {
 	switch kind {
 	case share.GroupKindContainer: // service or user-defined groups

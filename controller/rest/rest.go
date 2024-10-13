@@ -705,7 +705,7 @@ func restNewFilter(data interface{}, filters []restFieldFilter) *restFilter {
 		}
 	}
 
-	for i, _ := range filters {
+	for i := range filters {
 		rf.FilteredBy(data, &filters[i])
 	}
 
@@ -868,7 +868,7 @@ func restNewSorter(data []interface{}, sorts []restFieldSort) *restSorter {
 		}
 	}
 
-	for i, _ := range sorts {
+	for i := range sorts {
 		rs.SortedBy(&sorts[i])
 	}
 	return &rs

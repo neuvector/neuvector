@@ -156,7 +156,7 @@ func (r *ibmcloud) GetRepoList(org, name string, limit int) ([]*share.CLUSImage,
 			}
 		}
 	}
-	for rep, _ := range r.images {
+	for rep := range r.images {
 		image := &share.CLUSImage{Repo: rep}
 		repos = append(repos, image)
 	}

@@ -17,7 +17,7 @@ import (
 // There are half as many possible version-4 variant-2 UUIDs (legacy GUIDs)
 // because there is one less random bit available, 3 bits being consumed for the variant.
 
-/////// utility
+// ///// utility
 func testSetup(entryCnt int) (*uuidPRuleCache, *share.CLUSProcessProfile) {
 	pworker := Init()
 	pp := &share.CLUSProcessProfile{
@@ -41,10 +41,10 @@ func testSetup(entryCnt int) (*uuidPRuleCache, *share.CLUSProcessProfile) {
 	return pworker, pp
 }
 
-/////// utility
+// ///// utility
 func removeNilPpe(processes []*share.CLUSProcessProfileEntry) []*share.CLUSProcessProfileEntry {
 	list := make([]*share.CLUSProcessProfileEntry, 0)
-	for i, _ := range processes {
+	for i := range processes {
 		if processes[i] == nil {
 			continue
 		}
@@ -104,7 +104,7 @@ func TestDeleteProcRules(t *testing.T) {
 
 	//
 	list := make([]*share.CLUSProcessProfileEntry, 0)
-	for i, _ := range pp.Process {
+	for i := range pp.Process {
 		if 0 == (i % 2) {
 			continue
 		}
@@ -154,7 +154,7 @@ func TestDeleteProcRules(t *testing.T) {
 	pworker.handleProcessProfile(pp, false, accAdmin)
 
 	list = make([]*share.CLUSProcessProfileEntry, 0)
-	for i, _ := range pp.Process {
+	for i := range pp.Process {
 		if 1 == (i % 2) {
 			continue
 		}

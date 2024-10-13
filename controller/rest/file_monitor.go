@@ -354,7 +354,7 @@ func handlerFileMonitorList(w http.ResponseWriter, r *http.Request, ps httproute
 	query := restParseQuery(r)
 	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local file mointor list
 
-	for key, _ := range r.URL.Query() {
+	for key := range r.URL.Query() {
 		if strings.Contains(key, api.FilterByPredefined) {
 			predefined = true
 			break
@@ -387,7 +387,7 @@ func handlerFileMonitorShow(w http.ResponseWriter, r *http.Request, ps httproute
 	var predefined bool
 	name := ps.ByName("name")
 	query := r.URL.Query()
-	for key, _ := range query {
+	for key := range query {
 		if strings.Contains(key, api.FilterByPredefined) {
 			predefined = true
 			break

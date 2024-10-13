@@ -43,9 +43,9 @@ func my_completed(mover int, group string, err error) bool {
 	log.WithFields(log.Fields{"group": group, "mover": mover, "error": err}).Debug("ATMO:")
 	switch mover {
 	case Discover2Monitor:
-		return true		// promote Discover to Monitor
+		return true // promote Discover to Monitor
 	case Monitor2Protect:
-		return true		// promote Monitor to Protect
+		return true // promote Monitor to Protect
 	}
 	return false
 }
@@ -65,8 +65,8 @@ func initEnv() *automode_ctx {
 
 func testAddGroups(t *testing.T) {
 	ctx := initEnv()
-	ctx.ConfigureCompleteDuration(Discover2Monitor, time.Second * 30)
-	ctx.ConfigureCompleteDuration(Monitor2Protect, time.Second * 60)
+	ctx.ConfigureCompleteDuration(Discover2Monitor, time.Second*30)
+	ctx.ConfigureCompleteDuration(Monitor2Protect, time.Second*60)
 
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("m2d%d", i)

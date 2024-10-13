@@ -764,7 +764,7 @@ CHECK:
 			break CHECK
 		} else {
 			foundResources := utils.NewSet()
-			for rt, _ := range r2v {
+			for rt := range r2v {
 				foundResources.Add(rt)
 			}
 			if !foundResources.IsSuperset(roleInfoRule.resources) && !foundResources.Contains("*") {

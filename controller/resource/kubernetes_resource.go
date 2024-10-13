@@ -1522,7 +1522,7 @@ func (d *kubernetes) StopWatchAllResources() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	for rt, _ := range d.watchers {
+	for rt := range d.watchers {
 		if d.watchers[rt] != nil && d.watchers[rt].cancel != nil {
 			d.watchers[rt].cancel()
 			d.watchers[rt] = nil

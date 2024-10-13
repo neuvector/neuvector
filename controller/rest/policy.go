@@ -938,14 +938,14 @@ func checkReadOnlyRules(scope string, crhs []*share.CLUSRuleHead, rules []*api.R
 	return writableLearnedRules, writableUserCreatedRules, readOnlyRuleIDs, writableRuleIDs, errorIDs
 }
 
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------
 // caller                   rules param                 ignored entries in rules param      note
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------
 // admin(scope=local)       all rules                   fed/ground rules                    fed/ground rules are not affected during replacement
 // nsUser(scope=local)      rules this user can see     fed/ground rules                    namespace-user-non-accessible rules are not affected during replacement
 // fedAdmin(scope=local)    all rules                   fed/ground rules                    fed/ground rules are not affected during replacement
 // fedAdmin(scope=fed)      all rules                   ground/learned/user-created rules   ground/learned/user-created rules are not affected during replacement
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------------------------------------------------------------
 // 1. rules param contains the whole (updated) rules list that this user can see/config. it's from GET("/v1/policy/rule") plus some update/delete/add operations
 // 2. ground(crd) rules cannot be updated/deleted/added by this function
 // 3. accessible learned rules can be deleted, but not updated, by this function
