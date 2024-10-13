@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	openshiftServer = "openshift"
+	// openshiftServer = "openshift"
 
 	openshiftOAuthDiscoverURL    = "%s/.well-known/oauth-authorization-server"
 	openshiftOAuthDefaultURL     = "%s/oauth/authorize"

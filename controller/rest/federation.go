@@ -177,7 +177,7 @@ var _clusterStatusMap = map[int]string{
 	_fedClusterJoinPending:    api.FedStatusClusterPending,
 }
 
-var ibmSACfg share.CLUSIBMSAConfig
+// var ibmSACfg share.CLUSIBMSAConfig
 
 func LeadChangeNotify(leader bool) {
 	log.WithFields(log.Fields{"isLeader": leader, "_isLeader": _isLeader}).Info()
@@ -3342,9 +3342,10 @@ func handlerFedHealthCheck(w http.ResponseWriter, r *http.Request, ps httprouter
 var forbiddenFwUrl = map[string][]string{
 	"/v1/fed_auth": {http.MethodPost, http.MethodDelete},
 }
-var forbiddenFwUrlPrefix = map[string][]string{
-	"/v1/auth/": {http.MethodPost, http.MethodDelete},
-}
+
+// var forbiddenFwUrlPrefix = map[string][]string{
+// 	"/v1/auth/": {http.MethodPost, http.MethodDelete},
+// }
 
 type tForbiddenFwUrlInfo struct {
 	url       string

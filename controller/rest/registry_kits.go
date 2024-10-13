@@ -103,9 +103,9 @@ const (
 	regTestLongPollTimeout   = time.Second * 30
 )
 
-type imageSchema struct {
-	Version int `json:"schemaVersion"`
-}
+// type imageSchema struct {
+// 	Version int `json:"schemaVersion"`
+// }
 
 var regTestMgr *longpollManyMgr
 var regTestMap map[string]*regTestTask
@@ -122,9 +122,9 @@ type regTracer struct {
 	isManifest bool
 }
 
-func (t regTracer) format(m string) string {
-	return fmt.Sprintf("%.[2]*[1]s", m, maxMessageSize)
-}
+// func (t regTracer) format(m string) string {
+// 	return fmt.Sprintf("%.[2]*[1]s", m, maxMessageSize)
+// }
 
 func (t *regTracer) SetPhase(message string) {
 	t.steps = append(t.steps, &api.RESTRegistryTestStep{

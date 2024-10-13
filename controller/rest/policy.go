@@ -508,14 +508,14 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 	return rule
 }
 
-func policyRuleConf2Cluster(r *api.RESTPolicyRuleConfig) *share.CLUSPolicyRule {
-	return &share.CLUSPolicyRule{
-		ID:      r.ID,
-		Comment: *r.Comment,
-		From:    *r.From,
-		To:      *r.To,
-	}
-}
+// func policyRuleConf2Cluster(r *api.RESTPolicyRuleConfig) *share.CLUSPolicyRule {
+// 	return &share.CLUSPolicyRule{
+// 		ID:      r.ID,
+// 		Comment: *r.Comment,
+// 		From:    *r.From,
+// 		To:      *r.To,
+// 	}
+// }
 
 func deletePolicyRules(txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {

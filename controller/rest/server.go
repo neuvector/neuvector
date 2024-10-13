@@ -59,9 +59,9 @@ func isPasswordAuthServer(s *share.CLUSServer) bool {
 	return s.LDAP != nil
 }
 
-func isTokenAuthServer(s *share.CLUSServer) bool {
-	return s.SAML != nil || s.OIDC != nil
-}
+// func isTokenAuthServer(s *share.CLUSServer) bool {
+// 	return s.SAML != nil || s.OIDC != nil
+// }
 
 func isAuthServer(s *share.CLUSServer) bool {
 	return s.LDAP != nil || s.SAML != nil || s.OIDC != nil

@@ -3,11 +3,8 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
 
-	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/db"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
@@ -28,20 +25,20 @@ func perf_createDummyVulAssets(q *db.VulQueryFilter) error {
 	return nil
 }
 
-func perf_randomSelectVuls(vuls []*api.RESTVulnerability, count int) []*api.RESTVulnerability {
-	// Seed the random number generator with the current time
-	rand.Seed(time.Now().UnixNano())
+// func perf_randomSelectVuls(vuls []*api.RESTVulnerability, count int) []*api.RESTVulnerability {
+// 	// Seed the random number generator with the current time
+// 	rand.Seed(time.Now().UnixNano())
 
-	// Define the maximum value (exclusive)
-	maxValue := len(vuls)
+// 	// Define the maximum value (exclusive)
+// 	maxValue := len(vuls)
 
-	results := make([]*api.RESTVulnerability, 0)
-	for i := 0; i < count; i++ {
-		randomNumber := rand.Intn(maxValue)
-		results = append(results, vuls[randomNumber])
-	}
-	return results
-}
+// 	results := make([]*api.RESTVulnerability, 0)
+// 	for i := 0; i < count; i++ {
+// 		randomNumber := rand.Intn(maxValue)
+// 		results = append(results, vuls[randomNumber])
+// 	}
+// 	return results
+// }
 
 // "upstream:CVE-2015-8324"
 func _get_cvename(cvename string) string {

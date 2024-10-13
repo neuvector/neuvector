@@ -48,8 +48,8 @@ var Host share.CLUSHost = share.CLUSHost{
 var Ctrler, parentCtrler share.CLUSController
 
 type ctrlEnvInfo struct {
-	startsAt          time.Time
-	procDir           string
+	startsAt time.Time
+	// procDir           string
 	cgroupMemory      string
 	cgroupCPUAcct     string
 	runInContainer    bool

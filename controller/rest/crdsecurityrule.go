@@ -43,9 +43,9 @@ type nvCrdHandler struct {
 	lockKey    string
 	crUid      string // metadata.uid in the CR object
 	mdName     string // metadata.name in the CR object
-	rscType    string
-	lock       cluster.LockInterface
-	acc        *access.AccessControl
+	// rscType    string
+	lock cluster.LockInterface
+	acc  *access.AccessControl
 }
 
 func (h *nvCrdHandler) Init(lockKey string) {

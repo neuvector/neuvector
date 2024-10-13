@@ -808,17 +808,17 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 }
 
 // Must read from cluster instead of cache.
-func isGroupInUse(name string) bool {
-	crhs := clusHelper.GetPolicyRuleList()
-	for _, crh := range crhs {
-		if r, _ := clusHelper.GetPolicyRule(crh.ID); r != nil {
-			if r.From == name || r.To == name {
-				return true
-			}
-		}
-	}
-	return false
-}
+// func isGroupInUse(name string) bool {
+// 	crhs := clusHelper.GetPolicyRuleList()
+// 	for _, crh := range crhs {
+// 		if r, _ := clusHelper.GetPolicyRule(crh.ID); r != nil {
+// 			if r.From == name || r.To == name {
+// 				return true
+// 			}
+// 		}
+// 	}
+// 	return false
+// }
 
 func handlerGroupDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()

@@ -30,10 +30,10 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const (
-	_writeHeader   = true
-	_noWriteHeader = false
-)
+// const (
+// 	_writeHeader   = true
+// 	_noWriteHeader = false
+// )
 
 type admissionRequestObject struct {
 	ApiVersion string            `json:"apiVersion,omitempty"`

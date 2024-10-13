@@ -33,7 +33,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const scanImageDataTimeout = time.Second * 45
+// const scanImageDataTimeout = time.Second * 45
 const repoScanTimeout = time.Minute * 20
 
 type ScanService struct {
@@ -398,8 +398,8 @@ func (s *CapService) IsGRPCCompressed(ctx context.Context, v *share.RPCVoid) (*s
 type UpgradeService struct {
 }
 
-const tmpDir string = "/tmp/"
-const dstDir string = "/etc/neuvector/db/"
+// const tmpDir string = "/tmp/"
+// const dstDir string = "/etc/neuvector/db/"
 
 func (s *UpgradeService) SupportUpgradeDB(context.Context, *share.RPCVoid) (*share.CLUSBoolean, error) {
 	return &share.CLUSBoolean{Value: false}, nil

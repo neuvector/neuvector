@@ -39,7 +39,7 @@ const calculateInterval uint32 = 10
 
 // ///////
 type uuidPRuleCache struct {
-	bInit   bool
+	// bInit   bool
 	rwMutex sync.RWMutex
 
 	// workitems
@@ -54,7 +54,8 @@ type uuidPRuleCache struct {
 
 // //////// global cache stores in this file //////////
 var uuidProcCache *uuidPRuleCache
-var procHelper *ProcessRuleIDHelper
+
+// var procHelper *ProcessRuleIDHelper
 
 var funcGetGroupWithoutLock FuncGetGroupWithoutLock
 

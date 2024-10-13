@@ -493,13 +493,13 @@ func mockLoginUser(name, role, fedRole string, roleDomains map[string][]string) 
 
 var router *httprouter.Router
 
-func preTestDebug() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.DebugLevel)
-	initTest()
-	access.CompileUriPermitsMapping()
-}
+// func preTestDebug() {
+// 	log.SetOutput(os.Stdout)
+// 	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+// 	log.SetLevel(log.DebugLevel)
+// 	initTest()
+// 	access.CompileUriPermitsMapping()
+// }
 
 func preTest() {
 	log.SetOutput(os.Stdout)
@@ -744,17 +744,17 @@ func loginServerToken(token, server string) *mockResponseWriter {
 	return w
 }
 
-func loginServerGetSLORedirectURL(token, server string) *mockResponseWriter {
-	w := new(mockResponseWriter)
-	data := api.RESTTokenRedirect{
-		Redirect: "https://localhost/samlslo",
-	}
-	body, _ := json.Marshal(data)
-	r, _ := http.NewRequest("GET", "/v1/token_auth_server/"+server+"/slo", bytes.NewBuffer(body))
-	r.Header.Add("X-Auth-Token", token)
-	router.ServeHTTP(w, r)
-	return w
-}
+// func loginServerGetSLORedirectURL(token, server string) *mockResponseWriter {
+// 	w := new(mockResponseWriter)
+// 	data := api.RESTTokenRedirect{
+// 		Redirect: "https://localhost/samlslo",
+// 	}
+// 	body, _ := json.Marshal(data)
+// 	r, _ := http.NewRequest("GET", "/v1/token_auth_server/"+server+"/slo", bytes.NewBuffer(body))
+// 	r.Header.Add("X-Auth-Token", token)
+// 	router.ServeHTTP(w, r)
+// 	return w
+// }
 
 func logout(token string) *mockResponseWriter {
 	w := new(mockResponseWriter)

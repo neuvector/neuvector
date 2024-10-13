@@ -155,17 +155,17 @@ const (
 	userNoPlatformAuth
 )
 
-const (
-	jwtRegularTokenType = iota
-	jwtFedMasterTokenType
-)
+// const (
+// 	jwtRegularTokenType = iota
+// 	jwtFedMasterTokenType
+// )
 
 const loginTypeApikey int = 1
 
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
 
-var installID *string
+// var installID *string
 
 func GetJWTSigningKey() JWTCertificateState {
 	jwtKeyMutex.RLock()

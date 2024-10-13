@@ -99,7 +99,7 @@ var allowedNamespaces utils.Set     // all effectively allowed namespaces that d
 var allowedNamespacesWild utils.Set // all effectively allowed namespaces that contain wildcard character
 var nsSelectorValue string
 
-var allSetOps = []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan}
+// var allSetOps = []string{share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan}
 
 func InitK8sNsSelectorInfo(allowedNS, allowedNsWild, defAllowedNS utils.Set, selectorValue string, admCtrlEnabled bool) {
 	nsSelectorValue = selectorValue

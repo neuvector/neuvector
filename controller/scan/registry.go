@@ -1819,11 +1819,11 @@ func (rs *Registry) polling(ctx context.Context) {
 const maxRetry = 3
 
 type regScanTask struct {
-	sctx              *scanContext
-	reg               *Registry
-	imageID           string
-	retries           int
-	cancel            context.CancelFunc
+	sctx    *scanContext
+	reg     *Registry
+	imageID string
+	retries int
+	// cancel            context.CancelFunc
 	scanTypesRequired share.ScanTypeMap
 }
 

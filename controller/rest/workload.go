@@ -19,7 +19,7 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const logsSizeLimit = 500 * 1000
+// const logsSizeLimit = 500 * 1000
 
 func stats2REST(stats *share.CLUSStats) *api.RESTStats {
 	r := &api.RESTStats{

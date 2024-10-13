@@ -61,7 +61,7 @@ type automode_ctx struct {
 	m2p_life int
 
 	// callbacks
-	probefn probeFunc
+	// probefn probeFunc
 
 	// test functions
 	testfn   testFunc

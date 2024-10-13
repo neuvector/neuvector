@@ -1154,25 +1154,25 @@ func xlateConfigMap(obj metav1.Object) (string, interface{}) {
 	return "", nil
 }
 
-func xlateMutatingWebhookConfiguration(obj metav1.Object) (string, interface{}) {
-	var name string
-	var guid string
-	if o, ok := obj.(*admregv1.MutatingWebhookConfiguration); ok {
-		name = o.GetName()
-		guid = string(o.GetUID())
-	} else if o, ok := obj.(*admregv1b1.MutatingWebhookConfiguration); ok {
-		name = o.GetName()
-		guid = string(o.GetUID())
-	}
-	if name != "" {
-		r := &AdmissionWebhookConfiguration{
-			AdmType: nvAdmMutateType,
-			Name:    name,
-		}
-		return guid, r
-	}
-	return "", nil
-}
+// func xlateMutatingWebhookConfiguration(obj metav1.Object) (string, interface{}) {
+// 	var name string
+// 	var guid string
+// 	if o, ok := obj.(*admregv1.MutatingWebhookConfiguration); ok {
+// 		name = o.GetName()
+// 		guid = string(o.GetUID())
+// 	} else if o, ok := obj.(*admregv1b1.MutatingWebhookConfiguration); ok {
+// 		name = o.GetName()
+// 		guid = string(o.GetUID())
+// 	}
+// 	if name != "" {
+// 		r := &AdmissionWebhookConfiguration{
+// 			AdmType: nvAdmMutateType,
+// 			Name:    name,
+// 		}
+// 		return guid, r
+// 	}
+// 	return "", nil
+// }
 
 func xlateValidatingWebhookConfiguration(obj metav1.Object) (string, interface{}) {
 	var name string

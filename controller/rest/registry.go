@@ -1184,19 +1184,19 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 	restRespSuccess(w, r, nil, acc, login, nil, "Registry delete")
 }
 
-func diffStringSlices(a, b []string) []string {
-	mb := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		mb[x] = struct{}{}
-	}
-	var diff []string
-	for _, x := range a {
-		if _, found := mb[x]; !found {
-			diff = append(diff, x)
-		}
-	}
-	return diff
-}
+// func diffStringSlices(a, b []string) []string {
+// 	mb := make(map[string]struct{}, len(b))
+// 	for _, x := range b {
+// 		mb[x] = struct{}{}
+// 	}
+// 	var diff []string
+// 	for _, x := range a {
+// 		if _, found := mb[x]; !found {
+// 			diff = append(diff, x)
+// 		}
+// 	}
+// 	return diff
+// }
 
 // called by managed clusters
 func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {

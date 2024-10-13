@@ -180,10 +180,10 @@ type ibmsaNote struct {
 	Section          *ibmsaSection            `json:"section,omitempty"`
 }
 
-type ibmsaNotes struct {
-	Notes         []ibmsaNote `json:"notes"`
-	NextPageToken string      `json:"next_page_token"`
-}
+// type ibmsaNotes struct {
+// 	Notes         []ibmsaNote `json:"notes"`
+// 	NextPageToken string      `json:"next_page_token"`
+// }
 
 type ibmsaMetadata struct {
 	Notes        []ibmsaNote `json:"notes"`

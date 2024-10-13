@@ -33,13 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/opa"
 	"github.com/neuvector/neuvector/controller/resource"
-	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/scan/secrets"
@@ -51,10 +49,10 @@ const (
 	tlsClientCA = "/var/neuvector/clientCA.cert.pem"
 )
 
-const (
-	admissionWebhookAnnotationStatusKey = "neuvector-mutating-admission-webhook/status"
-	admissionWebhookLabelKey            = "neuvector-mutating-admission-webhook/label"
-)
+// const (
+// 	admissionWebhookAnnotationStatusKey = "neuvector-mutating-admission-webhook/status"
+// 	admissionWebhookLabelKey            = "neuvector-mutating-admission-webhook/label"
+// )
 
 const errFmtUnmarshall = "could not unmarshal raw %s object"
 
@@ -1720,22 +1718,22 @@ func scanEnvVarSecrets(vars map[string]string) []share.ScanSecretLog {
 	return slogs
 }
 
-func updateToOtherControllers(docKey string, jsonData string) {
-	// call grpc
-	info := share.CLUSKubernetesResInfo{
-		DocKey: docKey,
-		Data:   jsonData,
-	}
+// func updateToOtherControllers(docKey string, jsonData string) {
+// 	// call grpc
+// 	info := share.CLUSKubernetesResInfo{
+// 		DocKey: docKey,
+// 		Data:   jsonData,
+// 	}
 
-	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
-	for _, ep := range eps {
-		log.WithFields(log.Fields{"ep.ClusterIP": ep.ClusterIP, "ClusterIP": localDev.Ctrler.ClusterIP}).Debug("updateToOtherControllers(grpc-client)")
+// 	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
+// 	for _, ep := range eps {
+// 		log.WithFields(log.Fields{"ep.ClusterIP": ep.ClusterIP, "ClusterIP": localDev.Ctrler.ClusterIP}).Debug("updateToOtherControllers(grpc-client)")
 
-		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
-			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
-		}
-	}
-}
+// 		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
+// 			go rpc.ReportK8SResToOPA(ep.ClusterIP, ep.RPCServerPort, info)
+// 		}
+// 	}
+// }
 
 func ReportK8SResToOPA(info *share.CLUSKubernetesResInfo) {
 	docKey := info.DocKey

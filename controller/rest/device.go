@@ -17,7 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 )
 
-const clusterWaitPeriod int = 5
+// const clusterWaitPeriod int = 5
 
 func handlerControllerList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")

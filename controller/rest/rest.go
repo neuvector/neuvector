@@ -68,6 +68,7 @@ const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's giv
 
 var evqueue cluster.ObjectQueueInterface
 var auditQueue cluster.ObjectQueueInterface
+
 var messenger cluster.MessengerInterface
 var clusHelper kv.ClusterHelper
 var cfgHelper kv.ConfigHelper
@@ -79,6 +80,7 @@ var k8sPlatform bool
 
 var fedRestServerMutex sync.Mutex
 var fedRestServerState uint64
+
 var crdEventProcTicker *time.Ticker
 
 var dockerRegistries utils.Set
@@ -96,7 +98,7 @@ var _restPort uint
 var _fedPort uint
 var _fedServerChan chan bool
 
-var _licSigKeyEnv int
+// var _licSigKeyEnv int
 
 var _teleNeuvectorURL string
 var _teleFreq uint
@@ -1026,10 +1028,10 @@ func getNewestVersion(vers utils.Set) string {
 	return newest
 }
 
-func isIDStringValid(name string) bool {
-	valid, _ := regexp.MatchString("^[.a-zA-Z0-9_-]*$", name)
-	return valid
-}
+// func isIDStringValid(name string) bool {
+// 	valid, _ := regexp.MatchString("^[.a-zA-Z0-9_-]*$", name)
+// 	return valid
+// }
 
 func isObjectNameValid(name string) bool {
 	// Object name must starts with letters or digits

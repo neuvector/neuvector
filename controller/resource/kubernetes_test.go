@@ -18,11 +18,11 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func preTestDebug() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.DebugLevel)
-}
+// func preTestDebug() {
+// 	log.SetOutput(os.Stdout)
+// 	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+// 	log.SetLevel(log.DebugLevel)
+// }
 
 func preTest() {
 	log.SetOutput(os.Stdout)
