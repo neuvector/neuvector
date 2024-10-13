@@ -514,7 +514,7 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 			restRespNotFoundLogAccessDenied(w, login, err)
 			return
 		}
-		if wl.CapQuar == false {
+		if !wl.CapQuar {
 			err := "Unable to quarantine the container"
 			log.WithFields(log.Fields{"id": id}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err)

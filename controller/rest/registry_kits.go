@@ -224,7 +224,7 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -385,7 +385,7 @@ func handlerRegistryTestCancel(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}

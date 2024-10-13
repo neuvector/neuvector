@@ -552,7 +552,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 									} else {
 										for d, permits := range pripDomainPermits {
 											if !permits.IsEmpty() {
-												p, _ := domainPermissions[d]
+												p := domainPermissions[d]
 												p.Local.Union(permits.Local)
 												p.Remote.Union(permits.Remote)
 												domainPermissions[d] = p
@@ -745,7 +745,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	}
 
 	// For auth token generated for IBM SA setup, it has a fixed 30 minutes time-out
-	if role, _ := login.domainRoles[access.AccessDomainGlobal]; role != api.UserRoleIBMSA && role != api.UserRoleImportStatus {
+	if role := login.domainRoles[access.AccessDomainGlobal]; role != api.UserRoleIBMSA && role != api.UserRoleImportStatus {
 		login.timer.Reset(getUserTimeout(login.timeout))
 		login.lastAt = now
 		// on other controllers, if the token is already known, its login session timer is ticking based on the last request to other controllers.
@@ -931,7 +931,7 @@ func lookupShadowUser(server, provider, username, userid, email, role string, ro
 				"openldap":        "OpenLDAP",
 				"freeipa":         "FreeIPA",
 			}
-			if name, _ := mapping[provider]; name != "" {
+			if name := mapping[provider]; name != "" {
 				provider = name
 			}
 			user.Server = fmt.Sprintf("%s(%s)", share.FlavorRancher, provider)

@@ -151,7 +151,7 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -242,7 +242,7 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}

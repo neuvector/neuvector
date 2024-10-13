@@ -86,7 +86,7 @@ func handlerPolicyRuleList(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local rules
+	scope := query.pairs[api.QueryScope] // empty string means fed & local rules
 
 	var resp api.RESTPolicyRulesData
 	resp.Rules = make([]*api.RESTPolicyRule, 0)
@@ -354,7 +354,7 @@ func normalizeApps(apps []string) ([]string, error) {
 	i := 0
 	names := make([]string, appSet.Cardinality())
 	for id := range appSet.Iter() {
-		names[i], _ = common.AppNameMap[id.(uint32)]
+		names[i] = common.AppNameMap[id.(uint32)]
 		i++
 	}
 
@@ -504,7 +504,7 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 		Action:       r.Action,
 		Disable:      r.Disable,
 	}
-	rule.CfgType, _ = cfgTypeMapping[r.CfgType]
+	rule.CfgType = cfgTypeMapping[r.CfgType]
 	return rule
 }
 
@@ -768,7 +768,7 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 				rr.CfgType = api.CfgTypeUserCreated
 			}
 		}
-		cfgType, _ := cfgTypeMapping[rr.CfgType]
+		cfgType := cfgTypeMapping[rr.CfgType]
 		if (cfgType == share.FederalCfg && scope == share.ScopeLocal) || (cfgType != share.FederalCfg && scope == share.ScopeFed) {
 			e := "Mismatched rule CfgType with request"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
@@ -1009,7 +1009,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	for _, rr := range rules {
 		if rr.CfgType == "" { // CfgType is not specified in new rule. deduce from scope
 			if rr.From == "" && rr.To == "" {
-				rr.CfgType, _ = cfgTypeMap2Api[common.PolicyRuleIdToCfgType(rr.ID)]
+				rr.CfgType = cfgTypeMap2Api[common.PolicyRuleIdToCfgType(rr.ID)]
 			} else {
 				if rr.Learned {
 					rr.CfgType = api.CfgTypeLearned
@@ -1024,8 +1024,8 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		}
 	}
 	sort.SliceStable(rules, func(i, j int) bool {
-		iCfgType, _ := cfgTypeMapping[rules[i].CfgType]
-		jCfgType, _ := cfgTypeMapping[rules[j].CfgType]
+		iCfgType := cfgTypeMapping[rules[i].CfgType]
+		jCfgType := cfgTypeMapping[rules[j].CfgType]
 		switch iCfgType {
 		case share.FederalCfg:
 			if jCfgType != share.FederalCfg {
@@ -1166,7 +1166,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 				return err
 			}
 			if rr.ID == api.PolicyAutoID {
-				cfgType, _ := cfgTypeMapping[rr.CfgType]
+				cfgType := cfgTypeMapping[rr.CfgType]
 				rr.ID = common.GetAvailablePolicyID(idInUse, cfgType)
 				if rr.ID == 0 {
 					err = fmt.Errorf("Failed to locate available rule ID")
@@ -1294,7 +1294,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					break
 				}
 			}
-			if copied == false {
+			if !copied {
 				break
 			}
 		}
@@ -1451,7 +1451,7 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1800,7 +1800,7 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	query := restParseQuery(r)
-	delScope, _ := query.pairs[api.QueryScope]
+	delScope := query.pairs[api.QueryScope]
 	if delScope == "" {
 		delScope = share.ScopeLocal
 	}

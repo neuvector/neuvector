@@ -493,7 +493,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		*/
 	}
 	if state.Mode != nil && *state.Mode == share.AdmCtrlModeProtect {
-		if licenseAllowEnforce() == false {
+		if !licenseAllowEnforce() {
 			e := "The policy mode is not enabled in the license"
 			log.WithFields(log.Fields{"mode": *state.Mode}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
@@ -991,7 +991,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 	ruleCfg := confData.Config
-	cfgType, _ := cfgTypeMapping[ruleCfg.CfgType]
+	cfgType := cfgTypeMapping[ruleCfg.CfgType]
 	modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 	if (cfgType != share.UserCreated && cfgType != share.FederalCfg) ||
 		(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) ||

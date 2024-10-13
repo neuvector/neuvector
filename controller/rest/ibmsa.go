@@ -853,7 +853,7 @@ Loop:
 			} else if f.Protocol >= 144 && f.Protocol <= 252 {
 				f.ProtoName = "Unassigned"
 			} else if f.ProtoName != "N/A" {
-				f.ProtoName, _ = ipPortoName[f.Protocol]
+				f.ProtoName = ipPortoName[f.Protocol]
 			}
 			ibmsaPostThreatFinding(&f)
 		case <-ibmsaStopChan:

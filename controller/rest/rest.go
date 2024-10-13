@@ -187,7 +187,7 @@ func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, hea
 		hNames = append(hNames, "X-Transaction-ID")
 	}
 	for _, hName := range hNames {
-		if v, _ := headers[hName]; v != "" {
+		if v := headers[hName]; v != "" {
 			w.Header().Set(hName, v)
 		}
 	}
@@ -716,7 +716,7 @@ func (rf *restFilter) FilteredBy(data interface{}, ff *restFieldFilter) *restFil
 	v := reflect.ValueOf(data).Elem()
 
 	// Get field name from tag
-	if ff.field, _ = rf.tags[ff.tag]; ff.field == "" {
+	if ff.field = rf.tags[ff.tag]; ff.field == "" {
 		log.WithFields(log.Fields{"tag": ff.tag}).Debug("Field with tag not exist")
 		return rf
 	}
@@ -879,7 +879,7 @@ func (rs *restSorter) SortedBy(s *restFieldSort) *restSorter {
 	v := reflect.ValueOf(d).Elem()
 
 	// Get field name from tag
-	if s.field, _ = rs.tags[s.tag]; s.field == "" {
+	if s.field = rs.tags[s.tag]; s.field == "" {
 		log.WithFields(log.Fields{"tag": s.tag}).Error("Field with tag not exist")
 		return rs
 	}

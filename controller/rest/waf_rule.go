@@ -446,7 +446,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached == true {
+	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached {
 		e := "waf sensor already exists"
 		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)

@@ -46,7 +46,7 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -106,7 +106,7 @@ func handlerScanWorkloadReq(w http.ResponseWriter, r *http.Request, ps httproute
 
 	id := ps.ByName("id")
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -133,7 +133,7 @@ func handlerScanHostReq(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	id := ps.ByName("id")
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -158,7 +158,7 @@ func handlerScanPlatformReq(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -645,7 +645,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 
 					// If one of workload/node is in discover mode, then the image is in discover mode; and so on.
 					// Policy mode is empty if the image is not used.
-					pm, _ := img2mode[id]
+					pm := img2mode[id]
 					for i := 0; i < len(idns); i++ {
 						idns[i].PolicyMode = pm
 					}
@@ -807,7 +807,7 @@ func handlerScanCacheStat(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -835,7 +835,7 @@ func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}

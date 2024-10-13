@@ -424,12 +424,12 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	rc := req.Request
 	if rc.PolicyMode != nil && *rc.PolicyMode == share.PolicyModeEnforce &&
-		licenseAllowEnforce() == false {
+		!licenseAllowEnforce() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 	if rc.ProfileMode != nil && *rc.ProfileMode == share.PolicyModeEnforce &&
-		licenseAllowEnforce() == false {
+		!licenseAllowEnforce() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -559,7 +559,7 @@ func validateWebhook(h *api.RESTWebhook) (int, error) {
 		return api.RESTErrInvalidName, errors.New(msg)
 	}
 
-	if isObjectNameValid(h.Name) == false {
+	if !isObjectNameValid(h.Name) {
 		log.WithFields(log.Fields{"name": h.Name}).Error("Invalid webhook name")
 		return api.RESTErrInvalidName, errors.New("Invalid webhook name")
 	}
@@ -1375,7 +1375,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 			}
 
 			if rc.AuthByPlatform != nil {
-				if cconf.AuthByPlatform && *rc.AuthByPlatform == false {
+				if cconf.AuthByPlatform && !*rc.AuthByPlatform {
 					kick = true
 				}
 				cconf.AuthByPlatform = *rc.AuthByPlatform

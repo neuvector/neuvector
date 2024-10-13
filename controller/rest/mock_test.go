@@ -113,7 +113,7 @@ func (m *mockCache) Policy2CLUS(rule *api.RESTPolicyRule) *share.CLUSPolicyRule 
 		Priority:       rule.Priority,
 		Applications:   appNames2IDs(rule.Applications),
 	}
-	c.CfgType, _ = cfgTypeMapping[rule.CfgType]
+	c.CfgType = cfgTypeMapping[rule.CfgType]
 
 	return &c
 }
@@ -322,7 +322,7 @@ func (m *mockCache) Group2REST(group *share.CLUSGroup) *api.RESTGroup {
 		},
 	}
 	copy(g.CreaterDomains, group.CreaterDomains)
-	g.CfgType, _ = cfgTypeMap2Api[group.CfgType]
+	g.CfgType = cfgTypeMap2Api[group.CfgType]
 	return &g
 }
 
@@ -411,9 +411,7 @@ func (m *mockCache) GetComplianceProfile(name string, acc *access.AccessControl)
 		for _, m := range metaMap {
 			if _, ok := filter[m.TestNum]; !ok {
 				var tags []string
-				for _, complianceTag := range m.Tags {
-					tags = append(tags, complianceTag)
-				}
+				tags = append(tags, m.Tags...)
 				filter[m.TestNum] = tags
 			}
 		}

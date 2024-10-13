@@ -1788,7 +1788,7 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	query := restParseQuery(r)
-	str, _ := query.pairs[api.QueryDuration] // in minutes.
+	str := query.pairs[api.QueryDuration] // in minutes.
 	duration, _ := strconv.Atoi(str)
 	if duration <= 0 { // in minute
 		duration = 60

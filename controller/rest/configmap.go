@@ -884,10 +884,10 @@ func LoadInitCfg(load bool, platform string) bool {
 	context.platform = platform
 	for _, configMap := range configMaps {
 		// check whether we need to retry loading configmap when it failed in the last loading
-		if tried, _ := cfgmapTried[configMap.Type]; tried >= 6 {
+		if tried := cfgmapTried[configMap.Type]; tried >= 6 {
 			cfgmapTried[configMap.Type] = -2 // no need to retry loading this config
 		}
-		tried, _ := cfgmapTried[configMap.Type]
+		tried := cfgmapTried[configMap.Type]
 		if tried < 0 {
 			continue
 		}

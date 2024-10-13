@@ -208,7 +208,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -547,7 +547,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -955,7 +955,7 @@ func handlerRegistryList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	} else {
 		query := restParseQuery(r)
-		scope, _ := query.pairs[api.QueryScope] // empty string means fed & local groups
+		scope := query.pairs[api.QueryScope] // empty string means fed & local groups
 
 		list := scanner.GetAllRegistrySummary(scope, acc)
 		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
@@ -1049,7 +1049,7 @@ func handlerRegistryStart(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -1090,7 +1090,7 @@ func handlerRegistryStop(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -1131,7 +1131,7 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}

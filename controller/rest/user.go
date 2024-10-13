@@ -48,7 +48,7 @@ func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string, useProfile 
 			MinSpecialCount: profile.MinSpecialCount,
 		}
 		pwdHistoryCount := profile.PwdHistoryCount
-		if profile.EnablePwdHistory == false {
+		if !profile.EnablePwdHistory {
 			pwdHistoryCount = 0
 		}
 		for _, char := range newPwd {

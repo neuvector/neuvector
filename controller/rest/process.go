@@ -79,7 +79,7 @@ func handlerProcessProfileList(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local process profiles
+	scope := query.pairs[api.QueryScope] // empty string means fed & local process profiles
 
 	var resp api.RESTProcessProfilesData
 	resp.Profiles = make([]*api.RESTProcessProfile, 0)

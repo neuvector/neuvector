@@ -209,8 +209,8 @@ func authCallerForFedRoleMapping(oldSettings, newSettings []*share.GroupRoleMapp
 
 	// 2. check whether someone(non-fedAdmin) tries to assign/remove mapped fedAdmin/fedReader role for global domain to/from an existing groups role mapping
 	for grp := range grpMappingToUpdate.Iter() {
-		oldMappedRoles, _ := oldRoleMappings[grp.(string)]
-		newMappedRoles, _ := newRoleMappings[grp.(string)]
+		oldMappedRoles := oldRoleMappings[grp.(string)]
+		newMappedRoles := newRoleMappings[grp.(string)]
 		if fedRoles.Contains(oldMappedRoles.GlobalRole) || fedRoles.Contains(newMappedRoles.GlobalRole) {
 			if oldMappedRoles.GlobalRole != newMappedRoles.GlobalRole { // group's mapped role for global domain is fedAdmin/fedReader-changed
 				return fmt.Errorf("Access denied for roles(old: %s, new: %s) in the role mapping of group '%s'", oldMappedRoles.GlobalRole, newMappedRoles.GlobalRole, grp)
@@ -822,9 +822,7 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 	}
 	if saml.X509CertExtra != nil {
 		csaml.X509CertExtra = nil
-		for _, c := range *saml.X509CertExtra {
-			csaml.X509CertExtra = append(csaml.X509CertExtra, c)
-		}
+		csaml.X509CertExtra = append(csaml.X509CertExtra, *saml.X509CertExtra...)
 	}
 	if saml.AuthnSigningEnabled != nil {
 		csaml.AuthnSigningEnabled = *saml.AuthnSigningEnabled
@@ -1523,9 +1521,7 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 
 func configOneGroupRolesMapping(groupRoleMapping *share.GroupRoleMapping, clusGroupMappedRoles []*share.GroupRoleMapping, acc *access.AccessControl) ([]*share.GroupRoleMapping, error) {
 	newSettings := make([]*share.GroupRoleMapping, 0, len(clusGroupMappedRoles)+1)
-	for _, m := range clusGroupMappedRoles {
-		newSettings = append(newSettings, m)
-	}
+	newSettings = append(newSettings, clusGroupMappedRoles...)
 
 	foundIdx := -1
 	for idx, m := range newSettings {
@@ -1717,9 +1713,7 @@ func sortGroupRoleMappings(groups []string, groupRoleMappings []*share.GroupRole
 	// Now groupRoleMappingsMap contains only unrequested groups that do not have fedAdmin/fedReader-mapped role for global domain
 
 	// 3. append requested groups that do not have fedAdmin/fedReader-mapped role for global domain to sortedList
-	for _, m := range specifiedNonFedMapped {
-		sortedList = append(sortedList, m)
-	}
+	sortedList = append(sortedList, specifiedNonFedMapped...)
 
 	// 4. append the unrequested groups that do not have fedAdmin/fedReader role mapping for global domain to sortedList
 	for _, m := range groupRoleMappings {
