@@ -2755,7 +2755,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 		reqTo.Revisions = cacher.GetAllFedRulesRevisions()
 		if forcePulling {
-			for ruleType, _ := range reqTo.Revisions {
+			for ruleType := range reqTo.Revisions {
 				reqTo.Revisions[ruleType] = 0
 			}
 		}
@@ -2866,7 +2866,7 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 			return
 		}
 		if forcePulling {
-			for regName, _ := range cachedScanDataRevs.ScannedRegRevs {
+			for regName := range cachedScanDataRevs.ScannedRegRevs {
 				cachedScanDataRevs.ScannedRegRevs[regName] = 0
 			}
 			cachedScanDataRevs.ScannedRepoRev = 0
