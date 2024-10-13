@@ -894,7 +894,6 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 			if len(*conf.DelSensors) > 0 && len(cg.Sensors) > 0 {
 				for _, rs := range *conf.DelSensors {
-					var found bool = false
 					cs := &share.CLUSWafSetting{Name: rs, Action: share.DlpRuleActionDrop}
 					idx, found := common.FindSensorInWafGroup(cg.Sensors, cs)
 					if found {

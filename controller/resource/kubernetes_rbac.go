@@ -538,7 +538,7 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 // Rancher's Global/Cluster/Project Role is always represented by k8s clusterrole (param rbacRoleDomain is "")
 func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interface{}) (string, share.NvPermissions) {
 
-	_, getVerbs := rbacRolesWanted[rbacRoleName]
+	// _, getVerbs := rbacRolesWanted[rbacRoleName]
 	ag2r2v := make(map[string]map[string]utils.Set) // apiGroup -> (resource -> verbs)
 	if rules, ok := objs.([]rbacv1.PolicyRule); ok {
 		for _, rule := range rules {
@@ -659,9 +659,9 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 		// Adjustment between fedAdmin/fedReader/admin/reader roles & fed permission
 		nvRole, nvPermits = adjustNvRolePermits(rbacRoleName, nvRole, nvPermits)
 
-		if roleInfo, ok := rbacRolesWanted[rbacRoleName]; !ok || roleInfo.k8sReserved || !getVerbs {
-			ag2r2v = nil
-		}
+		// if roleInfo, ok := rbacRolesWanted[rbacRoleName]; !ok || roleInfo.k8sReserved || !getVerbs {
+		// 	ag2r2v = nil
+		// }
 		return nvRole, nvPermits
 	} else {
 		return api.UserRoleNone, share.NvPermissions{}

@@ -473,7 +473,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	collectedRules := make([]*api.RESTResponseRule, 0)
+	var collectedRules []*api.RESTResponseRule
 	if query.limit == 0 {
 		collectedRules = rules[query.start:]
 	} else {

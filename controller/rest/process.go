@@ -318,7 +318,6 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 	deleted := make(map[string]*share.CLUSProcessProfileEntry)
 	if conf.ProcessDelList != nil {
 		for _, proc := range *conf.ProcessDelList {
-			var found bool = false
 			p := &share.CLUSProcessProfileEntry{
 				Name:    proc.Name,
 				Path:    proc.Path,

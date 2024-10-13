@@ -749,7 +749,7 @@ func getCISReportFromCluster(bench share.BenchType, id string, cpf *compliancePr
 }
 
 func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *access.AccessControl) (*api.RESTBenchReport, int, string) {
-	rpt1, code, errMsg := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, acc)
+	rpt1, code, _ := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, acc)
 	if code != 0 {
 		// Ignore the error in the master node as some nodes are not master. (BenchStatusNotSupport)
 	}

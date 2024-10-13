@@ -1621,7 +1621,7 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 
 // do not update CustomResourceDefinition resource(schema) anymore
 func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []string {
-	nvCrdInfo := []*resource.NvCrdInfo{}
+	var nvCrdInfo []*resource.NvCrdInfo
 	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		{
 			RscType:           resource.RscTypeCrdSecurityRule,

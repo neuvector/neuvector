@@ -1181,7 +1181,7 @@ func (rs *Registry) imageScanAdd(img *share.CLUSImage) {
 		return
 	}
 
-	filteredTags, err := filterTags(tags, imageTagFilter.Tag, 0)
+	filteredTags, _ := filterTags(tags, imageTagFilter.Tag, 0)
 
 	if err, _ := rs.backupDrv.Login(rs.config); err != nil {
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "error": err}).Error()

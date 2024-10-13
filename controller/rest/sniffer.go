@@ -64,6 +64,7 @@ func isSnifferAccessible(id string, acc *access.AccessControl) (string, []*share
 			if !acc.Authorize(&share.CLUSSnifferDummy{WorkloadDomain: wl.Domain}, nil) {
 				status = nil
 				err = common.ErrObjectAccessDenied
+				return agentId, status, err
 			}
 		}
 	}

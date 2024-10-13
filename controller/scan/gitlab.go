@@ -106,7 +106,7 @@ func (r *gitlab) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 }
 
 func (r *gitlab) getData(ur string) ([]byte, error) {
-	request, err := http.NewRequest("GET", ur, nil)
+	request, _ := http.NewRequest("GET", ur, nil)
 	request.Header.Add("PRIVATE-TOKEN", r.privateToken)
 	resp, err := r.gitlabClient.Do(request)
 	if err != nil {
@@ -162,7 +162,7 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 	ur := r.gitUrl("/projects")
 	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 	if data, err := r.getData(ur); err == nil {
-		err = json.Unmarshal(data, &all)
+		_ = json.Unmarshal(data, &all)
 	} else {
 		e1 = err
 	}

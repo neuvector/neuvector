@@ -2812,7 +2812,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 								reqTo.Revisions = respTo.Revisions
 								bodyTo, _ := json.Marshal(&reqTo)
-								_, statusCode, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
+								_, _, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
 							}
 						}
 					}

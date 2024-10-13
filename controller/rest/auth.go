@@ -1923,7 +1923,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	roles, _, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
 		log.WithFields(log.Fields{"user": pw.Username}).Debug("No role available for this user.")
-		roleDomains = make(map[string][]string)
+		// roleDomains = make(map[string][]string)
 	} else {
 		for k, v := range roles {
 			if r, found := allRoles[k]; found && r == "admin" {

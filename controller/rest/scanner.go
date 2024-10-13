@@ -425,7 +425,7 @@ func handlerScanHostReport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	var resp *api.RESTScanReportData
 
-	vuls, _, err := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, _, _ := cacher.GetVulnerabilityReport(id, showTag)
 	if vuls == nil {
 		// Return an empty list if node has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
