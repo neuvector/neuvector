@@ -103,7 +103,7 @@ func parseWildcardRegex(s string) (string, error) {
 }
 
 func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter, error) {
-	if filters == nil || len(filters) == 0 {
+	if len(filters) == 0 {
 		return make([]*share.CLUSRegistryFilter, 0), nil
 	}
 

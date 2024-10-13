@@ -260,9 +260,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 			// add rule
 			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
 			capps := make([]string, len(filter.Apps))
-			for j, app := range filter.Apps {
-				capps[j] = app
-			}
+			copy(capps, filter.Apps)
 			frule := &share.CLUSFileAccessFilterRule{
 				Apps:        capps,
 				CreatedAt:   tm,
@@ -286,9 +284,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 					// update the rule
 					idx := utils.FilterIndexKey(cfilter.Path, cfilter.Regex)
 					capps := make([]string, len(filter.Apps))
-					for j, app := range filter.Apps {
-						capps[j] = app
-					}
+					copy(capps, filter.Apps)
 
 					frule := &share.CLUSFileAccessFilterRule{
 						Apps:        capps,

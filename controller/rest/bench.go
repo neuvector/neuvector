@@ -123,9 +123,7 @@ func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianc
 		}
 	}
 
-	for _, m := range item.Message {
-		r.Message = append(r.Message, m)
-	}
+	r.Message = append(r.Message, item.Message...)
 
 	if len(r.Message) > 0 {
 		allMessages := strings.Join(r.Message, ", ")
@@ -763,9 +761,7 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 	if rpt1 == nil || len(rpt1.Items) == 0 {
 		return rpt2, 0, ""
 	} else {
-		for _, item := range rpt2.Items {
-			rpt1.Items = append(rpt1.Items, item)
-		}
+		rpt1.Items = append(rpt1.Items, rpt2.Items...)
 
 		return rpt1, 0, ""
 	}

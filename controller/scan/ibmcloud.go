@@ -57,8 +57,7 @@ func (r *ibmcloud) aquireToken(password, ibmTokenUrl string) error {
 	params.Add("grant_type", grantType)
 	params.Add("apikey", password)
 
-	var data []byte
-	data = []byte(params.Encode())
+	data := []byte(params.Encode())
 
 	request, err := http.NewRequest("POST", ibmTokenUrl, bytes.NewReader(data))
 

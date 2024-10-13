@@ -77,7 +77,7 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 		if cm, ok := obj.(*corev1.ConfigMap); cm == nil || !ok {
 			err = fmt.Errorf("Error: Unknown type")
 		} else if cm.Data != nil {
-			resp.MeteringArchiveData, _ = cm.Data["archive"]
+			resp.MeteringArchiveData = cm.Data["archive"]
 		}
 	}
 

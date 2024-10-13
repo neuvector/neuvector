@@ -246,9 +246,7 @@ func (d *kubernetes) GetPlatformUserGroups(token string) ([]string, error) {
 	}
 
 	log.WithFields(log.Fields{"url": url, "user": user}).Debug("getPlatformUserGroups")
-	for _, group := range user.Groups {
-		groups = append(groups, group)
-	}
+	groups = append(groups, user.Groups...)
 
 	return groups, nil
 }

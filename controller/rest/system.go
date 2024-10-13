@@ -226,7 +226,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 
 	var rconf *api.RESTSystemConfig
 	var fedConf *api.RESTFedSystemConfig
-	scope, _ := restParseQuery(r).pairs[api.QueryScope]
+	scope := restParseQuery(r).pairs[api.QueryScope]
 	if scope == share.ScopeFed || scope == share.ScopeAll {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster || fedRole == api.FedRoleJoint {
 			if cconf := cacher.GetFedSystemConfig(acc); cconf == nil {
@@ -780,7 +780,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -911,7 +911,7 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1811,10 +1811,10 @@ func session2REST(s *share.CLUSSession) *api.RESTSession {
 	if s.Application == 0 {
 		app = utils.GetPortLink(uint8(s.IPProto), uint16(s.ServerPort))
 	} else {
-		app, _ = common.AppNameMap[s.Application]
+		app = common.AppNameMap[s.Application]
 	}
 	if s.XffApp != 0 {
-		xffapp, _ = common.AppNameMap[s.XffApp]
+		xffapp = common.AppNameMap[s.XffApp]
 	}
 	id := uint64(s.ID)
 	if s.HostMode {
@@ -2711,7 +2711,6 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		msgToken = "compliance profile"
 	}
 	configLog(share.CLUSEvImportFail, login, fmt.Sprintf("Failed to import %s", msgToken))
-	return
 }
 
 func handlerConfigImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

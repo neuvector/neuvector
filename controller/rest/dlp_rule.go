@@ -1432,9 +1432,7 @@ func parseDerivedDlpRules(dlpRuleMap map[string]*share.CLUSDerivedDlpRuleArray,
 			Wafrids:     make([]uint32, 0),
 			RuleType:    arr.RuleType,
 		}
-		for _, m := range arr.WlMacs {
-			wlDlpRule.DlpMacs = append(wlDlpRule.DlpMacs, m)
-		}
+		wlDlpRule.DlpMacs = append(wlDlpRule.DlpMacs, arr.WlMacs...)
 
 		for _, r := range arr.DlpRules {
 			wlDlpRule.DlpRules = append(wlDlpRule.DlpRules, derivedDlp2Rest(r))
@@ -1444,13 +1442,9 @@ func parseDerivedDlpRules(dlpRuleMap map[string]*share.CLUSDerivedDlpRuleArray,
 			wlDlpRule.WafRules = append(wlDlpRule.WafRules, derivedDlp2Rest(r))
 		}
 
-		for _, r := range arr.Rids {
-			wlDlpRule.Rids = append(wlDlpRule.Rids, r)
-		}
+		wlDlpRule.Rids = append(wlDlpRule.Rids, arr.Rids...)
+		wlDlpRule.Wafrids = append(wlDlpRule.Wafrids, arr.Wafrids...)
 
-		for _, r := range arr.Wafrids {
-			wlDlpRule.Wafrids = append(wlDlpRule.Wafrids, r)
-		}
 		wlrs = append(wlrs, &wlDlpRule)
 	}
 	return wlrs
@@ -1497,9 +1491,7 @@ func parseDerivedDlpRuleEntries(dlpRuleEntries []*share.CLUSDerivedDlpRuleEntry,
 			ID:       dre.ID,
 			Patterns: make([]string, 0),
 		}
-		for _, p := range dre.Patterns {
-			dlpRuleEntry.Patterns = append(dlpRuleEntry.Patterns, p)
-		}
+		dlpRuleEntry.Patterns = append(dlpRuleEntry.Patterns, dre.Patterns...)
 
 		rdre[i] = dlpRuleEntry
 	}

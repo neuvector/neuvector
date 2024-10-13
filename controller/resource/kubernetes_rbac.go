@@ -474,9 +474,7 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 					nvRole = api.UserRoleReader
 				}
 			} else {
-				if strings.HasPrefix(rsc, nvPermRscPrefix) {
-					rsc = rsc[len(nvPermRscPrefix):]
-				}
+				rsc = strings.TrimPrefix(rsc, nvPermRscPrefix)
 				if v, ok := nvPermitsValueSSO[rsc]; ok {
 					if verbs.Contains("*") || writeVerbs.Intersect(verbs).Cardinality() == writeVerbs.Cardinality() {
 						nvPermits.Union(v)
@@ -615,7 +613,6 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 						case api.UserRoleFedAdmin:
 							nvRole = api.UserRoleFedAdmin
 							nvPermits.Reset()
-							break
 						case api.UserRoleFedReader:
 							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
 								nvRole = api.UserRoleFedReader
@@ -1363,7 +1360,7 @@ func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainP
 			if nvRoles&share.UserRoleFedReader != 0 && fedRole == api.FedRoleMaster {
 				if d == access.AccessDomainGlobal {
 					// move fedReader to permissions
-					nvPermits, _ := domainPermits[access.AccessDomainGlobal]
+					nvPermits := domainPermits[access.AccessDomainGlobal]
 					nvPermits.Local.ReadValue = share.PERMS_FED_READ
 					nvPermits.Remote.ReadValue = share.PERMS_CLUSTER_READ
 					if nvPermits.Local.WriteValue&share.PERM_FED == 0 {
@@ -1433,7 +1430,7 @@ func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainP
 		nvGlobalRolePermits.Local.ReadValue = share.PERMS_CLUSTER_READ
 	}
 
-	nvGlobalPermits, _ := domainPermits[access.AccessDomainGlobal] // extra permissions on global domain
+	nvGlobalPermits := domainPermits[access.AccessDomainGlobal] // extra permissions on global domain
 	nvGlobalPermits.Local.FilterPermits("", "local", fedRole)
 	nvGlobalPermits.Local.ResetIfSubsetOf(nvGlobalRolePermits.Local)
 	nvGlobalPermits.Remote.FilterPermits("", "remote", fedRole)
@@ -1521,7 +1518,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 		for r := range roleRefs.Iter() {
 			var nvPermits share.NvFedPermissions
 			roleRef := r.(k8sRoleRef)
-			nvRole, _ := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
+			nvRole := d.roleCache[roleRef.role] // d.roleCache : k8s (cluster)role -> nv reserved role
 			// This k8s (cluster)role is in roleCache (i.e. it has a mpped nv reserved role).
 			// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
 			// It's possible that nvRole is fedAdmin/fedReader even it's Rancher Project Role which is not allowed.
@@ -1537,7 +1534,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 				allDomainRoles[roleRef.domain] = allDomainRoles[roleRef.domain] | reservedRoleMapping[nvRole]
 			}
 
-			k8sRolePermits, _ := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
+			k8sRolePermits := d.permitsCache[roleRef.role] // d.permitsCache : k8s (cluster)role -> nv permissions
 			// Merge this k8s role's local/remote nv permissions into this domain's local/remote nv permissions
 			// In k8s2NVRolePermits() we cannot tell a k8s clusterrole is for Rancher Cluster Role or Project Role.
 			// It's possible that k8sRolePermits contains PERM_FED even it's Rancher Project Role which is not allowed.
@@ -1550,7 +1547,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 				nvPermits.Remote.WriteValue = k8sRolePermits.WriteValue & noPermitFed
 			}
 			if !nvPermits.IsEmpty() {
-				p, _ := domainPermits[roleRef.domain]
+				p := domainPermits[roleRef.domain]
 				p.Local.Union(nvPermits.Local)
 				p.Remote.Union(nvPermits.Remote)
 				domainPermits[roleRef.domain] = p
@@ -1559,8 +1556,8 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 
 		domainRole, domainPermits = RemoveRedundant(allDomainRoles, domainPermits, api.FedRoleMaster) // assuming it's master cluster for now
 
-		oldDomainRole, _ := d.rbacCache[subj]
-		oldDomainPermits, _ := d.permitsRbacCache[subj]
+		oldDomainRole := d.rbacCache[subj]
+		oldDomainPermits := d.permitsRbacCache[subj]
 
 		// callback
 		if len(domainPermits) > 0 || len(domainRole) > 0 || len(oldDomainPermits) > 0 || len(oldDomainRole) > 0 { // only for reducing debug logs
@@ -1685,7 +1682,7 @@ func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
 			}
 		}
 		if len(domainPermits) > 0 {
-			if userRBAC, _ := allUsers[userRef]; rbac != nil {
+			if userRBAC := allUsers[userRef]; rbac != nil {
 				userRBAC.RBAC2 = domainPermits
 			} else {
 				allUsers[userRef] = &orchAPI.UserRBAC{Name: userRef.name, Domain: userRef.domain, RBAC2: domainPermits}
@@ -1952,8 +1949,6 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	getNeuvectorSvcAccount()
 
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
-
-	return
 }
 
 func getSubjectsString(ns string, subjects []string) string {

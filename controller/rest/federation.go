@@ -377,7 +377,7 @@ func isFedOpAllowed(expectedFedRole string, roleRequired RoleRquired, w http.Res
 
 func isFedRulesCleanupOngoing(w http.ResponseWriter) bool {
 	if m := clusHelper.GetFedMembership(); m != nil && m.FedRole == api.FedRoleNone && m.PendingDismiss {
-		if diff := time.Now().Sub(m.PendingDismissAt); diff.Minutes() <= 5 {
+		if diff := time.Since(m.PendingDismissAt); diff.Minutes() <= 5 {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrOpNotAllowed, "Federate rules cleanup is still ongoing. Please try again later.")
 			return true
 		}

@@ -74,7 +74,7 @@ func imageBankUpdate(img *resource.Image) {
 	newTags := utils.NewSetFromSliceKind(img.Tags)
 
 	ibMutex.Lock()
-	oldTags, _ := imageBank[key]
+	oldTags := imageBank[key]
 	imageBank[key] = newTags
 
 	var moded, deled utils.Set

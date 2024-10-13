@@ -86,10 +86,9 @@ func (m *mockCache) Group2CLUS(group *api.RESTGroup) *share.CLUSGroup {
 		PlatformRole:   group.PlatformRole,
 		Criteria:       make([]share.CLUSCriteriaEntry, len(group.Criteria)),
 	}
-	c.CfgType, _ = cfgTypeMapping[group.CfgType]
-	for i, d := range group.CreaterDomains {
-		c.CreaterDomains[i] = d
-	}
+	c.CfgType = cfgTypeMapping[group.CfgType]
+	copy(c.CreaterDomains, group.CreaterDomains)
+
 	for i, crt := range group.Criteria {
 		c.Criteria[i] = share.CLUSCriteriaEntry{
 			Key: crt.Key, Value: crt.Value, Op: crt.Op,
@@ -322,9 +321,7 @@ func (m *mockCache) Group2REST(group *share.CLUSGroup) *api.RESTGroup {
 			CreaterDomains: make([]string, len(group.CreaterDomains)),
 		},
 	}
-	for idx, cd := range group.CreaterDomains {
-		g.CreaterDomains[idx] = cd
-	}
+	copy(g.CreaterDomains, group.CreaterDomains)
 	g.CfgType, _ = cfgTypeMap2Api[group.CfgType]
 	return &g
 }

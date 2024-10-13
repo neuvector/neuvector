@@ -773,10 +773,8 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 			}
 			tag := fmt.Sprintf("%d", time.Now().Unix())
 			svc.Labels[keys.TagKey] = tag
-			if _, ok := svc.Labels[keys.EchoKey]; ok {
-				delete(svc.Labels, keys.EchoKey)
-				// we need adm webhook server to add 'echo' label later
-			}
+			delete(svc.Labels, keys.EchoKey)
+			// we need adm webhook server to add 'echo' label later
 			err = global.ORCH.UpdateResource(resource.RscTypeService, svc)
 			if err != nil {
 				log.WithFields(log.Fields{"service": svcname, "svc": svc, "err": err}).Error("update resource failed")

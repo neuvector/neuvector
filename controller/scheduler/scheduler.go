@@ -83,7 +83,7 @@ func (s *Schd) DelProcessor(name string) (string, error) {
 			break
 		}
 	}
-	if found == false {
+	if !found {
 		return "", fmt.Errorf("proc %s doesn't exist", name)
 	} else {
 		s.procs = append(s.procs[:i], s.procs[i+1:]...)

@@ -2279,6 +2279,4 @@ LOOP_ALL_IDS:
 		}
 	}
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
-
-	return
 }

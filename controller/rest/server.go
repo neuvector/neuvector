@@ -482,7 +482,6 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 	log.WithField("url", url).Debug("SAML SLO request generated")
 	resp.Redirect = &api.RESTTokenAuthServerRedirect{Name: login.server, Type: api.ServerTypeSAML, RedirectURL: url}
 	restRespSuccess(w, r, &resp, nil, nil, nil, "")
-	return
 }
 
 func handlerTokenAuthServerList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -723,9 +722,7 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 	var groupRoleMappings []*share.GroupRoleMapping
 	if ldap.GroupMappedRoles != nil {
 		copiedMappings := make([]*share.GroupRoleMapping, len(*ldap.GroupMappedRoles))
-		for idx, m := range *ldap.GroupMappedRoles {
-			copiedMappings[idx] = m
-		}
+		copy(copiedMappings, *ldap.GroupMappedRoles)
 		if groupRoleMappings, err = checkGroupRolesMapping(cldap.GroupMappedRoles, copiedMappings, acc); err == nil {
 			cldap.GroupMappedRoles = groupRoleMappings
 		}
@@ -851,9 +848,7 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 	var groupRoleMappings []*share.GroupRoleMapping
 	if saml.GroupMappedRoles != nil {
 		copiedMappings := make([]*share.GroupRoleMapping, len(*saml.GroupMappedRoles))
-		for idx, m := range *saml.GroupMappedRoles {
-			copiedMappings[idx] = m
-		}
+		copy(copiedMappings, *saml.GroupMappedRoles)
 		if groupRoleMappings, err = checkGroupRolesMapping(csaml.GroupMappedRoles, copiedMappings, acc); err == nil {
 			csaml.GroupMappedRoles = groupRoleMappings
 		}
@@ -978,9 +973,7 @@ func updateOIDCServer(cs *share.CLUSServer, oidc *api.RESTServerOIDCConfig, acc 
 	var groupRoleMappings []*share.GroupRoleMapping
 	if oidc.GroupMappedRoles != nil {
 		copiedMappings := make([]*share.GroupRoleMapping, len(*oidc.GroupMappedRoles))
-		for idx, m := range *oidc.GroupMappedRoles {
-			copiedMappings[idx] = m
-		}
+		copy(copiedMappings, *oidc.GroupMappedRoles)
 		if groupRoleMappings, err = checkGroupRolesMapping(coidc.GroupMappedRoles, copiedMappings, acc); err == nil {
 			coidc.GroupMappedRoles = groupRoleMappings
 		}

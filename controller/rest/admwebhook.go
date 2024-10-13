@@ -1464,7 +1464,7 @@ func (whsvr *WebhookServer) serve(w http.ResponseWriter, r *http.Request) {
 
 	stamps.Start = time.Now()
 	whsvr.serveWithTimeStamps(w, r, &stamps)
-	diff := time.Now().Sub(stamps.Start)
+	diff := time.Since(stamps.Start)
 	if diff.Seconds() >= 28 {
 		log.WithFields(log.Fields{"image": stamps.Images, "seconds": diff.Seconds(),
 			"fetch": stamps.Fetched.Sub(stamps.GonnaFetch).Seconds()}).Warn("unexpected")

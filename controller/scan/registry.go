@@ -1227,8 +1227,6 @@ func (rs *Registry) imageScanAdd(img *share.CLUSImage) {
 	} else {
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": img}).Error("Registry changed - ignored")
 	}
-
-	return
 }
 
 // no lock

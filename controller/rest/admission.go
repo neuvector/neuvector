@@ -1123,9 +1123,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 	if ruleCfg.Criteria != nil {
 		resp.Rule.Criteria = make([]*api.RESTAdmRuleCriterion, len(ruleCfg.Criteria))
-		for idx, c := range ruleCfg.Criteria {
-			resp.Rule.Criteria[idx] = c
-		}
+		copy(resp.Rule.Criteria, ruleCfg.Criteria)
 	}
 
 	opa.ConvertToRegoRule(clusConf)
@@ -1702,8 +1700,6 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 		}
 	}
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
-
-	return
 }
 
 func validateCustomPathCriteria(crt *share.CLUSAdmRuleCriterion) (bool, bool) {

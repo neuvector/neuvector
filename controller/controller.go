@@ -1094,8 +1094,8 @@ func amendStubRtInfo() error {
 }
 
 func amendNotPrivilegedMode() error {
-	podname, _ := Ctrler.Labels["io.kubernetes.pod.name"]
-	domain, _ := Ctrler.Labels["io.kubernetes.pod.namespace"]
+	podname := Ctrler.Labels["io.kubernetes.pod.name"]
+	domain := Ctrler.Labels["io.kubernetes.pod.namespace"]
 	if o, err := global.ORCH.GetResource(resource.RscTypePod, domain, podname); err != nil {
 		return fmt.Errorf("can not found: err = %v, %v, %v", domain, podname, err)
 	} else {
