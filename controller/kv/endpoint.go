@@ -101,7 +101,7 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 	// Not to export uniconf, if the exported config is going to be used on other systems,
 	// uniconf settings are not portable; if the export config is used on the system itself,
 	// the current state is kept, no refresh of uniconf keys.
-	// &cfgEndpoint{name: "uniconf", key: share.CLUSUniconfStore, isStore: true,
+	// {name: "uniconf", key: share.CLUSUniconfStore, isStore: true,
 	//	section: api.ConfEndpointIDConfig, lock: share.CLUSLockConfigKey},
 	{name: share.CFGEndpointServer, key: share.CLUSConfigServerStore, isStore: true,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
@@ -192,7 +192,6 @@ func readKeyValue(reader *bufio.Reader) (string, string, error) {
 			return key, value, nil
 		}
 	}
-	return "", "", io.EOF
 }
 
 func isFedObject(filterFedObjectType int, key string, value []byte, restore bool) (bool, []byte) {
@@ -250,9 +249,8 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 	default:
 		//for FedRoleMaster unzip policy rulelist before save to storage
 		if !restore && key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
-			var uzb []byte
 			//do unzip
-			uzb = utils.GunzipBytes(value)
+			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
 				log.Error("Failed to unzip policy rulelist")
 				return true, nil
@@ -505,11 +503,11 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			if key == policyZipRuleListKey {
 				applyTransaction(txn, nil, false, 0)
 				//zip rulelist before put to cluster during restore
-				clusHelper.PutPolicyRuleListZip(key, array)
+				_ = clusHelper.PutPolicyRuleListZip(key, array)
 			} else {
-				clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
+				_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
 				//for CLUSConfigSystemKey only
-				clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+				_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
 				if len(array) >= cluster.KVValueSizeMax && strings.HasPrefix(key, share.CLUSConfigCrdStore) { // 512 * 1024
 					zb := utils.GzipBytes(array)
 					txn.PutBinary(key, zb)
@@ -524,9 +522,6 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			count++
 		}
 	}
-
-	log.WithFields(log.Fields{"endpoint": ep.name, "file": source, "keys": count}).Info()
-	return nil
 }
 
 // the written-to-file values are always in text format. If it's in gzip format, unzip it before writing to file for the backup/export
