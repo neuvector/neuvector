@@ -8,6 +8,7 @@ import (
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCertManager(t *testing.T) {
@@ -22,7 +23,7 @@ func TestCertManager(t *testing.T) {
 	cm := NewCertManager(CertManagerConfig{
 		ExpiryCheckPeriod: time.Second * 10,
 	})
-	cm.Register(CN, &CertManagerCallback{
+	require.NoError(t, cm.Register(CN, &CertManagerCallback{
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := GenTlsKeyCert(CN, "", "", ValidityPeriod{}, x509.ExtKeyUsageAny)
 			if err != nil {
@@ -43,7 +44,7 @@ func TestCertManager(t *testing.T) {
 			assert.Equal(t, olddata, newcert.OldCert)
 			cert_verified = true
 		},
-	})
+	}))
 
 	// Should generate certificates
 	err := cm.CheckAndRenewCerts()
