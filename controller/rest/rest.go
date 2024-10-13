@@ -1002,12 +1002,10 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		clog.RESTBody = string(body[:size])
 	}
 
-	if fields != nil {
-		for key, value := range fields {
-			switch key {
-			case restLogFieldMsg:
-				clog.Msg = value
-			}
+	for key, value := range fields {
+		switch key {
+		case restLogFieldMsg:
+			clog.Msg = value
 		}
 	}
 

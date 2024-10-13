@@ -2929,9 +2929,7 @@ func _setFedJointPrivateKey(id string, key *rsa.PrivateKey) {
 	if key != nil {
 		jointClustersKeyCache[id] = key
 	} else {
-		if _, exist := jointClustersKeyCache[id]; exist {
-			delete(jointClustersKeyCache, id)
-		}
+		delete(jointClustersKeyCache, id)
 	}
 }
 

@@ -305,7 +305,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					crdHandler.mdName = req.Name
 				} else {
 					errCount = 1
-					errMsg = fmt.Sprintf("CRD Rule format error")
+					errMsg = "CRD Rule format error"
 				}
 			case "CREATE", "UPDATE":
 				if crdSecRule, err = resource.CreateNvCrdObject(rscType); crdSecRule != nil {
@@ -327,7 +327,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 				}
 				if err != nil {
 					errCount = 1
-					errMsg = fmt.Sprintf("CRD Rule format error")
+					errMsg = "CRD Rule format error"
 				} else {
 					if crdHandler.mdName != "" && rscType != "" {
 						if obj, err := global.ORCH.GetResource(rscType, req.Namespace, crdHandler.mdName); err == nil {

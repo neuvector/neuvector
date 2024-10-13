@@ -263,9 +263,7 @@ func checkGroupRolesMapping(oldSettings, newSettings []*share.GroupRoleMapping, 
 
 			// if a groups is mapped to a role for global domain, it's implicitly mapped to that same role for all domains. So remove unnecessary domain role mapping entry
 			if mappedRoles.RoleDomains != nil {
-				if _, ok := mappedRoles.RoleDomains[mappedRoles.GlobalRole]; ok {
-					delete(mappedRoles.RoleDomains, mappedRoles.GlobalRole)
-				}
+				delete(mappedRoles.RoleDomains, mappedRoles.GlobalRole)
 			}
 
 			mappedDomainRole := make(map[string]string, 0) // for each group, each domain can only be mapped to one role

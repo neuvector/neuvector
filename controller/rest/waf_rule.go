@@ -983,9 +983,7 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		defsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
 	}
 	for _, rn := range wafsensor.RuleListNames {
-		if _, foundInAll := defsensor.RuleList[rn]; foundInAll {
-			delete(defsensor.RuleList, rn)
-		}
+		delete(defsensor.RuleList, rn)
 	}
 	clusHelper.PutWafSensorTxn(txn, defsensor)
 	clusHelper.DeleteWafSensorTxn(txn, name)

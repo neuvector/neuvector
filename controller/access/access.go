@@ -451,7 +451,7 @@ func getRestRolePermitValues(roleName, domain string) map[string]rwPermit {
 		}
 		for _, option := range PermissionOptions {
 			// need to check fed/nv_resource permissions as well
-			permit, _ := rolePermits[option.ID]
+			permit := rolePermits[option.ID]
 			optionReadValue, optionWriteValue := option.Value, option.Value
 			if domain == AccessDomainGlobal {
 				optionReadValue &= share.PERMS_FED_READ
@@ -521,7 +521,7 @@ func getDomainPermissions(domain string, roles []string, extraPermits []share.Nv
 				} else {
 					for id, rw := range rolePermits {
 						if rw.read || rw.write {
-							rwFound, _ := allPermits[id]
+							rwFound := allPermits[id]
 							allPermits[id] = rwPermit{read: rwFound.read || rw.read, write: rwFound.write || rw.write}
 						}
 					}
@@ -544,7 +544,7 @@ func getDomainPermissions(domain string, roles []string, extraPermits []share.Nv
 	}
 	for _, permit := range GetTopLevelPermitsList(scope, dExtraPermits) { // iterate thru []*api.RESTRolePermission from extra permissions
 		if permit.Read || permit.Write {
-			rw, _ := allPermits[permit.ID]
+			rw := allPermits[permit.ID]
 			allPermits[permit.ID] = rwPermit{read: rw.read || permit.Read, write: rw.write || permit.Write}
 		}
 	}
@@ -584,7 +584,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 		}
 		for _, domain := range domains {
 			if domain != AccessDomainGlobal {
-				roles, _ := domainRoles[domain]
+				roles := domainRoles[domain]
 				domainRoles[domain] = append(roles, role)
 				allDomains[domain] = nil
 			}
@@ -599,7 +599,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 		}
 		for _, domain := range permitsDomains.Domains {
 			if domain != AccessDomainGlobal {
-				permits, _ := domainPermits[domain]
+				permits := domainPermits[domain]
 				domainPermits[domain] = append(permits, permitsDomains.Permits)
 				allDomains[domain] = nil
 			}
@@ -609,8 +609,8 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 	// 2-3. merge #2-1 & #2-2 to get the top-level permissions list for each domain
 	dPermitsList := make(map[string][]*api.RESTRolePermission, len(allDomains)) // domain -> list of permissions
 	for domain := range allDomains {
-		roles, _ := domainRoles[domain]
-		extraPermits, _ := domainPermits[domain]
+		roles := domainRoles[domain]
+		extraPermits := domainPermits[domain]
 		if permitsList := getDomainPermissions(domain, roles, extraPermits); len(permitsList) > 0 {
 			dPermitsList[domain] = permitsList
 		}
@@ -672,7 +672,7 @@ func getRequiredPermissions(r *http.Request) (int8, uint32) {
 			}
 		}
 	}
-	requiredPermissions, _ := apiPermissions[apiCategoryID]
+	requiredPermissions := apiPermissions[apiCategoryID]
 
 	return apiCategoryID, requiredPermissions
 }

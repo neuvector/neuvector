@@ -1310,9 +1310,7 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		defsensor.PreRuleList = make(map[string][]*share.CLUSDlpRule)
 	}
 	for _, rn := range dlpsensor.RuleListNames {
-		if _, foundInAll := defsensor.RuleList[rn]; foundInAll {
-			delete(defsensor.RuleList, rn)
-		}
+		delete(defsensor.RuleList, rn)
 	}
 	clusHelper.PutDlpSensorTxn(txn, defsensor)
 	clusHelper.DeleteDlpSensorTxn(txn, name)

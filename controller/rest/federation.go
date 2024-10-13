@@ -986,9 +986,7 @@ func revertMappedFedRoles(groupRoleMappings []*share.GroupRoleMapping) {
 			groupRoleMapping.GlobalRole = api.UserRoleReader
 		}
 		if groupRoleMapping.RoleDomains != nil {
-			if _, ok := groupRoleMapping.RoleDomains[groupRoleMapping.GlobalRole]; ok {
-				delete(groupRoleMapping.RoleDomains, groupRoleMapping.GlobalRole)
-			}
+			delete(groupRoleMapping.RoleDomains, groupRoleMapping.GlobalRole)
 		}
 	}
 }
