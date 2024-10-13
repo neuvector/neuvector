@@ -225,9 +225,9 @@ func createResponseRules() {
 				ID:      r.ID,
 				CfgType: share.UserCreated,
 			}
-			clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r)
+			_ = clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r)
 		}
-		clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs)
+		_ = clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs)
 		if _, err := txn.Apply(); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("")
 		}
@@ -300,7 +300,7 @@ func createDefAdmCtrlRules() {
 
 	for i, r := range defaultRules {
 		r.ID = uint32(i + 1)
-		clusHelper.PutAdmissionRule(admission.NvAdmValidateType, api.ValidatingExceptRuleType, r)
+		_ = clusHelper.PutAdmissionRule(admission.NvAdmValidateType, api.ValidatingExceptRuleType, r)
 		arh := &share.CLUSRuleHead{
 			ID:      r.ID,
 			CfgType: share.UserCreated,
@@ -328,7 +328,7 @@ func createDefAdmCtrlResponseRule() {
 	defer txn.Close()
 	for _, r := range defaultAdmCtrlResponseRules {
 		r.ID = maxID + 1
-		clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r)
+		_ = clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r)
 		crh := &share.CLUSRuleHead{
 			ID:      r.ID,
 			CfgType: share.UserCreated,
@@ -336,7 +336,7 @@ func createDefAdmCtrlResponseRule() {
 		crhs = append(crhs, crh)
 		maxID = r.ID
 	}
-	clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs)
+	_ = clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs)
 	if _, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 	}
@@ -416,7 +416,7 @@ func createDefaultServiceMeshMonitor() {
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	if !cfg.TapProxymesh {
 		cfg.TapProxymesh = true
-		clusHelper.PutSystemConfigRev(cfg, rev)
+		_ = clusHelper.PutSystemConfigRev(cfg, rev)
 	}
 }
 
@@ -587,9 +587,9 @@ func CreatePreDlpSensor(withlock bool) {
 						cdr.RuleListNames[rname] = rname
 					}
 				}
-				clusHelper.PutDlpSensor(cdr, false)
+				_ = clusHelper.PutDlpSensor(cdr, false)
 			} else {
-				clusHelper.PutDlpSensor(cdr, true)
+				_ = clusHelper.PutDlpSensor(cdr, true)
 			}
 		}
 	} else {
@@ -601,9 +601,9 @@ func CreatePreDlpSensor(withlock bool) {
 						cdr.RuleListNames[rname] = rname
 					}
 				}
-				clusHelper.PutDlpSensor(cdr, false)
+				_ = clusHelper.PutDlpSensor(cdr, false)
 			} else {
-				clusHelper.PutDlpSensor(cdr, true)
+				_ = clusHelper.PutDlpSensor(cdr, true)
 			}
 		}
 	}
@@ -689,9 +689,9 @@ func CreateDefDlpRules(withlock bool) {
 					defaultSensorAllDlpRule.PreRuleList[rname] = cdr_list
 				}
 			}
-			clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false)
+			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false)
 		} else {
-			clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true)
+			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true)
 		}
 	} else {
 		dlpsensor := clusHelper.GetDlpSensor(defaultSensorAllDlpRule.Name)
@@ -706,9 +706,9 @@ func CreateDefDlpRules(withlock bool) {
 					defaultSensorAllDlpRule.PreRuleList[rname] = cdr_list
 				}
 			}
-			clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false)
+			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false)
 		} else {
-			clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true)
+			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true)
 		}
 	}
 }
@@ -788,7 +788,7 @@ func CreatePreWafSensor(withlock bool) {
 	for _, cdr := range PreWafSensors {
 		wafsensor := clusHelper.GetWafSensor(cdr.Name)
 		if wafsensor == nil {
-			clusHelper.PutWafSensor(cdr, true)
+			_ = clusHelper.PutWafSensor(cdr, true)
 		}
 	}
 }
@@ -852,12 +852,12 @@ func CreateDefWafRules(withlock bool) {
 				rule.ID = common.GetWafRuleID(defaultSensorAllWafRule)
 			}
 		}
-		clusHelper.PutWafSensor(defaultSensorAllWafRule, false)
+		_ = clusHelper.PutWafSensor(defaultSensorAllWafRule, false)
 	} else {
 		for _, rule := range defaultSensorAllWafRule.RuleList {
 			rule.ID = common.GetWafRuleID(defaultSensorAllWafRule)
 		}
-		clusHelper.PutWafSensor(defaultSensorAllWafRule, true)
+		_ = clusHelper.PutWafSensor(defaultSensorAllWafRule, true)
 	}
 }
 
@@ -917,9 +917,9 @@ func createDefaultComplianceProfile() {
 }
 
 func createDefaultDomains() {
-	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainContainers, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
-	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainNodes, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
-	clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainImages, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
+	_ = clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainContainers, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
+	_ = clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainNodes, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
+	_ = clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainImages, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
 }
 
 func setDefaultUnusedGroupAging() {
@@ -929,7 +929,7 @@ func setDefaultUnusedGroupAging() {
 		return
 	}
 	cfg.UnusedGroupAging = share.UnusedGroupAgingDefault
-	clusHelper.PutSystemConfigRev(cfg, rev)
+	_ = clusHelper.PutSystemConfigRev(cfg, rev)
 }
 
 func createDefaultXffSetting() {
@@ -937,7 +937,7 @@ func createDefaultXffSetting() {
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	if !cfg.XffEnabled {
 		cfg.XffEnabled = true
-		clusHelper.PutSystemConfigRev(cfg, rev)
+		_ = clusHelper.PutSystemConfigRev(cfg, rev)
 	}
 }
 
@@ -945,7 +945,7 @@ func EnforceNetSysConfig() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	if cfg.XffEnabled || cfg.DisableNetPolicy || cfg.DetectUnmanagedWl {
-		clusHelper.PutSystemConfigRev(cfg, rev)
+		_ = clusHelper.PutSystemConfigRev(cfg, rev)
 	}
 }
 
@@ -954,7 +954,7 @@ func createDefaultNetServiceSetting() {
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	cfg.NetServiceStatus = false
 	cfg.NetServicePolicyMode = share.PolicyModeLearn
-	clusHelper.PutSystemConfigRev(cfg, rev)
+	_ = clusHelper.PutSystemConfigRev(cfg, rev)
 }
 
 func createDefaultVulnerabilityProfile() {
@@ -964,7 +964,7 @@ func createDefaultVulnerabilityProfile() {
 		Entries: make([]*share.CLUSVulnerabilityProfileEntry, 0),
 	}
 	value, _ := json.Marshal(profile)
-	cluster.Put(key, value)
+	_ = cluster.Put(key, value)
 }
 
 func createDefaultPwdProfile() {
@@ -986,13 +986,13 @@ func createDefaultPwdProfile() {
 		BlockMinutes:                60,
 	}
 	value, _ := json.Marshal(profile)
-	cluster.Put(key, value)
+	_ = cluster.Put(key, value)
 
 	cfg := &share.CLUSActivePwdProfileConfig{
 		Name: share.CLUSDefPwdProfileName,
 	}
 	value, _ = json.Marshal(cfg)
-	cluster.Put(share.CLUSConfigPwdProfileStore, value)
+	_ = cluster.Put(share.CLUSConfigPwdProfileStore, value)
 
 	// for rolling upgrade, enumerate all users & set their PwdResetTime to now
 	acc := access.NewAdminAccessControl()
@@ -1001,7 +1001,7 @@ func createDefaultPwdProfile() {
 		user.FailedLoginCount = 0
 		user.BlockLoginSince = time.Time{}
 		user.PwdResetTime = time.Now().UTC()
-		clusHelper.PutUser(user)
+		_ = clusHelper.PutUser(user)
 	}
 }
 
@@ -1039,7 +1039,7 @@ func addPredefinedFileRule(behavior, path, regexStr string) {
 			flt := share.CLUSFileMonitorFilter{Behavior: behavior, Path: path, Regex: regexStr}
 			flt.Filter = common.FsmonFilterToRest(flt.Path, flt.Regex)
 			fmp.Filters = append(fmp.Filters, flt)
-			clusHelper.PutFileMonitorProfile(group, fmp, 0)
+			_ = clusHelper.PutFileMonitorProfile(group, fmp, 0)
 
 			// file access rule
 			far, rev := clusHelper.GetFileAccessRule(group) // associated with "mon"
@@ -1052,7 +1052,7 @@ func addPredefinedFileRule(behavior, path, regexStr string) {
 
 			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
 			far.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps: make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior}
-			clusHelper.PutFileAccessRule(group, far, rev)
+			_ = clusHelper.PutFileAccessRule(group, far, rev)
 		}
 	}
 }

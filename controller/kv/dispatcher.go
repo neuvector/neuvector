@@ -78,49 +78,51 @@ func (dpt *kvDispatcher) unlock() {
 	dpt.mutex.Unlock()
 }
 
-func (dpt *kvDispatcher) dump() {
-	log.WithFields(log.Fields{"nodes-group": len(dpt.node2groups), "nodes": dpt.nodes.Cardinality(), "groups": len(dpt.group2nodes)}).Debug("DPT:")
-	for node, cache := range dpt.node2groups {
-		log.WithFields(log.Fields{"node": node}).Debug("DPT:")
-		for group, ids := range cache.members {
-			log.WithFields(log.Fields{"group": group, "count": ids.Cardinality()}).Debug("DPT:")
+/*
+	func (dpt *kvDispatcher) dump() {
+		log.WithFields(log.Fields{"nodes-group": len(dpt.node2groups), "nodes": dpt.nodes.Cardinality(), "groups": len(dpt.group2nodes)}).Debug("DPT:")
+		for node, cache := range dpt.node2groups {
+			log.WithFields(log.Fields{"node": node}).Debug("DPT:")
+			for group, ids := range cache.members {
+				log.WithFields(log.Fields{"group": group, "count": ids.Cardinality()}).Debug("DPT:")
+			}
+		}
+
+		for group, nodes := range dpt.group2nodes {
+			log.WithFields(log.Fields{"group": group, "nodes": nodes.String(), "count": nodes.Cardinality()}).Debug("DPT:")
 		}
 	}
 
-	for group, nodes := range dpt.group2nodes {
-		log.WithFields(log.Fields{"group": group, "nodes": nodes.String(), "count": nodes.Cardinality()}).Debug("DPT:")
-	}
-}
-
 // / reserved: future periodical purge procedure, returns expired custom groups
-func (dpt *kvDispatcher) purgeCustomGroupsByNode(node string) utils.Set {
-	log.WithFields(log.Fields{"node": node}).Debug("DPT: reserved")
-	exCustomGrps := utils.NewSet()
 
-	// search this node
-	if nodeCache, ok := dpt.node2groups[node]; ok {
-		for customGrp := range dpt.customs.Iter() {
-			custom := customGrp.(string)
-			if nodes, ok := dpt.group2nodes[custom]; ok && nodes.Contains(node) {
-				found := false
-				// search groups by one of its workload(id)
-				for _, ids := range nodeCache.members {
-					if dpt.matchedGrpFunc(custom, ids.Any().(string)) {
-						found = true
-						break // leave nodeCache
+	func (dpt *kvDispatcher) purgeCustomGroupsByNode(node string) utils.Set {
+		log.WithFields(log.Fields{"node": node}).Debug("DPT: reserved")
+		exCustomGrps := utils.NewSet()
+
+		// search this node
+		if nodeCache, ok := dpt.node2groups[node]; ok {
+			for customGrp := range dpt.customs.Iter() {
+				custom := customGrp.(string)
+				if nodes, ok := dpt.group2nodes[custom]; ok && nodes.Contains(node) {
+					found := false
+					// search groups by one of its workload(id)
+					for _, ids := range nodeCache.members {
+						if dpt.matchedGrpFunc(custom, ids.Any().(string)) {
+							found = true
+							break // leave nodeCache
+						}
 					}
-				}
 
-				if !found {
-					exCustomGrps.Add(custom)
-					nodes.Remove(node)
+					if !found {
+						exCustomGrps.Add(custom)
+						nodes.Remove(node)
+					}
 				}
 			}
 		}
+		return exCustomGrps
 	}
-	return exCustomGrps
-}
-
+*/
 func (dpt *kvDispatcher) purgeCustomGroupsByNodeGroups(node string, customGrps utils.Set) utils.Set {
 	exCustomGrps := utils.NewSet()
 
@@ -361,7 +363,7 @@ func (dpt *kvDispatcher) NodeLeave(node string, bLeader bool) {
 
 	if bLeader {
 		// delete the kv tree under the node
-		cluster.DeleteTree(share.CLUSNodeProfileStoreKey(node))
+		_ = cluster.DeleteTree(share.CLUSNodeProfileStoreKey(node))
 	}
 }
 
@@ -381,7 +383,7 @@ func (dpt *kvDispatcher) CustomGroupUpdate(group string, serviceGrps utils.Set, 
 	// dpt.dump()
 
 	if bLeader {
-		curs, _ := dpt.group2nodes[group]
+		curs := dpt.group2nodes[group]
 		deletes := olds.Difference(curs)
 		creates := curs.Difference(olds)
 

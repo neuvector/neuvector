@@ -15,9 +15,9 @@ import (
 func writePolicyToKvClusterTxn(txn *cluster.ClusterTransact, dels []uint32, keeps []*share.CLUSRuleHead) int {
 	// Write updated rules to the cluster
 	if len(dels) > 0 {
-		clusHelper.PutPolicyRuleListTxn(txn, keeps)
+		_ = clusHelper.PutPolicyRuleListTxn(txn, keeps)
 		for _, id := range dels {
-			clusHelper.DeletePolicyRuleTxn(txn, id)
+			_ = clusHelper.DeletePolicyRuleTxn(txn, id)
 		}
 	}
 	return len(dels)
@@ -142,9 +142,9 @@ func deleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string, cfg
 
 		// Write updated rules to the cluster by transaction
 		if dels.Cardinality() > 0 {
-			clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
+			_ = clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
 			for id := range dels.Iter() {
-				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
+				_ = clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
 			}
 			delCount += dels.Cardinality()
 		}
@@ -193,9 +193,9 @@ func deleteResponseRuleByGroupsTxn(txn *cluster.ClusterTransact, names []string)
 		}
 		// Write updated rules to the cluster by transaction
 		if dels.Cardinality() > 0 {
-			clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
+			_ = clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
 			for id := range dels.Iter() {
-				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
+				_ = clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
 			}
 			delCount += dels.Cardinality()
 		}
