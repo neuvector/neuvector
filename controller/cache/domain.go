@@ -106,10 +106,10 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var domain share.CLUSDomain
-		json.Unmarshal(value, &domain)
+		_ = json.Unmarshal(value, &domain)
 
 		domainMutex.Lock()
-		oDomain, _ := domainCacheMap[name]
+		oDomain := domainCacheMap[name]
 		domainCacheMap[name] = &domainCache{domain: &domain}
 		if cacher.rmNsGrps {
 			if _, ok := domainRemoveMap[name]; ok {
@@ -319,7 +319,7 @@ func pruneGroupsByNamespace() {
 
 			txn := cluster.Transact()
 			for _, name := range groups {
-				clusHelper.DeleteGroupTxn(txn, name)
+				_ = clusHelper.DeleteGroupTxn(txn, name)
 			}
 			if ok, err1 := txn.Apply(); err1 != nil || !ok {
 				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
@@ -417,7 +417,7 @@ func pruneOrphanGroups() {
 
 			txn := cluster.Transact()
 			for _, name := range groups {
-				clusHelper.DeleteGroupTxn(txn, name)
+				_ = clusHelper.DeleteGroupTxn(txn, name)
 			}
 			if ok, err1 := txn.Apply(); err1 != nil || !ok {
 				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")

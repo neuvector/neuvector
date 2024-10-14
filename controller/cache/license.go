@@ -33,7 +33,7 @@ func (m CacheMethod) GetCurrentLicense(acc *access.AccessControl) api.RESTLicens
 }
 
 func logLicenseEvent(ev share.TLogEvent, msg string) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	clog := share.CLUSEventLog{
@@ -47,7 +47,7 @@ func logLicenseEvent(ev share.TLogEvent, msg string) {
 		Msg:            msg,
 	}
 
-	cctx.EvQueue.Append(&clog)
+	_ = cctx.EvQueue.Append(&clog)
 }
 
 func licenseConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {

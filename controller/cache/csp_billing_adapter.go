@@ -116,10 +116,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	var err error
 	var obj interface{}
 	rscName := resource.RscCspUsageName
-	nvSemanticVersion := cctx.NvSemanticVersion
-	if strings.HasPrefix(nvSemanticVersion, "v") {
-		nvSemanticVersion = nvSemanticVersion[1:]
-	}
+	nvSemanticVersion := strings.TrimPrefix(cctx.NvSemanticVersion, "v")
 	// nvSemanticVersion is in the format {major}.{minor}.{patch}
 	// baseProduct is in the format cpe:/o:suse:neuvector:{major}.{minor}.{patch}
 	baseProduct := fmt.Sprintf("cpe:/o:suse:neuvector:%s", nvSemanticVersion)

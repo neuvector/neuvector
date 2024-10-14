@@ -90,24 +90,22 @@ func storeWorker(brokerList []string, config *kafka.Config) {
 		}
 	}
 }
-*/
 
 func startStoreThread(brokers []string) {
-	/*
-		log.WithFields(log.Fields{"brokers": brokers}).Debug("Kafka broker list")
+	log.WithFields(log.Fields{"brokers": brokers}).Debug("Kafka broker list")
 
-		// kafka.Logger = log.StandardLogger()
-		config := kafka.NewConfig()
-		config.Producer.RequiredAcks = kafka.NoResponse
-		config.Producer.Retry.Max = 0
+	// kafka.Logger = log.StandardLogger()
+	config := kafka.NewConfig()
+	config.Producer.RequiredAcks = kafka.NoResponse
+	config.Producer.Retry.Max = 0
 
-		// TODO: enable TLS
-		// tlsConfig := createTlsConfiguration()
-		// if tlsConfig != nil {
-		// 	config.Net.TLS.Config = tlsConfig
-		// 	config.Net.TLS.Enable = true
-		// }
+	// TODO: enable TLS
+	// tlsConfig := createTlsConfiguration()
+	// if tlsConfig != nil {
+	// 	config.Net.TLS.Config = tlsConfig
+	// 	config.Net.TLS.Enable = true
+	// }
 
-		go storeWorker(brokers, config)
-	*/
+	go storeWorker(brokers, config)
 }
+*/

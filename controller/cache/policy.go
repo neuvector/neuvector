@@ -86,7 +86,7 @@ func policyRule2REST(rule *share.CLUSPolicyRule) *api.RESTPolicyRule {
 		LastModTS:    rule.LastModAt.Unix(),
 		Priority:     rule.Priority,
 	}
-	r.CfgType, _ = cfgTypeMapping[rule.CfgType]
+	r.CfgType = cfgTypeMapping[rule.CfgType]
 
 	return &r
 }
@@ -125,7 +125,7 @@ func ruleContains(r1, r2 *share.CLUSPolicyRule) bool {
 	if r1.Ports != "any" && r1.Ports != r2.Ports {
 		pl1 := strings.Split(r1.Ports, ",")
 		pl2 := strings.Split(r2.Ports, ",")
-		if stringArrayContains(pl1, pl2) == false {
+		if !stringArrayContains(pl1, pl2) {
 			return false
 		}
 	}
@@ -137,7 +137,7 @@ func ruleContains(r1, r2 *share.CLUSPolicyRule) bool {
 		return false
 	}
 
-	if uintArrayContains(r1.Applications, r2.Applications) == false {
+	if !uintArrayContains(r1.Applications, r2.Applications) {
 		return false
 	}
 	return true
@@ -150,7 +150,7 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		if share.CLUSIsPolicyRuleKey(key) {
 			var rule share.CLUSPolicyRule
-			json.Unmarshal(value, &rule)
+			_ = json.Unmarshal(value, &rule)
 
 			// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 			// for example, in upgrade case, the group will be created.
@@ -206,7 +206,7 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			}
 		} else if share.CLUSIsPolicyZipRuleListKey(key) {
 			var heads []*share.CLUSRuleHead
-			json.Unmarshal(value, &heads)
+			_ = json.Unmarshal(value, &heads)
 
 			cacheMutexLock()
 			policyCache.ruleHeads = nil
@@ -548,7 +548,7 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 	}
 
 	//log.WithFields(log.Fields{"port": ports, "apps": apps}).Debug("")
-	if apps != nil && len(apps) != 0 {
+	if len(apps) != 0 {
 		wlAddr.LocalPortApp = make([]share.CLUSPortApp, 0)
 		wlAddr.NatPortApp = make([]share.CLUSPortApp, 0)
 		for _, app := range apps {
@@ -627,7 +627,7 @@ func fillPortsForWorkloadAddress(wlAddr *share.CLUSWorkloadAddr, ports string, a
 }
 
 func getPortApp(ports string, apps []uint32) []share.CLUSPortApp {
-	if apps != nil && len(apps) != 0 {
+	if len(apps) != 0 {
 		num := len(apps)
 		portApp := make([]share.CLUSPortApp, num)
 		for i := 0; i < num; i++ {
@@ -698,7 +698,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 			//set PolicyMode here to avoid 'Missing policy mode'
 			//errror at the adjustAction().
 			if wlCache1, ok1 := wlCacheMap[m.(string)]; ok1 {
-				if wlCache1.workload.HasDatapath == false {
+				if !wlCache1.workload.HasDatapath {
 					continue
 				}
 				wlAddr.PolicyMode, _ = getWorkloadEffectivePolicyMode(wlCache1)
@@ -737,7 +737,7 @@ func fillAddrForGroup(name string, ports string, hostID string, apps []uint32, i
 				}
 			}
 			//include nv.ip.xxx in openshift
-			if svcips != nil && len(svcips) > 0 {
+			if len(svcips) > 0 {
 				ipList = append(ipList, svcips...)
 			}
 		}
@@ -871,7 +871,7 @@ func getDefaultGroupPolicy() share.CLUSGroupIPPolicy {
 		//parent pid could be 0, so it is also possible this is child
 		//we only want to carry one member of POD family to reduce policy recalculate size
 		//this can save cpu, memory and internal network bandwidth
-		if cache.workload.HasDatapath == false {
+		if !cache.workload.HasDatapath {
 			continue
 		}
 		addr := getWorkloadAddress(cache)
@@ -1127,7 +1127,7 @@ func isAllContainerGrp(name string) bool {
 
 func isAllC2cAnyRule(rule *share.CLUSPolicyRule) bool {
 	if isAllContainerGrp(rule.From) && isAllContainerGrp(rule.To) &&
-		(rule.Applications == nil || len(rule.Applications) == 0) &&
+		len(rule.Applications) == 0 &&
 		(rule.Ports == "" || rule.Ports == "any") {
 		return true
 	}
@@ -1188,11 +1188,11 @@ func calculateIPPolicyFromCache() []share.CLUSGroupIPPolicy {
 			*/
 
 			policy.From = fillAddrForGroup(rule.From, "", rule.FromHost, nil, false)
-			if policy.From == nil || len(policy.From) == 0 {
+			if len(policy.From) == 0 {
 				continue
 			}
 			policy.To = fillAddrForGroup(rule.To, rule.Ports, rule.ToHost, rule.Applications, true)
-			if policy.To == nil || len(policy.To) == 0 {
+			if len(policy.To) == 0 {
 				continue
 			}
 			groupIPPolicies = append(groupIPPolicies, policy)
@@ -1578,7 +1578,7 @@ func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 		if uzb == nil {
 			log.Error("Failed to unzip data")
 		} else {
-			json.Unmarshal(uzb, &rules)
+			_ = json.Unmarshal(uzb, &rules)
 		}
 		return rules
 	}
@@ -1844,11 +1844,11 @@ func policyIPRulesCleanup(ruleKeys []string) {
 		txn.Delete(key)
 	}
 	//Ignore failure, missed keys will be removed the next update.
-	txn.Apply()
+	_, _ = txn.Apply()
 }
 
 func policyIPRulesCleanupNode(rule_key, verstr, newCommonRuleKey string, tmpNid map[string]string) {
-	for tnid, _ := range tmpNid {
+	for tnid := range tmpNid {
 		tmpNewNodeKey := fmt.Sprintf("%s%s/%s/", rule_key, tnid, verstr)
 		tmpNewNodeKeys, _ := cluster.GetStoreKeys(tmpNewNodeKey)
 		policyIPRulesCleanup(tmpNewNodeKeys)

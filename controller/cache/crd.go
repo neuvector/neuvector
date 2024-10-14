@@ -35,17 +35,17 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		switch cfgType {
 		case share.CLUSAdmissionCfgState:
 			var state share.CLUSAdmissionState
-			json.Unmarshal(value, &state)
+			_ = json.Unmarshal(value, &state)
 			sameUri := true
 			for admType, ctrlState := range state.CtrlStates {
 				switch admType {
 				case admission.NvAdmValidateType:
-					if cacheCtrlState, _ := crdStateCache.CtrlStates[admType]; cacheCtrlState != nil {
+					if cacheCtrlState := crdStateCache.CtrlStates[admType]; cacheCtrlState != nil {
 						if cacheCtrlState.Uri != ctrlState.Uri {
 							sameUri = false
 							cacheCtrlState.Uri = ctrlState.Uri
 							var param interface{} = &resource.NvCrdSvcName
-							cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+							_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
 						}
 					}
 				}
@@ -72,15 +72,15 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 							},
 						},
 					}
-					admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
+					_, _ = admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
 				}
 			}
 		case share.CLUSCrdContentCount:
 			if isLeader() {
 				var queueInfo share.CLUSCrdEventQueueInfo
-				json.Unmarshal(value, &queueInfo)
+				_ = json.Unmarshal(value, &queueInfo)
 				if queueInfo.Count > 0 {
-					cctx.StartStopFedPingPollFunc(share.ProcessCrdQueue, 0, nil)
+					_ = cctx.StartStopFedPingPollFunc(share.ProcessCrdQueue, 0, nil)
 				}
 			}
 		}
