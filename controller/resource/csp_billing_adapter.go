@@ -75,7 +75,7 @@ func GetCspConfig() api.RESTFedCspSupportResp {
 
 	if obj, err = global.ORCH.GetResource(RscTypeConfigMap, NvAdmSvcNamespace, "metering-archive"); err == nil {
 		if cm, ok := obj.(*corev1.ConfigMap); cm == nil || !ok {
-			log.WithFields(log.Fields{"err": "Error: Unknown type"}).Error()
+			err = fmt.Errorf("Error: Unknown type")
 		} else if cm.Data != nil {
 			resp.MeteringArchiveData = cm.Data["archive"]
 		}
