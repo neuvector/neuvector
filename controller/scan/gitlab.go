@@ -162,7 +162,7 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 	ur := r.gitUrl("/projects")
 	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 	if data, err := r.getData(ur); err == nil {
-		_ = json.Unmarshal(data, &all)
+		e1 = json.Unmarshal(data, &all)
 	} else {
 		e1 = err
 	}
