@@ -45,12 +45,13 @@ func preTest() {
 	}
 
 	sctx := scan.Context{
-		MutexLog:   mutexLog,
-		ScanLog:    mutexLog,
+		MutexLog: mutexLog,
+		ScanLog:  mutexLog,
 	}
 	scan.InitContext(&sctx, true)
 }
 
+/*
 type caseParam struct {
 	wls    []*share.CLUSWorkload
 	wlgs   []string
@@ -58,7 +59,6 @@ type caseParam struct {
 	groups []*share.CLUSGroup
 }
 
-/*
 func newCase(pm *caseParam) {
 	var mockCluster kv.MockCluster
 	mockCluster.Init(pm.rules, pm.groups)

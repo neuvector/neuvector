@@ -1,10 +1,10 @@
 package cache
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"sort"
 	"time"
 
@@ -23,7 +23,7 @@ const usageReportHistory = 180
 
 func signUsageReport(r *share.CLUSSystemUsageReport) string {
 	token := make([]byte, 4)
-	rand.Read(token)
+	_, _ = rand.Read(token)
 	s := fmt.Sprintf("%d%s", r.ReportedAt.Unix(), base64.StdEncoding.EncodeToString(token))
 	return utils.EncryptPassword(s)
 }
@@ -64,7 +64,7 @@ func writeUsageReport() error {
 
 		for i := usageReportHistory; i < len(all); i++ {
 			key := share.CLUSCtrlUsageReportKey(all[i])
-			cluster.Delete(key)
+			_ = cluster.Delete(key)
 		}
 	}
 

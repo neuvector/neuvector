@@ -379,9 +379,9 @@ func recordAudit(rlog *api.Audit) {
 func getWebhookCache(ruleID int, whName string) *webhookCache {
 	var whc *webhookCache
 	if ruleID > api.StartingFedAdmRespRuleID {
-		whc, _ = fedWebhookCacheMap[whName]
+		whc = fedWebhookCacheMap[whName]
 	} else {
-		whc, _ = webhookCacheMap[whName]
+		whc = webhookCacheMap[whName]
 	}
 
 	return whc
@@ -415,7 +415,7 @@ func webhookActivity(act *actionDesc, arg interface{}) {
 	rlog := arg.(*api.Event)
 	rlog.ResponseRuleID = int(act.id)
 	if isLeader() && len(act.webhooks) > 0 {
-		title := fmt.Sprintf("%s", rlog.Name)
+		title := rlog.Name
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
@@ -429,7 +429,7 @@ func webhookEvent(act *actionDesc, arg interface{}) {
 	rlog := arg.(*api.Event)
 	rlog.ResponseRuleID = int(act.id)
 	if isLeader() && len(act.webhooks) > 0 {
-		title := fmt.Sprintf("%s", rlog.Name)
+		title := rlog.Name
 		for _, w := range act.webhooks {
 			if whc := getWebhookCache(rlog.ResponseRuleID, w); whc != nil {
 				proxy := getWebhookProxy(whc)
@@ -502,7 +502,7 @@ func webhookAudit(act *actionDesc, arg interface{}) {
 			rlog.Name == api.EventNameAdmCtrlK8sReqAllowed ||
 			rlog.Name == api.EventNameAdmCtrlK8sReqViolation ||
 			rlog.Name == api.EventNameAdmCtrlK8sReqDenied {
-			title = fmt.Sprintf("%s", rlog.Name)
+			title = rlog.Name
 		} else if rlog.Level != api.LogLevelERR {
 			title = fmt.Sprintf("%s: critical: %d high %d medium %d", rlog.Name,
 				rlog.CriticalCnt, rlog.HighCnt, rlog.MediumCnt)
@@ -731,7 +731,7 @@ func eventLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, m
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
 	// Use event sync lock for both event and activity
-	if checkModifyIdx(syncCatgEventIdx, modifyIdx) == false {
+	if !checkModifyIdx(syncCatgEventIdx, modifyIdx) {
 		return
 	}
 	switch nType {
@@ -814,14 +814,14 @@ func violationUpdate(conn *share.CLUSConnection, server uint32) {
 			f.Direction = "egress"
 		}
 		var param interface{} = &f
-		cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+		_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
 	}
 }
 
 func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
-	if checkModifyIdx(syncCatgThreatIdx, modifyIdx) == false {
+	if !checkModifyIdx(syncCatgThreatIdx, modifyIdx) {
 		return
 	}
 
@@ -834,7 +834,7 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 		}
 
 		var thrts []share.CLUSThreatLog
-		json.Unmarshal(uzb, &thrts)
+		_ = json.Unmarshal(uzb, &thrts)
 
 		syncLock(syncCatgThreatIdx)
 		defer syncUnlock(syncCatgThreatIdx)
@@ -887,7 +887,7 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 						f.Direction = "egress"
 					}
 					var param interface{} = &f
-					cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
 				}
 			}
 		}
@@ -897,7 +897,7 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
-	if checkModifyIdx(syncCatgIncidentIdx, modifyIdx) == false {
+	if !checkModifyIdx(syncCatgIncidentIdx, modifyIdx) {
 		return
 	}
 	switch nType {
@@ -983,14 +983,14 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 						}
 					}
 					var param interface{} = &f
-					cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
 				}
 
 				if isLeader() && scanCfg.AutoScan {
 					if incd.ID == share.CLUSIncidHostPackageUpdated {
-						cacher.ScanHost(incd.HostID, access.NewReaderAccessControl())
+						_ = cacher.ScanHost(incd.HostID, access.NewReaderAccessControl())
 					} else if incd.ID == share.CLUSIncidContainerPackageUpdated {
-						cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl())
+						_ = cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl())
 					}
 				}
 			}
@@ -1001,7 +1001,7 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 func auditLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("")
 
-	if checkModifyIdx(syncCatgAuditIdx, modifyIdx) == false {
+	if !checkModifyIdx(syncCatgAuditIdx, modifyIdx) {
 		return
 	}
 	switch nType {
@@ -1279,7 +1279,7 @@ func syncAuditTx() *syncDataMsg {
 func syncActivityRx(msg *syncDataMsg) int {
 	// Use event sync lock for both event and activity
 	syncLock(syncCatgEventIdx)
-	if validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgEventIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1309,7 +1309,7 @@ func syncActivityRx(msg *syncDataMsg) int {
 
 func syncEventRx(msg *syncDataMsg) int {
 	syncLock(syncCatgEventIdx)
-	if validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgEventIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgEventIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1339,7 +1339,7 @@ func syncEventRx(msg *syncDataMsg) int {
 
 func syncThreatRx(msg *syncDataMsg) int {
 	syncLock(syncCatgThreatIdx)
-	if validateModifyIdx(syncCatgThreatIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgThreatIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgThreatIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1371,7 +1371,7 @@ func syncThreatRx(msg *syncDataMsg) int {
 
 func syncIncidentRx(msg *syncDataMsg) int {
 	syncLock(syncCatgIncidentIdx)
-	if validateModifyIdx(syncCatgIncidentIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgIncidentIdx, msg.ModifyIdx) {
 		syncUnlock(syncCatgIncidentIdx)
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -2128,7 +2128,7 @@ func checkDefAdminPwd(throttleMinutes uint) {
 			key := share.CLUSThrottledEventStore + "events"
 			value, rev, _ := cluster.GetRev(key)
 			if value != nil {
-				json.Unmarshal(value, &evtsTime)
+				_ = json.Unmarshal(value, &evtsTime)
 			}
 			if evtsTime.LastReportTime == nil {
 				evtsTime.LastReportTime = make(map[share.TLogEvent]int64)
@@ -2142,13 +2142,13 @@ func checkDefAdminPwd(throttleMinutes uint) {
 				}
 			}
 			if update {
-				CacheEvent(id, "Default admin user's default password is not changed yet.")
+				_ = CacheEvent(id, "Default admin user's default password is not changed yet.")
 				evtsTime.LastReportTime[id] = now.Unix()
 				value, _ := json.Marshal(&evtsTime)
 				if rev == 0 {
-					cluster.Put(key, value)
+					_ = cluster.Put(key, value)
 				} else {
-					cluster.PutRev(key, value, rev)
+					_ = cluster.PutRev(key, value, rev)
 				}
 			}
 		}

@@ -48,7 +48,7 @@ func fsmonGetCacheKey(idx string, cfgType share.TCfgType) string {
 	return fmt.Sprintf("%s:%d", idx, cfgType) // default:
 }
 
-//update profile from config
+// update profile from config
 func fsmonProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	name := share.CLUSFileMonitorKey2Group(key)
 
@@ -123,16 +123,14 @@ func fsmonProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 		cacheMutexUnlock()
 	case cluster.ClusterNotifyDelete:
 		cacheMutexLock()
-		if _, ok := fsmonProfileGroups[name]; ok {
-			delete(fsmonProfileGroups, name)
-		}
+		delete(fsmonProfileGroups, name)
 		cacheMutexUnlock()
-		clusHelper.DeleteFileAccessRule(name)
+		_ = clusHelper.DeleteFileAccessRule(name)
 		log.WithFields(log.Fields{"name": name}).Debug("Delete")
 	}
 }
 
-//update profile from config
+// update profile from config
 func fileAccessRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	name := share.CLUSFileMonitorKey2Group(key)
 
@@ -246,7 +244,7 @@ func (m CacheMethod) GetAllFileMonitorProfile(scope string, acc *access.AccessCo
 					UpdatedTimeStamp: filter.updatedAt.Unix(),
 				}
 
-				mf.CfgType, _ = cfgTypeMapping[filter.CfgType]
+				mf.CfgType = cfgTypeMapping[filter.CfgType]
 				if filter.customerAdd {
 					mf.Apps = filter.apps.ToStringSlice()
 				}
@@ -303,7 +301,7 @@ func (m CacheMethod) GetFileMonitorProfile(name string, acc *access.AccessContro
 			UpdatedTimeStamp: filter.updatedAt.Unix(),
 		}
 
-		mf.CfgType, _ = cfgTypeMapping[filter.CfgType]
+		mf.CfgType = cfgTypeMapping[filter.CfgType]
 		if filter.customerAdd {
 			mf.Apps = filter.apps.ToStringSlice()
 		}
@@ -317,7 +315,7 @@ func (m CacheMethod) GetFileMonitorProfile(name string, acc *access.AccessContro
 // caller owns cacheMutexRLock & has readAll right, no CRD section
 func (m CacheMethod) GetFedFileMonitorProfileCache() ([]*share.CLUSFileMonitorProfile, []*share.CLUSFileAccessRule) {
 	count := 0
-	for groupName, _ := range fsmonProfileGroups {
+	for groupName := range fsmonProfileGroups {
 		if strings.HasPrefix(groupName, api.FederalGroupPrefix) {
 			count++
 		}
@@ -436,8 +434,8 @@ func createGroupFileMonitor(txn *cluster.ClusterTransact, name, mode string, cfg
 		}
 		return false
 	} else {
-		clusHelper.PutFileMonitorProfileTxn(txn, name, &fmp)
-		clusHelper.PutFileAccessRuleTxn(txn, name, rconf)
+		_ = clusHelper.PutFileMonitorProfileTxn(txn, name, &fmp)
+		_ = clusHelper.PutFileAccessRuleTxn(txn, name, rconf)
 		return true
 	}
 }
@@ -529,7 +527,7 @@ func updateFileAccessRule(group string, conf *monitorProfile) {
 				}
 			}
 
-			if found == true {
+			if found {
 				continue
 			}
 

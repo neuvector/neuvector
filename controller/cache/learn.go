@@ -737,7 +737,7 @@ func unlearnAll(groupName string) {
 	}
 }
 
-//reduce maxLearnRuleID when delete rules
+// reduce maxLearnRuleID when delete rules
 func adjustMaxLearnRuleID(id uint32) {
 	lprActiveRuleIDs.Remove(id)
 	if id == maxLearnRuleID {
@@ -838,7 +838,7 @@ func recalcLearnedRule(pair *groupPair, rw *learnedPolicyRuleWrapper) {
 	}
 
 	rw.action &^= lprRecalc
-	if rw.rule.objs.Equal(objs) != true {
+	if !rw.rule.objs.Equal(objs) {
 		rw.rule.objs = objs
 		if objs.Cardinality() == 0 {
 			rw.action |= lprDelete
@@ -971,7 +971,7 @@ func procLearnedPolicy(updateCluster bool) int {
 				cr.Applications = rule.Applications
 				cr.Ports = rule.Ports
 				cr.LastModAt = time.Now().UTC()
-				clusHelper.PutPolicyRuleTxn(txn, cr)
+				_ = clusHelper.PutPolicyRuleTxn(txn, cr)
 				cctx.ConnLog.WithFields(log.Fields{
 					"from": cr.From, "to": cr.To, "id": cr.ID,
 				}).Debug("update")
@@ -994,15 +994,15 @@ func procLearnedPolicy(updateCluster bool) int {
 			}
 
 			if lenDel > 0 {
-				for id, _ := range deleteMap {
-					clusHelper.DeletePolicyRuleTxn(txn, id)
+				for id := range deleteMap {
+					_ = clusHelper.DeletePolicyRuleTxn(txn, id)
 				}
 			}
 
 			if lenAdd > 0 {
 				sort.Slice(addList, func(i, j int) bool { return addList[i].ID < addList[j].ID })
 				for _, rule := range addList {
-					clusHelper.PutPolicyRuleTxn(txn, rule)
+					_ = clusHelper.PutPolicyRuleTxn(txn, rule)
 					cctx.ConnLog.WithFields(log.Fields{
 						"from": rule.From, "to": rule.To, "id": rule.ID,
 					}).Debug("add")
@@ -1062,7 +1062,7 @@ func syncLearnedPolicyToCluster() int {
 				if !cmpLearnedApps(cr.Applications, lpr.objs) {
 					cr.Applications = apps2Slice(lpr.objs)
 					cr.LastModAt = time.Now().UTC()
-					clusHelper.PutPolicyRuleTxn(txn, cr)
+					_ = clusHelper.PutPolicyRuleTxn(txn, cr)
 
 					log.WithFields(log.Fields{
 						"from": pair.from, "to": pair.to, "apps": lpr.objs,
@@ -1073,7 +1073,7 @@ func syncLearnedPolicyToCluster() int {
 				if cr.Ports != newPorts {
 					cr.Ports = newPorts
 					cr.LastModAt = time.Now().UTC()
-					clusHelper.PutPolicyRuleTxn(txn, cr)
+					_ = clusHelper.PutPolicyRuleTxn(txn, cr)
 				}
 			}
 		} else {
@@ -1090,14 +1090,14 @@ func syncLearnedPolicyToCluster() int {
 		} else if _, ok := lprWrapperMapById[r.ID]; ok {
 			newList = append(newList, r)
 		} else {
-			clusHelper.DeletePolicyRuleTxn(txn, r.ID)
+			_ = clusHelper.DeletePolicyRuleTxn(txn, r.ID)
 		}
 	}
 
 	if len(addList) > 0 {
 		sort.Slice(addList, func(i, j int) bool { return addList[i].ID < addList[j].ID })
 		for _, rule := range addList {
-			clusHelper.PutPolicyRuleTxn(txn, rule)
+			_ = clusHelper.PutPolicyRuleTxn(txn, rule)
 			log.WithFields(log.Fields{
 				"from": rule.From, "to": rule.To, "id": rule.ID,
 			}).Debug("add")
@@ -1105,7 +1105,7 @@ func syncLearnedPolicyToCluster() int {
 		}
 	}
 
-	if reflect.DeepEqual(newList, crhs) != true {
+	if !reflect.DeepEqual(newList, crhs) {
 		if err := clusHelper.PutPolicyRuleListTxn(txn, newList); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Put policy rule list")
 			return -1
@@ -1270,7 +1270,7 @@ func startPolicyThread() {
 				if getDisableNetPolicyStatus() {
 					continue
 				}
-				if isLeader() == false {
+				if !isLeader() {
 					policyCalculated = false
 					continue
 				}
@@ -1540,9 +1540,9 @@ func syncGraphTx() *syncDataMsg {
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Debug("marshal error")
 		return nil
-	} else {
+	} /* else {
 		//log.WithFields(log.Fields{"data": string(data)}).Debug("marshal result")
-	}
+	} */
 	msg := syncDataMsg{CatgName: syncCatgGraph, ModifyIdx: getModifyIdx(syncCatgGraphIdx), Data: data}
 	log.WithFields(log.Fields{
 		"nodes": len(nodes), "links": len(links), "violations": len(violations),
@@ -1554,7 +1554,7 @@ func syncGraphTx() *syncDataMsg {
 func syncGraphRx(msg *syncDataMsg) int {
 	graphMutexLock()
 
-	if validateModifyIdx(syncCatgGraphIdx, msg.ModifyIdx) == false {
+	if !validateModifyIdx(syncCatgGraphIdx, msg.ModifyIdx) {
 		graphMutexUnlock()
 		// Introduce a delay before retry
 		time.Sleep(time.Second)
@@ -1689,7 +1689,7 @@ func checkGraphSyncState(ss *share.CLUSPolicySyncStatus, compareRules bool) {
 			// 2. Learned rules with duplicate rule id may cause infinite
 			// sync, we need to consider such case to decide sync status
 			if cr, ok := policyCache.ruleMap[rw.id]; ok {
-				if ruleContains(rule, cr) == false {
+				if !ruleContains(rule, cr) {
 					if _, ok1 := syncStatusMap[rw.id]; !ok1 {
 						syncStatusMap[rw.id] = false
 					}

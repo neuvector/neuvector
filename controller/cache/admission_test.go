@@ -685,11 +685,6 @@ func TestIsSetCriterionMet(t *testing.T) {
 func TestIsSetCriterionMet2(t *testing.T) {
 	preTest()
 
-	type ret struct {
-		met      bool
-		positive bool
-	}
-
 	{
 		crit1 := &share.CLUSAdmRuleCriterion{
 			Name:  share.CriteriaKeyUser,

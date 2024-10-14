@@ -44,7 +44,7 @@ func workloadConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSWorkloadConfig
-		json.Unmarshal(value, &cconf)
+		_ = json.Unmarshal(value, &cconf)
 
 		cacheMutexLock()
 		if cache, ok := wlCacheMap[id]; ok {
@@ -62,7 +62,7 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSAgentConfig
-		json.Unmarshal(value, &cconf)
+		_ = json.Unmarshal(value, &cconf)
 
 		cacheMutexLock()
 		if cache, ok := agentCacheMap[id]; ok {
@@ -138,7 +138,7 @@ func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte)
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSControllerConfig
-		json.Unmarshal(value, &cconf)
+		_ = json.Unmarshal(value, &cconf)
 
 		cacheMutexLock()
 		if cache, ok := ctrlCacheMap[id]; ok {
@@ -186,30 +186,30 @@ func uniconfUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 }
 
 func uniconfWorkloadDelete(id string, param interface{}) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	cache := param.(*workloadCache)
 	hostID := cache.workload.HostID
 	key := share.CLUSUniconfWorkloadKey(hostID, id)
-	cluster.Delete(key)
+	_ = cluster.Delete(key)
 }
 
 func uniconfAgentDelete(id string, param interface{}) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	agent := param.(*agentCache).agent
 	key := share.CLUSUniconfAgentKey(agent.HostID, id)
-	cluster.Delete(key)
+	_ = cluster.Delete(key)
 }
 
 func uniconfControllerDelete(id string, param interface{}) {
-	if isLeader() == false {
+	if !isLeader() {
 		return
 	}
 	key := share.CLUSUniconfControllerKey(id, id)
-	cluster.Delete(key)
+	_ = cluster.Delete(key)
 }
 
 func getNewServicePolicyMode() (string, string) {
@@ -402,9 +402,7 @@ func (m CacheMethod) GetFedSystemConfig(acc *access.AccessControl) *share.CLUSSy
 	rconf := share.CLUSSystemConfig{
 		Webhooks: make([]share.CLUSWebhook, len(fedSystemConfigCache.Webhooks)),
 	}
-	for i, wh := range fedSystemConfigCache.Webhooks {
-		rconf.Webhooks[i] = wh
-	}
+	copy(rconf.Webhooks, fedSystemConfigCache.Webhooks)
 
 	return &rconf
 }
@@ -460,17 +458,17 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	bSchedulePolicy := false
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		json.Unmarshal(value, &cfg)
+		_ = json.Unmarshal(value, &cfg)
 		log.WithFields(log.Fields{"config": cfg}).Debug()
 
 		if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 			if isLeader() {
 				var param interface{} = &cfg.IBMSAConfig
-				cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
+				_ = cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
 			}
 		} else {
 			// customer explicitly disables IBM SA endpoint
-			cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil)
+			_ = cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil)
 		}
 		//if global network policy mode enabled/disabled or mode changes
 		//shedule policy calculation
@@ -482,7 +480,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleIPPolicyCalculation(true)
 			scheduleDlpRuleCalculation(true)
 		}
-		if cfg.DisableNetPolicy != systemConfigCache.DisableNetPolicy && cfg.DisableNetPolicy == false {
+		if cfg.DisableNetPolicy != systemConfigCache.DisableNetPolicy && !cfg.DisableNetPolicy {
 			bSchedulePolicy = true
 			scheduleDlpRuleCalculation(true)
 		}
@@ -508,7 +506,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		httpsProxy := httpclient.ParseProxy(&cfg.RegistryHttpsProxy)
 
 		// NoProxy is empty for now.
-		httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
+		_ = httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
 			TLSconfig: &tls.Config{
 				InsecureSkipVerify: !cfg.EnableTLSVerification,
 				RootCAs:            pool,
@@ -579,7 +577,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	httpProxy := cfg.RegistryHttpProxy
 	var param1 interface{} = &httpsProxy
 	var param2 interface{} = &httpProxy
-	cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
+	_ = cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
 
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {
@@ -676,7 +674,7 @@ func configInit() {
 	}
 	if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 		var param interface{} = &cfg.IBMSAConfig
-		cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
+		_ = cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
 	}
 	if !utils.CompareSliceWithoutOrder(systemConfigCache.ControllerDebug, cctx.Debug) {
 		systemConfigCache.ControllerDebug = cctx.Debug

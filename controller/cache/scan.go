@@ -127,7 +127,6 @@ func scanMutexRUnlock() {
 
 type scanTask struct {
 	id       string
-	timerId  string
 	priority scheduler.Priority
 }
 
@@ -167,7 +166,7 @@ func (t *scanTask) rpcScanRunning(scanner string, info *scanInfo) {
 		var requeue bool
 		scanMutexRLock()
 		if info, ok := scanMap[t.id]; ok {
-			if (info.priority == scheduler.PriorityHigh || scanCfg.AutoScan == true) && info.retry < maxRetry {
+			if (info.priority == scheduler.PriorityHigh || scanCfg.AutoScan) && info.retry < maxRetry {
 				info.retry++
 				cctx.ScanLog.WithFields(log.Fields{
 					"id": t.id, "type": info.objType, "retry": info.retry,
@@ -267,7 +266,7 @@ func enableAutoScan() {
 		}
 		scanMutexUnlock()
 		for _, st := range all {
-			if scanCfg.AutoScan == false {
+			if !scanCfg.AutoScan {
 				break
 			}
 			if st.info.status == statusScanNone || st.info.status == statusScanning {
@@ -416,7 +415,7 @@ func scanRefresh(ctx context.Context, vpf scanUtils.VPFInterface) {
 
 	scanMutexLock()
 	ids := make([]string, len(scanMap))
-	for id, _ := range scanMap {
+	for id := range scanMap {
 		ids[i] = id
 		i++
 	}
@@ -600,19 +599,19 @@ func (m CacheMethod) GetAllScanners(acc *access.AccessControl) []*api.RESTScanne
 }
 
 func addScanner(id string) {
-	scanScher.AddProcessor(id)
+	_ = scanScher.AddProcessor(id)
 }
 
 func removeScanner(id string) {
-	scanScher.DelProcessor(id)
+	_, _ = scanScher.DelProcessor(id)
 }
 
 func scannerDBChange(newVer string) {
-	if isScanner() == false {
+	if !isScanner() {
 		return
 	}
 
-	if scanCfg.AutoScan == false {
+	if !scanCfg.AutoScan {
 		return
 	}
 
@@ -719,8 +718,8 @@ func scanMapDelete(taskId string) {
 			key = share.CLUSScanDataPlatformKey(taskId)
 			skey = share.CLUSScanStatePlatformKey(taskId)
 		}
-		cluster.Delete(key)
-		cluster.Delete(skey)
+		_ = cluster.Delete(key)
+		_ = cluster.Delete(skey)
 	}
 }
 
@@ -841,7 +840,7 @@ func updateScanState(id string, nType share.ScanObjectType, status string) {
 		state.ScannedAt = time.Now().UTC()
 	}
 	value, _ := json.Marshal(state)
-	cluster.Put(skey, value)
+	_ = cluster.Put(skey, value)
 }
 
 func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -921,7 +920,7 @@ func registryStateHandler(nType cluster.ClusterNotifyType, key string, value []b
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var state share.CLUSRegistryState
-		json.Unmarshal(value, &state)
+		_ = json.Unmarshal(value, &state)
 		scan.RegistryStateUpdate(name, &state)
 	case cluster.ClusterNotifyDelete:
 		// State is deleted when registry deleted. No handling here.
@@ -949,7 +948,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var sum share.CLUSRegistryImageSummary
-		json.Unmarshal(value, &sum)
+		_ = json.Unmarshal(value, &sum)
 
 		if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) && (name != common.RegistryFedRepoScanName) {
 			// when a new fed registry with its image scan result are deployed to a worker cluster, it's possible that
@@ -1042,7 +1041,7 @@ func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var scanDataRevs share.CLUSFedScanRevisions
-		json.Unmarshal(value, &scanDataRevs)
+		_ = json.Unmarshal(value, &scanDataRevs)
 		fedScanDataRevsCache = scanDataRevs
 
 	case cluster.ClusterNotifyDelete:
@@ -1265,7 +1264,7 @@ func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners 
 							ReportedAt: time.Now().UTC(),
 						}
 						clog.Msg = "Scanner autoscale is disabled because someone reverted the scaling for 3 continous times."
-						cctx.EvQueue.Append(&clog)
+						_ = cctx.EvQueue.Append(&clog)
 						skipScale = true
 						log.Info(clog.Msg)
 					} else {
@@ -1310,7 +1309,7 @@ func (m CacheMethod) GetScanConfig(acc *access.AccessControl) (*api.RESTScanConf
 	}
 
 	var cfg *api.RESTScanConfig
-	if scanCfg.AutoScan == true {
+	if scanCfg.AutoScan {
 		cfg = &api.RESTScanConfig{AutoScan: true}
 	} else {
 		cfg = &api.RESTScanConfig{AutoScan: false}
