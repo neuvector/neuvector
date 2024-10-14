@@ -1139,15 +1139,13 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 	stamps.Parsed = time.Now()
 
 	totalContainers := 0
-	{
+	if admResObject != nil {
 		reqImages := make([]string, 0, len(admResObject.AllContainers))
-		if admResObject != nil {
-			for _, containers := range admResObject.AllContainers {
-				for _, c := range containers {
-					reqImages = append(reqImages, c.Image)
-				}
-				totalContainers += len(containers)
+		for _, containers := range admResObject.AllContainers {
+			for _, c := range containers {
+				reqImages = append(reqImages, c.Image)
 			}
+			totalContainers += len(containers)
 		}
 		stamps.Images = strings.Join(reqImages, ",")
 	}
