@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -222,7 +221,7 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 		json.Unmarshal(value, &config)
 
 		if isFullFuncReg {
-			var oldFilters []string
+			// var oldFilters []string
 			oldSchedule := api.ScanSchManual
 			var credChanged bool
 
@@ -230,7 +229,7 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 
 			if ok && reg.config.Name != "" {
 				oldSchedule = reg.config.Schedule
-				oldFilters = reg.config.Filters
+				// oldFilters = reg.config.Filters
 
 				oldCfg := reg.config
 				reg.config = &config
@@ -286,7 +285,7 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 				// Assume that state is always created way after config is created, so no check
 				// of state here.
 			} else {
-				oldFilters = make([]string, 0)
+				// oldFilters = make([]string, 0)
 
 				reg = newRegistry(&config)
 				// put recovery images summary into new created registry
@@ -327,22 +326,22 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 						clusHelper.PutRegistryState(reg.config.Name, &state)
 					}
 					reg.stateUnlock()
-				} else if config.Schedule == api.ScanSchAuto && !reflect.DeepEqual(oldFilters, config.Filters) {
-					// Filter changes (including order change) with auto-scan enabled
-					/*
-						if reg.state.Status == api.RegistryStatusIdle {
-							// Start scanning if not
-							state := share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-							clusHelper.PutRegistryState(reg.config.Name, &state)
-						} else if reg.sctx != nil && !reg.sctx.refreshing {
-							// We don't want to block config change handler for too long, but if filters keeps changing, we don't want
-							// them to run in parallel. Use a flag to discard later changes. We could use another context to cancel
-							// the current and keep last one.
-							reg.sctx.refreshing = true
-							go reg.imageScanRefresh(false)
-						}
-					*/
-				}
+				} //else if config.Schedule == api.ScanSchAuto && !reflect.DeepEqual(oldFilters, config.Filters) {
+				// Filter changes (including order change) with auto-scan enabled
+				/*
+					if reg.state.Status == api.RegistryStatusIdle {
+						// Start scanning if not
+						state := share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
+						clusHelper.PutRegistryState(reg.config.Name, &state)
+					} else if reg.sctx != nil && !reg.sctx.refreshing {
+						// We don't want to block config change handler for too long, but if filters keeps changing, we don't want
+						// them to run in parallel. Use a flag to discard later changes. We could use another context to cancel
+						// the current and keep last one.
+						reg.sctx.refreshing = true
+						go reg.imageScanRefresh(false)
+					}
+				*/
+				//
 			}
 		} else {
 			reg, ok := regMapLookup(config.Name)

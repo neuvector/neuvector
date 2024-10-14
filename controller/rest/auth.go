@@ -1192,11 +1192,12 @@ func ResetLoginTokenTimer(tokenInfo *share.CLUSLoginTokenInfo) {
 				login.timer.Reset(getUserTimeout(login.timeout))
 				login.lastAt = time.Now()
 			}
-		} else {
-			// if this controller doesn't know this token yet, it's fine.
-			// later when a resp api request reaches this controller, if the token is still not in kv,
-			// this controller will accept it and start a new timer for this token
 		}
+		// else {
+		// 	// if this controller doesn't know this token yet, it's fine.
+		// 	// later when a resp api request reaches this controller, if the token is still not in kv,
+		// 	// this controller will accept it and start a new timer for this token
+		// }
 	}
 }
 

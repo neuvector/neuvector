@@ -36,6 +36,7 @@ func TestServerCreate(t *testing.T) {
 	s, _, _ := clusHelper.GetServerRev("s1", accAdmin)
 	if s == nil {
 		t.Errorf("Failed to get created server.")
+		return
 	}
 
 	if s.Enable {
@@ -78,6 +79,7 @@ func TestServerRole(t *testing.T) { // for 4.2(-)
 	s, _, _ := clusHelper.GetServerRev("s1", accAdmin)
 	if s == nil {
 		t.Errorf("Failed to get created server.")
+		return
 	}
 
 	if s.LDAP == nil {
@@ -112,6 +114,7 @@ func TestServerRole(t *testing.T) { // for 4.2(-)
 	s, _, _ = clusHelper.GetServerRev("s1", accAdmin)
 	if s == nil {
 		t.Errorf("Failed to get server.")
+		return
 	}
 	if s.LDAP == nil {
 		t.Errorf("Failed to get LDAP server.")
@@ -153,6 +156,7 @@ func TestServerRoleNew(t *testing.T) { // for 4.3(+)
 	s, _, _ := clusHelper.GetServerRev("s1", accAdmin)
 	if s == nil {
 		t.Errorf("Failed to get created server.")
+		return
 	}
 
 	if s.LDAP == nil {
@@ -196,9 +200,11 @@ func TestServerRoleNew(t *testing.T) { // for 4.3(+)
 	s, _, _ = clusHelper.GetServerRev("s1", accAdmin)
 	if s == nil {
 		t.Errorf("Failed to get server.")
+		return
 	}
 	if s.LDAP == nil {
 		t.Errorf("Failed to get LDAP server.")
+		return
 	}
 	if len(s.LDAP.GroupMappedRoles) != 2 {
 		t.Errorf("Incorrect configuration of role mapping. len=%+v", len(s.LDAP.GroupMappedRoles))
@@ -246,7 +252,7 @@ func TestServerConfig(t *testing.T) { // for 4.2-)
 
 		var sdata api.RESTServerData
 		w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-		json.Unmarshal(w.body, &sdata)
+		_ = json.Unmarshal(w.body, &sdata)
 		if len(sdata.Server.LDAP.GroupMappedRoles) != 1 {
 			t.Errorf("Incorrect configuration of group role mapping. len=%+v", len(sdata.Server.LDAP.GroupMappedRoles))
 		}
@@ -283,7 +289,7 @@ func TestServerConfig2(t *testing.T) { // for 4.2(-)
 
 	var sdata api.RESTServerData
 	w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-	json.Unmarshal(w.body, &sdata)
+	_ = json.Unmarshal(w.body, &sdata)
 	groupRoleMappings := sdata.Server.LDAP.GroupMappedRoles
 	expects := []*share.GroupRoleMapping{
 		{
@@ -361,7 +367,7 @@ func TestServerConfigNew(t *testing.T) { // for 4.3(+)
 
 		var sdata api.RESTServerData
 		w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-		json.Unmarshal(w.body, &sdata)
+		_ = json.Unmarshal(w.body, &sdata)
 		if len(sdata.Server.LDAP.GroupMappedRoles) != 1 {
 			t.Errorf("Incorrect configuration of group role mapping. len=%+v", len(sdata.Server.LDAP.GroupMappedRoles))
 		}
@@ -401,7 +407,7 @@ func TestServerConfigNew(t *testing.T) { // for 4.3(+)
 		}
 		var sdata2 api.RESTServerData
 		w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-		json.Unmarshal(w.body, &sdata2)
+		_ = json.Unmarshal(w.body, &sdata2)
 		if len(sdata2.Server.LDAP.GroupMappedRoles) != 0 {
 			t.Errorf("Incorrect configuration of group role mapping. result len=%+v, expect 0", len(sdata2.Server.LDAP.GroupMappedRoles))
 		}
@@ -606,7 +612,7 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		if w.status != http.StatusOK {
 			t.Errorf("Get server failed: %v", w.status)
 		}
-		json.Unmarshal(w.body, &sdata)
+		_ = json.Unmarshal(w.body, &sdata)
 		if sdata.Server == nil {
 			t.Errorf("No server data")
 		} else if sdata.Server.LDAP == nil {
@@ -652,7 +658,7 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		}
 		var sdataRet api.RESTServerData
 		w = restCall("GET", "/v1/server/s1", nil, api.UserRoleAdmin)
-		json.Unmarshal(w.body, &sdataRet)
+		_ = json.Unmarshal(w.body, &sdataRet)
 		compareGroupMappedData("2", sdataRet.Server.LDAP.GroupMappedRoles, expected2, t)
 	}
 
@@ -728,7 +734,7 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		}
 		var sdataRet api.RESTServerData
 		w = restCall("GET", "/v1/server/s1", nil, api.UserRoleAdmin)
-		json.Unmarshal(w.body, &sdataRet)
+		_ = json.Unmarshal(w.body, &sdataRet)
 		compareGroupMappedData("3", sdataRet.Server.LDAP.GroupMappedRoles, expected3, t)
 
 		/*
@@ -822,9 +828,9 @@ func TestServerDelete(t *testing.T) {
 
 	// Used by auth order
 	mockCluster.Init(nil, nil)
-	mockCluster.PutServerRev(&s1, 0)
+	_ = mockCluster.PutServerRev(&s1, 0)
 	sysc := share.CLUSSystemConfig{AuthOrder: []string{"s1", "local"}}
-	mockCluster.PutSystemConfigRev(&sysc, 0)
+	_ = mockCluster.PutSystemConfigRev(&sysc, 0)
 	clusHelper = &mockCluster
 
 	w := restCall("DELETE", "/v1/server/s1", nil, api.UserRoleAdmin)
@@ -834,9 +840,9 @@ func TestServerDelete(t *testing.T) {
 
 	// Not used
 	mockCluster.Init(nil, nil)
-	mockCluster.PutServerRev(&s1, 0)
+	_ = mockCluster.PutServerRev(&s1, 0)
 	sysc = share.CLUSSystemConfig{AuthOrder: []string{"local"}}
-	mockCluster.PutSystemConfigRev(&sysc, 0)
+	_ = mockCluster.PutSystemConfigRev(&sysc, 0)
 
 	w = restCall("DELETE", "/v1/server/s1", nil, api.UserRoleAdmin)
 	if w.status != http.StatusOK {
@@ -852,21 +858,21 @@ func TestOIDCUpdate(t *testing.T) {
 	}
 	accAdmin := access.NewAdminAccessControl()
 	oidc := api.RESTServerOIDCConfig{}
-	updateOIDCServer(&cs, &oidc, accAdmin, nil)
+	_ = updateOIDCServer(&cs, &oidc, accAdmin, nil)
 	if !reflect.DeepEqual(cs.OIDC.Scopes, auth.DefaultOIDCScopes) {
 		t.Errorf("Invalid OIDC scopes update: %v", cs.OIDC.Scopes)
 	}
 
 	scopes := []string{"one"}
 	oidc = api.RESTServerOIDCConfig{Scopes: &scopes}
-	updateOIDCServer(&cs, &oidc, accAdmin, nil)
+	_ = updateOIDCServer(&cs, &oidc, accAdmin, nil)
 	if len(cs.OIDC.Scopes) != 2 || cs.OIDC.Scopes[0] != "openid" || cs.OIDC.Scopes[1] != "one" {
 		t.Errorf("Invalid OIDC scopes update: %v", cs.OIDC.Scopes)
 	}
 
 	scopes = []string{"openid", "two"}
 	oidc = api.RESTServerOIDCConfig{Scopes: &scopes}
-	updateOIDCServer(&cs, &oidc, accAdmin, nil)
+	_ = updateOIDCServer(&cs, &oidc, accAdmin, nil)
 	if len(cs.OIDC.Scopes) != 2 || cs.OIDC.Scopes[0] != "openid" || cs.OIDC.Scopes[1] != "two" {
 		t.Errorf("Invalid OIDC scopes update: %v", cs.OIDC.Scopes)
 	}

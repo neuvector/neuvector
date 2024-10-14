@@ -1061,12 +1061,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 		cs := &share.CLUSServer{Name: rs.Name, LDAP: cldap}
 
-		for ok := true; ok; ok = false {
-			if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
-				if err = validateLDAPServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
+			if err = validateLDAPServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.WithFields(log.Fields{"server": rs.Name}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -1092,12 +1093,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 		cs := &share.CLUSServer{Name: rs.Name, SAML: csaml}
 
-		for ok := true; ok; ok = false {
-			if err = updateSAMLServer(cs, rs.SAML, acc, login); err == nil {
-				if err = validateSAMLServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateSAMLServer(cs, rs.SAML, acc, login); err == nil {
+			if err = validateSAMLServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.WithFields(log.Fields{"server": rs.Name}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -1124,12 +1126,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 		cs := &share.CLUSServer{Name: rs.Name, OIDC: coidc}
 
-		for ok := true; ok; ok = false {
-			if err = updateOIDCServer(cs, rs.OIDC, acc, login); err == nil {
-				if err = validateOIDCServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateOIDCServer(cs, rs.OIDC, acc, login); err == nil {
+			if err = validateOIDCServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.WithFields(log.Fields{"server": rs.Name}).Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -1947,12 +1950,13 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		}
 
 		// Consider as create so empty attributes can be filled
-		for ok := true; ok; ok = false {
-			if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
-				if err = validateLDAPServer(cs); err == nil {
-					break
-				}
+		success := false
+		if err = updateLDAPServer(cs, rs.LDAP, true, acc, login); err == nil {
+			if err = validateLDAPServer(cs); err == nil {
+				success = true
 			}
+		}
+		if !success {
 			log.Error(err)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return

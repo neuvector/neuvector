@@ -266,7 +266,7 @@ func (m *mockCache) CreateService(svc *api.RESTServiceConfig, acc *access.Access
 			Domain:  svc.Domain,
 			Kind:    share.GroupKindContainer,
 		}
-		clusHelper.PutGroup(&rg, true)
+		_ = clusHelper.PutGroup(&rg, true)
 		return nil
 	}
 }

@@ -1368,7 +1368,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 	failurePolicy := resource.IgnoreLower
 	status, code, origConf, cconf := setAdmCtrlStateInCluster(&crdConfig.Enable, &crdConfig.Mode, &defaultAction, &crdConfig.AdmClientMode, &failurePolicy, cfgType)
 	if status != http.StatusOK {
-		return fmt.Errorf(restErrMessage[code])
+		return fmt.Errorf("%s", restErrMessage[code])
 	}
 	time.Sleep(time.Second)
 
@@ -1630,7 +1630,7 @@ func (h *nvCrdHandler) crdHandleVulnProfile(vulnProfileCfg *resource.NvCrdVulnPr
 			}
 		} else if cvp != nil && cvp.CfgType != cfgType && cvp.CfgType == share.GroundCfg {
 			log.WithFields(log.Fields{"name": vulnProfileCfg.Profile.Name}).Error("profile is managed by CRD")
-			return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+			return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 		}
 		if cvp, err = configVulnerabilityProfile(vulnProfileCfg.Profile, option, cfgType, cvp); err == nil {
 			if err = clusHelper.PutVulnerabilityProfile(cvp, nil); err == nil && cacheRecord != nil {
@@ -1655,7 +1655,7 @@ func (h *nvCrdHandler) crdHandleCompProfile(compProfileCfg *resource.NvCrdCompPr
 		ccp, _, _ := clusHelper.GetComplianceProfile(compProfileCfg.Templates.Name, h.acc)
 		if ccp != nil && ccp.CfgType != cfgType && ccp.CfgType == share.GroundCfg {
 			log.WithFields(log.Fields{"name": compProfileCfg.Templates.Name}).Error("profile is managed by CRD")
-			return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+			return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 		}
 		ccp = &share.CLUSComplianceProfile{
 			Name:    compProfileCfg.Templates.Name,

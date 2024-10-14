@@ -154,8 +154,6 @@ func (q *tCrdRequestsMgr) crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) (
 					crdEventQueue.CrdEventRecord = append(crdEventQueue.CrdEventRecord, name)
 					err = clusHelper.PutCrdEventQueue(crdEventQueue)
 					// => TODO : what if it fails again because the key value size is still too big?
-				} else {
-					// => TODO: what if no queue entry is deleted?
 				}
 				if err == nil {
 					return "", nil

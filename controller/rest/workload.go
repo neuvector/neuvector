@@ -741,8 +741,6 @@ func handlerWorkloadRequest(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Unsupported command")
 		return
 	}
-
-	restRespSuccess(w, r, nil, acc, login, &req, "Container request")
 }
 
 func handlerWorkloadProcessProfile(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

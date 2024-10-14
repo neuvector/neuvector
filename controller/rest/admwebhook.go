@@ -1141,11 +1141,13 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 	totalContainers := 0
 	{
 		reqImages := make([]string, 0, len(admResObject.AllContainers))
-		for _, containers := range admResObject.AllContainers {
-			for _, c := range containers {
-				reqImages = append(reqImages, c.Image)
+		if admResObject != nil {
+			for _, containers := range admResObject.AllContainers {
+				for _, c := range containers {
+					reqImages = append(reqImages, c.Image)
+				}
+				totalContainers += len(containers)
 			}
-			totalContainers += len(containers)
 		}
 		stamps.Images = strings.Join(reqImages, ",")
 	}
@@ -1356,7 +1358,9 @@ func (whsvr *WebhookServer) serveK8s(w http.ResponseWriter, r *http.Request, adm
 
 		if admType == admission.NvAdmValidateType {
 			admissionResponse, _, ignoredReq = whsvr.validate(&ar, globalMode, defaultAction, stamps, false)
-			admissionResponse.UID = ar.Request.UID
+			if admissionResponse != nil {
+				admissionResponse.UID = ar.Request.UID
+			}
 		} else {
 			log.WithFields(log.Fields{"path": r.URL.Path}).Debug("unsupported path")
 			http.Error(w, "unsupported", http.StatusNotImplemented)

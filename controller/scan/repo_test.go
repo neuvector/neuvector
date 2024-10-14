@@ -126,7 +126,7 @@ func TestLocalRepoScan(t *testing.T) {
 	}
 
 	// Store another result, same name different ID
-	smd.StoreRepoScanResult(&sr2)
+	_ = smd.StoreRepoScanResult(&sr2)
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
 	_, ok = mockCluster.ScanSums[key]
 	if !ok {
@@ -171,13 +171,13 @@ func TestRemoteRepoScan(t *testing.T) {
 	newRepoScanRegistry(common.RegistryRepoScanName)
 
 	// store a local image
-	smd.StoreRepoScanResult(&sr1)
+	_ = smd.StoreRepoScanResult(&sr1)
 	key := share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
 	sum := mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, false, nil)
 
 	// store a remote image
-	smd.StoreRepoScanResult(&sr3)
+	_ = smd.StoreRepoScanResult(&sr3)
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr3.ImageID)
 	sum = mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr3.ImageID, sum, false, nil)

@@ -110,7 +110,7 @@ func TestProcessProfileShow(t *testing.T) {
 		w := restCall("GET", "/v1/process_profile/containers", nil, api.UserRoleAdmin)
 		if w.status == http.StatusOK {
 			var resp api.RESTProcessProfileData
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if !reflect.DeepEqual(resp.Profile.ProcessList, pp) {
 				t.Errorf("Status is OK but a wrong content")
 				t.Logf("  Resp: %+v\n", resp.Profile.ProcessList)
@@ -147,7 +147,7 @@ func TestProcessProfileShow(t *testing.T) {
 		w := restCall("GET", "/v1/process_profile/nodes", nil, api.UserRoleAdmin)
 		if w.status == http.StatusOK {
 			var resp api.RESTProcessProfileData
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if !reflect.DeepEqual(resp.Profile.ProcessList, pp) {
 				t.Errorf("Status is OK but a wrong content")
 				t.Logf("  Resp: %+v\n", resp.Profile.ProcessList)

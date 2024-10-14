@@ -170,7 +170,7 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 	// get user projects
 	if users, err := r.getUsers(); err == nil {
 		for _, user := range users {
-			ur = r.gitUrl(fmt.Sprintf("/users/%d/projects", user.ID))
+			ur = r.gitUrl("/users/%d/projects", user.ID)
 			smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 			if data, err := r.getData(ur); err == nil {
 				if err = json.Unmarshal(data, &projects); err == nil {
@@ -181,7 +181,7 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 	} else {
 		e2 = err
 	}
-	ur = r.gitUrl(fmt.Sprintf("/users/%s/projects", r.username))
+	ur = r.gitUrl("/users/%s/projects", r.username)
 	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 	if data, err := r.getData(ur); err == nil {
 		if err = json.Unmarshal(data, &projects); err == nil {
@@ -194,7 +194,7 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 	// get group projects
 	if groups, err := r.getGroups(); err == nil {
 		for _, group := range groups {
-			ur = r.gitUrl(fmt.Sprintf("/groups/%d/projects?include_subgroups=true", group.ID))
+			ur = r.gitUrl("/groups/%d/projects?include_subgroups=true", group.ID)
 			smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 			if data, err := r.getData(ur); err == nil {
 				if err = json.Unmarshal(data, &projects); err == nil {

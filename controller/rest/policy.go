@@ -467,7 +467,7 @@ func validateRestPolicyRuleConfig(r *api.RESTPolicyRuleConfig) error {
 	}
 
 	if r.Priority != 0 {
-		if r.Priority < 0 || r.Priority > 100 {
+		if r.Priority > 100 {
 			log.WithFields(log.Fields{"id": r.ID, "Priority": r.Priority}).Error("Prioty out of range [0-100]")
 			return errors.New("Priority out of range")
 		}
@@ -584,7 +584,7 @@ func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgTyp
 			if crh.CfgType == share.GroundCfg {
 				e := "Can't move Base Rule"
 				log.WithFields(log.Fields{"move": id}).Error(e)
-				return fmt.Errorf(e) // break from here if the moving item is ground rule. i.e. ground rule cannot be moved
+				return fmt.Errorf("%s", e) // break from here if the moving item is ground rule. i.e. ground rule cannot be moved
 			}
 			moveIdx = i
 		}
@@ -603,14 +603,14 @@ func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgTyp
 	if moveIdx == -1 {
 		e := "Rule to move doesn't exist"
 		log.WithFields(log.Fields{"move": id}).Error(e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	toIdx, af := locatePosition(crhs, after, moveIdx)
 	if toIdx == -1 {
 		e := "Move-to position cannot be found"
 		log.WithFields(log.Fields{"after": af}).Error(e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 	if bottomIdx == -1 {
 		bottomIdx = len(crhs) - 1
@@ -667,7 +667,7 @@ func movePolicyRule(w http.ResponseWriter, r *http.Request, move *api.RESTPolicy
 		e := "Policy rule doesn't exist"
 		log.WithFields(log.Fields{"move": move.ID}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf(e), 0
+		return fmt.Errorf("%s", e), 0
 	}
 
 	if move.After != nil && *move.After != 0 && *move.After == int(move.ID) {
@@ -745,7 +745,7 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"scope": scope, "after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	if toIdx < topIdx {
@@ -773,19 +773,19 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 			e := "Mismatched rule CfgType with request"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if ids.Contains(rr.ID) {
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if cfgType == share.Learned || cfgType == share.GroundCfg {
 			e := "Cannot create learned/Base policy rule"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		if e := isLocalReservedId(rr.ID); e != nil {
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
@@ -1048,7 +1048,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					e := "Duplicate rule ID"
 					log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return fmt.Errorf(e)
+					return fmt.Errorf("%s", e)
 				} else {
 					// for admin/fedAdmin, because they can see all rules, rules param contains all rest-created rules' IDs in use.
 					// but for namespace user, because they cannot see all rules, rules param contains only subset of rest-created rules' IDs in use.
@@ -1116,9 +1116,9 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 				if del.Contains(rr.ID) {
 					del.Remove(rr.ID)
 					existingRule = true
-				} else {
-					// ignore new or unaccessible learned rules in rules param
-				}
+				} // else {
+				// ignore new or unaccessible learned rules in rules param
+				// }
 			} // ignore learned rules when scope=fed
 		} else if rr.CfgType == api.CfgTypeGround {
 			// always ignore ground rules from rest api

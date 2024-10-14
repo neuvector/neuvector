@@ -458,7 +458,7 @@ func createDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, cfgTy
 			e := "sensor cannot be created in cluster!"
 			log.WithFields(log.Fields{"sensor": sensor.Name}).Error(e)
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 		log.Debug("Creating predefined sensor!")
 	}
@@ -489,7 +489,7 @@ func createDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, cfgTy
 			e := "Dlp rule id overflow!"
 			log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 
 		//save full rule with pattern in default sensor
@@ -693,7 +693,7 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 	var cfgType share.TCfgType = share.UserCreated
 	if reviewType != share.ReviewTypeCRD && sensor.CfgType == share.GroundCfg {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	} else if reviewType == share.ReviewTypeCRD {
 		cfgType = share.GroundCfg
 	}
@@ -804,7 +804,7 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 					e := "Dlp rule id overflow!"
 					log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return fmt.Errorf(e)
+					return fmt.Errorf("%s", e)
 				}
 			}
 			//save full rule with pattern in default sensor
@@ -840,13 +840,13 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 						e := "Cannot find dlp rule in this sensor!"
 						log.WithFields(log.Fields{"sensor": conf.Name, "rulename": rdr.Name}).Error(e)
 						restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 					if !foundInAll {
 						e := "Cannot find full dlp rule to delete!"
 						log.WithFields(log.Fields{"sensor": defsensor.Name, "rulename": rdr.Name}).Error(e)
 						restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 				}
 			}
@@ -890,7 +890,7 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 						e := "Dlp rule id overflow!"
 						log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
 						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-						return fmt.Errorf(e)
+						return fmt.Errorf("%s", e)
 					}
 				}
 				//save full rule with pattern in default sensor
@@ -1264,14 +1264,14 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		e := "Cannot delete default sensor!"
 		log.WithFields(log.Fields{"name": name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	if name == share.CLUSDlpCcSensor || name == share.CLUSDlpSsnSensor {
 		e := "Cannot delete predefined sensor!"
 		log.WithFields(log.Fields{"name": name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	rdlpsensor, err := cacher.GetDlpSensor(name, acc)
@@ -1281,7 +1281,7 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		return err
 	} else if reviewType != share.ReviewTypeCRD && rdlpsensor.CfgType == api.CfgTypeGround {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return fmt.Errorf(restErrMessage[api.RESTErrOpNotAllowed])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	}
 
 	var lock cluster.LockInterface
@@ -1296,7 +1296,7 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 	if dlpsensor == nil {
 		log.WithFields(log.Fields{"name": name}).Error("Fail to get dlp sensor!")
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
-		return fmt.Errorf(restErrMessage[api.RESTErrObjectNotFound])
+		return fmt.Errorf("%s", restErrMessage[api.RESTErrObjectNotFound])
 	}
 	defsensor := clusHelper.GetDlpSensor(share.CLUSDlpDefaultSensor)
 
@@ -1715,7 +1715,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 	if invalidCrdKind || len(secRules) == 0 {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_DLP)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_DLP)
 		return nil
 	}
 
@@ -1739,7 +1739,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 		for _, secRule := range secRules {
 			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdDlpContent(&secRule, share.ReviewTypeImportDLP, share.ReviewTypeDisplayDLP)
 			if errCount > 0 {
-				err = fmt.Errorf(errMsg)
+				err = fmt.Errorf("%s", errMsg)
 				break
 			} else {
 				parsedDlpCfgs = append(parsedDlpCfgs, parsedCfg)
