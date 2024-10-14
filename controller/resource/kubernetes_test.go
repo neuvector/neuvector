@@ -18,11 +18,11 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func preTestDebug() {
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
-	log.SetLevel(log.DebugLevel)
-}
+// func preTestDebug() {
+// 	log.SetOutput(os.Stdout)
+// 	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
+// 	log.SetLevel(log.DebugLevel)
+// }
 
 func preTest() {
 	log.SetOutput(os.Stdout)
@@ -586,7 +586,7 @@ func (r *tRbacRancherSSO) verifyNvRolePermits(actualDomainRoles, expectDomainRol
 	actualDomainPerms, expectDomainPerms map[string]share.NvFedPermissions) {
 
 	for d, expectedRole := range expectDomainRoles {
-		if actualRole, _ := actualDomainRoles[d]; expectedRole != actualRole {
+		if actualRole := actualDomainRoles[d]; expectedRole != actualRole {
 			r.t.Logf("<< %s >>\n", r.caseName)
 			var dDisplay string
 			if d == "" {
@@ -600,7 +600,7 @@ func (r *tRbacRancherSSO) verifyNvRolePermits(actualDomainRoles, expectDomainRol
 		}
 	}
 	for d, expectedPermits := range expectDomainPerms {
-		if actualPermits, _ := actualDomainPerms[d]; expectedPermits != actualPermits {
+		if actualPermits := actualDomainPerms[d]; expectedPermits != actualPermits {
 			r.t.Logf("<< %s >>\n", r.caseName)
 			var dDisplay string
 			if d == "" {

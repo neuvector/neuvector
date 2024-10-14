@@ -315,8 +315,8 @@ func validateWafRuleConfig(list []api.RESTWafRule) error {
 	return nil
 }
 
-//lock is alreay hold when call this function
-//clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+// lock is alreay hold when call this function
+// clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 func createDefaultWafSensor() {
 	kv.CreateDefWafRules(true)
 	kv.CreatePreWafSensor(true)
@@ -446,7 +446,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached == true {
+	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached {
 		e := "waf sensor already exists"
 		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
@@ -894,7 +894,6 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 			if len(*conf.DelSensors) > 0 && len(cg.Sensors) > 0 {
 				for _, rs := range *conf.DelSensors {
-					var found bool = false
 					cs := &share.CLUSWafSetting{Name: rs, Action: share.DlpRuleActionDrop}
 					idx, found := common.FindSensorInWafGroup(cg.Sensors, cs)
 					if found {
@@ -983,9 +982,7 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		defsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
 	}
 	for _, rn := range wafsensor.RuleListNames {
-		if _, foundInAll := defsensor.RuleList[rn]; foundInAll {
-			delete(defsensor.RuleList, rn)
-		}
+		delete(defsensor.RuleList, rn)
 	}
 	clusHelper.PutWafSensorTxn(txn, defsensor)
 	clusHelper.DeleteWafSensorTxn(txn, name)
@@ -1067,7 +1064,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 
 		ruleList := make([]*resource.NvSecurityWafRule, 0, len(sensor.RuleListNames))
-		for rName, _ := range sensor.RuleListNames {
+		for rName := range sensor.RuleListNames {
 			if r, ok := defSensor.RuleList[rName]; ok {
 				patterns := make([]api.RESTWafCriteriaEntry, len(r.Patterns))
 				for idx, p := range r.Patterns {

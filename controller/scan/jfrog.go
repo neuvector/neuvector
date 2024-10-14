@@ -50,11 +50,11 @@ type aqlFolder struct {
 	Name string `json:"name"`
 }
 
-type aqlRange struct {
-	Start int `json:"start_pos"`
-	End   int `json:"end_post"`
-	Total int `json:"total"`
-}
+// type aqlRange struct {
+// 	Start int `json:"start_pos"`
+// 	End   int `json:"end_post"`
+// 	Total int `json:"total"`
+// }
 
 type aqlFolderResult struct {
 	Folders []aqlFolder `json:"results"`

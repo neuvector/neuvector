@@ -260,9 +260,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 			// add rule
 			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
 			capps := make([]string, len(filter.Apps))
-			for j, app := range filter.Apps {
-				capps[j] = app
-			}
+			copy(capps, filter.Apps)
 			frule := &share.CLUSFileAccessFilterRule{
 				Apps:        capps,
 				CreatedAt:   tm,
@@ -286,9 +284,7 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 					// update the rule
 					idx := utils.FilterIndexKey(cfilter.Path, cfilter.Regex)
 					capps := make([]string, len(filter.Apps))
-					for j, app := range filter.Apps {
-						capps[j] = app
-					}
+					copy(capps, filter.Apps)
 
 					frule := &share.CLUSFileAccessFilterRule{
 						Apps:        capps,
@@ -352,9 +348,9 @@ func handlerFileMonitorList(w http.ResponseWriter, r *http.Request, ps httproute
 
 	var predefined bool
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local file mointor list
+	scope := query.pairs[api.QueryScope] // empty string means fed & local file mointor list
 
-	for key, _ := range r.URL.Query() {
+	for key := range r.URL.Query() {
 		if strings.Contains(key, api.FilterByPredefined) {
 			predefined = true
 			break
@@ -387,7 +383,7 @@ func handlerFileMonitorShow(w http.ResponseWriter, r *http.Request, ps httproute
 	var predefined bool
 	name := ps.ByName("name")
 	query := r.URL.Query()
-	for key, _ := range query {
+	for key := range query {
 		if strings.Contains(key, api.FilterByPredefined) {
 			predefined = true
 			break

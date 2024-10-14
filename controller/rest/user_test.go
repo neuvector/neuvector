@@ -183,7 +183,7 @@ func TestUserConfigKick(t *testing.T) {
 	token1 = getLoginToken(w)
 	// Login user2
 	w = login("user2", "222222")
-	token2 := getLoginToken(w)
+	_ = getLoginToken(w)
 
 	// Modify user2's role as user1
 	role2 := api.UserRoleAdmin
@@ -215,7 +215,7 @@ func TestUserConfigKick(t *testing.T) {
 
 	// Login back in user2
 	w = login("user2", "222222")
-	token2 = getLoginToken(w)
+	token2 := getLoginToken(w)
 
 	// Modify user2 self's password
 	pass2 := "222222"

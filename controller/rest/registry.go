@@ -103,7 +103,7 @@ func parseWildcardRegex(s string) (string, error) {
 }
 
 func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter, error) {
-	if filters == nil || len(filters) == 0 {
+	if len(filters) == 0 {
 		return make([]*share.CLUSRegistryFilter, 0), nil
 	}
 
@@ -208,7 +208,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -547,7 +547,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -955,7 +955,7 @@ func handlerRegistryList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	} else {
 		query := restParseQuery(r)
-		scope, _ := query.pairs[api.QueryScope] // empty string means fed & local groups
+		scope := query.pairs[api.QueryScope] // empty string means fed & local groups
 
 		list := scanner.GetAllRegistrySummary(scope, acc)
 		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
@@ -1049,7 +1049,7 @@ func handlerRegistryStart(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -1090,7 +1090,7 @@ func handlerRegistryStop(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -1131,7 +1131,7 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if licenseAllowScan() != true {
+	if !licenseAllowScan() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
@@ -1184,19 +1184,19 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 	restRespSuccess(w, r, nil, acc, login, nil, "Registry delete")
 }
 
-func diffStringSlices(a, b []string) []string {
-	mb := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		mb[x] = struct{}{}
-	}
-	var diff []string
-	for _, x := range a {
-		if _, found := mb[x]; !found {
-			diff = append(diff, x)
-		}
-	}
-	return diff
-}
+// func diffStringSlices(a, b []string) []string {
+// 	mb := make(map[string]struct{}, len(b))
+// 	for _, x := range b {
+// 		mb[x] = struct{}{}
+// 	}
+// 	var diff []string
+// 	for _, x := range a {
+// 		if _, found := mb[x]; !found {
+// 			diff = append(diff, x)
+// 		}
+// 	}
+// 	return diff
+// }
 
 // called by managed clusters
 func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
@@ -1261,7 +1261,7 @@ func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
 			txn.Put(share.CLUSRegistryConfigKey(n.Name), value)
 		}
 	}
-	for name, _ := range oldRegs {
+	for name := range oldRegs {
 		txn.Delete(share.CLUSRegistryConfigKey(name))
 	}
 

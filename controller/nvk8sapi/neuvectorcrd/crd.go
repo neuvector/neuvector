@@ -385,12 +385,12 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 									{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
-							"mode": apiextv1.JSONSchemaProps{
+							"mode": {
 								Type: b.schemaTypeString,
 								Enum: []apiextv1.JSON{
-									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
-									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
-									apiextv1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
+									{Raw: b.enumMap[share.PolicyModeLearn]},
+									{Raw: b.enumMap[share.PolicyModeEvaluate]},
+									{Raw: b.enumMap[share.PolicyModeEnforce]},
 								},
 							},
 						},
@@ -495,12 +495,12 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 									{Raw: b.enumMap[share.ProfileShield_UNUSED]},
 								},
 							},
-							"mode": apiextv1b1.JSONSchemaProps{
+							"mode": {
 								Type: b.schemaTypeString,
 								Enum: []apiextv1b1.JSON{
-									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeLearn]},
-									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEvaluate]},
-									apiextv1b1.JSON{Raw: b.enumMap[share.PolicyModeEnforce]},
+									{Raw: b.enumMap[share.PolicyModeLearn]},
+									{Raw: b.enumMap[share.PolicyModeEvaluate]},
+									{Raw: b.enumMap[share.PolicyModeEnforce]},
 								},
 							},
 						},
@@ -1621,7 +1621,7 @@ func isCrdUpToDate(leader bool, crdInfo *resource.NvCrdInfo) (bool, bool, error)
 
 // do not update CustomResourceDefinition resource(schema) anymore
 func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []string {
-	nvCrdInfo := []*resource.NvCrdInfo{}
+	var nvCrdInfo []*resource.NvCrdInfo
 	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		{
 			RscType:           resource.RscTypeCrdSecurityRule,

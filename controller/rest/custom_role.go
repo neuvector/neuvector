@@ -391,7 +391,7 @@ func handlerRoleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	now := time.Now()
 	apikeys := clusHelper.GetAllApikeysNoAuth()
 	for _, apikey := range apikeys {
-		if now.UTC().Unix() >= apikey.ExpirationTimestamp  {
+		if now.UTC().Unix() >= apikey.ExpirationTimestamp {
 			continue
 		}
 

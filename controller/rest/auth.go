@@ -155,17 +155,17 @@ const (
 	userNoPlatformAuth
 )
 
-const (
-	jwtRegularTokenType = iota
-	jwtFedMasterTokenType
-)
+// const (
+// 	jwtRegularTokenType = iota
+// 	jwtFedMasterTokenType
+// )
 
 const loginTypeApikey int = 1
 
 var rancherCookieCache = make(map[string]int64) // key is rancher cookie, value is seconds since the epoch(ValidUntil)
 var rancherCookieMutex sync.RWMutex
 
-var installID *string
+// var installID *string
 
 func GetJWTSigningKey() JWTCertificateState {
 	jwtKeyMutex.RLock()
@@ -552,7 +552,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 									} else {
 										for d, permits := range pripDomainPermits {
 											if !permits.IsEmpty() {
-												p, _ := domainPermissions[d]
+												p := domainPermissions[d]
 												p.Local.Union(permits.Local)
 												p.Remote.Union(permits.Remote)
 												domainPermissions[d] = p
@@ -745,7 +745,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	}
 
 	// For auth token generated for IBM SA setup, it has a fixed 30 minutes time-out
-	if role, _ := login.domainRoles[access.AccessDomainGlobal]; role != api.UserRoleIBMSA && role != api.UserRoleImportStatus {
+	if role := login.domainRoles[access.AccessDomainGlobal]; role != api.UserRoleIBMSA && role != api.UserRoleImportStatus {
 		login.timer.Reset(getUserTimeout(login.timeout))
 		login.lastAt = now
 		// on other controllers, if the token is already known, its login session timer is ticking based on the last request to other controllers.
@@ -931,7 +931,7 @@ func lookupShadowUser(server, provider, username, userid, email, role string, ro
 				"openldap":        "OpenLDAP",
 				"freeipa":         "FreeIPA",
 			}
-			if name, _ := mapping[provider]; name != "" {
+			if name := mapping[provider]; name != "" {
 				provider = name
 			}
 			user.Server = fmt.Sprintf("%s(%s)", share.FlavorRancher, provider)
@@ -1923,7 +1923,7 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 	roles, _, err := global.ORCH.GetUserRoles(pw.Username, resource.SUBJECT_USER)
 	if err != nil || roles == nil || len(roles) == 0 {
 		log.WithFields(log.Fields{"user": pw.Username}).Debug("No role available for this user.")
-		roleDomains = make(map[string][]string)
+		// roleDomains = make(map[string][]string)
 	} else {
 		for k, v := range roles {
 			if r, found := allRoles[k]; found && r == "admin" {
@@ -2929,9 +2929,7 @@ func _setFedJointPrivateKey(id string, key *rsa.PrivateKey) {
 	if key != nil {
 		jointClustersKeyCache[id] = key
 	} else {
-		if _, exist := jointClustersKeyCache[id]; exist {
-			delete(jointClustersKeyCache, id)
-		}
+		delete(jointClustersKeyCache, id)
 	}
 }
 

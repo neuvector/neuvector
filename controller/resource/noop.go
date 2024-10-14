@@ -17,17 +17,17 @@ type noop struct {
 	lock             sync.RWMutex
 }
 
-func (d *noop) locateResourceCache(rt string, id string) interface{} {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	if cache, ok := d.resCaches[rt]; !ok {
-		return nil
-	} else if old, ok := cache[id]; !ok {
-		return nil
-	} else {
-		return old
-	}
-}
+// func (d *noop) locateResourceCache(rt string, id string) interface{} {
+// 	d.lock.RLock()
+// 	defer d.lock.RUnlock()
+// 	if cache, ok := d.resCaches[rt]; !ok {
+// 		return nil
+// 	} else if old, ok := cache[id]; !ok {
+// 		return nil
+// 	} else {
+// 		return old
+// 	}
+// }
 
 // Return if object is created or modified, and the old object if exists.
 func (d *noop) updateResourceCache(rt string, id string, obj interface{}) (string, interface{}) {

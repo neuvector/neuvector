@@ -13,36 +13,35 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
-	"github.com/neuvector/neuvector/share/licenseinfo"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-func validateLicenseReq(req *api.RESTLicenseRequest) error {
-	/* Todo: more input validation */
-	if req.Email == "" {
-		return fmt.Errorf("Missing required field")
-	}
-	return nil
-}
+// func validateLicenseReq(req *api.RESTLicenseRequest) error {
+// 	/* Todo: more input validation */
+// 	if req.Email == "" {
+// 		return fmt.Errorf("Missing required field")
+// 	}
+// 	return nil
+// }
 
-func reqLicense(req *api.RESTLicenseRequest) string {
-	log.WithFields(log.Fields{"req": req}).Debug()
+// func reqLicense(req *api.RESTLicenseRequest) string {
+// 	log.WithFields(log.Fields{"req": req}).Debug()
 
-	info := &api.RESTLicenseInfo{
-		Name:  req.Name,
-		Email: req.Email,
-		Phone: req.Phone,
-		ID:    localDev.Host.ID,
-	}
+// 	info := &api.RESTLicenseInfo{
+// 		Name:  req.Name,
+// 		Email: req.Email,
+// 		Phone: req.Phone,
+// 		ID:    localDev.Host.ID,
+// 	}
 
-	val, _ := json.Marshal(info)
-	if ret, err := licenseinfo.EncryptToBase64(utils.GetLicenseSymKey(), val); err != nil {
-		log.WithFields(log.Fields{"err": err}).Error("encrypt error")
-		return ""
-	} else {
-		return ret
-	}
-}
+// 	val, _ := json.Marshal(info)
+// 	if ret, err := licenseinfo.EncryptToBase64(utils.GetLicenseSymKey(), val); err != nil {
+// 		log.WithFields(log.Fields{"err": err}).Error("encrypt error")
+// 		return ""
+// 	} else {
+// 		return ret
+// 	}
+// }
 
 func handlerLicenseShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")

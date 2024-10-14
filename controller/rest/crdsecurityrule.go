@@ -43,9 +43,9 @@ type nvCrdHandler struct {
 	lockKey    string
 	crUid      string // metadata.uid in the CR object
 	mdName     string // metadata.name in the CR object
-	rscType    string
-	lock       cluster.LockInterface
-	acc        *access.AccessControl
+	// rscType    string
+	lock cluster.LockInterface
+	acc  *access.AccessControl
 }
 
 func (h *nvCrdHandler) Init(lockKey string) {
@@ -897,8 +897,8 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 					log.WithFields(log.Fields{"key": key, "behavior": ffp.Behavior}).Debug("CRD: new entry")
 					if _, exist := far.Filters[key]; exist {
 						if _, ok := cacher.IsPrdefineFileGroup(ffp.Filter, ffp.Recursive); ok {
-							for i, _ := range mon.Filters {
-								if mon.Filters[i].Filter == ffp.Filter && mon.Filters[i].CustomerAdd == false {
+							for i := range mon.Filters {
+								if mon.Filters[i].Filter == ffp.Filter && !mon.Filters[i].CustomerAdd {
 									// remove the predefined from the main filters
 									delete(far.Filters, key)
 									mon.Filters = append(mon.Filters[:i], mon.Filters[i+1:]...)
@@ -1034,7 +1034,7 @@ func (h *nvCrdHandler) isSameFwRuleContent(cr *share.CLUSPolicyRule, ruleConf *a
 	}
 	if (cr.From == rule.From) && (cr.To == rule.To) && (cr.Ports == rule.Ports) && (cr.Action == rule.Action) &&
 		(cr.Comment == rule.Comment) && (cr.Priority == ruleConf.Priority) && (cr.Disable == rule.Disable) {
-		if cfgType, _ := cfgTypeMapping[ruleConf.CfgType]; cr.CfgType != cfgType {
+		if cfgType := cfgTypeMapping[ruleConf.CfgType]; cr.CfgType != cfgType {
 			return false
 		}
 	} else {
@@ -1106,7 +1106,7 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 		} else {
 			if h.isSameFwRuleContent(cr, &ruleConf) {
 				if rh, ok := ruleHead[ruleConf.ID]; ok {
-					if cfgType, _ := cfgTypeMap2Api[rh.CfgType]; cfgType == ruleConf.CfgType && rh.Priority == ruleConf.Priority {
+					if cfgType := cfgTypeMap2Api[rh.CfgType]; cfgType == ruleConf.CfgType && rh.Priority == ruleConf.Priority {
 						// same rule content & rule head found
 						ruleSame[ruleConf.ID] = true
 					}
@@ -1273,7 +1273,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 					crdIDs.Add(ruleID)
 				}
 				if !ids.Contains(ruleID) {
-					arhs, _ := clusArhsNew[ruleType]
+					arhs := clusArhsNew[ruleType]
 					arh := &share.CLUSRuleHead{
 						ID:      ruleID,
 						CfgType: cfgType,
@@ -2553,7 +2553,7 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 			var err error
 			var criteria []*share.CLUSAdmRuleCriterion
 			if criteria, err = cache.AdmCriteria2CLUS(crdRule.Criteria); err == nil {
-				options, _ := admRuleOptions[crdRuleType]
+				options := admRuleOptions[crdRuleType]
 				err = validateAdmCtrlCriteria(criteria, options.K8sOptions.RuleOptions, crdRuleType)
 			}
 			if err != nil {
@@ -2600,7 +2600,7 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 					if crdRule.RuleMode != nil {
 						ruleCfg.RuleMode = *crdRule.RuleMode
 					}
-					rulesCfg, _ := admRulesCfg[crdRuleType]
+					rulesCfg := admRulesCfg[crdRuleType]
 					admRulesCfg[crdRuleType] = append(rulesCfg, ruleCfg)
 					crdRuleIDs.Add(crdRule.ID)
 				}
@@ -3929,7 +3929,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		} else {
 			switch kind {
 			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-				crossCheckRecord, _ := recordList[recordName]
+				crossCheckRecord := recordList[recordName]
 				delete(recordList, recordName)
 				crInfo, _ = crdHandler.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdMd5, recordList, crossCheckRecord)
 			case resource.NvAdmCtrlSecurityRuleKind:

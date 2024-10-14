@@ -68,6 +68,7 @@ const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's giv
 
 var evqueue cluster.ObjectQueueInterface
 var auditQueue cluster.ObjectQueueInterface
+
 var messenger cluster.MessengerInterface
 var clusHelper kv.ClusterHelper
 var cfgHelper kv.ConfigHelper
@@ -79,6 +80,7 @@ var k8sPlatform bool
 
 var fedRestServerMutex sync.Mutex
 var fedRestServerState uint64
+
 var crdEventProcTicker *time.Ticker
 
 var dockerRegistries utils.Set
@@ -96,7 +98,7 @@ var _restPort uint
 var _fedPort uint
 var _fedServerChan chan bool
 
-var _licSigKeyEnv int
+// var _licSigKeyEnv int
 
 var _teleNeuvectorURL string
 var _teleFreq uint
@@ -187,7 +189,7 @@ func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, hea
 		hNames = append(hNames, "X-Transaction-ID")
 	}
 	for _, hName := range hNames {
-		if v, _ := headers[hName]; v != "" {
+		if v := headers[hName]; v != "" {
 			w.Header().Set(hName, v)
 		}
 	}
@@ -705,7 +707,7 @@ func restNewFilter(data interface{}, filters []restFieldFilter) *restFilter {
 		}
 	}
 
-	for i, _ := range filters {
+	for i := range filters {
 		rf.FilteredBy(data, &filters[i])
 	}
 
@@ -716,7 +718,7 @@ func (rf *restFilter) FilteredBy(data interface{}, ff *restFieldFilter) *restFil
 	v := reflect.ValueOf(data).Elem()
 
 	// Get field name from tag
-	if ff.field, _ = rf.tags[ff.tag]; ff.field == "" {
+	if ff.field = rf.tags[ff.tag]; ff.field == "" {
 		log.WithFields(log.Fields{"tag": ff.tag}).Debug("Field with tag not exist")
 		return rf
 	}
@@ -868,7 +870,7 @@ func restNewSorter(data []interface{}, sorts []restFieldSort) *restSorter {
 		}
 	}
 
-	for i, _ := range sorts {
+	for i := range sorts {
 		rs.SortedBy(&sorts[i])
 	}
 	return &rs
@@ -879,7 +881,7 @@ func (rs *restSorter) SortedBy(s *restFieldSort) *restSorter {
 	v := reflect.ValueOf(d).Elem()
 
 	// Get field name from tag
-	if s.field, _ = rs.tags[s.tag]; s.field == "" {
+	if s.field = rs.tags[s.tag]; s.field == "" {
 		log.WithFields(log.Fields{"tag": s.tag}).Error("Field with tag not exist")
 		return rs
 	}
@@ -1002,12 +1004,10 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		clog.RESTBody = string(body[:size])
 	}
 
-	if fields != nil {
-		for key, value := range fields {
-			switch key {
-			case restLogFieldMsg:
-				clog.Msg = value
-			}
+	for key, value := range fields {
+		switch key {
+		case restLogFieldMsg:
+			clog.Msg = value
 		}
 	}
 
@@ -1028,10 +1028,10 @@ func getNewestVersion(vers utils.Set) string {
 	return newest
 }
 
-func isIDStringValid(name string) bool {
-	valid, _ := regexp.MatchString("^[.a-zA-Z0-9_-]*$", name)
-	return valid
-}
+// func isIDStringValid(name string) bool {
+// 	valid, _ := regexp.MatchString("^[.a-zA-Z0-9_-]*$", name)
+// 	return valid
+// }
 
 func isObjectNameValid(name string) bool {
 	// Object name must starts with letters or digits

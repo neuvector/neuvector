@@ -30,7 +30,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
 		return
-	} else if licenseAllowEnforce() == false {
+	} else if !licenseAllowEnforce() {
 		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	} else if _, err := cacher.GetAdmissionState(acc); err != nil {
@@ -142,7 +142,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 							} else {
 								matchedRule.Type = api.ValidatingAllowRuleType
 							}
-							matchedRule.RuleCfgType, _ = cfgTypeMap2Api[assessResult.RuleCfgType]
+							matchedRule.RuleCfgType = cfgTypeMap2Api[assessResult.RuleCfgType]
 							matchedRules = append(matchedRules, matchedRule)
 						}
 						oneResult.MatchedRules = matchedRules

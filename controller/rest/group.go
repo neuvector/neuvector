@@ -58,7 +58,7 @@ func handlerGroupBrief(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	query := restParseQuery(r)
 
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local groups
+	scope := query.pairs[api.QueryScope] // empty string means fed & local groups
 
 	var resp api.RESTGroupsBriefData
 	resp.Groups = make([]*api.RESTGroupBrief, 0)
@@ -160,7 +160,7 @@ func handlerGroupList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	if value, ok := query.pairs[api.QueryKeyView]; ok && value == api.QueryValueViewPod {
 		view = api.QueryValueViewPod
 	}
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local groups
+	scope := query.pairs[api.QueryScope] // empty string means fed & local groups
 
 	var resp api.RESTGroupsData
 	resp.Groups = make([]*api.RESTGroup, 0)
@@ -523,7 +523,7 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 
 		if ct.Key == share.CriteriaKeyNamespace || ct.Key == share.CriteriaKeyDomain {
 			var grp *share.CLUSGroup
-			cfgType, _ := cfgTypeMapping[rg.CfgType]
+			cfgType := cfgTypeMapping[rg.CfgType]
 			if ct.Op != share.CriteriaOpEqual {
 				grp = &share.CLUSGroup{CfgType: cfgType}
 			} else {
@@ -549,7 +549,7 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 				return api.RESTErrInvalidRequest, e, hasAddrCT
 			}
 			if err := validateAddressRange(ct.Value); err != nil {
-				if validateDomainName(ct.Value) == false {
+				if !validateDomainName(ct.Value) {
 					e := fmt.Sprintf("Invalid address criteria %s", kovStr)
 					log.WithFields(log.Fields{"address": ct.Value}).Error(e)
 					return api.RESTErrInvalidRequest, e, hasAddrCT
@@ -594,7 +594,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		CreaterDomains: acc.GetAdminDomains(share.PERMS_RUNTIME_POLICIES),
 		Kind:           share.GroupKindContainer,
 	}
-	cg.CfgType, _ = cfgTypeMapping[rg.CfgType]
+	cg.CfgType = cfgTypeMapping[rg.CfgType]
 	if !acc.Authorize(&cg, nil) {
 		restRespAccessDenied(w, login)
 		return
@@ -808,17 +808,17 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 }
 
 // Must read from cluster instead of cache.
-func isGroupInUse(name string) bool {
-	crhs := clusHelper.GetPolicyRuleList()
-	for _, crh := range crhs {
-		if r, _ := clusHelper.GetPolicyRule(crh.ID); r != nil {
-			if r.From == name || r.To == name {
-				return true
-			}
-		}
-	}
-	return false
-}
+// func isGroupInUse(name string) bool {
+// 	crhs := clusHelper.GetPolicyRuleList()
+// 	for _, crh := range crhs {
+// 		if r, _ := clusHelper.GetPolicyRule(crh.ID); r != nil {
+// 			if r.From == name || r.To == name {
+// 				return true
+// 			}
+// 		}
+// 	}
+// 	return false
+// }
 
 func handlerGroupDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
@@ -1074,7 +1074,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		switch *rc.PolicyMode {
 		case share.PolicyModeLearn, share.PolicyModeEvaluate:
 		case share.PolicyModeEnforce:
-			if licenseAllowEnforce() == false {
+			if !licenseAllowEnforce() {
 				e := "The policy mode is not enabled in the license"
 				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
@@ -1091,7 +1091,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		switch *rc.ProfileMode {
 		case share.PolicyModeLearn, share.PolicyModeEvaluate:
 		case share.PolicyModeEnforce:
-			if licenseAllowEnforce() == false {
+			if !licenseAllowEnforce() {
 				e := "The profile mode is not enabled in the license"
 				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
@@ -1485,7 +1485,7 @@ func deleteFedGroupPolicy() { // delete all fed groups(caller must be fedAdmin),
 	kv.DeletePolicyByCfgTypeTxn(txn, share.FederalCfg)
 
 	gpsMap := clusHelper.GetAllGroups(share.ScopeFed, access.NewFedAdminAccessControl())
-	for name, _ := range gpsMap {
+	for name := range gpsMap {
 		kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
 		if name == api.LearnedExternal {
 			continue
@@ -1525,7 +1525,7 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		switch *rc.PolicyMode {
 		case share.PolicyModeLearn, share.PolicyModeEvaluate:
 		case share.PolicyModeEnforce:
-			if licenseAllowEnforce() == false {
+			if !licenseAllowEnforce() {
 				e := "The policy mode is not enabled in the license"
 				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
@@ -1628,7 +1628,7 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		switch *rc.ProfileMode {
 		case share.PolicyModeLearn, share.PolicyModeEvaluate:
 		case share.PolicyModeEnforce:
-			if licenseAllowEnforce() == false {
+			if !licenseAllowEnforce() {
 				e := "The profile mode is not enabled in the license"
 				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)

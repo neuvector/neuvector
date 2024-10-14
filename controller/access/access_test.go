@@ -620,17 +620,17 @@ func TestDualAccess(t *testing.T) {
 
 // --
 
-type readObject struct {
-	members []string
-}
+// type readObject struct {
+// 	members []string
+// }
 
-func newReadObject(members []string) *readObject {
-	return &readObject{members: members}
-}
+// func newReadObject(members []string) *readObject {
+// 	return &readObject{members: members}
+// }
 
-func (o *readObject) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
-	return o.members, nil
-}
+// func (o *readObject) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
+// 	return o.members, nil
+// }
 
 // --
 

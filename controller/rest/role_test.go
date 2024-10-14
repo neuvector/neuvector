@@ -35,11 +35,11 @@ func TestRoles(t *testing.T) {
 			Fullname: "joe", Password: "123456", Role: api.UserRoleReader,
 		}}
 		body, _ := json.Marshal(data)
-		w := restCall("POST", "/v1/user", body, api.UserRoleAdmin)
+		_ = restCall("POST", "/v1/user", body, api.UserRoleAdmin)
 
 		// Get as reader
 		var resp api.RESTUsersData
-		w = restCall("GET", "/v1/user", nil, api.UserRoleReader)
+		w := restCall("GET", "/v1/user", nil, api.UserRoleReader)
 		if w.status != http.StatusOK {
 			t.Errorf("Get user failed: %v", w.status)
 		}

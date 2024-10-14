@@ -74,7 +74,6 @@ func (c *orchConn) cbWatcherState(state string, err error) {
 			log.WithFields(log.Fields{"error": err}).Error()
 		}
 	}
-	return
 }
 
 func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, old interface{}) {

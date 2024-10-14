@@ -782,7 +782,7 @@ func (rs *Registry) getScanImages(sctx *scanContext, drv registryDriver, dryrun 
 		if allImages != nil {
 			prefix := fmt.Sprintf("%s/", filter.Org)
 			matchAll := (filter.Org == "" && filter.Repo == ".*")
-			for r, _ := range allImages {
+			for r := range allImages {
 				if matchAll || (filter.Org != "" && strings.HasPrefix(r.Repo, prefix)) {
 					// create a new CLUSImage because &r points one same location
 					repos = append(repos, &share.CLUSImage{Repo: r.Repo, RegMod: r.RegMod})
@@ -1181,7 +1181,7 @@ func (rs *Registry) imageScanAdd(img *share.CLUSImage) {
 		return
 	}
 
-	filteredTags, err := filterTags(tags, imageTagFilter.Tag, 0)
+	filteredTags, _ := filterTags(tags, imageTagFilter.Tag, 0)
 
 	if err, _ := rs.backupDrv.Login(rs.config); err != nil {
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "error": err}).Error()
@@ -1227,8 +1227,6 @@ func (rs *Registry) imageScanAdd(img *share.CLUSImage) {
 	} else {
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": img}).Error("Registry changed - ignored")
 	}
-
-	return
 }
 
 // no lock
@@ -1368,7 +1366,7 @@ func (rs *Registry) cleanupOneImage(id string) {
 
 func (rs *Registry) cleanupImages(sctx *scanContext, imageMap map[string]utils.Set) {
 	// remove the out-of-date repository
-	for id, _ := range rs.summary {
+	for id := range rs.summary {
 		if _, ok := imageMap[id]; !ok {
 			rs.cleanupOneImage(id)
 		}
@@ -1821,11 +1819,11 @@ func (rs *Registry) polling(ctx context.Context) {
 const maxRetry = 3
 
 type regScanTask struct {
-	sctx              *scanContext
-	reg               *Registry
-	imageID           string
-	retries           int
-	cancel            context.CancelFunc
+	sctx    *scanContext
+	reg     *Registry
+	imageID string
+	retries int
+	// cancel            context.CancelFunc
 	scanTypesRequired share.ScanTypeMap
 }
 

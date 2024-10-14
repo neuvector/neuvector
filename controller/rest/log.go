@@ -323,8 +323,7 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 	}
 
-	var violationMap map[string]*api.RESTViolationWorkload
-	violationMap = make(map[string]*api.RESTViolationWorkload)
+	violationMap := make(map[string]*api.RESTViolationWorkload)
 	for _, v := range violations {
 		var wlID, wlName, wlDomain string
 		if client {

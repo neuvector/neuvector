@@ -30,10 +30,10 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const (
-	_writeHeader   = true
-	_noWriteHeader = false
-)
+// const (
+// 	_writeHeader   = true
+// 	_noWriteHeader = false
+// )
 
 type admissionRequestObject struct {
 	ApiVersion string            `json:"apiVersion,omitempty"`
@@ -493,7 +493,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		*/
 	}
 	if state.Mode != nil && *state.Mode == share.AdmCtrlModeProtect {
-		if licenseAllowEnforce() == false {
+		if !licenseAllowEnforce() {
 			e := "The policy mode is not enabled in the license"
 			log.WithFields(log.Fields{"mode": *state.Mode}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
@@ -991,7 +991,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 	ruleCfg := confData.Config
-	cfgType, _ := cfgTypeMapping[ruleCfg.CfgType]
+	cfgType := cfgTypeMapping[ruleCfg.CfgType]
 	modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 	if (cfgType != share.UserCreated && cfgType != share.FederalCfg) ||
 		(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) ||
@@ -1123,9 +1123,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 	if ruleCfg.Criteria != nil {
 		resp.Rule.Criteria = make([]*api.RESTAdmRuleCriterion, len(ruleCfg.Criteria))
-		for idx, c := range ruleCfg.Criteria {
-			resp.Rule.Criteria[idx] = c
-		}
+		copy(resp.Rule.Criteria, ruleCfg.Criteria)
 	}
 
 	opa.ConvertToRegoRule(clusConf)
@@ -1702,8 +1700,6 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 		}
 	}
 	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
-
-	return
 }
 
 func validateCustomPathCriteria(crt *share.CLUSAdmRuleCriterion) (bool, bool) {

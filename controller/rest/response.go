@@ -238,7 +238,7 @@ func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	var scope string
-	if scope, _ = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
+	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
 		scope = share.ScopeLocal
 	}
 	if (scope == share.ScopeFed && (!acc.IsFedReader() && !acc.IsFedAdmin() && !acc.HasPermFed())) || !acc.Authorize(&share.CLUSResponseRuleOptionsDummy{}, nil) {
@@ -400,7 +400,7 @@ func responseRule2Cluster(r *api.RESTResponseRule) *share.CLUSResponseRule {
 		Webhooks:   r.Webhooks,
 		Disable:    r.Disable,
 	}
-	ret.CfgType, _ = cfgTypeMapping[r.CfgType]
+	ret.CfgType = cfgTypeMapping[r.CfgType]
 	return ret
 }
 
@@ -455,7 +455,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope] // empty string means fed & local rules
+	scope := query.pairs[api.QueryScope] // empty string means fed & local rules
 
 	size := query.limit
 	if size == 0 {
@@ -473,7 +473,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	collectedRules := make([]*api.RESTResponseRule, 0)
+	var collectedRules []*api.RESTResponseRule
 	if query.limit == 0 {
 		collectedRules = rules[query.start:]
 	} else {
@@ -898,7 +898,7 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	query := restParseQuery(r)
-	scope, _ := query.pairs[api.QueryScope]
+	scope := query.pairs[api.QueryScope]
 	if scope == "" {
 		scope = share.ScopeLocal
 	} else if scope != share.ScopeFed && scope != share.ScopeLocal {

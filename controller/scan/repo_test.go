@@ -109,9 +109,9 @@ func TestLocalRepoScan(t *testing.T) {
 		t.Errorf("Unable to local image cache: id=%+v", sr1.ImageID)
 	} else if c.highVuls != 2 || c.medVuls != 1 {
 		t.Errorf("Incorrect CVE count: high=%+v, medium=%+v", c.highVuls, c.medVuls)
-	} else if h, _ := c.vulInfo["High"]; len(h) != 2 {
+	} else if h := c.vulInfo["High"]; len(h) != 2 {
 		t.Errorf("Incorrect CVE info high count: high=%+v", len(h))
-	} else if m, _ := c.vulInfo["Medium"]; len(m) != 1 {
+	} else if m := c.vulInfo["Medium"]; len(m) != 1 {
 		t.Errorf("Incorrect CVE info medium count: medium=%+v", len(m))
 	}
 
@@ -173,13 +173,13 @@ func TestRemoteRepoScan(t *testing.T) {
 	// store a local image
 	smd.StoreRepoScanResult(&sr1)
 	key := share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
-	sum, _ := mockCluster.ScanSums[key]
+	sum := mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, false, nil)
 
 	// store a remote image
 	smd.StoreRepoScanResult(&sr3)
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr3.ImageID)
-	sum, _ = mockCluster.ScanSums[key]
+	sum = mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr3.ImageID, sum, false, nil)
 
 	// search image that registry matches
