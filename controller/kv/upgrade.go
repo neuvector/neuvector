@@ -391,7 +391,7 @@ func upgradeRuleHead(rules []*share.CLUSRuleHead) (bool, bool) {
 func upgradeAdmissionCert(value []byte) (*share.CLUSAdmissionCertCloaked, bool, bool) {
 	// cert in kv is from 2.5
 	var certOld share.CLUSAdmissionCert
-	if json.Unmarshal(value, &certOld) == nil {
+	if err := json.Unmarshal(value, &certOld); err == nil {
 		certNew := share.CLUSAdmissionCertCloaked{
 			CN:        certOld.CN,
 			CaKeyNew:  string(certOld.CaKey),
@@ -406,6 +406,8 @@ func upgradeAdmissionCert(value []byte) (*share.CLUSAdmissionCertCloaked, bool, 
 		_ = json.Unmarshal(valueNew, &cert)
 		// cert.CaKeyNew / cert.CaCertNew / cert.KeyNew / cert.CertNew are still cloaked
 		return &cert, true, true
+	} else {
+		log.WithFields(log.Fields{"err": err}).Info("Unmarshal")
 	}
 	return nil, false, false
 }
@@ -420,38 +422,38 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 		switch config {
 		case share.CFGEndpointUser:
 			var user share.CLUSUser
-			_ = json.Unmarshal(value, &user)
+			_ = nvJsonUnmarshal(key, value, &user)
 			if upd, wrt := upgradeUser(&user); upd {
 				return &user, wrt
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeSystemConfig(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointServer:
 			var cfg share.CLUSServer
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeServer(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointGroup:
 			var cfg share.CLUSGroup
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeGroup(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointPolicy:
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSPolicyRule
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				if upd, wrt := upgradePolicyRule(&cfg); upd {
 					return &cfg, wrt
 				}
 			} else if share.CLUSIsPolicyZipRuleListKey(key) {
 				var cfg []*share.CLUSRuleHead
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				if upd, wrt := upgradePolicyRuleHead(cfg); upd {
 					return &cfg, wrt
 				}
@@ -459,31 +461,31 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 			}
 		case share.CFGEndpointRegistry:
 			var cfg share.CLUSRegistryConfig
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeRegistry(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointProcessProfile:
 			var cfg share.CLUSProcessProfile
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeProcessProfile(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointFileMonitor:
 			var cfg share.CLUSFileMonitorProfile
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeFileMonitorProfile(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointDlpGroup:
 			var cfg share.CLUSDlpGroup
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeDlpGroup(&cfg); upd {
 				return &cfg, wrt
 			}
 		case share.CFGEndpointDlpRule:
 			var cfg share.CLUSDlpSensor
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if upd, wrt := upgradeDlpSensor(&cfg); upd {
 				return &cfg, wrt
 			}
@@ -493,7 +495,7 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 				token := share.CLUSPolicyKey2AdmCfgSubkey(key)
 				if token == share.CLUSAdmissionCfgState {
 					var state share.CLUSAdmissionState
-					_ = json.Unmarshal(value, &state)
+					_ = nvJsonUnmarshal(key, value, &state)
 					if upd, wrt := upgradeAdmCtrlState(config, &state); upd {
 						return &state, wrt
 					}
@@ -501,13 +503,13 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 					if config == share.CFGEndpointAdmissionControl {
 						if token == share.CLUSAdmissionCfgRule {
 							var rule share.CLUSAdmissionRule
-							_ = json.Unmarshal(value, &rule)
+							_ = nvJsonUnmarshal(key, value, &rule)
 							if upd, wrt := upgradeAdmCtrlRule(&rule); upd {
 								return &rule, wrt
 							}
 						} else if token == share.CLUSAdmissionCfgRuleList {
 							var cfg []*share.CLUSRuleHead
-							_ = json.Unmarshal(value, &cfg)
+							_ = nvJsonUnmarshal(key, value, &cfg)
 							if upd, wrt := upgradeRuleHead(cfg); upd {
 								return &cfg, wrt
 							}
@@ -524,23 +526,23 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 				}
 			} else if config == share.CFGEndpointCrd && scope == resource.NvSecurityRuleKind {
 				var cfg share.CLUSCrdSecurityRule
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				if upd, wrt := upgradeCrdSecurityRule(&cfg); upd {
 					return &cfg, wrt
 				}
 			}
 		case share.CFGEndpointResponseRule:
 			var cfg share.CLUSResponseRule
-			_ = json.Unmarshal(value, &cfg)
+			_ = nvJsonUnmarshal(key, value, &cfg)
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSResponseRule
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				if upd, wrt := upgradeResponseRule(&cfg); upd {
 					return &cfg, wrt
 				}
 			} else if share.CLUSIsPolicyRuleListKey(key) {
 				var cfg []*share.CLUSRuleHead
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				if upd, wrt := upgradeRuleHead(cfg); upd {
 					return &cfg, wrt
 				}
@@ -548,7 +550,7 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 		case share.CFGEndpointVulnerability:
 			if key == share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName) {
 				var cfg share.CLUSVulnerabilityProfile
-				if err := json.Unmarshal(value, &cfg); err == nil {
+				if err := nvJsonUnmarshal(key, value, &cfg); err == nil {
 					upd := false
 					if cfg.CfgType == 0 {
 						cfg.CfgType = share.UserCreated
@@ -562,7 +564,7 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 		case share.CFGEndpointCompliance:
 			if key == share.CLUSComplianceProfileKey(share.DefaultComplianceProfileName) {
 				var cfg share.CLUSComplianceProfile
-				if err := json.Unmarshal(value, &cfg); err == nil {
+				if err := nvJsonUnmarshal(key, value, &cfg); err == nil {
 					upd := false
 					if cfg.CfgType == 0 {
 						cfg.CfgType = share.UserCreated
@@ -647,10 +649,12 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 			if share.CLUSKeyLength(key) == 4 {
 				if v == nil {
 					var r share.CLUSAwsResource
-					_ = json.Unmarshal(value, &r)
+					_ = nvJsonUnmarshal(key, value, &r)
 					v = &r
 				}
-				_ = dec.Uncloak(v)
+				if err := dec.Uncloak(v); err != nil {
+					log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
+				}
 			}
 		}
 	case "config":
@@ -660,32 +664,40 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 		case share.CFGEndpointSystem:
 			if v == nil {
 				var cfg share.CLUSSystemConfig
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			_ = dec.Uncloak(v)
+			if err := dec.Uncloak(v); err != nil {
+				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
+			}
 		case share.CFGEndpointServer:
 			if v == nil {
 				var cfg share.CLUSServer
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			_ = dec.Uncloak(v)
+			if err := dec.Uncloak(v); err != nil {
+				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
+			}
 		case share.CFGEndpointRegistry:
 			if v == nil {
 				var cfg share.CLUSRegistryConfig
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			_ = dec.Uncloak(v)
+			if err := dec.Uncloak(v); err != nil {
+				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
+			}
 		case share.CFGEndpointCloud:
 			if v == nil {
 				// Currently the only data structure
 				var cfg share.CLUSAwsProjectCfg
-				_ = json.Unmarshal(value, &cfg)
+				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			_ = dec.Uncloak(v)
+			if err := dec.Uncloak(v); err != nil {
+				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
+			}
 		}
 	}
 
@@ -813,7 +825,7 @@ func getControlVersion() *share.CLUSCtrlVersion {
 	key := share.CLUSCtrlVerKey
 	value, _ := cluster.Get(key)
 	if value != nil {
-		_ = json.Unmarshal(value, &ver)
+		_ = nvJsonUnmarshal(key, value, &ver)
 		return &ver
 	}
 
@@ -1111,7 +1123,7 @@ func upgradeDomainRoles() {
 		if value, err := cluster.Get(key); err == nil {
 			server := share.CLUSServer{}
 			updated := false
-			if err = json.Unmarshal(value, &server); err == nil {
+			if err = nvJsonUnmarshal(key, value, &server); err == nil {
 				caseSensitive := true
 				var roleGroups *map[string][]string
 				if server.LDAP != nil {
@@ -1426,7 +1438,7 @@ func renameCustomReservedRoles() {
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			user := share.CLUSUser{}
-			if err = json.Unmarshal(value, &user); err == nil {
+			if err = nvJsonUnmarshal(key, value, &user); err == nil {
 				if updated := reassignMappedUserRoles(&user, roleNameMapping); updated {
 					value, _ := json.Marshal(&user)
 					if err = cluster.Put(key, value); err != nil {
@@ -1443,7 +1455,7 @@ func renameCustomReservedRoles() {
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			server := share.CLUSServer{}
-			if err = json.Unmarshal(value, &server); err == nil {
+			if err = nvJsonUnmarshal(key, value, &server); err == nil {
 				if updated := reassignMappedServerRoles(&server, roleNameMapping); updated {
 					value, _ := json.Marshal(&server)
 					if err = cluster.Put(key, value); err != nil {
@@ -1612,7 +1624,7 @@ func upgradeDlpGroup(cfg *share.CLUSDlpGroup) (bool, bool) {
 		key := share.CLUSGroupKey(cfg.Name)
 		if value, err := cluster.Get(key); err == nil {
 			var group share.CLUSGroup
-			_ = json.Unmarshal(value, &group)
+			_ = nvJsonUnmarshal(key, value, &group)
 			cfg.CfgType = group.CfgType
 			return true, true
 		}

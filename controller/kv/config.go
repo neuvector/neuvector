@@ -275,7 +275,7 @@ func (c *configHelper) isKvRestoring() (string, bool) {
 
 	value, _ := cluster.Get(share.CLUSKvRestoreKey)
 	if value != nil {
-		_ = json.Unmarshal(value, &kvRestore)
+		_ = nvJsonUnmarshal(share.CLUSKvRestoreKey, value, &kvRestore)
 		if !kvRestore.StartAt.IsZero() && time.Since(kvRestore.StartAt) < time.Duration(2)*time.Minute {
 			return kvRestore.CtrlerID, true
 		}
@@ -460,6 +460,8 @@ func (c *configHelper) Restore() (string, bool, bool, string, error) {
 		var fedRulesRev share.CLUSFedRulesRevision
 		if err := json.Unmarshal([]byte(importInfo.fedRulesRevValue), &fedRulesRev); err == nil {
 			_ = clusHelper.PutFedRulesRevision(nil, &fedRulesRev)
+		} else {
+			log.WithFields(log.Fields{"err": err}).Info("Unmarshal")
 		}
 	}
 
@@ -733,6 +735,8 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 							_ = clusHelper.PutFedRulesRevision(txn, share.CLUSEmptyFedRulesRevision())
 						}
 						log.WithFields(log.Fields{"fedRole": importFedRole}).Info("Will import from")
+					} else {
+						log.WithFields(log.Fields{"err": err, "key": key}).Error("dec.Unmarshal")
 					}
 					if currFedRole == "" && importFedRole == api.FedRoleMaster {
 						// for stand-alone cluster, we allow it to promote to master cluster by importing master cluster's backup file
@@ -765,12 +769,14 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					strNew := fmt.Sprintf("\"%s\":\"0001-01-01T00:00:00Z\"", field)
 					value = strings.Replace(value, strOld, strNew, 1)
 				}
-				if err := json.Unmarshal([]byte(value), &u); err == nil {
+				if err := nvJsonUnmarshal(key, []byte(value), &u); err == nil {
 					u.FailedLoginCount = 0
 					u.BlockLoginSince = time.Time{}
 					u.PwdResetTime = time.Now().UTC()
 					data, _ := json.Marshal(&u)
 					value = string(data)
+				} else {
+					log.WithFields(log.Fields{"err": err}).Info("Unmarshal")
 				}
 			}
 
@@ -801,7 +807,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						if ep.name == share.CFGEndpointAdmissionControl && key == "object/config/admission_control/default/state" {
 							//time.Sleep(time.Second) // so that controllers have chance to update cache
 							var state share.CLUSAdmissionState
-							if err := json.Unmarshal([]byte(value), &state); err == nil {
+							if err := nvJsonUnmarshal(key, []byte(value), &state); err == nil {
 								if ctrlState := state.CtrlStates[admission.NvAdmValidateType]; ctrlState != nil {
 									var failurePolicy string
 									if state.FailurePolicy == resource.FailLower {
@@ -894,6 +900,8 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 		var fedRulesRev share.CLUSFedRulesRevision
 		if err := json.Unmarshal([]byte(importInfo.fedRulesRevValue), &fedRulesRev); err == nil {
 			_ = clusHelper.PutFedRulesRevision(nil, &fedRulesRev)
+		} else {
+			log.WithFields(log.Fields{"err": err}).Info("Failed to unmarshal fed rules revision")
 		}
 	}
 
@@ -928,7 +936,9 @@ func getBackupVersion() share.CLUSCtrlVersion {
 		log.WithFields(log.Fields{"error": err, "file": source}).Error("Unable to read file")
 		return ver
 	} else {
-		_ = json.Unmarshal([]byte(value), &ver)
+		if err := json.Unmarshal([]byte(value), &ver); err != nil {
+			log.WithFields(log.Fields{"err": err}).Info("Unmarshal")
+		}
 		return ver
 	}
 }
