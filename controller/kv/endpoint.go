@@ -221,7 +221,7 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 					tmpvalue = uzb
 				}
 
-				if err := json.Unmarshal(tmpvalue, &rhs); err == nil {
+				if nvJsonUnmarshal(key, tmpvalue, &rhs) == nil {
 					// because fed policies are always in top, we can simply iterate thru rhs
 					firstNonFedIdx := len(rhs)
 					for idx, rh := range rhs {
@@ -388,7 +388,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			subKey := share.CLUSKeyNthToken(key, 3)
 			if subKey == share.CLUSFedMembershipSubKey {
 				var m share.CLUSFedMembership
-				if err := json.Unmarshal([]byte(value), &m); err == nil {
+				if nvJsonUnmarshal(key, []byte(value), &m) == nil {
 					importInfo.fedRole = m.FedRole
 					log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Info()
 				}
@@ -445,7 +445,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 
 		if ep.name == share.CFGEndpointUser {
 			var u share.CLUSUser
-			if err := json.Unmarshal([]byte(value), &u); err == nil {
+			if nvJsonUnmarshal(key, []byte(value), &u) == nil {
 				u.FailedLoginCount = 0
 				u.BlockLoginSince = time.Time{}
 				u.PwdResetTime = time.Now().UTC()

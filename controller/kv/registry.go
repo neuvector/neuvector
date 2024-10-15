@@ -100,7 +100,7 @@ func restoreToCluster(reg, fedRole string) string {
 	// 1. Read summary first
 	sums := make([]*share.CLUSRegistryImageSummary, 0)
 	if !isFedReg || fedRole == api.FedRoleMaster || (fedRole == api.FedRoleJoint && isFedReg) {
-		_ = filepath.Walk(regPath, func(path string, info os.FileInfo, err error) error {
+		err2 := filepath.Walk(regPath, func(path string, info os.FileInfo, err error) error {
 			if info != nil && strings.HasSuffix(path, summarySuffix) {
 				value, err := os.ReadFile(path)
 				if err == nil {
@@ -120,6 +120,9 @@ func restoreToCluster(reg, fedRole string) string {
 			}
 			return nil
 		})
+		if err2 != nil {
+			log.WithFields(log.Fields{"error": err2.Error(), "dir": regPath}).Error("Failed to walk directory")
+		}
 	} else {
 		os.RemoveAll(regPath)
 	}
