@@ -104,14 +104,14 @@ func makeLocalUserWithRole(username, password, role string, roleDomains map[stri
 
 func getLoginToken(w *mockResponseWriter) string {
 	var data api.RESTTokenData
-	json.Unmarshal(w.body, &data)
+	_ = json.Unmarshal(w.body, &data)
 	return data.Token.Token
 }
 
 func checkUserAttrs(w *mockResponseWriter, server, user, role string, tmo uint32) error {
 	// Check returned User attributes
 	var data api.RESTTokenData
-	json.Unmarshal(w.body, &data)
+	_ = json.Unmarshal(w.body, &data)
 	if data.Token.Server != server || data.Token.Username != user || data.Token.Role != role {
 		return fmt.Errorf("Error in user attributes: %+v", *data.Token)
 	}
@@ -138,7 +138,7 @@ func TestLocalLogin(t *testing.T) {
 	clusHelper = &mockCluster
 
 	user := makeLocalUser("user", "pass", api.UserRoleReader)
-	clusHelper.CreateUser(user)
+	_ = clusHelper.CreateUser(user)
 
 	cacher = &mockCache{}
 
@@ -184,7 +184,7 @@ func TestLDAPLogin(t *testing.T) {
 			},
 		},
 	}
-	clusHelper.PutServerRev(&ldap, 0)
+	_ = clusHelper.PutServerRev(&ldap, 0)
 
 	mockAuther := mockRemoteAuth{users: make(map[string]*passwordUser)}
 	// User group membership doesn't match role group mapping
@@ -219,7 +219,7 @@ func TestLDAPLogin(t *testing.T) {
 	// Revert user group membership, add default role to server
 	mockAuther.addPasswordUser("user", "pass", []string{"group2"})
 	ldap.LDAP.DefaultRole = api.UserRoleAdmin
-	clusHelper.PutServerRev(&ldap, 0)
+	_ = clusHelper.PutServerRev(&ldap, 0)
 
 	w = login("user", "pass")
 	if w.status != http.StatusOK {
@@ -383,7 +383,7 @@ func TestLocalLoginServer(t *testing.T) {
 	clusHelper = &mockCluster
 
 	user := makeLocalUser("user", "pass", api.UserRoleAdmin)
-	clusHelper.CreateUser(user)
+	_ = clusHelper.CreateUser(user)
 
 	cacher = &mockCache{}
 
@@ -436,7 +436,7 @@ func TestLDAPLoginServer(t *testing.T) {
 			},
 		},
 	}
-	clusHelper.PutServerRev(&ldap, 0)
+	_ = clusHelper.PutServerRev(&ldap, 0)
 
 	mockAuther := mockRemoteAuth{users: make(map[string]*passwordUser)}
 	// User group membership doesn't match role group mapping
@@ -485,7 +485,7 @@ func TestSAMLLogin(t *testing.T) {
 			},
 		},
 	}
-	clusHelper.PutServerRev(&ldap, 0)
+	_ = clusHelper.PutServerRev(&ldap, 0)
 
 	// Not enabled
 	saml := share.CLUSServer{
@@ -505,7 +505,7 @@ func TestSAMLLogin(t *testing.T) {
 			X509Cert: "cert",
 		},
 	}
-	clusHelper.PutServerRev(&saml, 0)
+	_ = clusHelper.PutServerRev(&saml, 0)
 
 	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
 	mockAuther.addSAMLUser("token", map[string][]string{"Email": {"joe@example.com"}})
@@ -570,7 +570,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 			X509Cert: "cert",
 		},
 	}
-	clusHelper.PutServerRev(&saml, 0)
+	_ = clusHelper.PutServerRev(&saml, 0)
 
 	username := "joe"
 	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
@@ -612,7 +612,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 
 	// Modify user's timeout and role by admin
 	admin := makeLocalUser("admin", "admin", api.UserRoleAdmin)
-	clusHelper.CreateUser(admin)
+	_ = clusHelper.CreateUser(admin)
 	w = login("admin", "admin")
 	tokenAdmin := getLoginToken(w)
 
@@ -828,7 +828,7 @@ func TestOIDCLogin(t *testing.T) {
 			},
 		},
 	}
-	clusHelper.PutServerRev(&ldap, 0)
+	_ = clusHelper.PutServerRev(&ldap, 0)
 
 	// Not enabled
 	oidc := share.CLUSServer{
@@ -846,7 +846,7 @@ func TestOIDCLogin(t *testing.T) {
 			Issuer: "issuer",
 		},
 	}
-	clusHelper.PutServerRev(&oidc, 0)
+	_ = clusHelper.PutServerRev(&oidc, 0)
 
 	mockAuther := mockRemoteAuth{oidcUsers: make(map[string]*oidcUser)}
 	mockAuther.addOIDCUser("token", map[string]interface{}{oidcPreferredNameKey: "joe@example.com"})

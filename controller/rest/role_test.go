@@ -43,7 +43,7 @@ func TestRoles(t *testing.T) {
 		if w.status != http.StatusOK {
 			t.Errorf("Get user failed: %v", w.status)
 		}
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 		if len(resp.Users) != 1 {
 			t.Errorf("Incorrect user count in rest: count=%v expect=1", len(resp.Users))
 		}
@@ -56,7 +56,7 @@ func TestRoles(t *testing.T) {
 		if w.status != http.StatusOK {
 			t.Errorf("Get user failed: %v", w.status)
 		}
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 		if len(resp.Users) != 0 {
 			t.Errorf("CIOps user should not be able to get user list: count=%v expect=0", len(resp.Users))
 		}

@@ -752,6 +752,7 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 	rpt1, code, _ := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, acc)
 	if code != 0 {
 		// Ignore the error in the master node as some nodes are not master. (BenchStatusNotSupport)
+		log.WithFields(log.Fields{"code": code}).Debug("Ignore the error in the master node as some nodes are not master")
 	}
 	rpt2, code, errMsg := getCISReportFromCluster(share.BenchKubeWorker, id, cpf, acc)
 	if code != 0 {

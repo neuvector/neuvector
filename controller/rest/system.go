@@ -2619,7 +2619,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		} else {
 			body, _ := io.ReadAll(r.Body)
 			body = _preprocessImportBody(body)
-			json_data, err := yaml.YAMLToJSON(body)
+			var json_data []byte
+			json_data, err = yaml.YAMLToJSON(body)
 			if err != nil {
 				log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Request error")
 				restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

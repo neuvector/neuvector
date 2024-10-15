@@ -49,7 +49,7 @@ func verifyCustomRole(testID string, data *api.RESTUserRoleConfigData, acc *acce
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get role: status=%v.", w.status)
 	}
-	json.Unmarshal(w.body, &resp)
+	_ = json.Unmarshal(w.body, &resp)
 	if resp.Role.Name != data.Config.Name || resp.Role.Comment != data.Config.Comment || resp.Role.Reserved {
 		t.Fatalf("Incorrect role by REST: role=%v", data.Config.Name)
 	} else {
@@ -134,7 +134,7 @@ func TestRoleCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get roles: status=%v.", w.status)
 	}
-	json.Unmarshal(w.body, &resp)
+	_ = json.Unmarshal(w.body, &resp)
 	if len(resp.Roles) != 4 { // 4 reserved roles(not including None) + created custom role
 		t.Fatalf("Incorrect role count in rest: count=%v expected=5", len(resp.Roles))
 	}

@@ -68,7 +68,7 @@ func TestPolicyRuleList(t *testing.T) {
 	w := restCall("GET", "/v1/policy/rule?scope=fed", nil, api.UserRoleReader)
 	if w.status == http.StatusOK {
 		var resp api.RESTPolicyRulesData
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 		if len(resp.Rules) != 1 {
 			t.Errorf("List policy rules positive: Status is OK.")
 			t.Logf("  Expect len: 1\n")
@@ -104,7 +104,7 @@ func TestPolicyRuleShow(t *testing.T) {
 		w := restCall("GET", "/v1/policy/rule/10", nil, api.UserRoleAdmin)
 
 		var resp api.RESTPolicyRuleData
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 
 		if !compareRESTRules(&rule, resp.Rule) {
 			t.Errorf("Get existing rule: Not found.")
@@ -124,7 +124,7 @@ func TestPolicyRuleShow(t *testing.T) {
 		}
 
 		var resp api.RESTError
-		json.Unmarshal(w.body, &resp)
+		_ = json.Unmarshal(w.body, &resp)
 
 		if resp.Code != api.RESTErrObjectNotFound {
 			t.Errorf("Get non-existing policy: Incorrect error code.")
@@ -867,8 +867,6 @@ func TestFedPolicyRuleMove(t *testing.T) {
 					t.Errorf("Move fed policy rule(%d) positive: Status is OK.", idx)
 					t.Logf("  Expect IDs: %d, %d, %d, %d, %d\n", expected[idx].IDs[0], expected[idx].IDs[1], expected[idx].IDs[2], expected[idx].IDs[3], expected[idx].IDs[4])
 					t.Logf("  Actual IDs: %d, %d, %d, %d, %d\n", crhs[0].ID, crhs[1].ID, crhs[2].ID, crhs[3].ID, crhs[4].ID)
-				} else {
-					// t.Logf("  Now IDs(%d): %d, %d, %d, %d, %d\n", idx, crhs[0].ID, crhs[1].ID, crhs[2].ID, crhs[3].ID, crhs[4].ID) //->
 				}
 			} else {
 				t.Errorf("Move fed policy rule(%d) positive: Status is not OK", idx)
@@ -1422,12 +1420,13 @@ func TestPolicyRuleReplaceTime(t *testing.T) {
 		nrule, _ := clusHelper.GetPolicyRule(rule1.ID)
 		if nrule == nil {
 			t.Errorf("Replace policy rules positive: rule1 should not be removed.")
-		}
-		if nrule.CreatedAt != createdAt {
-			t.Errorf("Replace policy rules positive: rule1 created time should not be changed. %+v", nrule)
-		}
-		if nrule.LastModAt == lastModAt {
-			t.Errorf("Replace policy rules positive: rule1 last modify time should be updated. %+v", nrule)
+		} else {
+			if nrule.CreatedAt != createdAt {
+				t.Errorf("Replace policy rules positive: rule1 created time should not be changed. %+v", nrule)
+			}
+			if nrule.LastModAt == lastModAt {
+				t.Errorf("Replace policy rules positive: rule1 last modify time should be updated. %+v", nrule)
+			}
 		}
 	}
 
@@ -2097,13 +2096,7 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		data := api.RESTPolicyRuleActionData{Rules: &[]*api.RESTPolicyRule{&rr2, &rr3, &rr4, &rr1}}
 		body, _ := json.Marshal(data)
 
-		w := restCall("PATCH", "/v1/policy/rule?scope=fed", body, api.UserRoleAdmin)
-
-		if w.status == http.StatusOK {
-			/*t.Errorf("Replace to add a new fed rule ID with conflict ID: Status is OK.")
-			t.Logf("  Expect status: %+v\n", http.StatusOK)
-			t.Logf("  Actual status: %+v\n", w.status)*/
-		}
+		restCall("PATCH", "/v1/policy/rule?scope=fed", body, api.UserRoleAdmin)
 
 		expcrhs := []*share.CLUSRuleHead{
 			{ID: 100003, CfgType: share.FederalCfg},
@@ -3285,7 +3278,7 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 		user1 := makeLocalUserWithRole("user1", "111111", api.UserRoleNone,
 			map[string][]string{api.UserRoleAdmin: {"domain1", "domain2"}},
 		)
-		clusHelper.CreateUser(user1)
+		_ = clusHelper.CreateUser(user1)
 
 		w := login("user1", "111111")
 		token1 := getLoginToken(w)
@@ -3319,7 +3312,7 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 			t.Errorf("Surprised to replace policy rules successfully: Status is OK.")
 		} else {
 			var resp api.RESTErrorReadOnlyRules
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if len(resp.ReadOnlyRuleIDs) == 2 && ((resp.ReadOnlyRuleIDs[0] == 14 && resp.ReadOnlyRuleIDs[1] == 15) || (resp.ReadOnlyRuleIDs[0] == 15 && resp.ReadOnlyRuleIDs[1] == 14)) {
 			} else {
 				t.Errorf("Wrong error read-only rule IDs: %+v", resp.ReadOnlyRuleIDs)
@@ -3337,7 +3330,7 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 			t.Errorf("Surprised to replace policy rules successfully: Status is OK.")
 		} else {
 			var resp api.RESTErrorReadOnlyRules
-			json.Unmarshal(w.body, &resp)
+			_ = json.Unmarshal(w.body, &resp)
 			if len(resp.ReadOnlyRuleIDs) == 1 && (resp.ReadOnlyRuleIDs[0] == 14) {
 			} else {
 				t.Errorf("Wrong error read-only rule IDs: %+v", resp.ReadOnlyRuleIDs)

@@ -17,19 +17,71 @@ func TestFilterPositive(t *testing.T) {
 	preTest()
 
 	cases := map[string]share.CLUSRegistryFilter{
-		"neuvector/image:latest":      {"neuvector", "image", "latest"},
-		"neuvector/image:*":           {"neuvector", "image", ".*"},
-		"neuvector/*:*":               {"neuvector", ".*", ".*"},
-		"neuvector/*":                 {"neuvector", ".*", ".*"},
-		"*:*":                         {"", ".*", ".*"},
-		"neuvector/[image1|image2]:*": {"neuvector", "[image1|image2]", ".*"},
-		"neu*:*":                      {"", "neu.*", ".*"},
-		"neuvector/*:v2.1":            {"neuvector", ".*", "v2.1"},
-		"neuvector/*:v2.*":            {"neuvector", ".*", "v2.*"},
-		"neuvector/*:v2.[0]{1,2}":     {"neuvector", ".*", "v2.[0]{1,2}"},
-		"neuvector/*:v2.[0]*":         {"neuvector", ".*", "v2.[0]*"},
-		"neuvector/*_20201010_*:*":    {"neuvector", ".*_20201010_.*", ".*"},
-		"neuvector/.*_20201010_*:*":   {"neuvector", ".*_20201010_.*", ".*"},
+		"neuvector/image:latest": {
+			Org:  "neuvector",
+			Repo: "image",
+			Tag:  "latest",
+		},
+		"neuvector/image:*": {
+			Org:  "neuvector",
+			Repo: "image",
+			Tag:  ".*",
+		},
+		"neuvector/*:*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  ".*",
+		},
+		"neuvector/*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  ".*",
+		},
+		"*:*": {
+			Org:  "",
+			Repo: ".*",
+			Tag:  ".*",
+		},
+		"neuvector/[image1|image2]:*": {
+			Org:  "neuvector",
+			Repo: "[image1|image2]",
+			Tag:  ".*",
+		},
+		"neu*:*": {
+			Org:  "",
+			Repo: "neu.*",
+			Tag:  ".*",
+		},
+		"neuvector/*:v2.1": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.1",
+		},
+		"neuvector/*:v2.*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.*",
+		},
+		"neuvector/*:v2.[0]{1,2}": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.[0]{1,2}",
+		},
+		"neuvector/*:v2.[0]*": {
+			Org:  "neuvector",
+			Repo: ".*",
+			Tag:  "v2.[0]*",
+		},
+		"neuvector/*_20201010_*:*": {
+			Org:  "neuvector",
+			Repo: ".*_20201010_.*",
+			Tag:  ".*",
+		},
+		"neuvector/.*_20201010_*:*": {
+			Org:  "neuvector",
+			Repo: ".*_20201010_.*",
+			Tag:  ".*",
+		},
 	}
 
 	for k, v := range cases {

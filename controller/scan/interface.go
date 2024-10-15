@@ -668,13 +668,14 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 			}
 			rvuls = vpf.FilterVulREST(rvuls, idns, showTag)
 
-			var rsecrets []*api.RESTScanSecret
-			if !rs.config.DisableFiles && layer.Secrets != nil {
-				rsecrets = make([]*api.RESTScanSecret, 0)
-				for _, s := range layer.Secrets.Logs {
-					rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
-				}
-			}
+			// we don't return secret in the report
+			// var rsecrets []*api.RESTScanSecret
+			// if !rs.config.DisableFiles && layer.Secrets != nil {
+			// 	rsecrets = make([]*api.RESTScanSecret, 0)
+			// 	for _, s := range layer.Secrets.Logs {
+			// 		rsecrets = append(rsecrets, scanUtils.ScanSecrets2REST(s))
+			// 	}
+			// }
 			layers[j] = &api.RESTScanLayer{Digest: layer.Digest, Cmds: layer.Cmds, Vuls: rvuls /*Secrets: rsecrets,*/, Size: layer.Size}
 		}
 		return &api.RESTScanLayersReport{Layers: layers}, nil

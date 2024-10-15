@@ -319,9 +319,9 @@ func validateResponseRule(r *api.RESTResponseRule, acc *access.AccessControl) er
 				} else if cd.CondType == share.EventCondTypeCVEName {
 					r.Conditions[i].CondValue = strings.ToUpper(cd.CondValue)
 				}
-			} else if r.Event == share.EventCompliance {
-				// value validation
-			}
+			} //else if r.Event == share.EventCompliance {
+			// value validation
+			// }
 			if !cds.Contains(cd.CondType) {
 				cds.Add(cd.CondType)
 			} else {
@@ -589,7 +589,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 
 	var cfgType share.TCfgType = share.UserCreated
@@ -603,7 +603,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-			return fmt.Errorf(e)
+			return fmt.Errorf("%s", e)
 		}
 
 		if rr.ID == api.PolicyAutoID {

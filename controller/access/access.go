@@ -1357,7 +1357,7 @@ type AccessOP string
 
 const (
 	AccessOPRead  AccessOP = "read"
-	AccessOPWrite          = "write"
+	AccessOPWrite AccessOP = "write"
 )
 
 const AccessDomainGlobal = ""

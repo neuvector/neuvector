@@ -11,8 +11,8 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -245,15 +245,15 @@ func handlerSnifferStart(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	res, err := rpc.SnifferCmd(agentID, req)
 	if err != nil {
-		switch grpc.Code(err) {
+		switch status.Code(err) {
 		case codes.InvalidArgument:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Invalid argument")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Invalid argument")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		case codes.Internal:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Failed to start sniffer")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Failed to start sniffer")
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrAgentError, "Failed to start sniffer")
 		default:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Failed to start sniffer")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Failed to start sniffer")
 			restRespError(w, http.StatusInternalServerError, api.RESTErrClusterRPCError)
 		}
 		return
@@ -290,18 +290,18 @@ func handlerSnifferStop(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	req := &share.CLUSSnifferRequest{ID: id, Cmd: share.SnifferCmd_StopSniffer}
 	_, err = rpc.SnifferCmd(agentId, req)
 	if err != nil {
-		switch grpc.Code(err) {
+		switch status.Code(err) {
 		case codes.NotFound:
 			log.Error("Failed to locate sniffer")
 			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		case codes.InvalidArgument:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Invalid argument")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Invalid argument")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		case codes.Internal:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Failed to stop sniffer")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Failed to stop sniffer")
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrAgentError, "Failed to stop sniffer")
 		default:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Failed to stop sniffer")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Failed to stop sniffer")
 			restRespError(w, http.StatusInternalServerError, api.RESTErrClusterRPCError)
 		}
 		return
@@ -333,18 +333,18 @@ func handlerSnifferDelete(w http.ResponseWriter, r *http.Request, ps httprouter.
 	req := &share.CLUSSnifferRequest{ID: id, Cmd: share.SnifferCmd_RemoveSniffer}
 	_, err = rpc.SnifferCmd(agentId, req)
 	if err != nil {
-		switch grpc.Code(err) {
+		switch status.Code(err) {
 		case codes.NotFound:
 			log.Error("Failed to locate sniffer")
 			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		case codes.InvalidArgument:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Invalid argument")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Invalid argument")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		case codes.Internal:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Failed to remove sniffer")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Failed to remove sniffer")
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrAgentError, "Failed to remove sniffer")
 		default:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Debug("Failed to delete sniffer")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Debug("Failed to delete sniffer")
 			restRespError(w, http.StatusInternalServerError, api.RESTErrClusterRPCError)
 		}
 		return
@@ -381,15 +381,15 @@ func handlerSnifferGetFile(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	pcap, err := rpc.GetSnifferPcap(agentId, id, query.limit)
 	if err != nil {
-		switch grpc.Code(err) {
+		switch status.Code(err) {
 		case codes.NotFound:
 			log.Error("Failed to locate sniffer")
 			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		case codes.Internal:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Error("Failed to download pcap file")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Error("Failed to download pcap file")
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrAgentError, "Failed to download pcap file")
 		default:
-			log.WithFields(log.Fields{"error": grpc.ErrorDesc(err)}).Debug("Failed to download pcap file")
+			log.WithFields(log.Fields{"error": status.Convert(err).Message()}).Debug("Failed to download pcap file")
 			restRespError(w, http.StatusInternalServerError, api.RESTErrClusterRPCError)
 		}
 		return

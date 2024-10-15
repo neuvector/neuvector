@@ -280,7 +280,7 @@ func validateAddressRange(ipRange string) error {
 	ip, ipr := utils.ParseIPRange(ipRange)
 	if ip == nil || ipr == nil || bytes.Compare(ip, ipr) > 0 {
 		e := "Invalid IP range"
-		return fmt.Errorf(e)
+		return fmt.Errorf("%s", e)
 	}
 	return nil
 }
@@ -1818,7 +1818,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	if invalidCrdKind || len(secRules) == 0 {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
 		return nil
 	}
 
@@ -1849,7 +1849,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
 			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(&secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
-				err = fmt.Errorf(errMsg)
+				err = fmt.Errorf("%s", errMsg)
 				break
 			} else {
 				log.WithFields(log.Fields{"target": grpCfgRet.TargetName, "len": len(grpCfgRet.GroupCfgs)}).Debug()
