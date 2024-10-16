@@ -8,3 +8,9 @@ linters:
     - staticcheck
     - unused
     - gofmt
+
+issues:
+  exclude-rules:
+    - linters:
+        - staticcheck
+      text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
