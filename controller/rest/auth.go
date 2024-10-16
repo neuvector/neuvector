@@ -665,8 +665,11 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	}
 
 	// Check token end-of-life
+	if claims.ExpiresAt == nil {
+		return nil, userInvalidRequest, rsessToken
+	}
 	now := time.Now()
-	if claims.ExpiresAt != nil && now.After(claims.ExpiresAt.Time) {
+	if now.After(claims.ExpiresAt.Time) {
 		return nil, userTimeout, rsessToken
 	}
 
@@ -1426,17 +1429,17 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	}
 	now := time.Now()
 	c := tokenClaim{
-		Remote:           remote,
-		Fullname:         user.Fullname,
-		Username:         user.Username,
-		Server:           user.Server,
-		EMail:            user.EMail,
-		Locale:           user.Locale,
-		MainSessionID:    mainSessionID,
-		MainSessionUser:  mainSessionUser,
-		Timeout:          user.Timeout,
-		Roles:            domainRoles,
-		ExtraPermits:     extraDomainPermits,
+		Remote:          remote,
+		Fullname:        user.Fullname,
+		Username:        user.Username,
+		Server:          user.Server,
+		EMail:           user.EMail,
+		Locale:          user.Locale,
+		MainSessionID:   mainSessionID,
+		MainSessionUser: mainSessionUser,
+		Timeout:         user.Timeout,
+		Roles:           domainRoles,
+		ExtraPermits:    extraDomainPermits,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        id,
 			Subject:   installID,
@@ -1532,20 +1535,20 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 	now := time.Now()
 
 	c := tokenClaim{
-		Fullname:         user.Fullname,
-		Username:         user.Username,
-		Server:           user.Server,
-		EMail:            user.EMail,
-		Locale:           user.Locale,
-		MainSessionID:    login.id,
-		MainSessionUser:  login.fullname,
-		Timeout:          user.Timeout,
-		Roles:            user.RemoteRolePermits.DomainRole,
-		ExtraPermits:     user.RemoteRolePermits.ExtraPermits,
+		Fullname:        user.Fullname,
+		Username:        user.Username,
+		Server:          user.Server,
+		EMail:           user.EMail,
+		Locale:          user.Locale,
+		MainSessionID:   login.id,
+		MainSessionUser: login.fullname,
+		Timeout:         user.Timeout,
+		Roles:           user.RemoteRolePermits.DomainRole,
+		ExtraPermits:    user.RemoteRolePermits.ExtraPermits,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        id,
+			ID: id,
 			//Subject: installID,	    // no need because it's not verified for master token(multi-clusters)
-			Issuer:    localDev.Ctrler.ID,
+			Issuer: localDev.Ctrler.ID,
 			//IssuedAt:  now.Unix(),	// for fed master token only : comment out so that iat won't be validated on the joint cluster side
 			ExpiresAt: jwt.NewNumericDate(now.Add(jwtFedTokenLife)),
 		},
@@ -1563,7 +1566,7 @@ func jwtGenFedPingToken(callerFedRole, clusterID, secret string, rsaPrivateKey *
 	// master token must not have fedAdmin role because joint clusters do not recognize fedAdmin role.
 	c := tokenClaim{
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        id,
+			ID: id,
 			//Subject:   installID, // no need because it's not verified for ping token(multi-clusters)
 			Issuer:    localDev.Ctrler.ID,
 			ExpiresAt: jwt.NewNumericDate(now.Add(jwtFedTokenLife)),
@@ -2100,7 +2103,10 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 		return nil, nil, err
 	}
 
-	if claims.ExpiresAt != nil && time.Now().After(claims.ExpiresAt.Time) {
+	if claims.ExpiresAt == nil {
+		return nil, nil, errors.New("Token expiration not set")
+	}
+	if time.Now().After(claims.ExpiresAt.Time) {
 		return nil, nil, errTokenExpired
 	}
 
