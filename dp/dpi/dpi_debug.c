@@ -37,6 +37,7 @@ void debug_log(bool print_ts, const char *fmt, ...)
     va_end(args);
 }
 
+//debug purpose only not use in production
 void debug_dump_hex(const uint8_t *ptr, int len)
 {
 #define LINE_LEN (6 + 3 + 16 * 3 + 6 + 16)

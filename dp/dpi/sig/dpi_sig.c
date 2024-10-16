@@ -5,7 +5,7 @@
 uint32_t DlpRuleCount = 0;
 
 #define MAX_USER_SIG_COUNT (DPI_SIG_MAX_USER_SIG_ID - DPI_SIG_MIN_USER_SIG_ID + 1)
-#define MAX_USER_SIG_LEN 1280//1024+256
+#define MAX_USER_SIG_LEN 2048
 
 static dpi_sigopt_status_t
 dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
@@ -75,6 +75,7 @@ dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
         DEBUG_ERROR(DBG_ERROR, "too many dlp rule (%d) created, max allowed is (%d) ", DlpRuleCount, MAX_USER_SIG_COUNT);
         return DPI_SIGOPT_TOO_MANY_DLP_RULE;
     }
+    //conf->text null terminated
     if (strlen(conf->text) >= MAX_USER_SIG_LEN) {
         DEBUG_ERROR(DBG_ERROR, "dlp rule len(%d) too long, max allowed is (%d) ", strlen(conf->text), MAX_USER_SIG_LEN);
         return DPI_SIGOPT_VALUE_TOO_LONG;
@@ -195,6 +196,7 @@ dpi_dlp_parse_rule (dpi_dlp_parser_t *parser, char **opts, int count,
     dpi_sig_macro_sig_t *macro;
     dpi_sig_t *sig;
     int i;
+    //text is null terminated
     int text_len = strlen(text);
 
     for (i = 0; i < count; i ++) {

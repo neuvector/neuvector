@@ -146,7 +146,7 @@ void dpi_ep_set_server_ver(dpi_packet_t *p, char *ver, int len)
     io_app_t *app = ep_app_map_locate(p->ep, s->server.port, s->ip_proto);
     if (unlikely(app == NULL)) return;
 
-    strncpy(app->version, ver, size);
+    strlcpy(app->version, ver, size);
     app->version[size] = '\0';
 
     DEBUG_LOG(DBG_SESSION, p, "port=%u version=%s\n", s->server.port, app->version);

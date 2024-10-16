@@ -600,11 +600,13 @@ static int http_header_xforwarded_for_token(void *param, uint8_t *ptr, int len, 
     }
     ip_str_len = l-ptr;
 
+    //preallocated memory
     ip_str = (char *) calloc(ip_str_len + 1, sizeof(char));
     if (ip_str == NULL) {
         return CONSUME_TOKEN_SKIP_LINE;
     }
     strncpy(ip_str, (char *)ptr, ip_str_len);
+    //ip_str is null terminated
     ip_str[ip_str_len] = '\0';
     s->xff_client_ip = inet_addr(ip_str);
     if (s->xff_client_ip == (uint32_t)(-1)) {
@@ -616,6 +618,7 @@ static int http_header_xforwarded_for_token(void *param, uint8_t *ptr, int len, 
 
     DEBUG_LOG(DBG_PARSER, p, "X-Forwarded-For: %s, ip=0x%08x, sess flags=0x%04x\n",ip_str, s->xff_client_ip, s->flags);
 
+    //memory freed
     free(ip_str);
     return CONSUME_TOKEN_SKIP_LINE;
 }
@@ -642,11 +645,10 @@ static int http_header_host_token(void *param, uint8_t *ptr, int len, int token_
         l ++;
     }
     host_str_len = l-ptr;
+    int size = min(host_str_len+1, sizeof(s->vhost));
+    strlcpy((char *)s->vhost, (char *)ptr, size);
 
-    strncpy((char *)s->vhost, (char *)ptr, host_str_len);
-    s->vhost[host_str_len] = '\0';
-
-    s->vhlen = host_str_len;
+    s->vhlen = size-1;
     DEBUG_LOG(DBG_PARSER, p, "vhostname(%s) vhlen(%hu)\n", (char *)s->vhost, s->vhlen);
 
     return CONSUME_TOKEN_SKIP_LINE;

@@ -30,7 +30,7 @@ size_t strlcpy (char *dst, const char *src, size_t siz)
     if (n == 0) {
         if (siz != 0)
             *d = '\0';      /* NUL-terminate dst */
-        while (*s++)
+        while (s&&*s++)     /* avoid dereference a NUL pointer, get length of src*/
             ;
     }
 
