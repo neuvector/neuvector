@@ -574,6 +574,7 @@ static void dpi_dlp_trigger_sig_dir(dpi_packet_t *p, dpi_match_t *m, bool flip, 
     // Look for cache
     memset(&log, 0, sizeof(log));
     log.ThreatID = htonl(tprop.id);
+    //sig->conf->name is null terminated
     log.DlpNameHash = sdbm_hash((uint8_t *)(sig->conf->name), strlen(sig->conf->name)*sizeof(char));
 
     if (unlikely(p->ep_mac == NULL)) return;

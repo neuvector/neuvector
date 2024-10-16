@@ -1572,6 +1572,7 @@ static int fqdn_name_match(struct cds_lfht_node *ht_node, const void *key)
 
 static uint32_t fqdn_name_hash(const void *key)
 {
+    //key is null terminated
     const char *k = key;
     return sdbm_hash((uint8_t *)k, strlen(k)*sizeof(char));
 }
@@ -1813,6 +1814,7 @@ static bool match_fqdn_wildcard_name(char *vhost, char *fqdname)
     int i, j;
 
     strlcpy(dname, vhost, MAX_FQDN_LEN);
+    //dname is null terminated
     for (j = strlen(dname)-2; j > 0;  j--) {
         if (dname[j] == '.') {
             break;
@@ -1945,6 +1947,7 @@ int snooped_fqdn_ipv4_mapping(char *name, uint32_t *ip, int cnt)
     fqdn_name_entry_t *name_entry = NULL;
     dpi_fqdn_hdl_t *hdl = g_fqdn_hdl;
 
+    //name is null terminated
     if (strlen(name) > 0) {
         lower_string(name);
     }
@@ -1960,6 +1963,7 @@ int snooped_fqdn_ipv4_mapping(char *name, uint32_t *ip, int cnt)
     int i, j;
 
     strlcpy(dname, name, MAX_FQDN_LEN);
+    //dname is null terminated
     for (j = strlen(dname)-2; j > 0;  j--) {
         if (dname[j] == '.') {
             break;
