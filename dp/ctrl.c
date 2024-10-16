@@ -116,6 +116,8 @@ int dp_ctrl_send_json(json_t *root)
     }
 
     socklen_t addr_len = sizeof(struct sockaddr_un);
+    //data is nul terminated according to json_dumps
+    //so strlen(data) is safe here
     int sent = sendto(g_ctrl_fd, data, strlen(data), 0,
                       (struct sockaddr *)&g_client_addr, addr_len);
     DEBUG_CTRL("%s\n", data);
@@ -410,6 +412,7 @@ static int dp_ctrl_add_mac(json_t *msg)
     io_mac_t *mac, *ucmac, *bcmac;
     struct ether_addr oldmac;
     const char *mac_str, *ucmac_str, *bcmac_str, *oldmac_str, *pmac_str;
+    size_t ucl, bcl, oml, pml;
     const char *iface;
     int i, count=0;
     json_t *obj, *nw_obj;
@@ -418,9 +421,17 @@ static int dp_ctrl_add_mac(json_t *msg)
     iface = json_string_value(json_object_get(msg, "iface"));
     mac_str = json_string_value(json_object_get(msg, "mac"));
     ucmac_str = json_string_value(json_object_get(msg, "ucmac"));
+    ucl = json_string_length(json_object_get(msg, "ucmac"));
+
     bcmac_str = json_string_value(json_object_get(msg, "bcmac"));
+    bcl = json_string_length(json_object_get(msg, "bcmac"));
+
     oldmac_str = json_string_value(json_object_get(msg, "oldmac"));
+    oml = json_string_length(json_object_get(msg, "oldmac"));
+
     pmac_str = json_string_value(json_object_get(msg, "pmac"));
+    pml = json_string_length(json_object_get(msg, "pmac"));
+
     obj = json_object_get(msg, "pips");
     if (obj) {
         count = json_array_size(obj);
@@ -460,23 +471,23 @@ static int dp_ctrl_add_mac(json_t *msg)
 
     ether_aton_r(mac_str, &mac->mac);
     mac->ep = ep;
-    if (strlen(ucmac_str) > 0) {
+    if (ucl > 0) {
         ether_aton_r(ucmac_str, &ucmac->mac);
         ucmac->unicast = 1;
         ucmac->ep = ep;
     }
-    if (strlen(bcmac_str) > 0) {
+    if (bcl > 0) {
         ether_aton_r(bcmac_str, &bcmac->mac);
         bcmac->broadcast = 1;
         bcmac->ep = ep;
     }
-    if (strlen(oldmac_str) > 0) {
+    if (oml > 0) {
         ether_aton_r(oldmac_str, &oldmac);
     } else {
         oldmac = mac->mac;
     }
     //for proxymesh ep, we need original ep's MAC to get policy handle
-    if (strlen(pmac_str) > 0) {
+    if (pml > 0) {
         ether_aton_r(pmac_str, &ep->pmac);
     }
     //proxymesh ep, we need original ep's IPs to do xff policy match
