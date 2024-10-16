@@ -277,7 +277,7 @@ static int dns_question(dpi_packet_t *p, uint8_t *ptr, int len, int shift, int c
 
         if (type == DNS_TYPE_A && questions != NULL) {
             if (jump > 1) {
-                strcpy(questions[(*qt_count)++].question, labels);
+                strlcpy(questions[(*qt_count)++].question, labels, MAX_LABEL_LEN);
             }
         }else if (type == DNS_TYPE_AXFR) {
             DEBUG_LOG(DBG_PARSER, p, "DNS Zone Transfer AXFR.\n");
@@ -323,7 +323,7 @@ static int dns_answer(dpi_packet_t *p, uint8_t *ptr, int len, int shift, int cou
         //ipv4 address
         if (type == DNS_TYPE_A && rd_len == 4 && answers != NULL) {
             if (jump > 1) {
-                strcpy(answers[*aw_count].question, labels);
+                strlcpy(answers[*aw_count].question, labels, MAX_LABEL_LEN);
                 uint8_t *addr = ptr + shift;
                 memcpy(&answers[*aw_count].ip4, addr, 4);
                 answers[*aw_count].ip = true;
@@ -334,8 +334,8 @@ static int dns_answer(dpi_packet_t *p, uint8_t *ptr, int len, int shift, int cou
             if (jump > 1) {
                 int ret = get_dns_name(p, ptr, len, shift, cname);
                 if (ret > 1) {
-                    strcpy(answers[*aw_count].question, labels);
-                    strcpy(answers[*aw_count].cname, cname);
+                    strlcpy(answers[*aw_count].question, labels, MAX_LABEL_LEN);
+                    strlcpy(answers[*aw_count].cname, cname, MAX_LABEL_LEN);
                     answers[*aw_count].ip = false;
                     (*aw_count)++;
                 }

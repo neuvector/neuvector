@@ -1543,9 +1543,9 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 		Roles:            user.RemoteRolePermits.DomainRole,
 		ExtraPermits:     user.RemoteRolePermits.ExtraPermits,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID: id,
+			ID:        id,
 			//Subject: installID,	    // no need because it's not verified for master token(multi-clusters)
-			Issuer: localDev.Ctrler.ID,
+			Issuer:    localDev.Ctrler.ID,
 			//IssuedAt:  now.Unix(),	// for fed master token only : comment out so that iat won't be validated on the joint cluster side
 			ExpiresAt: jwt.NewNumericDate(now.Add(jwtFedTokenLife)),
 		},

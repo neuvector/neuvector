@@ -101,8 +101,7 @@ static uint16_t tns_connect_addr(dpi_packet_t *p, uint8_t *tnsbodyptr, uint16_t 
                     start = pos;
 
                     SKIP_GROUP()
-                    strncpy(prtcl, (char *)(tnsbodyptr + start), pos - start);
-                    prtcl[pos - start] = '\0';
+                    strlcpy(prtcl, (char *)(tnsbodyptr + start), pos - start+1);
 
                     DEBUG_LOG(DBG_PARSER, p, "tns: connect: protocol (%s)\n",prtcl);
 
@@ -125,8 +124,7 @@ static uint16_t tns_connect_addr(dpi_packet_t *p, uint8_t *tnsbodyptr, uint16_t 
                     } else {
                         if (pos - start > 0) {
                             char tmport[pos - start + 1];
-                            strncpy(tmport, (char *)(tnsbodyptr + start), pos - start);
-                            tmport[pos - start] = '\0';
+                            strlcpy(tmport, (char *)(tnsbodyptr + start), pos - start + 1);
                             DEBUG_LOG(DBG_PARSER, p, "tns: connect: connect port (%s) abnormal \n", tmport);
                             dpi_fire_parser(p);
                             *rc = TNS_NOTPASS;
@@ -148,8 +146,7 @@ static uint16_t tns_connect_addr(dpi_packet_t *p, uint8_t *tnsbodyptr, uint16_t 
 
                     SKIP_GROUP()
 
-                    strncpy(tnshost, (char *)(tnsbodyptr + start), pos - start);
-                    tnshost[pos - start] = '\0';
+                    strlcpy(tnshost, (char *)(tnsbodyptr + start), pos - start + 1);
                     DEBUG_LOG(DBG_PARSER, p, "tns: connect: host (%s) \n", tnshost);
                 } else {
                     SKIP_GROUP()
@@ -306,8 +303,7 @@ static uint16_t tns_redir_connect_addr(dpi_packet_t *p, uint8_t *tnsbodyptr, uin
                     start = pos;
                     SKIP_GROUP()
 
-                    strncpy(redirect_prtl, (char *)(tnsbodyptr + start), pos - start);
-                    redirect_prtl[pos - start] = '\0';
+                    strlcpy(redirect_prtl, (char *)(tnsbodyptr + start), pos - start + 1);
 
                     DEBUG_LOG(DBG_PARSER, p, "tns: redirect: connect protocol (%s)\n",redirect_prtl);
 
@@ -331,8 +327,7 @@ static uint16_t tns_redir_connect_addr(dpi_packet_t *p, uint8_t *tnsbodyptr, uin
                     } else {
                         if (pos - start > 0) {
                             char tmport[pos - start + 1];
-                            strncpy(tmport, (char *)(tnsbodyptr + start), pos - start);
-                            tmport[pos - start] = '\0';
+                            strlcpy(tmport, (char *)(tnsbodyptr + start), pos - start + 1);
                             DEBUG_LOG(DBG_PARSER, p, "tns: redirect: connect port (%s) abnormal \n", tmport);
                         }
                     }
@@ -350,8 +345,7 @@ static uint16_t tns_redir_connect_addr(dpi_packet_t *p, uint8_t *tnsbodyptr, uin
 
                     SKIP_GROUP()
 
-                    strncpy(host, (char *)(tnsbodyptr + start), pos - start);
-                    host[pos - start] = '\0';
+                    strlcpy(host, (char *)(tnsbodyptr + start), pos - start + 1);
 
                     DEBUG_LOG(DBG_PARSER, p, "tns: redirect: host (%s)\n", host);
                     if ( pos - start > 6) {
