@@ -327,14 +327,13 @@ func (s *SystemTools) ReadCmdLine(pid int) ([]string, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	//	for scanner.Scan() {
-	// first line only
-	cmds = strings.Split(string(scanner.Text()), "\x00")
-	for i, t := range cmds { // it guarantees the tokens aren't pinning memory.
-		cmds[i] = string([]byte(t))
+	if scanner.Scan() {
+		// first line only
+		cmds = strings.Split(string(scanner.Text()), "\x00")
+		for i, t := range cmds { // it guarantees the tokens aren't pinning memory.
+			cmds[i] = string([]byte(t))
+		}
 	}
-	//		break
-	//	}
 	return cmds, nil
 }
 
