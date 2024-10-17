@@ -11,6 +11,11 @@ linters:
 
 issues:
   exclude-rules:
-    - linters:
+    - path: share/
+      linters:
+        - staticcheck
+      text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+    - path: controller/
+      linters:
         - staticcheck
       text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
