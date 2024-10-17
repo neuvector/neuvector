@@ -2,7 +2,7 @@ package registry
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -46,7 +46,7 @@ func (t *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, reterr
 	}
 
-	response.Body = ioutil.NopCloser(strings.NewReader(t.data[t.index].response))
+	response.Body = io.NopCloser(strings.NewReader(t.data[t.index].response))
 	t.index++
 	return response, nil
 }
@@ -112,7 +112,7 @@ func TestDockerHubAuth(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			transport.AddMockData(md)
+			_ = transport.AddMockData(md)
 		}
 	}
 
@@ -127,7 +127,7 @@ func TestDockerHubAuth(t *testing.T) {
 		}
 
 		if tc.responseMsg != "" {
-			respMsg, readErr := ioutil.ReadAll(resp.Body)
+			respMsg, readErr := io.ReadAll(resp.Body)
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
@@ -244,7 +244,7 @@ func TestDockerHubReauth(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			transport.AddMockData(md)
+			_ = transport.AddMockData(md)
 		}
 	}
 
@@ -259,7 +259,7 @@ func TestDockerHubReauth(t *testing.T) {
 		}
 
 		if tc.responseMsg != "" {
-			respMsg, readErr := ioutil.ReadAll(resp.Body)
+			respMsg, readErr := io.ReadAll(resp.Body)
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
@@ -425,7 +425,7 @@ func TestDockerHubRoundTrip(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			transport.AddMockData(md)
+			_ = transport.AddMockData(md)
 		}
 	}
 
@@ -440,7 +440,7 @@ func TestDockerHubRoundTrip(t *testing.T) {
 		}
 
 		if tc.responseMsg != "" {
-			respMsg, readErr := ioutil.ReadAll(resp.Body)
+			respMsg, readErr := io.ReadAll(resp.Body)
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {

@@ -139,8 +139,7 @@ type HealthChecks []*HealthCheck
 // attached, this function determines the best representative of the status as
 // as single string using the following heuristic:
 //
-//  maintenance > critical > warning > passing
-//
+//	maintenance > critical > warning > passing
 func (c HealthChecks) AggregatedStatus() string {
 	var passing, warning, critical, maintenance bool
 	for _, check := range c {
@@ -204,7 +203,7 @@ func (h *Health) Node(node string, q *QueryOptions) (HealthChecks, *QueryMeta, e
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out HealthChecks
@@ -225,7 +224,7 @@ func (h *Health) Checks(service string, q *QueryOptions) (HealthChecks, *QueryMe
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out HealthChecks
@@ -289,7 +288,7 @@ func (h *Health) service(service string, tags []string, passingOnly bool, q *Que
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out []*ServiceEntry
@@ -319,7 +318,7 @@ func (h *Health) State(state string, q *QueryOptions) (HealthChecks, *QueryMeta,
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out HealthChecks

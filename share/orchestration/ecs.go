@@ -11,7 +11,8 @@ type ecs struct {
 	noop
 }
 
-var ecsDriver ecs
+// for Amazon Elastic Container Service (Amazon ECS)
+// var ecsDriver ecs
 
 // Check of container is deployed by ecs or simply "docker run".
 // ecs-agent has no label but it's host-mode container which has no its own interface
@@ -31,9 +32,9 @@ func (d *ecs) GetService(meta *container.ContainerMeta, node string) *Service {
 		return &Service{Name: seviceName}
 	}
 
-	cluster, _ := meta.Labels[container.ECSCluster]
-	task, _ := meta.Labels[container.ECSTaskDefinition]
-	container, _ := meta.Labels[container.ECSContainerName]
+	cluster := meta.Labels[container.ECSCluster]
+	task := meta.Labels[container.ECSTaskDefinition]
+	container := meta.Labels[container.ECSContainerName]
 	if cluster != "" && task != "" && container != "" {
 		return &Service{Name: cluster + "." + task + "." + container}
 	} else if task != "" {
@@ -63,7 +64,7 @@ func (d *ecs) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	}
 
 	for _, addrs := range ports {
-		for j, _ := range addrs {
+		for j := range addrs {
 			addrs[j].Scope = share.CLUSIPAddrScopeLocalhost
 		}
 	}

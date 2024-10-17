@@ -16,11 +16,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	criRT "k8s.io/cri-api/pkg/apis/runtime/v1"     // major
-	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"  // backward-compatible
+	criRT "k8s.io/cri-api/pkg/apis/runtime/v1"    // major
+	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2" // backward-compatible
 )
 
-var bCriApiV1Alpha2 bool 	// V1Alpha2 for older crio
+var bCriApiV1Alpha2 bool // V1Alpha2 for older crio
 
 // --
 const (
@@ -101,7 +101,7 @@ func newCriClient(sock string, ctx context.Context) (*grpc.ClientConn, *criRT.Ve
 			log.WithFields(log.Fields{"error": err}).Error("Fail to get crio version")
 			return nil, nil, err
 		}
-		bCriApiV1Alpha2 = true		// a global key selector
+		bCriApiV1Alpha2 = true // a global key selector
 		rtVersion = (*criRT.VersionResponse)(unsafe.Pointer(ver))
 	}
 	return conn, rtVersion, err
@@ -119,9 +119,9 @@ func criListContainers(conn *grpc.ClientConn, ctx context.Context, bRunning bool
 	if bCriApiV1Alpha2 {
 		flt := &pb.ContainerFilter{}
 		if bRunning {
-			flt.State = &pb.ContainerStateValue{ State: pb.ContainerState_CONTAINER_RUNNING}
+			flt.State = &pb.ContainerStateValue{State: pb.ContainerState_CONTAINER_RUNNING}
 		} else {
-			flt.State = &pb.ContainerStateValue{ State: pb.ContainerState_CONTAINER_EXITED}
+			flt.State = &pb.ContainerStateValue{State: pb.ContainerState_CONTAINER_EXITED}
 		}
 		resp_containers, err := pb.NewRuntimeServiceClient(conn).ListContainers(ctx, &pb.ListContainersRequest{Filter: flt})
 		return (*criRT.ListContainersResponse)(unsafe.Pointer(resp_containers)), err
@@ -129,9 +129,9 @@ func criListContainers(conn *grpc.ClientConn, ctx context.Context, bRunning bool
 
 	flt := &criRT.ContainerFilter{}
 	if bRunning {
-		flt.State = &criRT.ContainerStateValue{ State: criRT.ContainerState_CONTAINER_RUNNING}
+		flt.State = &criRT.ContainerStateValue{State: criRT.ContainerState_CONTAINER_RUNNING}
 	} else {
-		flt.State = &criRT.ContainerStateValue{ State: criRT.ContainerState_CONTAINER_EXITED}
+		flt.State = &criRT.ContainerStateValue{State: criRT.ContainerState_CONTAINER_EXITED}
 	}
 	return criRT.NewRuntimeServiceClient(conn).ListContainers(ctx, &criRT.ListContainersRequest{Filter: flt})
 }
@@ -140,9 +140,9 @@ func criListPodSandboxes(conn *grpc.ClientConn, ctx context.Context, bReady bool
 	if bCriApiV1Alpha2 {
 		flt := &pb.PodSandboxFilter{}
 		if bReady {
-			flt.State = &pb.PodSandboxStateValue{ State: pb.PodSandboxState_SANDBOX_READY}
+			flt.State = &pb.PodSandboxStateValue{State: pb.PodSandboxState_SANDBOX_READY}
 		} else {
-			flt.State = &pb.PodSandboxStateValue{ State: pb.PodSandboxState_SANDBOX_NOTREADY}
+			flt.State = &pb.PodSandboxStateValue{State: pb.PodSandboxState_SANDBOX_NOTREADY}
 		}
 		resp_sandboxes, err := pb.NewRuntimeServiceClient(conn).ListPodSandbox(ctx, &pb.ListPodSandboxRequest{Filter: flt})
 		return (*criRT.ListPodSandboxResponse)(unsafe.Pointer(resp_sandboxes)), err
@@ -150,9 +150,9 @@ func criListPodSandboxes(conn *grpc.ClientConn, ctx context.Context, bReady bool
 
 	flt := &criRT.PodSandboxFilter{}
 	if bReady {
-		flt.State = &criRT.PodSandboxStateValue{ State: criRT.PodSandboxState_SANDBOX_READY}
+		flt.State = &criRT.PodSandboxStateValue{State: criRT.PodSandboxState_SANDBOX_READY}
 	} else {
-		flt.State = &criRT.PodSandboxStateValue{ State: criRT.PodSandboxState_SANDBOX_NOTREADY}
+		flt.State = &criRT.PodSandboxStateValue{State: criRT.PodSandboxState_SANDBOX_NOTREADY}
 	}
 	return criRT.NewRuntimeServiceClient(conn).ListPodSandbox(ctx, &criRT.ListPodSandboxRequest{Filter: flt})
 }
@@ -188,16 +188,16 @@ func criImageStatus(conn *grpc.ClientConn, ctx context.Context, name string) (*c
 		return (*criRT.ImageStatusResponse)(unsafe.Pointer(status)), err
 	}
 	return criRT.NewImageServiceClient(conn).ImageStatus(ctx,
-			&criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}, Verbose: true})
+		&criRT.ImageStatusRequest{Image: &criRT.ImageSpec{Image: name}, Verbose: true})
 }
 
 func criGetImageMeta(conn *grpc.ClientConn, ctx context.Context, name string) (*ImageMeta, error) {
 	type criImageInfo struct {
 		Info struct {
 			ImageSpec struct {
-				Author    string     `json:"author"`
-				CreatedAt time.Time  `json:"created"`
-				Config struct {
+				Author    string    `json:"author"`
+				CreatedAt time.Time `json:"created"`
+				Config    struct {
 					Enrtrypoint []string          `json:"Entrypoint"`
 					Labels      map[string]string `json:"Labels"`
 				} `json:"config"`
@@ -213,9 +213,7 @@ func criGetImageMeta(conn *grpc.ClientConn, ctx context.Context, name string) (*
 			Labels: make(map[string]string),
 		}
 
-		for _, tag := range resp.Image.RepoTags {
-			meta.RepoTags = append(meta.RepoTags, tag)
-		}
+		meta.RepoTags = append(meta.RepoTags, resp.Image.RepoTags...)
 
 		if len(resp.Image.RepoDigests) > 0 {
 			meta.Digest = resp.Image.RepoDigests[0]
@@ -264,7 +262,7 @@ func criGetSelfID(conn *grpc.ClientConn, ctx context.Context, rid string) (strin
 		podname = strings.TrimSpace(string(dat))
 	}
 
-	resp_containers, err := criListContainers(conn, ctx, true);
+	resp_containers, err := criListContainers(conn, ctx, true)
 	if err == nil && resp_containers != nil {
 		for _, c := range resp_containers.Containers {
 			cid := c.GetId()
@@ -303,22 +301,22 @@ func criGetStorageDevice(conn *grpc.ClientConn, ctx context.Context) (string, er
 	if err == nil {
 		for _, usage := range res.GetImageFilesystems() {
 			if fsid := usage.GetFsId(); fsid != nil {
-					dev := strings.TrimSuffix(filepath.Base(fsid.GetMountpoint()), "-images")
-					if dev == "docker" { // find the driver
-						if entries, err := os.ReadDir((filepath.Join("/proc/1/root", fsid.GetMountpoint(), "image"))); err == nil {
-							dev = "overlay2"  // default
-							for _, dir := range entries {
-								dev = dir.Name()
-								// log.WithFields(log.Fields{"dev": dev}).Debug()
-								switch dev {
-								case "overlay", "overlay2", "overlayFS", "overlayfs", "overlayFs", "aufs", "btrfs":
-									return dev, nil
-								}
+				dev := strings.TrimSuffix(filepath.Base(fsid.GetMountpoint()), "-images")
+				if dev == "docker" { // find the driver
+					if entries, err := os.ReadDir((filepath.Join("/proc/1/root", fsid.GetMountpoint(), "image"))); err == nil {
+						dev = "overlay2" // default
+						for _, dir := range entries {
+							dev = dir.Name()
+							// log.WithFields(log.Fields{"dev": dev}).Debug()
+							switch dev {
+							case "overlay", "overlay2", "overlayFS", "overlayfs", "overlayFs", "aufs", "btrfs":
+								return dev, nil
 							}
 						}
 					}
-					log.WithFields(log.Fields{"dev": dev}).Debug("not found")
-					return dev, nil
+				}
+				log.WithFields(log.Fields{"dev": dev}).Debug("not found")
+				return dev, nil
 			}
 		}
 	}

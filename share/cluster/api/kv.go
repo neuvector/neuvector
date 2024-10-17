@@ -130,7 +130,7 @@ func (k *KV) getInternal(key string, params map[string]string, q *QueryOptions) 
 	}
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if resp.StatusCode == 404 {

@@ -12,6 +12,7 @@ import (
 	"os"
 )
 
+/*
 // The function is only for local test
 func parseGolangPackage(file string) {
 	f, err := openExe(file)
@@ -34,8 +35,8 @@ func parseGolangPackage(file string) {
 	bi.GoVersion = vers
 
 	fmt.Printf("%+v\n", bi)
-	return
 }
+*/
 
 var (
 	// errUnrecognizedFormat is returned when a given executable file doesn't
@@ -97,7 +98,7 @@ func readRawBuildInfo(x exe, checkOnly bool) (string, string, error) {
 	ptrSize := int(data[14])
 	if data[15]&2 != 0 {
 		vers, data = decodeString(data[32:])
-		mod, data = decodeString(data)
+		mod, _ = decodeString(data)
 	} else {
 		bigEndian := data[15] != 0
 		var bo binary.ByteOrder
@@ -173,9 +174,13 @@ func openExe(file string) (exe, error) {
 	}
 	data := make([]byte, 16)
 	if _, err := io.ReadFull(f, data); err != nil {
+		f.Close()
 		return nil, err
 	}
-	f.Seek(0, 0)
+	if _, err := f.Seek(0, 0); err != nil {
+		f.Close()
+		return nil, err
+	}
 	if bytes.HasPrefix(data, []byte("\x7FELF")) {
 		e, err := elf.NewFile(f)
 		if err != nil {

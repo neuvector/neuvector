@@ -16,8 +16,8 @@
 package fsmon
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
@@ -83,8 +83,8 @@ const (
 
 	FAN_Q_OVERFLOW = 0x00004000 /* Event queued overflowed */
 
-	FAN_OPEN_PERM   = 0x00010000 /* File open in perm check */
-	FAN_ACCESS_PERM = 0x00020000 /* File accessed in perm check */
+	FAN_OPEN_PERM      = 0x00010000 /* File open in perm check */
+	FAN_ACCESS_PERM    = 0x00020000 /* File accessed in perm check */
 	FAN_OPEN_EXEC_PERM = 0x00040000 /* File open/exec in perm check */
 
 	FAN_ONDIR = 0x40000000 /* event occurred against dir */
@@ -224,7 +224,7 @@ func (nd *NotifyFD) GetEvents() ([]*EventMetadata, error) {
 	}
 
 	reader := bytes.NewReader(buffer)
-	for i := 0; i < (n / FA_EVENT_LEN); i ++ {
+	for i := 0; i < (n / FA_EVENT_LEN); i++ {
 		ev := &eventMetadata{}
 		if err = binary.Read(reader, binary.LittleEndian, ev); err == nil { // only have the EOF error
 			if ev.Version == FANOTIFY_METADATA_VERSION {

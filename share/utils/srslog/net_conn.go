@@ -15,7 +15,7 @@ type netConn struct {
 // hostname, and sends the message to the connection.
 func (n *netConn) writeString(framer Framer, formatter Formatter, tmo time.Duration, p Priority, hostname, tag, msg string) error {
 	if tmo != 0 {
-		n.conn.SetWriteDeadline(time.Now().Add(tmo))
+		_ = n.conn.SetWriteDeadline(time.Now().Add(tmo))
 	}
 	if framer == nil {
 		framer = DefaultFramer

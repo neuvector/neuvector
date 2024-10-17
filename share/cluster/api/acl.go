@@ -338,7 +338,7 @@ func (a *ACL) Info(id string, q *QueryOptions) (*ACLEntry, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLEntry
@@ -364,7 +364,7 @@ func (a *ACL) List(q *QueryOptions) ([]*ACLEntry, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLEntry
@@ -385,7 +385,7 @@ func (a *ACL) Replication(q *QueryOptions) (*ACLReplicationStatus, *QueryMeta, e
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries *ACLReplicationStatus
@@ -495,7 +495,7 @@ func (a *ACL) TokenRead(tokenID string, q *QueryOptions) (*ACLToken, *QueryMeta,
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out ACLToken
@@ -519,7 +519,7 @@ func (a *ACL) TokenReadSelf(q *QueryOptions) (*ACLToken, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out ACLToken
@@ -542,7 +542,7 @@ func (a *ACL) TokenList(q *QueryOptions) ([]*ACLTokenListEntry, *QueryMeta, erro
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLTokenListEntry
@@ -626,7 +626,7 @@ func (a *ACL) PolicyRead(policyID string, q *QueryOptions) (*ACLPolicy, *QueryMe
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out ACLPolicy
@@ -649,7 +649,7 @@ func (a *ACL) PolicyList(q *QueryOptions) ([]*ACLPolicyListEntry, *QueryMeta, er
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLPolicyListEntry
@@ -672,7 +672,7 @@ func (a *ACL) RulesTranslate(rules io.Reader) (string, error) {
 	}
 	defer resp.Body.Close()
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	ruleBytes, err := io.ReadAll(resp.Body)
@@ -696,7 +696,7 @@ func (a *ACL) RulesTranslateToken(tokenID string) (string, error) {
 	}
 	defer resp.Body.Close()
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	ruleBytes, err := io.ReadAll(resp.Body)
@@ -782,7 +782,7 @@ func (a *ACL) RoleRead(roleID string, q *QueryOptions) (*ACLRole, *QueryMeta, er
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if !found {
@@ -808,7 +808,7 @@ func (a *ACL) RoleReadByName(roleName string, q *QueryOptions) (*ACLRole, *Query
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if !found {
@@ -836,7 +836,7 @@ func (a *ACL) RoleList(q *QueryOptions) ([]*ACLRole, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLRole
@@ -927,7 +927,7 @@ func (a *ACL) AuthMethodRead(methodName string, q *QueryOptions) (*ACLAuthMethod
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if !found {
@@ -955,7 +955,7 @@ func (a *ACL) AuthMethodList(q *QueryOptions) ([]*ACLAuthMethodListEntry, *Query
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLAuthMethodListEntry
@@ -1041,7 +1041,7 @@ func (a *ACL) BindingRuleRead(bindingRuleID string, q *QueryOptions) (*ACLBindin
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if !found {
@@ -1070,7 +1070,7 @@ func (a *ACL) BindingRuleList(methodName string, q *QueryOptions) ([]*ACLBinding
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*ACLBindingRule

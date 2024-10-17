@@ -72,11 +72,6 @@ func (p *ProxyConfigEntry) GetModifyIndex() uint64 {
 	return p.ModifyIndex
 }
 
-type rawEntryListResponse struct {
-	kind    string
-	Entries []map[string]interface{}
-}
-
 func makeConfigEntry(kind, name string) (ConfigEntry, error) {
 	switch kind {
 	case ServiceDefaults:
@@ -162,7 +157,7 @@ func (conf *ConfigEntries) Get(kind string, name string, q *QueryOptions) (Confi
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if err := decodeBody(resp, entry); err != nil {
@@ -187,7 +182,7 @@ func (conf *ConfigEntries) List(kind string, q *QueryOptions) ([]ConfigEntry, *Q
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var raw []map[string]interface{}

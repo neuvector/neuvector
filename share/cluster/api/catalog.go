@@ -134,7 +134,7 @@ func (c *Catalog) Nodes(q *QueryOptions) ([]*Node, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out []*Node
@@ -155,7 +155,7 @@ func (c *Catalog) Services(q *QueryOptions) (map[string][]string, *QueryMeta, er
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out map[string][]string
@@ -212,7 +212,7 @@ func (c *Catalog) service(service string, tags []string, q *QueryOptions, connec
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out []*CatalogService
@@ -233,7 +233,7 @@ func (c *Catalog) Node(node string, q *QueryOptions) (*CatalogNode, *QueryMeta, 
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out *CatalogNode

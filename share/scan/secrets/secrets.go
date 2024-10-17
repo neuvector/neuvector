@@ -407,6 +407,7 @@ func isSelectedFile(filename string, list []FileType) bool {
 	return false
 }
 
+/*
 func isBinaryCerticiate(reportPath, ext string) (*share.CLUSSecretLog, bool) {
 	// base64: pem, crt, key, p7b, p7c
 	// binary: der, pfx, p12
@@ -431,6 +432,7 @@ func isBinaryCerticiate(reportPath, ext string) (*share.CLUSSecretLog, bool) {
 	}
 	return seclog, true
 }
+*/
 
 // exclude comment lines from the original content
 // #, <!, and {*
@@ -711,7 +713,7 @@ func FindSecretsByRootpath(rootPath string, envVars []byte, config Config) ([]sh
 	}
 	//	scanFileTotal += cnt
 	//	log.WithFields(log.Fields{"scanFileTotal": scanFileTotal}).Debug("SCRT")
-	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Now().Sub(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
+	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Since(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
 	return res, perm, err
 }
 
@@ -793,7 +795,7 @@ func FindSecretsByFilePathMap(fileMap map[string]string, envVars []byte, config 
 		err = fmt.Errorf("Timeout")
 	}
 
-	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Now().Sub(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
+	log.WithFields(log.Fields{"scan_cnt": cnt, "duration": time.Since(start_time), "perm_cnt": len(perm), "secret_cnt": len(res)}).Debug("SCRT done")
 	return res, perm, err
 }
 

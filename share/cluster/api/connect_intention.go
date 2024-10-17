@@ -147,7 +147,7 @@ func (h *Connect) Intentions(q *QueryOptions) ([]*Intention, *QueryMeta, error) 
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out []*Intention
@@ -168,16 +168,20 @@ func (h *Connect) IntentionGet(id string, q *QueryOptions) (*Intention, *QueryMe
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if resp.StatusCode == 404 {
 		return nil, qm, nil
 	} else if resp.StatusCode != 200 {
 		var buf bytes.Buffer
-		io.Copy(&buf, resp.Body)
-		return nil, nil, fmt.Errorf(
-			"Unexpected response %d: %s", resp.StatusCode, buf.String())
+		var msg string
+		if _, err := io.Copy(&buf, resp.Body); err == nil {
+			msg = buf.String()
+		} else {
+			msg = "copy error: " + err.Error()
+		}
+		return nil, nil, fmt.Errorf("Unexpected response %d: %s", resp.StatusCode, msg)
 	}
 
 	var out Intention
@@ -224,7 +228,7 @@ func (h *Connect) IntentionMatch(args *IntentionMatch, q *QueryOptions) (map[str
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out map[string][]*Intention
@@ -251,7 +255,7 @@ func (h *Connect) IntentionCheck(args *IntentionCheck, q *QueryOptions) (bool, *
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out struct{ Allowed bool }

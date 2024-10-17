@@ -515,7 +515,7 @@ func (a *Agent) Service(serviceID string, q *QueryOptions) (*AgentService, *Quer
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out *AgentService
@@ -784,7 +784,7 @@ func (a *Agent) ConnectCARoots(q *QueryOptions) (*CARootList, *QueryMeta, error)
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out CARootList
@@ -805,7 +805,7 @@ func (a *Agent) ConnectCALeaf(serviceID string, q *QueryOptions) (*LeafCert, *Qu
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out LeafCert
@@ -830,7 +830,7 @@ func (a *Agent) ConnectProxyConfig(proxyServiceID string, q *QueryOptions) (*Con
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	parseQueryMeta(resp, qm)
+	_ = parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out ConnectProxyConfig
@@ -1027,8 +1027,13 @@ func (a *Agent) updateTokenOnce(target, token string, q *WriteOptions) (*WriteMe
 
 	if resp.StatusCode != 200 {
 		var buf bytes.Buffer
-		io.Copy(&buf, resp.Body)
-		return wm, resp.StatusCode, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+		var msg string
+		if _, err := io.Copy(&buf, resp.Body); err == nil {
+			msg = buf.String()
+		} else {
+			msg = "copy error: " + err.Error()
+		}
+		return wm, resp.StatusCode, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, msg)
 	}
 
 	return wm, resp.StatusCode, nil

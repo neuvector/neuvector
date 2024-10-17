@@ -80,7 +80,7 @@ func getStructureTableAddressEFI(f *os.File) (address int64, length int, err err
 		if err != nil {
 			return 0, 0, err
 		}
-		defer syscall.Munmap(eps)
+		defer func() { _ = syscall.Munmap(eps) }()
 
 		if !epsValid(eps) {
 			break
@@ -101,7 +101,7 @@ func getStructureTableAddress(f *os.File) (address int64, length int, err error)
 	if err != nil {
 		return 0, 0, err
 	}
-	defer syscall.Munmap(mem)
+	defer func() { _ = syscall.Munmap(mem) }()
 
 	for i := range mem {
 		if i > len(mem)-epsSize {
@@ -192,7 +192,7 @@ func (si *SysInfo) getMemoryInfo() {
 		}
 		return
 	}
-	defer syscall.Munmap(mem)
+	defer func() { _ = syscall.Munmap(mem) }()
 
 	var memSizeAlt uint
 loop:
