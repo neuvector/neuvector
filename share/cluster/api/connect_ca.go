@@ -126,7 +126,7 @@ func (h *Connect) CARoots(q *QueryOptions) (*CARootList, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out CARootList
@@ -147,7 +147,7 @@ func (h *Connect) CAGetConfig(q *QueryOptions) (*CAConfig, *QueryMeta, error) {
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out CAConfig

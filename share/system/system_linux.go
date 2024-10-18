@@ -179,7 +179,7 @@ func (s *SystemTools) CallNamespaceFunc(nsid int, nstypes []string, cb NSCallbac
 	for i, ns := range nstypes {
 		cur_ns[i], err = namespace.CurNsHandle(ns)
 		if err != nil {
-			log.WithFields(log.Fields{"namespace": ns, "error": err}).Debug("Failed to store")
+			log.WithFields(log.Fields{"namespace": ns, "error": err}).Error("Failed to store")
 			return err
 		}
 		defer cur_ns[i].Close()
@@ -189,7 +189,7 @@ func (s *SystemTools) CallNamespaceFunc(nsid int, nstypes []string, cb NSCallbac
 	for i, ns := range nstypes {
 		new_ns[i], err = namespace.NewNsHandle(ns, s.procDir, nsid)
 		if err != nil {
-			log.WithFields(log.Fields{"namespace": ns, "error": err}).Debug("Failed to open")
+			log.WithFields(log.Fields{"namespace": ns, "error": err}).Error("Failed to open")
 			return err
 		}
 		defer new_ns[i].Close()
@@ -198,7 +198,7 @@ func (s *SystemTools) CallNamespaceFunc(nsid int, nstypes []string, cb NSCallbac
 	// Switch to namespace
 	for i, ns := range nstypes {
 		if err = namespace.Set(new_ns[i]); err != nil {
-			log.WithFields(log.Fields{"namespace": ns, "error": err}).Debug("Failed to switch to")
+			log.WithFields(log.Fields{"namespace": ns, "error": err}).Error("Failed to switch to")
 			return err
 		}
 		defer func() {
@@ -207,7 +207,7 @@ func (s *SystemTools) CallNamespaceFunc(nsid int, nstypes []string, cb NSCallbac
 			}
 		}()
 
-		log.WithFields(log.Fields{"namespace": ns, "pid": nsid}).Debug("Switch to")
+		log.WithFields(log.Fields{"namespace": ns, "pid": nsid}).Error("Switch to")
 	}
 
 	cb(params)
@@ -218,13 +218,15 @@ func (s *SystemTools) CallNamespaceFunc(nsid int, nstypes []string, cb NSCallbac
 func (s *SystemTools) GetHostname(pid int) string {
 	var hostname string
 
-	_ = s.CallNamespaceFunc(pid, []string{namespace.NSUTS}, func(params interface{}) {
+	if err2 := s.CallNamespaceFunc(pid, []string{namespace.NSUTS}, func(params interface{}) {
 		if data, err := os.ReadFile("/proc/sys/kernel/hostname"); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to read hostname")
 		} else {
 			hostname = strings.TrimSpace(string(data))
 		}
-	}, nil)
+	}, nil); err2 != nil {
+		log.WithFields(log.Fields{"error": err2}).Error("CallNamespaceFunc failed")
+	}
 
 	return hostname
 }
@@ -545,7 +547,7 @@ func (s *SystemTools) NsRunScriptFile(pid int, path string) ([]byte, error) {
 		if err == nil {
 			err = fmt.Errorf("Error executing nsrun")
 		}
-		log.WithFields(log.Fields{"error": err, "msg": errb.String()}).Debug("")
+		log.WithFields(log.Fields{"error": err, "msg": errb.String()}).Error()
 		return nil, err
 	}
 	return out, nil
@@ -748,7 +750,7 @@ func (s *SystemTools) NsGetFile(filePath string, pid int, binary bool, start, le
 	cmd.Stderr = &errb
 	out, err := cmd.Output()
 	if err != nil {
-		log.WithFields(log.Fields{"error": err, "msg": errb.String()}).Debug("nsget return error")
+		log.WithFields(log.Fields{"error": err, "msg": errb.String()}).Error("nsget return error")
 		if ee, ok := err.(*exec.ExitError); ok {
 			status := s.GetExitStatus(ee)
 			if status == 2 {
@@ -758,13 +760,13 @@ func (s *SystemTools) NsGetFile(filePath string, pid int, binary bool, start, le
 		return nil, err
 	}
 	if errb.Len() != 0 {
-		log.WithFields(log.Fields{"err": errb.String()}).Debug("nsget return error")
-		return nil, fmt.Errorf("%s", errb.String())
+		log.WithFields(log.Fields{"err": errb.String()}).Error("nsget return error")
+		return nil, errors.New(errb.String())
 	}
 	if binary {
 		out, err = base64.StdEncoding.DecodeString(string(out))
 		if err != nil {
-			log.WithFields(log.Fields{"err": err}).Debug("base64 DecodeString fail")
+			log.WithFields(log.Fields{"err": err}).Error("base64 DecodeString fail")
 			return nil, err
 		}
 	}

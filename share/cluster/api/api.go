@@ -812,7 +812,7 @@ func (c *Client) query(endpoint string, out interface{}, q *QueryOptions) (*Quer
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if err := decodeBody(resp, out); err != nil {
@@ -844,11 +844,15 @@ func (c *Client) write(endpoint string, in, out interface{}, q *WriteOptions) (*
 	return wm, nil
 }
 
-// parseQueryMeta is used to help parse query meta-data
+func parseQueryMeta(resp *http.Response, q *QueryMeta) {
+	_ = parseQueryMetaWrapped(resp, q)
+}
+
+// parseQueryMetaWrapped is used to help parse query meta-data
 //
 // TODO(rb): bug? the error from this function is never handled
-// (see https://github.com/hashicorp/consul/blob/main/api/api.go)
-func parseQueryMeta(resp *http.Response, q *QueryMeta) error {
+// (see parseQueryMeta() in https://github.com/hashicorp/consul/blob/main/api/api.go)
+func parseQueryMetaWrapped(resp *http.Response, q *QueryMeta) error {
 	header := resp.Header
 
 	// Parse the X-Consul-Index (if it's set - hash based blocking queries don't

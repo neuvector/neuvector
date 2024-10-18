@@ -92,7 +92,10 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	}
 
 	var sockPath string
-	id, _, _ := sys.GetSelfContainerID() // ref, not reliable
+	id, _, err := sys.GetSelfContainerID() // ref, not reliable
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "id": id}).Info()
+	}
 	sockPath, err = getContainerSocketPath(client, id, endpoint)
 	if err == nil {
 		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()

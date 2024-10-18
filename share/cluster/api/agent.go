@@ -515,7 +515,7 @@ func (a *Agent) Service(serviceID string, q *QueryOptions) (*AgentService, *Quer
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out *AgentService
@@ -784,7 +784,7 @@ func (a *Agent) ConnectCARoots(q *QueryOptions) (*CARootList, *QueryMeta, error)
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out CARootList
@@ -805,7 +805,7 @@ func (a *Agent) ConnectCALeaf(serviceID string, q *QueryOptions) (*LeafCert, *Qu
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out LeafCert
@@ -830,7 +830,7 @@ func (a *Agent) ConnectProxyConfig(proxyServiceID string, q *QueryOptions) (*Con
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out ConnectProxyConfig

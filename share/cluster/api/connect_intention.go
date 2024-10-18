@@ -147,7 +147,7 @@ func (h *Connect) Intentions(q *QueryOptions) ([]*Intention, *QueryMeta, error) 
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out []*Intention
@@ -168,7 +168,7 @@ func (h *Connect) IntentionGet(id string, q *QueryOptions) (*Intention, *QueryMe
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if resp.StatusCode == 404 {
@@ -228,7 +228,7 @@ func (h *Connect) IntentionMatch(args *IntentionMatch, q *QueryOptions) (map[str
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out map[string][]*Intention
@@ -255,7 +255,7 @@ func (h *Connect) IntentionCheck(args *IntentionCheck, q *QueryOptions) (bool, *
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out struct{ Allowed bool }

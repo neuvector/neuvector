@@ -225,7 +225,7 @@ func (client *DockerClient) CreateContainer(config *ContainerConfig, name string
 	result := &RespContainersCreate{}
 	err = json.Unmarshal(data, result)
 	if err != nil {
-		return "", fmt.Errorf("%s", string(data))
+		return "", errors.New(string(data))
 	}
 	return result.Id, nil
 }

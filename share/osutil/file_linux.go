@@ -340,7 +340,7 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 	if !si.IsDir() {
-		return fmt.Errorf("%s", ErrorNotDirectory)
+		return errors.New(string(ErrorNotDirectory))
 	}
 
 	// overwrite it even it already exists

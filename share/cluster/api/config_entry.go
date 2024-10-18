@@ -157,7 +157,7 @@ func (conf *ConfigEntries) Get(kind string, name string, q *QueryOptions) (Confi
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	if err := decodeBody(resp, entry); err != nil {
@@ -182,7 +182,7 @@ func (conf *ConfigEntries) List(kind string, q *QueryOptions) ([]ConfigEntry, *Q
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var raw []map[string]interface{}

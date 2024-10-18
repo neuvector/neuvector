@@ -203,7 +203,7 @@ func (h *Health) Node(node string, q *QueryOptions) (HealthChecks, *QueryMeta, e
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out HealthChecks
@@ -224,7 +224,7 @@ func (h *Health) Checks(service string, q *QueryOptions) (HealthChecks, *QueryMe
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out HealthChecks
@@ -288,7 +288,7 @@ func (h *Health) service(service string, tags []string, passingOnly bool, q *Que
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out []*ServiceEntry
@@ -318,7 +318,7 @@ func (h *Health) State(state string, q *QueryOptions) (HealthChecks, *QueryMeta,
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var out HealthChecks

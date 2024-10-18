@@ -89,5 +89,7 @@ func (s *SystemTools) IsToolProcess(sid, pgid int) bool {
 }
 
 func (s *SystemTools) KillCommandSubtree(pgid int, info string) {
-	_ = syscall.Kill(-pgid, syscall.SIGKILL)
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+		log.WithFields(log.Fields{"pid": pgid, "error": err}).Error("can not signal")
+	}
 }

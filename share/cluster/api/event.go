@@ -77,7 +77,7 @@ func (e *Event) List(name string, q *QueryOptions) ([]*UserEvent, *QueryMeta, er
 	defer resp.Body.Close()
 
 	qm := &QueryMeta{}
-	_ = parseQueryMeta(resp, qm)
+	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
 	var entries []*UserEvent
