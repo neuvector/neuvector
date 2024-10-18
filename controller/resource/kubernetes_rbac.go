@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	log "github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1b1 "k8s.io/api/rbac/v1beta1"
