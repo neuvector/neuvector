@@ -235,14 +235,18 @@ func AddScanner(id string) {
 		regScher.Init()
 	}
 
-	regScher.AddProcessor(id)
+	if err := regScher.AddProcessor(id); err != nil {
+		log.WithError(err).Error("failed to add processor")
+	}
 }
 
 func RemoveScanner(id string) {
 	log.WithFields(log.Fields{"id": id}).Info()
 
 	if regScher != nil {
-		regScher.DelProcessor(id)
+		if _, err := regScher.DelProcessor(id); err != nil {
+			log.WithError(err).Error("failed to delete processor")
+		}
 	}
 }
 
