@@ -176,15 +176,18 @@ func NewSetFromSlice(s []interface{}) Set {
 
 type threadUnsafeSet map[interface{}]struct{}
 
+/*
 type orderedPair struct {
 	first  interface{}
 	second interface{}
 }
+*/
 
 func newThreadUnsafeSet() threadUnsafeSet {
 	return make(threadUnsafeSet)
 }
 
+/*
 func (pair *orderedPair) Equal(other orderedPair) bool {
 	if pair.first == other.first &&
 		pair.second == other.second {
@@ -193,6 +196,7 @@ func (pair *orderedPair) Equal(other orderedPair) bool {
 
 	return false
 }
+*/
 
 func (set *threadUnsafeSet) Add(i interface{}) bool {
 	_, found := (*set)[i]
@@ -325,9 +329,11 @@ func (set *threadUnsafeSet) String() string {
 	return fmt.Sprintf("{%s}", strings.Join(items, ", "))
 }
 
-func (pair orderedPair) String() string {
-	return fmt.Sprintf("(%v, %v)", pair.first, pair.second)
-}
+/*
+	func (pair orderedPair) String() string {
+		return fmt.Sprintf("(%v, %v)", pair.first, pair.second)
+	}
+*/
 
 func (set *threadUnsafeSet) ToSlice() []interface{} {
 	keys := make([]interface{}, 0, set.Cardinality())

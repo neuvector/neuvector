@@ -22,7 +22,7 @@ func newHTTPClient(u *url.URL, tlsConfig *tls.Config, timeout time.Duration, set
 			if tcpConn, ok := conn.(*net.TCPConn); ok && setUserTimeout != nil {
 				// Sender can break TCP connection if the remote side doesn't
 				// acknowledge packets within timeout
-				setUserTimeout(tcpConn, timeout)
+				_ = setUserTimeout(tcpConn, timeout)
 			}
 			return conn, err
 		}

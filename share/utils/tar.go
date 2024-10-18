@@ -90,7 +90,13 @@ func NewXzReader(r io.Reader) (*XzReader, error) {
 
 func (r *XzReader) Close() error {
 	r.ReadCloser.Close()
-	r.cmd.Process.Kill()
+	if err := r.cmd.Process.Kill(); err != nil {
+		var path string
+		if r.cmd != nil {
+			path = r.cmd.Path
+		}
+		log.WithFields(log.Fields{"err": err, "path": path}).Error()
+	}
 	return <-r.closech
 }
 
@@ -408,7 +414,7 @@ func SelectivelyExtractModules(r io.Reader, lastfix string, maxFileSize int64) (
 	return data, nil
 }
 
-//func SelectivelyExtractToFile(r io.Reader, prefix string, toExtract []string, dir string) (map[string]string, error) {
+// func SelectivelyExtractToFile(r io.Reader, prefix string, toExtract []string, dir string) (map[string]string, error) {
 func SelectivelyExtractToFile(r io.Reader, selected func(string) bool, dir string) (map[string]string, error) {
 	files := make(map[string]string)
 
@@ -503,7 +509,9 @@ func Unzip(src string, dest string) error {
 
 		if f.Mode().IsDir() {
 			// Make Folder
-			os.MkdirAll(fpath, os.ModePerm)
+			if err := os.MkdirAll(fpath, os.ModePerm); err != nil {
+				log.WithFields(log.Fields{"err": err, "fpath": fpath}).Error()
+			}
 			continue
 		}
 

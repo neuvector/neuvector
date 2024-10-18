@@ -163,7 +163,7 @@ func (s *Semaphore) Acquire(stopCh <-chan struct{}) (<-chan struct{}, error) {
 		s.sessionRenew = make(chan struct{})
 		s.lockSession = sess
 		session := s.c.Session()
-		go session.RenewPeriodic(s.opts.SessionTTL, sess, nil, s.sessionRenew)
+		go func() { _ = session.RenewPeriodic(s.opts.SessionTTL, sess, nil, s.sessionRenew) }()
 
 		// If we fail to acquire the lock, cleanup the session
 		defer func() {

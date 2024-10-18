@@ -2675,12 +2675,11 @@ func (p *Probe) addProcHistory(id string, proc *procInternal, bFromMonitor bool)
 		p.procHistoryMap[id] = histProc
 	}
 
-	if dbgError := histProc.Write(proc); dbgError != nil {
-		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-	}
+	histProc.Write(proc)
+
 	// Verification section, test only
-	// log.WithFields(log.Fields{"path": proc.path, "id": id, "cnt": histProc.Leng()}).Debug("PROC: ")
-	//	if histProc.Leng() == 400 {
+	// log.WithFields(log.Fields{"path": proc.path, "id": id, "cnt": histProc.Length()}).Debug("PROC: ")
+	// if histProc.Length()() == 400 {
 	//		var list []*procInternal
 	//		elements := histProc.DumpExt()
 	//		for i := 0; i < len(elements); i++ {

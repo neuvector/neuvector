@@ -46,7 +46,7 @@ func (d *rancher) GetServiceFromPodLabels(namespace, pod, node string, labels ma
 }
 
 func (d *rancher) GetService(meta *container.ContainerMeta, node string) *Service {
-	if service, _ := meta.Labels[container.RancherKeyStackServiceName]; service != "" {
+	if service := meta.Labels[container.RancherKeyStackServiceName]; service != "" {
 		return &Service{Name: service}
 	}
 
@@ -115,7 +115,7 @@ func (d *rancher) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	key = container.RancherCNINetwork
 	if _, ok := meta.Labels[key]; ok {
 		for _, addrs := range ports {
-			for j, _ := range addrs {
+			for j := range addrs {
 				addrs[j].Scope = share.CLUSIPAddrScopeGlobal
 				addrs[j].NetworkID = container.RancherOverlayNetworkName
 				addrs[j].NetworkName = container.RancherOverlayNetworkName

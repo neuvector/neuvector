@@ -133,7 +133,7 @@ func TestVersion(t *testing.T) {
 	cases := []string{
 		"2:svn28991.0-45.el7",
 	}
-	for i, _ := range cases {
+	for i := range cases {
 		_, err := NewVersion(cases[i])
 		if err != nil {
 			t.Errorf("%d: %s - %s", i, cases[i], err)

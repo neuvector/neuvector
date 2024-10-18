@@ -3,6 +3,8 @@ package srslog
 import (
 	"net"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // netConn has an internal net.Conn and adheres to the serverConn interface,
@@ -15,7 +17,10 @@ type netConn struct {
 // hostname, and sends the message to the connection.
 func (n *netConn) writeString(framer Framer, formatter Formatter, tmo time.Duration, p Priority, hostname, tag, msg string) error {
 	if tmo != 0 {
-		n.conn.SetWriteDeadline(time.Now().Add(tmo))
+		t := time.Now().Add(tmo)
+		if err := n.conn.SetWriteDeadline(t); err != nil {
+			log.WithFields(log.Fields{"err": err, "t": t}).Error()
+		}
 	}
 	if framer == nil {
 		framer = DefaultFramer

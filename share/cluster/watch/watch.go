@@ -36,7 +36,7 @@ type WatchPlan struct {
 	pause    bool
 	stopLock sync.Mutex
 
-	Key string
+	Key        string
 	CongestCtl bool
 }
 

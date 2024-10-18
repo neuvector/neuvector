@@ -1,0 +1,30 @@
+* @holyspectral @yasker 
+/CODEOWNERS @holyspectral @BinX-Suse @yasker
+/.github/ @neuvector/build @yasker  
+/build/ @neuvector/build @yasker 
+/controller/ @neuvector/controller @yasker 
+/controller/scan/ @neuvector/controller @neuvector/scanner @yasker 
+/db/ @neuvector/controller @yasker 
+/dp/ @neuvector/dp @yasker
+/templates/ @neuvector/controller @yasker 
+/upgrader/ @neuvector/controller @yasker 
+/agent/ @neuvector/enforcer @yasker 
+/tools/ @neuvector/enforcer @yasker 
+/monitor/ @neuvector/enforcer @neuvector/controller @yasker 
+/scripts/ @neuvector/enforcer @neuvector/controller @yasker 
+/share/auth/ @neuvector/controller @yasker 
+/share/cluster/ @neuvector/enforcer @neuvector/controller @yasker 
+/share/container/ @neuvector/enforcer @yasker 
+/share/fsmon/ @neuvector/enforcer @yasker 
+/share/global/ @neuvector/enforcer @neuvector/controller @yasker 
+/share/healthz @neuvector/controller @yasker 
+/share/httpclient/ @neuvector/controller @neuvector/scanner @yasker 
+/share/httptrace/ @neuvector/controller @neuvector/scanner @yasker 
+/share/k8sutils/ @neuvector/controller @yasker 
+/share/licenseinfo/ @neuvector/controller @yasker 
+/share/migration/ @neuvector/controller @yasker 
+/share/orchestration/ @neuvector/controller @yasker 
+/share/osutil/ @neuvector/enforcer @yasker 
+/share/scan/ @neuvector/enforcer @neuvector/controller @neuvector/scanner @yasker 
+/share/utils/ @neuvector/enforcer @neuvector/controller @neuvector/scanner @yasker 
+

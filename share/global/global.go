@@ -207,7 +207,7 @@ func IdentifyK8sContainerID(id string) (string, error) {
 				if strings.HasPrefix(c.Name, "k8s_POD") {
 					// parent: POD
 					if c.ID == id {
-						podname, _ = c.Labels[container.KubeKeyPodName]
+						podname = c.Labels[container.KubeKeyPodName]
 						break
 					}
 				} else {
@@ -233,9 +233,9 @@ func IdentifyK8sContainerID(id string) (string, error) {
 }
 
 func (d *orchHub) SetFlavor(flavor string) error {
-	d.Driver.SetFlavor(flavor)
+	_ = d.Driver.SetFlavor(flavor)
 	if d.ResourceDriver != nil {
-		d.ResourceDriver.SetFlavor(flavor)
+		_ = d.ResourceDriver.SetFlavor(flavor)
 	}
 
 	return nil

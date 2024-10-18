@@ -8,3 +8,14 @@ linters:
     - staticcheck
     - unused
     - gofmt
+
+issues:
+  exclude-rules:
+    - path: share/
+      linters:
+        - staticcheck
+      text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+    - path: controller/
+      linters:
+        - staticcheck
+      text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
