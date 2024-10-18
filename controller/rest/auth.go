@@ -15,7 +15,7 @@ import (
 
 	"errors"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 
@@ -68,7 +68,7 @@ type tokenClaim struct {
 	ExtraPermits    access.DomainPermissions `json:"extra_permissions"`      // extra domain -> permissions(other than in 'Roles'). only for Rancher SSO
 	NameID          string                   `json:"nameId,omitempty"`       // Used by SAML Single Logout
 	SessionIndex    string                   `json:"sessionIndex,omitempty"` // Used by SAML Single Logout
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 type joinToken struct {
@@ -176,7 +176,7 @@ func GetJWTSigningKey() JWTCertificateState {
 // With userMutex locked when calling this because it does loginSession lookup first
 func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (*loginSession, int) {
 	s := &loginSession{
-		id:                 claims.Id,
+		id:                 claims.ID,
 		mainSessionID:      claims.MainSessionID,
 		mainSessionUser:    claims.MainSessionUser,
 		token:              token,
@@ -186,11 +186,13 @@ func newLoginSessionFromToken(token string, claims *tokenClaim, now time.Time) (
 		remote:             claims.Remote,
 		loginAt:            now,
 		lastAt:             now,
-		eolAt:              time.Unix(claims.ExpiresAt, 0),
 		domainRoles:        claims.Roles,
 		extraDomainPermits: claims.ExtraPermits,
 		nameid:             claims.NameID,
 		sessionIndex:       claims.SessionIndex,
+	}
+	if claims.ExpiresAt != nil {
+		s.eolAt = claims.ExpiresAt.Time
 	}
 	if rc := _registerLoginSession(s); rc != userOK {
 		updateFedLoginSession(s)
@@ -217,7 +219,6 @@ func newLoginSessionFromUser(user *share.CLUSUser, domainRoles access.DomainRole
 		remote:             remote,
 		loginAt:            now,
 		lastAt:             now,
-		eolAt:              time.Unix(claims.ExpiresAt, 0),
 		domainRoles:        domainRoles,
 		extraDomainPermits: extraDomainPermits,
 	}
@@ -228,6 +229,9 @@ func newLoginSessionFromUser(user *share.CLUSUser, domainRoles access.DomainRole
 	if sso != nil {
 		s.nameid = sso.SAMLNameID
 		s.sessionIndex = sso.SAMLSessionIndex
+	}
+	if claims.ExpiresAt != nil {
+		s.eolAt = claims.ExpiresAt.Time
 	}
 
 	var rc int
@@ -661,8 +665,11 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	}
 
 	// Check token end-of-life
+	if claims.ExpiresAt == nil {
+		return nil, userInvalidRequest, rsessToken
+	}
 	now := time.Now()
-	if now.Unix() >= claims.ExpiresAt {
+	if now.After(claims.ExpiresAt.Time) {
 		return nil, userTimeout, rsessToken
 	}
 
@@ -1146,7 +1153,9 @@ func invalidateImportStatusToken(tempToken string) {
 		s := &loginSession{
 			token:    tempToken,
 			fullname: claims.Fullname,
-			eolAt:    time.Unix(claims.ExpiresAt, 0),
+		}
+		if claims.ExpiresAt != nil {
+			s.eolAt = claims.ExpiresAt.Time
 		}
 		_deleteSessionToken(s)
 	}
@@ -1431,11 +1440,11 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 		Timeout:         user.Timeout,
 		Roles:           domainRoles,
 		ExtraPermits:    extraDomainPermits,
-		StandardClaims: jwt.StandardClaims{
-			Id:        id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        id,
 			Subject:   installID,
 			Issuer:    localDev.Ctrler.ID,
-			ExpiresAt: now.Add(jwtTokenLife).Unix(),
+			ExpiresAt: jwt.NewNumericDate(now.Add(jwtTokenLife)),
 		},
 	}
 	if sso != nil {
@@ -1445,13 +1454,13 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	if r, ok := domainRoles[access.AccessDomainGlobal]; ok && (r == api.UserRoleIBMSA || r == api.UserRoleImportStatus) && len(domainRoles) == 1 {
 		if r == api.UserRoleIBMSA {
 			c.Timeout = uint32(30 * 60) // jwtIbmSaTokenLife, 30 minutes
-			c.StandardClaims.ExpiresAt = now.Add(jwtIbmSaTokenLife).Unix()
+			c.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(jwtIbmSaTokenLife))
 		} else {
 			c.Timeout = uint32(10 * 60) // jwtImportStatusTokenLife, 10 minutes
-			c.StandardClaims.ExpiresAt = now.Add(jwtImportStatusTokenLife).Unix()
+			c.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(jwtImportStatusTokenLife))
 		}
 	}
-	c.StandardClaims.IssuedAt = now.Add(_halfHourBefore).Unix() // so that token won't be invalidated among controllers because of system time diff & iat
+	c.RegisteredClaims.IssuedAt = jwt.NewNumericDate(now.Add(_halfHourBefore)) // so that token won't be invalidated among controllers because of system time diff & iat
 
 	// Validate token
 	jwtCert := GetJWTSigningKey()
@@ -1536,12 +1545,12 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 		Timeout:         user.Timeout,
 		Roles:           user.RemoteRolePermits.DomainRole,
 		ExtraPermits:    user.RemoteRolePermits.ExtraPermits,
-		StandardClaims: jwt.StandardClaims{
-			Id: id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID: id,
 			//Subject: installID,	    // no need because it's not verified for master token(multi-clusters)
 			Issuer: localDev.Ctrler.ID,
 			//IssuedAt:  now.Unix(),	// for fed master token only : comment out so that iat won't be validated on the joint cluster side
-			ExpiresAt: now.Add(jwtFedTokenLife).Unix(),
+			ExpiresAt: jwt.NewNumericDate(now.Add(jwtFedTokenLife)),
 		},
 	}
 
@@ -1556,11 +1565,11 @@ func jwtGenFedPingToken(callerFedRole, clusterID, secret string, rsaPrivateKey *
 	now := time.Now()
 	// master token must not have fedAdmin role because joint clusters do not recognize fedAdmin role.
 	c := tokenClaim{
-		StandardClaims: jwt.StandardClaims{
-			Id: id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID: id,
 			//Subject:   installID, // no need because it's not verified for ping token(multi-clusters)
 			Issuer:    localDev.Ctrler.ID,
-			ExpiresAt: now.Add(jwtFedTokenLife).Unix(),
+			ExpiresAt: jwt.NewNumericDate(now.Add(jwtFedTokenLife)),
 		},
 	}
 
@@ -2094,7 +2103,10 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 		return nil, nil, err
 	}
 
-	if time.Now().Unix() >= claims.ExpiresAt {
+	if claims.ExpiresAt == nil {
+		return nil, nil, errors.New("token expiration not set")
+	}
+	if time.Now().After(claims.ExpiresAt.Time) {
 		return nil, nil, errTokenExpired
 	}
 
