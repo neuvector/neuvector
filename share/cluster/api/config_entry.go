@@ -72,11 +72,6 @@ func (p *ProxyConfigEntry) GetModifyIndex() uint64 {
 	return p.ModifyIndex
 }
 
-type rawEntryListResponse struct {
-	kind    string
-	Entries []map[string]interface{}
-}
-
 func makeConfigEntry(kind, name string) (ConfigEntry, error) {
 	switch kind {
 	case ServiceDefaults:

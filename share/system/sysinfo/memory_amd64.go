@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Memory information.
@@ -60,6 +62,7 @@ func epsValid(eps []byte) bool {
 func getStructureTableAddressEFI(f *os.File) (address int64, length int, err error) {
 	systab, err := openFile("/sys/firmware/efi/systab")
 	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("systab")
 		return 0, 0, err
 	}
 	defer systab.Close()
@@ -73,14 +76,20 @@ func getStructureTableAddressEFI(f *os.File) (address int64, length int, err err
 
 		addr, err := strconv.ParseInt(sl[1], 0, 64)
 		if err != nil {
+			log.WithFields(log.Fields{"err": err, "s": sl[1]}).Error()
 			return 0, 0, err
 		}
 
 		eps, err := syscall.Mmap(int(f.Fd()), addr, epsSize, syscall.PROT_READ, syscall.MAP_SHARED)
 		if err != nil {
+			log.WithFields(log.Fields{"err": err, "addr": addr}).Error("Mmap")
 			return 0, 0, err
 		}
-		defer syscall.Munmap(eps)
+		defer func() {
+			if err := syscall.Munmap(eps); err != nil {
+				log.WithFields(log.Fields{"err": err}).Error("Munmap")
+			}
+		}()
 
 		if !epsValid(eps) {
 			break
@@ -89,6 +98,7 @@ func getStructureTableAddressEFI(f *os.File) (address int64, length int, err err
 		return int64(dword(eps, 0x18)), int(word(eps, 0x16)), nil
 	}
 	if err := s.Err(); err != nil {
+		log.WithFields(log.Fields{"s.err": err}).Error()
 		return 0, 0, err
 	}
 
@@ -99,9 +109,14 @@ func getStructureTableAddress(f *os.File) (address int64, length int, err error)
 	// SMBIOS Reference Specification Version 3.0.0, page 21
 	mem, err := syscall.Mmap(int(f.Fd()), 0xf0000, 0x10000, syscall.PROT_READ, syscall.MAP_SHARED)
 	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("Mmap")
 		return 0, 0, err
 	}
-	defer syscall.Munmap(mem)
+	defer func() {
+		if err := syscall.Munmap(mem); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("Munmap")
+		}
+	}()
 
 	for i := range mem {
 		if i > len(mem)-epsSize {
@@ -134,6 +149,7 @@ func getStructureTable() ([]byte, error) {
 	address, length, err := getStructureTableAddressEFI(f)
 	if err != nil {
 		if address, length, err = getStructureTableAddress(f); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error()
 			return nil, err
 		}
 	}
@@ -142,6 +158,7 @@ func getStructureTable() ([]byte, error) {
 	align := address & (int64(os.Getpagesize()) - 1)
 	mem, err := syscall.Mmap(int(f.Fd()), address-align, length+int(align), syscall.PROT_READ, syscall.MAP_SHARED)
 	if err != nil {
+		log.WithFields(log.Fields{"err": err, "address": (address - align)}).Error("Mmap")
 		return nil, err
 	}
 
@@ -188,11 +205,17 @@ func (si *SysInfo) getMemoryInfo() {
 			if size, err := getSystemMemoryFromProcMeminfo(); err == nil {
 				si.Memory.Type = "DRAM"
 				si.Memory.Size = uint(size) / 1024
+			} else {
+				log.WithFields(log.Fields{"err": err}).Error()
 			}
 		}
 		return
 	}
-	defer syscall.Munmap(mem)
+	defer func() {
+		if err := syscall.Munmap(mem); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("Munmap")
+		}
+	}()
 
 	var memSizeAlt uint
 loop:

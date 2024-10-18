@@ -9,14 +9,14 @@ import (
 func TestSLESPackageList(t *testing.T) {
 	db, err := rpmdb.Open("testdata/Packages.sles")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 	} else {
 		defer db.Close()
 	}
 
 	pkgs, err := db.ListPackages()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 	}
 
 	if len(pkgs) != 159 {

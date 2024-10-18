@@ -79,8 +79,8 @@ func (d *base) GetService(meta *container.ContainerMeta, node string) *Service {
 		return &Service{Name: seviceName}
 	}
 
-	project, _ := meta.Labels[container.DockerComposeProjectKey]
-	service, _ := meta.Labels[container.DockerComposeServiceKey]
+	project := meta.Labels[container.DockerComposeProjectKey]
+	service := meta.Labels[container.DockerComposeServiceKey]
 	if project != "" && service != "" {
 		if reDockerRegistryReplica == nil || reDockerUCP == nil {
 			reDockerRegistryReplica = regexp.MustCompile(reStrDockerRegistryReplica)
@@ -92,7 +92,7 @@ func (d *base) GetService(meta *container.ContainerMeta, node string) *Service {
 			project = renameDockerUCP
 		}
 		return &Service{Name: project + "." + service}
-	} else if service, _ = meta.Labels[container.DockerSwarmServiceKey]; service != "" {
+	} else if service = meta.Labels[container.DockerSwarmServiceKey]; service != "" {
 		return &Service{Name: service}
 	}
 
@@ -138,7 +138,7 @@ func (d *base) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 ) {
 	// Set an interface IP as global if it's IP belongs to 'global' network subnet
 	for _, addrs := range ports {
-		for j, _ := range addrs {
+		for j := range addrs {
 			if network := d.getNetworkFromAddr(addrs[j].IPNet.IP, nets); network != nil {
 				if network.Scope == container.DockerNetworkGlobal || network.Scope == container.DockerNetworkSwarm {
 					addrs[j].Scope = share.CLUSIPAddrScopeGlobal

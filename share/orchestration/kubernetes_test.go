@@ -251,7 +251,7 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	driver.createCleanupScript(&script, test)
+	_ = driver.createCleanupScript(&script, test)
 	e := strings.TrimSpace(ret)
 	r := strings.TrimSpace(script.String())
 	if e != r {
@@ -282,7 +282,7 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	driver.createCleanupScript(&script, test)
+	_ = driver.createCleanupScript(&script, test)
 	e = strings.TrimSpace(ret)
 	r = strings.TrimSpace(script.String())
 	if e != r {
@@ -320,7 +320,7 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	driver.createCleanupScript(&script, test)
+	_ = driver.createCleanupScript(&script, test)
 	e = strings.TrimSpace(ret)
 	r = strings.TrimSpace(script.String())
 	if e != r {
@@ -340,7 +340,7 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	driver.createCleanupScript(&script, test)
+	_ = driver.createCleanupScript(&script, test)
 	e = strings.TrimSpace(ret)
 	r = strings.TrimSpace(script.String())
 	if e != r {

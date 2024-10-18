@@ -76,7 +76,7 @@ func extractProcRootPath(pid int, input string, inTest bool) (string, error) {
 		}
 		return matches[0], nil
 	} else {
-		return fmt.Sprintf(global.SYS.GetProcDir() + "%d/root", pid), nil
+		return fmt.Sprintf(global.SYS.GetProcDir()+"%d/root", pid), nil
 	}
 }
 
@@ -205,7 +205,7 @@ func GetFileInfoExtFromPid(root, pid int) []*FileInfoExt {
 	}
 }
 
-//get the file information, if the file is a symlink, return both the symlink and the real file
+// get the file information, if the file is a symlink, return both the symlink and the real file
 func GetFileInfoExtFromPath(root int, path string, flt interface{}, protect, userAdded bool) []*FileInfoExt {
 	files := make([]*FileInfoExt, 0)
 	if info, err := os.Lstat(path); err == nil {
@@ -252,6 +252,7 @@ func HashZero(hash [fileHashKeep]byte) bool {
 	return hash == [fileHashKeep]byte{}
 }
 
+/*
 func parseFilter(filter string) (string, string) {
 	ss := strings.Split(filter, "/")
 	var base string
@@ -269,6 +270,7 @@ func parseFilter(filter string) (string, string) {
 	regexStr := strings.Replace(filter, "*", ".*", -1)
 	return base, regexStr
 }
+*/
 
 func GetFileDirInfo(file string) FileInfoExt {
 	dir := filepath.Dir(file)
@@ -281,7 +283,7 @@ func GetFileDirInfo(file string) FileInfoExt {
 	return FileInfoExt{}
 }
 
-/////////
+// ///////
 const ErrorNotDirectory string = "src is not a directory"
 
 // CopyFile copies the contents of the file named src to the file named
@@ -338,7 +340,7 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 	if !si.IsDir() {
-		return fmt.Errorf(ErrorNotDirectory)
+		return errors.New(string(ErrorNotDirectory))
 	}
 
 	// overwrite it even it already exists

@@ -47,11 +47,6 @@ type crioDriver struct {
 	eventCallback    EventCallback
 }
 
-type imageInfo struct {
-	repoTag string
-	digest  string
-}
-
 func getPauseImageRepoDigests(sys *system.SystemTools) (string, error) {
 	config_files := []string{
 		"/proc/1/root/etc/crio/crio.conf",
@@ -97,7 +92,7 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		return nil, err
 	}
 
-	sockPath := endpoint
+	var sockPath string
 	id, _, _ := sys.GetSelfContainerID() // not relaible, could be sandboxID
 	id, _ = criGetSelfID(cri, ctx, id)
 	sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint) // update id
@@ -119,7 +114,7 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 			log.WithFields(log.Fields{"error": err}).Error("Fail to get pause image info")
 		} else {
 			driver.podImgRepoDigest = repoDig
-			driver.setPodImageInfo()
+			_ = driver.setPodImageInfo()
 			log.WithFields(log.Fields{"repoDig": driver.podImgRepoDigest, "imgID": driver.podImgID, "imgDigest": driver.podImgDigest}).Debug("CRIO:")
 		}
 	}
@@ -140,7 +135,7 @@ func (d *crioDriver) reConnect() error {
 	}
 	// the original socket has been recreated and its mounted path was also lost.
 	endpoint := d.endpoint
-	if d.endpointHost != "" {	// use the host
+	if d.endpointHost != "" { // use the host
 		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
 		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
@@ -206,7 +201,7 @@ type criContainerInfo struct {
 		Image       string `json:"image"`
 		Privileged  bool   `json:"privileged"`
 		RuntimeSpec struct {
-			Annotations map[string]string   `json:"annotations"`
+			Annotations map[string]string `json:"annotations"`
 		} `json:"runtimeSpec"`
 	} `json:"info"`
 }
@@ -550,8 +545,8 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 		time.Sleep(time.Second * 5)
 		if err := d.reConnect(); err != nil {
 			log.WithFields(log.Fields{"err": err}).Error()
-			d.failedQueryCnt++	// the query is coming every 20-seconds
-			if d.failedQueryCnt > 5 {	// 100 seconds
+			d.failedQueryCnt++        // the query is coming every 20-seconds
+			if d.failedQueryCnt > 5 { // 100 seconds
 				// notify parent to exit container
 				if d.eventCallback != nil {
 					d.eventCallback(EventSocketError, "", 0)
@@ -572,7 +567,7 @@ func (d *crioDriver) ListContainerIDs() (utils.Set, utils.Set) {
 		}
 	}
 
-	d.failedQueryCnt = 0	// reset
+	d.failedQueryCnt = 0 // reset
 	if resp_sandboxes, err := criListPodSandboxes(d.criClient, ctx, true); err == nil && resp_sandboxes != nil {
 		for _, pod := range resp_sandboxes.Items {
 			ids.Add(pod.Id)

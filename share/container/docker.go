@@ -91,18 +91,20 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		return nil, err
 	}
 
-	sockPath := endpoint
-	id, _, err := sys.GetSelfContainerID()	// ref, not reliable
+	var sockPath string
+	id, _, err := sys.GetSelfContainerID() // ref, not reliable
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "id": id}).Info()
+	}
 	sockPath, err = getContainerSocketPath(client, id, endpoint)
 	if err == nil {
 		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
 	}
 
-
 	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client,
-		                   version: ver, info: info, selfID: id,}
+		version: ver, info: info, selfID: id}
 	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current",
-	         "docker-containerd-shim-current", "containerd-shim-runc-v1", "containerd-shim-runc-v2", "containerd", "containerd-shim")
+		"docker-containerd-shim-current", "containerd-shim-runc-v1", "containerd-shim-runc-v2", "containerd", "containerd-shim")
 	driver.pidHost = IsPidHost()
 	return &driver, nil
 }
@@ -578,8 +580,6 @@ func (d *dockerDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func (d *dockerDriver) cpEventHandler(e *dockerclient.Event, ec chan error, args ...interface{}) {
