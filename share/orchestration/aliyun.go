@@ -35,7 +35,7 @@ func (d *aliyun) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	// Best effort, set eth0 as overlay IP
 	for name, addrs := range ports {
 		if name == "eth0" {
-			for j, _ := range addrs {
+			for j := range addrs {
 				addrs[j].Scope = share.CLUSIPAddrScopeGlobal
 			}
 		}

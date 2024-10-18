@@ -38,8 +38,8 @@ type InternalSecretController struct {
 	secretName      string
 	lastRevision    string
 	reloadFuncs     []func([]byte, []byte, []byte) error
-	clientset       *kubernetes.Clientset
-	initialized     int32
+	//	clientset       *kubernetes.Clientset
+	initialized int32
 }
 
 func verifyCert(cacert []byte, cert []byte, key []byte) error {
@@ -295,7 +295,9 @@ func (c *InternalSecretController) secretDelete(obj interface{}) {
 	}).Debug("internal secret is deleted")
 }
 
-func NewInternalSecretController(informerFactory informers.SharedInformerFactory, namespace string, secretName string, reloadFuncs []func([]byte, []byte, []byte) error) (*InternalSecretController, error) {
+func NewInternalSecretController(informerFactory informers.SharedInformerFactory, namespace string, secretName string,
+	reloadFuncs []func([]byte, []byte, []byte) error) (*InternalSecretController, error) {
+
 	secretInformer := informerFactory.Core().V1().Secrets()
 
 	c := &InternalSecretController{
@@ -306,7 +308,7 @@ func NewInternalSecretController(informerFactory informers.SharedInformerFactory
 		reloadFuncs:     reloadFuncs,
 	}
 
-	secretInformer.Informer().AddEventHandlerWithResyncPeriod(
+	if _, err := secretInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			// Called on creation
 			AddFunc: c.secretAdd,
@@ -316,7 +318,9 @@ func NewInternalSecretController(informerFactory informers.SharedInformerFactory
 			DeleteFunc: c.secretDelete,
 		},
 		time.Minute*5, // re-enumerate cache every 5 minutes
-	)
+	); err != nil {
+		log.WithField("error", err).Error()
+	}
 
 	return c, nil
 }

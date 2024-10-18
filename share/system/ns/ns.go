@@ -49,7 +49,7 @@ func CurNsHandle(nstype string) (*NsHandle, error) {
 	return &NsHandle{nstype: nstype, fd: fd}, nil
 }
 
-func (ns NsHandle) String() string {
+func (ns *NsHandle) String() string {
 	if ns.fd == -1 {
 		return "NS(None)"
 	}
@@ -57,13 +57,13 @@ func (ns NsHandle) String() string {
 }
 
 // IsOpen returns true if Close() has not been called.
-func (ns NsHandle) IsOpen() bool {
+func (ns *NsHandle) IsOpen() bool {
 	return ns.fd != -1
 }
 
 // Close closes the NsHandle and resets its file descriptor to -1.
 // It is not safe to use an NsHandle after Close() is called.
-func (ns NsHandle) Close() error {
+func (ns *NsHandle) Close() error {
 	if ns.fd == -1 {
 		return nil
 	}

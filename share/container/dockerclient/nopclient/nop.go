@@ -79,11 +79,9 @@ func (client *NopClient) MonitorEvents(options *dockerclient.MonitorEventsOption
 }
 
 func (client *NopClient) StartMonitorEvents(cb dockerclient.Callback, ec chan error, args ...interface{}) {
-	return
 }
 
 func (client *NopClient) StopAllMonitorEvents() {
-	return
 }
 
 func (client *NopClient) TagImage(nameOrID string, repo string, tag string, force bool) error {
@@ -91,11 +89,9 @@ func (client *NopClient) TagImage(nameOrID string, repo string, tag string, forc
 }
 
 func (client *NopClient) StartMonitorStats(id string, cb dockerclient.StatCallback, ec chan error, args ...interface{}) {
-	return
 }
 
 func (client *NopClient) StopAllMonitorStats() {
-	return
 }
 
 func (client *NopClient) Version() (*dockerclient.Version, error) {

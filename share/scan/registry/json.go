@@ -11,6 +11,7 @@ var (
 	ErrNoMorePages = errors.New("No more pages")
 )
 
+/*
 func (r *Registry) getJson(url string, response interface{}) error {
 	resp, err := r.Client.Get(url)
 	if err != nil {
@@ -26,6 +27,7 @@ func (r *Registry) getJson(url string, response interface{}) error {
 
 	return nil
 }
+*/
 
 // getPaginatedJson accepts a string and a pointer, and returns the
 // next page URL while updating pointed-to variable with a parsed JSON
@@ -48,7 +50,7 @@ func (r *Registry) getPaginatedJson(url string, response interface{}) (string, e
 // Matches an RFC 5988 (https://tools.ietf.org/html/rfc5988#section-5)
 // Link header. For example,
 //
-//    <http://registry.example.com/v2/_catalog?n=5&last=tag5>; type="application/json"; rel="next"
+//	<http://registry.example.com/v2/_catalog?n=5&last=tag5>; type="application/json"; rel="next"
 //
 // The URL is _supposed_ to be wrapped by angle brackets `< ... >`,
 // but e.g., quay.io does not include them. Similarly, params like

@@ -29,7 +29,8 @@ const consulPeers string = consulDataDir + "/raft/peers.json"
 
 const defaultRPCPort = 18300
 const defaultLANPort = 18301
-const defaultWANPort = 18302
+
+//const defaultWANPort = 18302
 
 const queryKvTimeout = time.Second * 1 // lower to 100 ms?
 
@@ -72,6 +73,7 @@ func gossipSharedKey() string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
+/*
 func createPeerFileV2(cc *ClusterConfig) error {
 	log.WithFields(log.Fields{"peers": cc.joinAddrList}).Info()
 
@@ -93,6 +95,7 @@ func createPeerFileV2(cc *ClusterConfig) error {
 
 	return nil
 }
+*/
 
 func createPeerFileV3(cc *ClusterConfig) error {
 	log.WithFields(log.Fields{"peers": cc.joinAddrList}).Info()
@@ -132,7 +135,42 @@ func createConfigFile(cc *ClusterConfig) error {
 		lanPort = defaultLANPort
 	}
 
-	os.MkdirAll(consulDataDir, os.ModePerm)
+	type tConsulConfigPorts struct {
+		Dns      int  `json:"dns"`
+		Server   uint `json:"server"`
+		Serf_lan uint `json:"serf_lan"`
+		Serf_wan int  `json:"serf_wan"`
+	}
+
+	type tConsulConfigPerformance struct {
+		Rpc_hold_timeout string `json:"rpc_hold_timeout"`
+	}
+
+	type tConsulConfig struct {
+		//Acl_datacenter          string                   `json:"acl_datacenter"`
+		//Acl_default_policy      string                   `json:"acl_default_policy"`
+		//Acl_down_policy         string                   `json:"acl_down_policy"`
+		//Acl_master_token        string                   `json:"acl_master_token"`
+		Enable_debug            bool                     `json:"enable_debug,omitempty"`
+		Check_update_interval   string                   `json:"check_update_interval"`
+		Disable_update_check    bool                     `json:"disable_update_check"`
+		Disable_remote_exec     bool                     `json:"disable_remote_exec"`
+		Disable_host_node_id    bool                     `json:"disable_host_node_id"`
+		Skip_leave_on_interrupt bool                     `json:"skip_leave_on_interrupt"`
+		Leave_on_terminate      bool                     `json:"leave_on_terminate"`
+		Encrypt                 string                   `json:"encrypt"`
+		Ca_file                 string                   `json:"ca_file"`
+		Cert_file               string                   `json:"cert_file"`
+		Key_file                string                   `json:"key_file"`
+		Verify_incoming         bool                     `json:"verify_incoming"`
+		Verify_outgoing         bool                     `json:"verify_outgoing"`
+		Log_level               string                   `json:"log_level"`
+		Ports                   tConsulConfigPorts       `json:"ports"`
+		Tls_cipher_suites       string                   `json:"tls_cipher_suites"`
+		Performance             tConsulConfigPerformance `json:"performance"`
+	}
+
+	_ = os.MkdirAll(consulDataDir, os.ModePerm)
 	f, err := os.Create(consulConf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create consul config file")
@@ -140,50 +178,44 @@ func createConfigFile(cc *ClusterConfig) error {
 	}
 	defer f.Close()
 
-	var sa []string
-	sa = append(sa, fmt.Sprintf("{\n"))
-	// sa = append(sa, fmt.Sprintf("    \"acl_datacenter\": \"dc1\", \n"))
-	// sa = append(sa, fmt.Sprintf("    \"acl_default_policy\": \"deny\", \n"))
-	// sa = append(sa, fmt.Sprintf("    \"acl_down_policy\": \"deny\", \n"))
-	// sa = append(sa, fmt.Sprintf("    \"acl_master_token\": \"%s\", \n", consulAclToken))
-	if cc.EnableDebug {
-		sa = append(sa, "    \"enable_debug\": true,\n")
+	cfg := tConsulConfig{
+		//Acl_datacenter:          "dc1",
+		//Acl_default_policy:      "deny",
+		//Acl_down_policy:         "deny",
+		//Acl_master_token:        consulAclToken,
+		Enable_debug:            cc.EnableDebug,
+		Check_update_interval:   "0s",
+		Disable_update_check:    true,
+		Disable_remote_exec:     true,
+		Disable_host_node_id:    true,
+		Skip_leave_on_interrupt: false,
+		Leave_on_terminate:      true,
+		Encrypt:                 gossipSharedKey(),
+		Ca_file:                 fmt.Sprintf("%s%s", InternalCertDir, InternalCACert),
+		Cert_file:               fmt.Sprintf("%s%s", InternalCertDir, InternalCert),
+		Key_file:                fmt.Sprintf("%s%s", InternalCertDir, InternalCertKey),
+		Verify_incoming:         true,
+		Verify_outgoing:         true,
+		Ports: tConsulConfigPorts{
+			Dns:      -1,
+			Server:   rpcPort,
+			Serf_lan: lanPort,
+			Serf_wan: -1,
+		},
+		Tls_cipher_suites: "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+		Performance: tConsulConfigPerformance{
+			Rpc_hold_timeout: fmt.Sprintf("%ds", 300),
+		},
 	}
-	sa = append(sa, "    \"check_update_interval\": \"0s\",\n")
-	sa = append(sa, "    \"disable_update_check\": true,\n")
-	sa = append(sa, "    \"disable_remote_exec\": true,\n")
-	sa = append(sa, "    \"disable_host_node_id\": true,\n")
-	sa = append(sa, "    \"skip_leave_on_interrupt\": false,\n")
-	sa = append(sa, "    \"leave_on_terminate\": true,\n")
-	sa = append(sa, fmt.Sprintf("    \"encrypt\": \"%s\",\n", gossipSharedKey()))
-	sa = append(sa, fmt.Sprintf("    \"ca_file\": \"%s%s\",\n", InternalCertDir, InternalCACert))
-	sa = append(sa, fmt.Sprintf("    \"cert_file\": \"%s%s\",\n", InternalCertDir, InternalCert))
-	sa = append(sa, fmt.Sprintf("    \"key_file\": \"%s%s\",\n", InternalCertDir, InternalCertKey))
-	sa = append(sa, fmt.Sprintf("    \"verify_incoming\": true,\n"))
-	sa = append(sa, fmt.Sprintf("    \"verify_outgoing\": true,\n"))
 	if cc.Debug {
-		sa = append(sa, fmt.Sprintf("    \"log_level\": \"DEBUG\",\n"))
+		cfg.Log_level = "DEBUG"
 	} else {
-		sa = append(sa, fmt.Sprintf("    \"log_level\": \"ERROR\",\n"))
+		cfg.Log_level = "ERROR"
 	}
-	sa = append(sa, fmt.Sprintf("    \"ports\": {\n"))
-	sa = append(sa, fmt.Sprintf("        \"dns\": %d,\n", -1))
-	sa = append(sa, fmt.Sprintf("        \"server\": %d,\n", rpcPort))
-	sa = append(sa, fmt.Sprintf("        \"serf_lan\": %d,\n", lanPort))
-	sa = append(sa, fmt.Sprintf("        \"serf_wan\": %d\n", -1))
-	sa = append(sa, fmt.Sprintf("    },\n"))
-	sa = append(sa, fmt.Sprintf("    \"tls_cipher_suites\": \"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384\",\n"))
-	sa = append(sa, fmt.Sprintf("    \"performance\": {\n"))
-	sa = append(sa, fmt.Sprintf("        \"rpc_hold_timeout\": \"%ds\"\n", 300))
-	sa = append(sa, fmt.Sprintf("    }\n"))
-	sa = append(sa, fmt.Sprintf("}\n"))
-
-	for _, si := range sa {
-		_, err := f.WriteString(si)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Failed to write consul config file")
-			return err
-		}
+	value, _ := json.MarshalIndent(&cfg, "", "    ")
+	if _, err := f.WriteString(string(value)); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to write consul config file")
+		return err
 	}
 
 	return nil
@@ -229,7 +261,7 @@ func (m *consulMethod) getClient() (*api.Client, error) {
 }
 
 func (m *consulMethod) Start(cc *ClusterConfig, eCh chan error, recover bool) {
-	m.stopRunningInstance()
+	_ = m.stopRunningInstance()
 
 	args := []string{"agent", "-datacenter", cc.DataCenter, "-data-dir", consulDataDir}
 
@@ -315,7 +347,7 @@ func (m *consulMethod) Start(cc *ClusterConfig, eCh chan error, recover bool) {
 		eCh <- err
 	}
 	if recover {
-		createPeerFileV3(cc)
+		_ = createPeerFileV3(cc)
 	}
 	m.rpcPort = cc.RPCPort
 
@@ -365,7 +397,7 @@ func (m *consulMethod) Leave(server bool) error {
 	log.Info("Consul process exit")
 
 	if server {
-		m.leaveRaft(m.clusterIP)
+		_ = m.leaveRaft(m.clusterIP)
 	}
 
 	cmd := exec.Command(consulExe, "leave")
@@ -383,7 +415,7 @@ func (m *consulMethod) Leave(server bool) error {
 func (m *consulMethod) ForceLeave(node string, server bool) error {
 
 	if server {
-		m.leaveRaft(node)
+		_ = m.leaveRaft(node)
 	}
 
 	c, err := m.getClient()
@@ -402,7 +434,9 @@ func (m *consulMethod) Join(cc *ClusterConfig) error {
 	agent := c.Agent()
 
 	for _, ip := range cc.joinAddrList {
-		err = agent.Join(ip, false)
+		if err := agent.Join(ip, false); err != nil {
+			log.WithFields(log.Fields{"error": err, "ip": ip}).Error()
+		}
 	}
 
 	/*
@@ -462,7 +496,6 @@ func ConsulGet(url string) (string, bool) {
 		return "", false
 	}
 }
-*/
 
 // Consul KV Store related
 
@@ -476,7 +509,6 @@ type consulBody struct {
 	Value       string `json:"Value,omitempty"`
 }
 
-/*
 func GetAll(store string) ([][]byte, []int, bool) {
 	if offlineSupport && !started {
 		return getAllFromCache(store)

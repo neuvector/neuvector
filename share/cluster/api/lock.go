@@ -151,7 +151,7 @@ func (l *Lock) Lock(stopCh <-chan struct{}) (<-chan struct{}, error) {
 		l.sessionRenew = make(chan struct{})
 		l.lockSession = s
 		session := l.c.Session()
-		go session.RenewPeriodic(l.opts.SessionTTL, s, nil, l.sessionRenew)
+		go func() { _ = session.RenewPeriodic(l.opts.SessionTTL, s, nil, l.sessionRenew) }()
 
 		// If we fail to acquire the lock, cleanup the session
 		defer func() {
@@ -218,7 +218,7 @@ WAIT:
 	if !locked {
 		// Determine why the lock failed
 		qOpts.WaitIndex = 0
-		pair, meta, err = kv.Get(l.opts.Key, qOpts)
+		pair, meta, _ = kv.Get(l.opts.Key, qOpts)
 		if pair != nil && pair.Session != "" {
 			//If the session is not null, this means that a wait can safely happen
 			//using a long poll

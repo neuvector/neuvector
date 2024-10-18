@@ -3,16 +3,16 @@ package watch
 import (
 	"fmt"
 	"reflect"
-	"time"
 	"strings"
+	"time"
 
-	log "github.com/sirupsen/logrus"
 	consulapi "github.com/neuvector/neuvector/share/cluster/api"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
 	// retryInterval is the base retry value
-	retryInterval = 5 * time.Second
+	//retryInterval = 5 * time.Second
 
 	// maximum back off time, this is to prevent
 	// exponential runaway
@@ -21,19 +21,19 @@ const (
 
 	// congestion controls
 	// (1) congestion detection
-	congestTimeWindow = 2 * time.Second    // detection on possible surges
+	congestTimeWindow  = 2 * time.Second // detection on possible surges
 	congestIndexWindow = 8
-	congestQualCount  = 2                   // qualification
+	congestQualCount   = 2 // qualification
 
 	// (2) adaptive congestion avoidance
-	fastForwardBaseline = 64    // minimum fast-forward count
-	fastForwardTopline = 2048   // maximum fast-forward count
-	rampDownBaseline = 128      // least ramp-down count
-	waitStepBaseline = 2        // minimum wait steps
-	waitStepRampDown = 4        // ramp-down wait steps
-	waitStepTopline = 6         // maximum wait steps
-	waitStepBaseUnit = 5        // 5 sec per wait step
-	queryWaitTimeStep = waitStepBaseUnit * time.Second
+	fastForwardBaseline = 64   // minimum fast-forward count
+	fastForwardTopline  = 2048 // maximum fast-forward count
+	rampDownBaseline    = 128  // least ramp-down count
+	waitStepBaseline    = 2    // minimum wait steps
+	waitStepRampDown    = 4    // ramp-down wait steps
+	waitStepTopline     = 6    // maximum wait steps
+	waitStepBaseUnit    = 5    // 5 sec per wait step
+	queryWaitTimeStep   = waitStepBaseUnit * time.Second
 )
 
 var reportFail bool
@@ -75,14 +75,14 @@ OUTER:
 			fastForwardMode = false
 			cNum = 0
 			p.waitTime = queryWaitTime
-			p.lastIndex = 0     // get the latest
+			p.lastIndex = 0 // get the latest
 		}
 
 		// Invoke the handler
 		now := time.Now()
 		index, result, err := p.Func(p)
 		if p.CongestCtl {
-			vDiff =  index + fastForwardCnt - p.lastIndex   // eliminate the wrap-around case
+			vDiff = index + fastForwardCnt - p.lastIndex // eliminate the wrap-around case
 			// log.WithFields(log.Fields{"index": index, "request": p.lastIndex, "diff": vDiff, "empty": result == nil}).Info("WATCH")
 		}
 		if err != nil {
@@ -93,10 +93,10 @@ OUTER:
 		} else if fastForwardMode {
 			if vDiff < fastForwardCnt {
 				// ramp down
-				if (vDiff*2) > fastForwardCnt {
+				if (vDiff * 2) > fastForwardCnt {
 					// step down a level but keep the same wait time
 					fastForwardCnt /= 2
-				} else if vDiff > rampDownBaseline {  // wait a little bit longer
+				} else if vDiff > rampDownBaseline { // wait a little bit longer
 					waitSteps = waitStepRampDown
 					fastForwardCnt = rampDownBaseline
 				} else {
@@ -109,21 +109,21 @@ OUTER:
 					cNum = 0
 					fastForwardCnt = 0
 					p.waitTime = queryWaitTime
-					if result == nil {  // should not happen
-						index = 0       // recovery: do the must-proceed query
+					if result == nil { // should not happen
+						index = 0 // recovery: do the must-proceed query
 					}
-				} else {
+				} /* else {
 					// log.WithFields(log.Fields{"forward": fastForwardCnt, "waitSteps": waitSteps}).Info("WATCH: rampD")
-				}
+				} */
 
 			} else {
 				// ramp up
 				fastForwardCnt *= 2
-				if fastForwardCnt > fastForwardTopline {  // capped by predefined maximum number, 2048
+				if fastForwardCnt > fastForwardTopline { // capped by predefined maximum number, 2048
 					fastForwardCnt = fastForwardTopline
 				}
 				waitSteps++
-				if waitSteps > waitStepTopline {  // capped by predefined maximum time, 30 sec
+				if waitSteps > waitStepTopline { // capped by predefined maximum time, 30 sec
 					waitSteps = waitStepTopline
 				}
 				p.waitTime = time.Duration(waitSteps) * queryWaitTimeStep
@@ -144,7 +144,7 @@ OUTER:
 						// log.WithFields(log.Fields{"forward": fastForwardCnt, "waitSteps": waitSteps}).Info("WATCH: fastF")
 					}
 				} else {
-					cNum = 0    // reset
+					cNum = 0 // reset
 				}
 			}
 		}
@@ -165,8 +165,8 @@ OUTER:
 					retry = maxBackoffTime
 				}
 			*/
-			if reportFail == true && p.Fail != nil {
-				if p.Fail() == true {
+			if reportFail && p.Fail != nil {
+				if p.Fail() {
 					// report is accepted
 					reportFail = false
 				}
@@ -246,7 +246,7 @@ func (p *WatchPlan) shouldStop() bool {
 	if p.stop {
 		return true
 	}
-	for p.pause == true && p.stop == false {
+	for p.pause && !p.stop {
 		time.Sleep(time.Second)
 	}
 	return p.stop
@@ -264,7 +264,7 @@ func (p *WatchPlan) Pause() {
 func (p *WatchPlan) Resume() {
 	p.stopLock.Lock()
 	defer p.stopLock.Unlock()
-	if p.stop || p.pause == false {
+	if p.stop || !p.pause {
 		return
 	}
 	reportFail = true

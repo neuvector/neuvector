@@ -45,7 +45,9 @@ func PerfProfile(req *share.CLUSProfilingRequest, folder, prefix string) {
 			if f, err := os.Create(filename); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Failed to create memory profiling file")
 			} else {
-				pprof.WriteHeapProfile(f)
+				if err := pprof.WriteHeapProfile(f); err != nil {
+					log.WithFields(log.Fields{"err": err}).Error("Failed to write memory profiling file")
+				}
 				f.Close()
 			}
 		case share.ProfilingMethod_CPU:
@@ -54,9 +56,12 @@ func PerfProfile(req *share.CLUSProfilingRequest, folder, prefix string) {
 			if f, err := os.Create(filename); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Failed to create cpu profiling file")
 			} else {
-				pprof.StartCPUProfile(f)
-				time.Sleep(time.Second * time.Duration(req.Duration))
-				pprof.StopCPUProfile()
+				if err := pprof.StartCPUProfile(f); err != nil {
+					log.WithFields(log.Fields{"err": err}).Error("Failed to start cpu profiling")
+				} else {
+					time.Sleep(time.Second * time.Duration(req.Duration))
+					pprof.StopCPUProfile()
+				}
 				f.Close()
 			}
 
@@ -64,7 +69,9 @@ func PerfProfile(req *share.CLUSProfilingRequest, folder, prefix string) {
 			if f, err := os.Create(filename); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Failed to create goroutine profiling file")
 			} else {
-				pprof.Lookup("goroutine").WriteTo(f, 0)
+				if err := pprof.Lookup("goroutine").WriteTo(f, 0); err != nil {
+					log.WithFields(log.Fields{"err": err}).Error("Failed to write goroutine profiling file")
+				}
 				f.Close()
 			}
 		}
@@ -73,9 +80,11 @@ func PerfProfile(req *share.CLUSProfilingRequest, folder, prefix string) {
 	log.Debug("Profiling is done.")
 }
 
-////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////
 var lastSnapshot time.Time
+
 const snapshotWindow = time.Duration(time.Minute * 5)
+
 func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, prefix, label string) {
 	type snapshotData struct {
 		RecordedAt        time.Time
@@ -116,7 +125,7 @@ func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, pr
 		// get auxiliary data
 		lsof, _ := sh.Command("lsof", "+D", "/usr/local/bin").Output()
 		ps, _ := sh.Command("ps", "-o", "%cpu,pid,ppid,pgid,vsz,rss,ni,comm", "-g", strconv.Itoa(pid)).Output()
-		data := snapshotData {
+		data := snapshotData{
 			RecordedAt:        lastSnapshot,
 			MemoryLimit:       memLimit,
 			WorkingMemory:     usage,
@@ -138,7 +147,10 @@ func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, pr
 		PerfProfile(req, workFolder, prefix)
 
 		// deferred action because PerfProfile will create the tmp_folder
-		os.WriteFile(filepath.Join(workFolder, "data.json"), file, 0644)
+		path := filepath.Join(workFolder, "data.json")
+		if err := os.WriteFile(path, file, 0644); err != nil {
+			log.WithFields(log.Fields{"err": err, "path": path, "len": len(file)}).Error()
+		}
 
 		//  write the .tar.gzip
 		targetZipFile := filepath.Join(folder, fmt.Sprintf("%ssnapshot.%s.%s.zip", prefix, cid, label))
@@ -147,5 +159,5 @@ func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, pr
 			log.WithFields(log.Fields{"package": targetZipFile}).Info()
 		}
 		log.Info("done")
-	} ()
+	}()
 }

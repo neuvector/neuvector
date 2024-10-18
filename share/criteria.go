@@ -55,7 +55,7 @@ const (
 	CriteriaKeySaBindRiskyRole               string = "saBindRiskyRole"
 	CriteriaKeyImageVerifiers                string = "imageVerifiers"
 	CriteriaKeyAnnotations                   string = "annotations"
-  CriteriaKeyStorageClassName              string = "storageClassName"
+	CriteriaKeyStorageClassName              string = "storageClassName"
 )
 
 const (
@@ -138,7 +138,7 @@ func IsSvcIpGroupSelected(svcipgroup *CLUSGroup, selector []CLUSCriteriaEntry) b
 			rets[key] = ret
 			poss[key] = positive
 		} else {
-			p, _ := poss[key]
+			p := poss[key]
 			if !positive && !p {
 				rets[key] = v && ret
 			} else {
@@ -225,7 +225,7 @@ func IsWorkloadSelected(workload *CLUSWorkload, selector []CLUSCriteriaEntry, do
 			rets[key] = ret
 			poss[key] = positive
 		} else {
-			p, _ := poss[key]
+			p := poss[key]
 			if !positive && !p {
 				rets[key] = v && ret
 			} else {

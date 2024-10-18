@@ -21,12 +21,6 @@ type CVEDBType map[string]*share.ScanVulnerability
 var scanDbMutex sync.RWMutex
 var scannerDB = share.CLUSScannerDB{CVEDB: make(map[string]*share.ScanVulnerability)}
 
-type RegTestMeg struct {
-	comment string
-	url     string
-	body    string
-}
-
 const (
 	vulnSeverityLow int8 = iota
 	vulnSeverityMedium
@@ -985,8 +979,6 @@ func GetCVERecord(name, dbKey, baseOS string) *api.RESTVulnerability {
 func Perf_getRandomCVEs(count int) []string {
 	sdb := GetScannerDB()
 	cvedb := sdb.CVEDB
-
-	rand.Seed(time.Now().UnixNano())
 
 	// Get all cve names
 	keys := make([]string, 0, len(cvedb))

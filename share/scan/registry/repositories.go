@@ -44,7 +44,7 @@ func (r *Registry) Repositories() ([]string, error) {
 }
 
 func (r *Registry) Search(term string, limit int) ([]string, error) {
-	u := r.url("/v1/search?q=" + url.QueryEscape(term) + "&n=" + url.QueryEscape(fmt.Sprintf("%d", limit)))
+	u := r.url("/v1/search?q=%s&n=%s", url.QueryEscape(term), url.QueryEscape(fmt.Sprintf("%d", limit)))
 	resp, err := r.Client.Get(u)
 	if err != nil {
 		return nil, err

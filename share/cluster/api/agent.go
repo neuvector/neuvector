@@ -1027,8 +1027,13 @@ func (a *Agent) updateTokenOnce(target, token string, q *WriteOptions) (*WriteMe
 
 	if resp.StatusCode != 200 {
 		var buf bytes.Buffer
-		io.Copy(&buf, resp.Body)
-		return wm, resp.StatusCode, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+		var msg string
+		if _, err := io.Copy(&buf, resp.Body); err == nil {
+			msg = buf.String()
+		} else {
+			msg = "copy error: " + err.Error()
+		}
+		return wm, resp.StatusCode, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, msg)
 	}
 
 	return wm, resp.StatusCode, nil

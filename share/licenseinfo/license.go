@@ -116,7 +116,7 @@ func GetLicenseInfo(license string, symmetricKey []byte) (string, error) { // re
 	return licValue, err
 }
 
-//--------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------
 func ObjToBytes(obj interface{}) ([]byte, error) {
 	var buffBin bytes.Buffer
 
@@ -159,7 +159,7 @@ func LicenseFromB64String(str string) (*signedLicenseInfo, error) {
 	return l, ObjFromB64String(l, str)
 }
 
-//--------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------
 // PublicKeyFromBytes returns a public key from a []byte.
 func PublicKeyFromBytes(b []byte, metered bool) (*ecdsa.PublicKey, error) {
 	var curve elliptic.Curve
@@ -191,7 +191,7 @@ func PublicKeyFromB64String(str string, metered bool) (*ecdsa.PublicKey, error) 
 	return PublicKeyFromBytes(b, metered)
 }
 
-//--------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------
 func (l *signedLicenseInfo) hash() ([]byte, error) {
 	h256 := sha256.New()
 

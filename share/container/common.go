@@ -93,12 +93,12 @@ const (
 )
 
 const (
-    NeuvectorSetServiceName              = "io.neuvector.service.name"
+	NeuvectorSetServiceName = "io.neuvector.service.name"
 )
 
 const (
-	IbmCloudProviderIP                   = "ibm-cloud-provider-ip"
-	IbmCloudClusterID                    = "clusterID"
+	IbmCloudProviderIP = "ibm-cloud-provider-ip"
+	IbmCloudClusterID  = "clusterID"
 )
 
 const (

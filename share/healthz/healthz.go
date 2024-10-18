@@ -36,7 +36,7 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write(buf)
+	_, _ = w.Write(buf)
 }
 
 func StartHealthzServer() error {

@@ -21,7 +21,7 @@ func (s *Status) Leader() (string, error) {
 	defer cancel()
 
 	r := s.c.newRequest("GET", "/v1/status/leader")
-	r.setQueryOptions(&QueryOptions{ctx:ctx})
+	r.setQueryOptions(&QueryOptions{ctx: ctx})
 	_, resp, err := requireOK(s.c.doRequest(r))
 	if err != nil {
 		return "", err

@@ -5,8 +5,8 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/vishvananda/netlink"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/vishvananda/netlink"
 )
 
 type NetAddr struct {
@@ -17,7 +17,7 @@ type NetAddr struct {
 type NetIface struct {
 	Name  string    `json:"name"`
 	Type  string    `json:"type"`
-	Mtu   int    	`json:"mtu"`
+	Mtu   int       `json:"mtu"`
 	Flags net.Flags `json:"flags"`
 	Addrs []NetAddr `json:"addrs"`
 }
@@ -40,7 +40,7 @@ func GetGlobalAddrs() map[string]NetIface {
 		if link == nil || link.Attrs() == nil {
 			continue
 		}
-		
+
 		attrs := link.Attrs()
 
 		iface := NetIface{

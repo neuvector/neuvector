@@ -24,10 +24,6 @@ import (
 	"google.golang.org/grpc/security/advancedtls"
 )
 
-var (
-	shouldReload int32
-)
-
 const GRPCMaxMsgSize = 1024 * 1024 * 32
 
 var subjectCN string
@@ -103,7 +99,7 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 		grpc.UnaryInterceptor(middlefunc),
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
-		grpc.MaxMsgSize(GRPCMaxMsgSize),
+		grpc.MaxRecvMsgSize(GRPCMaxMsgSize),
 	}
 
 	listen, err := net.Listen("tcp", endpoint)
@@ -170,7 +166,7 @@ func NewGRPCServerUnix(socket string) (*GRPCServer, error) {
 	opts := []grpc.ServerOption{
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
-		grpc.MaxMsgSize(GRPCMaxMsgSize),
+		grpc.MaxRecvMsgSize(GRPCMaxMsgSize),
 	}
 
 	listen, err := net.Listen("unix", socket)
@@ -389,10 +385,6 @@ func isUnixSocketEndpoint(endpoint string) bool {
 	return !strings.Contains(endpoint, ":")
 }
 
-func createControllerCapServiceWrapper(conn *grpc.ClientConn) Service {
-	return share.NewControllerCapServiceClient(conn)
-}
-
 func IsControllerGRPCCommpressed(endpoint string) bool {
 	var err error
 	var c *GRPCClient
@@ -410,7 +402,7 @@ func IsControllerGRPCCommpressed(endpoint string) bool {
 		return false
 	}
 
-	s := share.NewControllerCapServiceClient(c.GetClient()).(share.ControllerCapServiceClient)
+	s := share.NewControllerCapServiceClient(c.GetClient())
 
 	cap, err := s.IsGRPCCompressed(ctx, &share.RPCVoid{})
 	if err != nil || cap == nil || !cap.Value {
@@ -418,10 +410,6 @@ func IsControllerGRPCCommpressed(endpoint string) bool {
 	} else {
 		return true
 	}
-}
-
-func createEnforcerCapServiceWrapper(conn *grpc.ClientConn) Service {
-	return share.NewEnforcerCapServiceClient(conn)
 }
 
 func IsEnforcerGRPCCommpressed(endpoint string) bool {
@@ -441,7 +429,7 @@ func IsEnforcerGRPCCommpressed(endpoint string) bool {
 		return false
 	}
 
-	s := share.NewEnforcerCapServiceClient(c.GetClient()).(share.EnforcerCapServiceClient)
+	s := share.NewEnforcerCapServiceClient(c.GetClient())
 
 	cap, err := s.IsGRPCCompressed(ctx, &share.RPCVoid{})
 	if err != nil || cap == nil || !cap.Value {

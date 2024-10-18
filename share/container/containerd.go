@@ -29,8 +29,9 @@ import (
 
 const defaultContainerdSock = "/run/containerd/containerd.sock"
 const defaultK3sContainerdSock = "/run/k3s/containerd/containerd.sock"
-const defaultContainerdNamespace = "default"
 const k8sContainerdNamespace = "k8s.io"
+
+// const defaultContainerdNamespace = "default"
 
 type containerdDriver struct {
 	sys           *system.SystemTools
@@ -45,7 +46,7 @@ type containerdDriver struct {
 	cancelMonitor context.CancelFunc
 	rtProcMap     utils.Set
 	snapshotter   string
-	pidHost		  bool
+	pidHost       bool
 }
 
 // patch for the mismatched grpc versions
@@ -115,7 +116,7 @@ func (d *containerdDriver) reConnect() error {
 	}
 	// the original socket has been recreated and its mounted path was also lost.
 	endpoint := d.endpoint
-	if d.endpointHost != "" {	// use the host
+	if d.endpointHost != "" { // use the host
 		endpoint = filepath.Join("/proc/1/root", d.endpointHost)
 		endpoint, _ = justifyRuntimeSocketFile(endpoint)
 	}
@@ -150,7 +151,6 @@ func (d *containerdDriver) reConnect() error {
 	d.version = &ver
 	return nil
 }
-
 
 func (d *containerdDriver) String() string {
 	return RuntimeContainerd
@@ -232,9 +232,15 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		if ext, err := c.Extensions(ctx); err == nil {
 			if pdata, ok := ext["io.cri-containerd.sandbox.metadata"]; ok {
 				attempts, err = d.decodeExtension_attempt(pdata.GetValue())
+				if err != nil {
+					log.WithFields(log.Fields{"id": c.ID(), "rootpid": rootpid, "err": err}).Error("CTR: sandbox")
+				}
 				//	log.WithFields(log.Fields{"id": c.ID(), "attempt": attempt}).Debug("CTR: sandbox")
 			} else if pdata, ok := ext["io.cri-containerd.container.metadata"]; ok {
 				attempts, err = d.decodeExtension_attempt(pdata.GetValue())
+				if err != nil {
+					log.WithFields(log.Fields{"id": c.ID(), "rootpid": rootpid, "err": err}).Error("CTR: container")
+				}
 				//	log.WithFields(log.Fields{"id": c.ID(),"attempt": attempt}).Debug("CTR: container")
 			}
 		}
@@ -244,7 +250,7 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		}
 	}
 
-	status := &containerd.Status{	// unknown
+	status := &containerd.Status{ // unknown
 		Status:     containerd.Stopped,
 		ExitStatus: 0,
 		ExitTime:   time.Time{},
@@ -559,12 +565,12 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 					default:
 						log.WithFields(log.Fields{"event": v}).Debug("Unknown containderd event")
 					}
-					connectErrorCnt = 0		// reset
+					connectErrorCnt = 0 // reset
 				}
 			case err := <-errCh:
 				if err != nil && err != io.EOF {
 					log.WithFields(log.Fields{"error": err.Error()}).Error("Containderd event monitor error")
-					if strings.Contains( err.Error(), "rpc error: code = Unavailable"){
+					if strings.Contains(err.Error(), "rpc error: code = Unavailable") {
 						// lost connection, wait for 10 second try reconnect
 						time.Sleep(time.Second * 10)
 						if err := d.reConnect(); err != nil {
@@ -573,7 +579,7 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 						}
 					}
 					connectErrorCnt++
-					if connectErrorCnt >= 12 {	// restart enforcer
+					if connectErrorCnt >= 12 { // restart enforcer
 						cb(EventSocketError, "", 0)
 					}
 				}
@@ -583,8 +589,6 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func (d *containerdDriver) GetProxy() (string, string, string) {
@@ -621,7 +625,7 @@ func (d *containerdDriver) reverseImageNameFromDigestName(digestName string) str
 	return ""
 }
 
-/// below structures are for decoding purpose only
+// / below structures are for decoding purpose only
 type containerdConfigMeta struct {
 	Name      string `json:"name"`
 	Uid       string `json:"uid"`
@@ -678,14 +682,14 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 	pod, err := criPodSandboxStatus(d.criClient, ctx, id)
 	if err == nil && pod != nil {
 		if pod.Status == nil || pod.Info == nil {
-			log.WithFields(log.Fields{"id":id, "pod": pod}).Error("Fail to get pod")
+			log.WithFields(log.Fields{"id": id, "pod": pod}).Error("Fail to get pod")
 			return nil, 0, 0, err
 		}
 
 		// a POD
 		meta = &ContainerMetaExtra{
-			CreatedAt:     time.Unix(0, pod.Status.CreatedAt),
-			Running:       pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
+			CreatedAt: time.Unix(0, pod.Status.CreatedAt),
+			Running:   pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
 		}
 		attempt = pod.Status.Metadata.Attempt
 		pid, _ = d.getContainerPid_CRI(pod.GetInfo())
@@ -698,8 +702,8 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 		}
 
 		meta = &ContainerMetaExtra{
-			ExitCode:      int(cs.Status.ExitCode),
-			Running:       cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
+			ExitCode: int(cs.Status.ExitCode),
+			Running:  cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
 		}
 		attempt = cs.Status.Metadata.Attempt
 		pid, _ = d.getContainerPid_CRI(cs.GetInfo())
@@ -707,7 +711,7 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 	return meta, pid, attempt, nil
 }
 
-///////
+// /////
 type criContainerInfoRes struct {
 	Info struct {
 		Pid    int `json:"pid"`

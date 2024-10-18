@@ -38,13 +38,13 @@ func (schema DatabaseSchema) validateOperations(operations ...Operation) bool {
 	for _, op := range operations {
 		table, ok := schema.Tables[op.Table]
 		if ok {
-			for column, _ := range op.Row {
+			for column := range op.Row {
 				if _, ok := table.Columns[column]; !ok {
 					return false
 				}
 			}
 			for _, row := range op.Rows {
-				for column, _ := range row {
+				for column := range row {
 					if _, ok := table.Columns[column]; !ok {
 						return false
 					}

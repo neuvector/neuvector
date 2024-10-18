@@ -20,20 +20,20 @@ var (
 		MetasV2:   &[]api.RESTBenchMeta{},
 		MetaMapV2: make(map[string]api.RESTBenchMeta),
 	}
+	/*
+		mockPrimeComplianceMetaConfig = &UpdateConfigParams{
+			Metas:     &[]api.RESTBenchMeta{},
+			MetaMap:   make(map[string]api.RESTBenchMeta),
+			MetasV2:   &[]api.RESTBenchMeta{},
+			MetaMapV2: make(map[string]api.RESTBenchMeta),
+			FilterMap: make(map[string]int),
+		}
 
-	mockPrimeComplianceMetaConfig = &UpdateConfigParams{
-		Metas:     &[]api.RESTBenchMeta{},
-		MetaMap:   make(map[string]api.RESTBenchMeta),
-		MetasV2:   &[]api.RESTBenchMeta{},
-		MetaMapV2: make(map[string]api.RESTBenchMeta),
-		FilterMap: make(map[string]int),
-	}
-
-	mockPrimeImageBenchConfig = &UpdateConfigParams{
-		Metas:   &[]api.RESTBenchMeta{},
-		MetaMap: make(map[string]api.RESTBenchMeta),
-	}
-
+		mockPrimeImageBenchConfig = &UpdateConfigParams{
+			Metas:   &[]api.RESTBenchMeta{},
+			MetaMap: make(map[string]api.RESTBenchMeta),
+		}
+	*/
 	mockCISItems = make(map[string]api.RESTBenchCheck)
 
 	// V2 Return the Tags map[string]share.TagDetails
@@ -118,7 +118,7 @@ func TestTagConsistance(t *testing.T) {
 		mockTagCount := make(map[string]int)
 		cisItemTagCount := make(map[string]int)
 
-		for tag, _ := range cisItems[id].TagsV2 {
+		for tag := range cisItems[id].TagsV2 {
 			cisItemTagCount[tag]++
 		}
 
@@ -472,7 +472,7 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 			t.Errorf("Expected meta.Tags is the should be nil in complianceMetaConfig.MetasV2")
 		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for compliance, _ := range meta.TagsV2 {
+			for compliance := range meta.TagsV2 {
 				if _, found := expectedTags[meta.TestNum][compliance]; !found {
 					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}
@@ -487,7 +487,7 @@ func TestUpdateComplianceConfigs(t *testing.T) {
 			t.Errorf("Expected meta.Tags is the should be nil in complianceMetaConfig.MetaMapV2")
 		}
 		if _, ok := expectedTags[meta.TestNum]; ok {
-			for compliance, _ := range meta.TagsV2 {
+			for compliance := range meta.TagsV2 {
 				if _, found := expectedTags[meta.TestNum][compliance]; !found {
 					t.Errorf("Expected compliance %s not found for TestNum %s", compliance, meta.TestNum)
 				}

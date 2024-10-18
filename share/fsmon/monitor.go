@@ -21,24 +21,27 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-// //
 var mLog *log.Logger = log.New()
 
+/*
 const inodeChangeMask = syscall.IN_CLOSE_WRITE |
+
 	syscall.IN_DELETE |
 	syscall.IN_DELETE_SELF |
 	syscall.IN_MOVE |
 	syscall.IN_MOVE_SELF |
 	syscall.IN_MOVED_TO
-
+*/
 const inodeMovedMask = syscall.IN_MOVE | syscall.IN_MOVE_SELF | syscall.IN_MOVED_TO
 
+/*
 var packageFile utils.Set = utils.NewSet(
+
 	"/var/lib/dpkg/status",
 	"/var/lib/rpm/Packages",
 	"/var/lib/rpm/Packages.db",
 	"/lib/apk/db/installed")
-
+*/
 type SendAggregateReportCallback func(fsmsg *MonitorMessage) bool
 
 var ImportantFiles []share.CLUSFileMonitorFilter = []share.CLUSFileMonitorFilter{
@@ -69,9 +72,11 @@ var DefaultContainerConf share.CLUSFileMonitorProfile = share.CLUSFileMonitorPro
 	Filters: ImportantFiles,
 }
 
+/*
 const (
 	imonitorFileDelay = 10
 )
+*/
 
 const (
 	fileEventAttr uint32 = (1 << iota)
@@ -377,7 +382,9 @@ func (w *FileWatch) reportLearningRules() {
 	}
 	w.mux.Unlock()
 	if len(learnRules) > 0 {
-		w.sendRule(learnRules)
+		if err := w.sendRule(learnRules); err != nil {
+			log.WithFields(log.Fields{"error": err, "len": len(learnRules)}).Error()
+		}
 	}
 }
 
@@ -492,7 +499,9 @@ func (w *FileWatch) UpdateAccessRules(name string, rootPid int, conf *share.CLUS
 	}
 	w.mux.Unlock()
 
-	w.fanotifier.UpdateAccessRule(rootPid, conf)
+	if err := w.fanotifier.UpdateAccessRule(rootPid, conf); err != nil {
+		log.WithFields(log.Fields{"error": err, "rootPid": rootPid}).Error()
+	}
 }
 
 func (w *FileWatch) Close() {
@@ -919,7 +928,7 @@ func (w *FileWatch) ContainerCleanup(rootPid int, bLeave bool) {
 
 	w.mux.Lock()
 	defer w.mux.Unlock()
-	for path, _ := range w.fileEvents {
+	for path := range w.fileEvents {
 		if pid, _ := global.SYS.ParseContainerFilePath(path); pid == rootPid {
 			delete(w.fileEvents, path)
 		}

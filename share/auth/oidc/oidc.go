@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	jose "github.com/go-jose/go-jose/v3"
 	"github.com/mitchellh/pointerstructure"
 	"golang.org/x/oauth2"
 )
@@ -80,11 +79,6 @@ type Provider struct {
 	rawClaims []byte
 
 	remoteKeySet *remoteKeySet
-}
-
-type cachedKeys struct {
-	keys   []jose.JSONWebKey
-	expiry time.Time
 }
 
 type providerJSON struct {
@@ -370,7 +364,9 @@ func (i *IDToken) Claims() (map[string]interface{}, error) {
 	}
 
 	var a interface{}
-	json.Unmarshal(i.claims, &a)
+	if err := json.Unmarshal(i.claims, &a); err != nil {
+		return nil, err
+	}
 	if m, ok := a.(map[string]interface{}); ok {
 		return m, nil
 	}

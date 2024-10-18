@@ -63,7 +63,7 @@ func CheckUidAuthority(user string, pid int) (bool, error) {
 	return false, nil
 }
 
-//get the non-privileged user uid start value
+// get the non-privileged user uid start value
 func getUserStartUid(pid int) int {
 	var uidStart int = UserUidMin
 	dat, err := global.SYS.ReadContainerFile("/etc/login.defs", pid, 0, 0)

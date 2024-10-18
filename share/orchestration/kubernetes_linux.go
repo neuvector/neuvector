@@ -11,7 +11,7 @@ func (d *kubernetes) isTunnelInterface(name, kind string) bool {
 		return true
 	}
 	//antreaCNI's antrea-gw0 i/f
-	if strings.HasPrefix(name, "antrea") &&  kind == "openvswitch" {
+	if strings.HasPrefix(name, "antrea") && kind == "openvswitch" {
 		return true
 	}
 	// flannel.1

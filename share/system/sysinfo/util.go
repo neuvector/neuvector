@@ -14,13 +14,13 @@ import (
 func joinLink(root, link, dir string) string {
 	var path string
 	if filepath.IsAbs(link) {
-		 path = filepath.Join(root, link)
+		path = filepath.Join(root, link)
 	} else {
-	   path = filepath.Join(dir, link)
-	   path = filepath.Join(root, path)
+		path = filepath.Join(dir, link)
+		path = filepath.Join(root, path)
 	}
 	return path
- }
+}
 
 // Read one-liner text files, strip newline.
 func slurpFile(path string) string {

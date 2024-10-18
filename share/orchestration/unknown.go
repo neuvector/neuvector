@@ -27,7 +27,7 @@ func (d *unknown) GetDomain(labels map[string]string) string {
 func (d *unknown) SetIPAddrScope(ports map[string][]share.CLUSIPAddr, meta *container.ContainerMeta, nets map[string]*container.Network) {
 	for name, addrs := range ports {
 		cfgs := d.envParser.GetPlatformIntf(name)
-		for j, _ := range addrs {
+		for j := range addrs {
 			if len(cfgs) > j {
 				switch cfgs[j] {
 				case share.ENV_PLT_INTF_GLOBAL:

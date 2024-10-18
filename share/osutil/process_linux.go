@@ -76,7 +76,7 @@ func GetProcessPIDs(pid int) (ppid, gid, sid int, status, cmd string) {
 		return
 	}
 
-	status, _ = procStatusMap[sa[2]]
+	status = procStatusMap[sa[2]]
 	ppid, _ = strconv.Atoi(sa[3])
 
 	if len(sa) < 5 {
@@ -151,6 +151,7 @@ func GetProcessSocketInodes(pid int) (utils.Set, error) {
 	return inodes, nil
 }
 
+/*
 func getListenPortsByFile(listens utils.Set, fileName string, inodes utils.Set, tcp bool) {
 	f, err := os.Open(fileName)
 	if err != nil {
@@ -199,6 +200,7 @@ func getListenPortsByFile(listens utils.Set, fileName string, inodes utils.Set, 
 		}
 	}
 }
+*/
 
 func getCGroupSocketTable(rootPid int, tbl map[uint32]SocketInfo, file string, tcp bool) {
 	fileName := filepath.Join("/proc", strconv.Itoa(rootPid), "root/proc/1/net", file)

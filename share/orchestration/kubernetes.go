@@ -18,12 +18,12 @@ import (
 	"github.com/hashicorp/go-version"
 	log "github.com/sirupsen/logrus"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/system"
 	sk "github.com/neuvector/neuvector/share/system/sidekick"
 	"github.com/neuvector/neuvector/share/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -166,13 +166,17 @@ func getVersion(tag string, verToGet int, useToken bool) (string, error) {
 			req.Header.Set("Authorization", "Bearer "+string(data))
 		}
 	}
-	if resp, err = client.Do(req); err != nil {
+	if resp, err = client.Do(req); err != nil || resp == nil {
 		return "", fmt.Errorf("Get Version fail - error=%s", err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
-	if resp != nil && resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("getVersion fail - code=%d, tag=%s, useToken=%v", resp.StatusCode, tag, useToken)
 	}
 
@@ -450,15 +454,15 @@ pause-amd64:3.0 k8s_POD_frontend-3823415956-853n5_default_.....
 	   |        "io.kubernetes.pod.name": "frontend-3823415956-853n5"
 */
 func (d *kubernetes) GetService(meta *container.ContainerMeta, node string) *Service {
-	namespace, _ := meta.Labels[container.KubeKeyPodNamespace]
+	namespace := meta.Labels[container.KubeKeyPodNamespace]
 
-	if dc, _ := meta.Labels[container.KubeKeyDeployConfig]; dc != "" {
+	if dc := meta.Labels[container.KubeKeyDeployConfig]; dc != "" {
 		return &Service{Domain: namespace, Name: dc}
 	}
 
 	// pod.name can take format such as, frontend-3823415956-853n5, calico-node-m308t, kube-proxy-8vbrs.
 	// For the first case, the pod-template-hash is 3823415956, if the hash label exists, we remove it.
-	if pod, _ := meta.Labels[container.KubeKeyPodName]; pod != "" {
+	if pod := meta.Labels[container.KubeKeyPodName]; pod != "" {
 		return d.GetServiceFromPodLabels(namespace, pod, node, meta.Labels)
 	}
 
@@ -466,9 +470,9 @@ func (d *kubernetes) GetService(meta *container.ContainerMeta, node string) *Ser
 }
 
 func (d *kubernetes) GetPlatformRole(m *container.ContainerMeta) (string, bool) {
-	vpodns, _ := m.Labels[container.KubeKeyPodNamespace]
-	vcname, _ := m.Labels[container.KubeKeyContainerName]
-	podname, _ := m.Labels[container.KubeKeyPodName]
+	vpodns := m.Labels[container.KubeKeyPodNamespace]
+	vcname := m.Labels[container.KubeKeyContainerName]
+	podname := m.Labels[container.KubeKeyPodName]
 
 	svc := d.GetService(m, "")
 	svcName := utils.MakeServiceName(svc.Domain, svc.Name)
@@ -518,8 +522,8 @@ func (d *kubernetes) GetPlatformRole(m *container.ContainerMeta) (string, bool) 
 }
 
 func (d *kubernetes) GetDomain(labels map[string]string) string {
-	if pod, _ := labels[container.KubeKeyPodName]; pod != "" {
-		namespace, _ := labels[container.KubeKeyPodNamespace]
+	if pod := labels[container.KubeKeyPodName]; pod != "" {
+		namespace := labels[container.KubeKeyPodNamespace]
 		return namespace
 	}
 
@@ -537,13 +541,13 @@ func (d *kubernetes) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	for name, addrs := range ports {
 		// This is for Diamanti
 		if name == "mgmt0" {
-			for j, _ := range addrs {
+			for j := range addrs {
 				addrs[j].Scope = share.CLUSIPAddrScopeLocalhost
 			}
 			continue
 		}
 
-		for j, _ := range addrs {
+		for j := range addrs {
 			addrs[j].Scope = share.CLUSIPAddrScopeGlobal
 		}
 	}

@@ -9,10 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-/////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////
 // Record and trace the namespace processes in the system
 // Kill them during process exiting stages
-/////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////
 type toolProcessMonitor struct {
 	mutex sync.Mutex
 	pMap  map[int]string
@@ -89,5 +89,7 @@ func (s *SystemTools) IsToolProcess(sid, pgid int) bool {
 }
 
 func (s *SystemTools) KillCommandSubtree(pgid int, info string) {
-	syscall.Kill(-pgid, syscall.SIGKILL)
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+		log.WithFields(log.Fields{"pid": pgid, "error": err}).Error("can not signal")
+	}
 }

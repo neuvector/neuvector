@@ -2951,7 +2951,7 @@ func updateComplianceMetasFromMap(metas *[]api.RESTBenchMeta, metaMap map[string
 	for id, item := range metaMapV2 {
 		*metasV2 = append(*metasV2, item)
 		var tags []string
-		for compliance, _ := range item.RESTBenchCheck.TagsV2 {
+		for compliance := range item.RESTBenchCheck.TagsV2 {
 			tags = append(tags, compliance)
 		}
 		benchMeta = api.RESTBenchMeta{
@@ -3205,7 +3205,7 @@ func updateImageBenchWithPrimeConfig(primeConfig string, params *UpdateConfigPar
 				primeMetaData.Tags = []string{}
 			}
 
-			for compliance, _ := range check.Tags {
+			for compliance := range check.Tags {
 				primeMetaData.Tags = append(primeMetaData.Tags, compliance)
 			}
 

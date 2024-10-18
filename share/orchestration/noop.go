@@ -2,15 +2,15 @@ package orchestration
 
 import (
 	"net"
-	"strings"
-
-	"github.com/codeskyblue/go-sh"
+	//"strings"
+	//"github.com/codeskyblue/go-sh"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	sk "github.com/neuvector/neuvector/share/system/sidekick"
 )
 
+/*
 func shell(cmd string) ([]byte, error) {
 	// log.Printf("shell: %v\n", cmd)
 	c := strings.Split(cmd, " ")
@@ -22,6 +22,7 @@ func shellCombined(cmd string) ([]byte, error) {
 	c := strings.Split(cmd, " ")
 	return sh.Command(c[0], c[1:]).CombinedOutput()
 }
+*/
 
 // --
 
@@ -56,7 +57,6 @@ func (d *noop) GetDomain(labels map[string]string) string {
 func (d *noop) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	meta *container.ContainerMeta, nets map[string]*container.Network,
 ) {
-	return
 }
 
 func (d *noop) GetHostTunnelIP(links map[string]sk.NetIface) []net.IPNet {

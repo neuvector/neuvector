@@ -8,8 +8,8 @@ import (
 type NotifyCallback func(path string, mask uint32, params interface{}, pInfo *ProcInfo)
 
 type filterRegex struct {
-	path  string
-	regex *regexp.Regexp
+	path      string
+	regex     *regexp.Regexp
 	recursive bool
 }
 
@@ -25,7 +25,7 @@ type IFile struct {
 	protect bool // access control
 	learnt  bool // discover mode
 	userAdd bool
-	lastChg int64	// unix time
+	lastChg int64 // unix time
 }
 
 type fNotify struct {

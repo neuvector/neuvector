@@ -6,11 +6,11 @@ package sysinfo
 
 import (
 	"bufio"
-	"crypto/rand"
-	"fmt"
+	//	"crypto/rand"
+	//	"fmt"
 	"os"
 	"strings"
-	"time"
+	// "time"
 )
 
 // Node information.
@@ -25,56 +25,57 @@ func (si *SysInfo) getHostname() {
 	si.Node.Hostname = slurpFile("/proc/sys/kernel/hostname")
 }
 
-func (si *SysInfo) getSetMachineID() {
-	const pathSystemdMachineID = "/etc/machine-id"
-	const pathDbusMachineID = "/var/lib/dbus/machine-id"
+/*
+	func (si *SysInfo) getSetMachineID() {
+		const pathSystemdMachineID = "/etc/machine-id"
+		const pathDbusMachineID = "/var/lib/dbus/machine-id"
 
-	systemdMachineID := slurpFile(pathSystemdMachineID)
-	dbusMachineID := slurpFile(pathDbusMachineID)
+		systemdMachineID := slurpFile(pathSystemdMachineID)
+		dbusMachineID := slurpFile(pathDbusMachineID)
 
-	if systemdMachineID != "" && dbusMachineID != "" {
-		// All OK, just return the machine id.
-		if systemdMachineID == dbusMachineID {
+		if systemdMachineID != "" && dbusMachineID != "" {
+			// All OK, just return the machine id.
+			if systemdMachineID == dbusMachineID {
+				si.Node.MachineID = systemdMachineID
+				return
+			}
+
+			// They both exist, but they don't match! Copy systemd machine id to DBUS machine id.
+			spewFile(pathDbusMachineID, systemdMachineID, 0444)
 			si.Node.MachineID = systemdMachineID
 			return
 		}
 
-		// They both exist, but they don't match! Copy systemd machine id to DBUS machine id.
-		spewFile(pathDbusMachineID, systemdMachineID, 0444)
-		si.Node.MachineID = systemdMachineID
-		return
+		// Copy DBUS machine id to non-existent systemd machine id.
+		if systemdMachineID == "" && dbusMachineID != "" {
+			spewFile(pathSystemdMachineID, dbusMachineID, 0444)
+			si.Node.MachineID = dbusMachineID
+			return
+		}
+
+		// Copy systemd machine id to non-existent DBUS machine id.
+		if systemdMachineID != "" && dbusMachineID == "" {
+			spewFile(pathDbusMachineID, systemdMachineID, 0444)
+			si.Node.MachineID = systemdMachineID
+			return
+		}
+
+		// Generate and write fresh new machine ID to both locations, conforming to the DBUS specification:
+		// https://dbus.freedesktop.org/doc/dbus-specification.html#uuids
+
+		random := make([]byte, 12)
+		if _, err := rand.Read(random); err != nil {
+			return
+		}
+		newMachineID := fmt.Sprintf("%x%x", random, time.Now().Unix())
+
+		spewFile(pathSystemdMachineID, newMachineID, 0444)
+		spewFile(pathDbusMachineID, newMachineID, 0444)
+		si.Node.MachineID = newMachineID
+
+		os.Exit(0)
 	}
-
-	// Copy DBUS machine id to non-existent systemd machine id.
-	if systemdMachineID == "" && dbusMachineID != "" {
-		spewFile(pathSystemdMachineID, dbusMachineID, 0444)
-		si.Node.MachineID = dbusMachineID
-		return
-	}
-
-	// Copy systemd machine id to non-existent DBUS machine id.
-	if systemdMachineID != "" && dbusMachineID == "" {
-		spewFile(pathDbusMachineID, systemdMachineID, 0444)
-		si.Node.MachineID = systemdMachineID
-		return
-	}
-
-	// Generate and write fresh new machine ID to both locations, conforming to the DBUS specification:
-	// https://dbus.freedesktop.org/doc/dbus-specification.html#uuids
-
-	random := make([]byte, 12)
-	if _, err := rand.Read(random); err != nil {
-		return
-	}
-	newMachineID := fmt.Sprintf("%x%x", random, time.Now().Unix())
-
-	spewFile(pathSystemdMachineID, newMachineID, 0444)
-	spewFile(pathDbusMachineID, newMachineID, 0444)
-	si.Node.MachineID = newMachineID
-
-	os.Exit(0)
-}
-
+*/
 func (si *SysInfo) getTimezone() {
 	if fi, err := lstatFile("/etc/localtime"); err == nil {
 		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {

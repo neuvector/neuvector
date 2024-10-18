@@ -32,8 +32,8 @@ func TestRancherIPScopeWithLabel(t *testing.T) {
 	driver := &rancher{noop: noop{platform: share.PlatformRancher}}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ := ports["eth0"]
-	eth1, _ := ports["eth1"]
+	eth0 := ports["eth0"]
+	eth1 := ports["eth1"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeLocalhost ||
 		eth0[1].Scope != share.CLUSIPAddrScopeGlobal ||
 		eth1[0].Scope != share.CLUSIPAddrScopeLocalhost {
@@ -64,8 +64,8 @@ func TestRancherIPScopeWithoutLabel(t *testing.T) {
 	driver := &rancher{noop: noop{platform: share.PlatformRancher}}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ := ports["eth0"]
-	eth1, _ := ports["eth1"]
+	eth0 := ports["eth0"]
+	eth1 := ports["eth1"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeGlobal ||
 		eth1[0].Scope != share.CLUSIPAddrScopeLocalhost {
 		t.Errorf("Wrong IP scope set, with container.ip label:\n")
@@ -80,7 +80,7 @@ func TestRancherIPScopeWithoutLabel(t *testing.T) {
 	}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ = ports["eth0"]
+	eth0 = ports["eth0"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeGlobal {
 		t.Errorf("Wrong IP scope set, with container.ip label:\n")
 		t.Errorf("    eth0=%v\n", eth0)
@@ -104,7 +104,7 @@ func TestRancherIPScopeDefault(t *testing.T) {
 	driver := &rancher{noop: noop{platform: share.PlatformRancher}}
 	driver.SetIPAddrScope(ports, &meta, nil)
 
-	eth0, _ := ports["eth0"]
+	eth0 := ports["eth0"]
 	if eth0[0].Scope != share.CLUSIPAddrScopeLocalhost ||
 		eth0[1].Scope != share.CLUSIPAddrScopeLocalhost {
 		t.Errorf("Wrong IP scope set, default net mode:\n")

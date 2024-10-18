@@ -21,37 +21,41 @@ const StubRtName = "stubRtDriver"
 
 // a dummy static runtime driver
 type stubRTDriver struct {
-	sys      *system.SystemTools
-	sysInfo  *sysinfo.SysInfo
+	sys     *system.SystemTools
+	sysInfo *sysinfo.SysInfo
 
-	rootPid      int
-	initTime     time.Time
+	rootPid  int
+	initTime time.Time
 
-	selfID		 string
+	selfID       string
 	podName      string
 	nodeHostname string
 	ipAddress    string
 }
 
-func (d *stubRTDriver) IsRuntimeProcess(proc string, cmds []string) bool { return false }
-func (d *stubRTDriver) String() string { return StubRtName }
-func (d *stubRTDriver) MonitorEvent(cb EventCallback, cpath bool) error { return ErrMethodNotSupported }
-func (d *stubRTDriver) StopMonitorEvent() {}
-func (d *stubRTDriver) GetContainer(id string) (*ContainerMetaExtra, error) {	return nil, nil }
+func (d *stubRTDriver) IsRuntimeProcess(proc string, cmds []string) bool          { return false }
+func (d *stubRTDriver) String() string                                            { return StubRtName }
+func (d *stubRTDriver) MonitorEvent(cb EventCallback, cpath bool) error           { return ErrMethodNotSupported }
+func (d *stubRTDriver) StopMonitorEvent()                                         {}
+func (d *stubRTDriver) GetContainer(id string) (*ContainerMetaExtra, error)       { return nil, nil }
 func (d *stubRTDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) { return nil, nil }
-func (d *stubRTDriver) ListContainerIDs() (utils.Set, utils.Set) { return nil, nil }
-func (d *stubRTDriver) GetImageHistory(name string) ([]*ImageHistory, error) { return nil, nil }
-func (d *stubRTDriver) GetImage(name string) (*ImageMeta, error) { return nil, nil }
-func (d *stubRTDriver) GetImageFile(id string) (io.ReadCloser, error)      { return nil, nil }
-func (d *stubRTDriver) GetNetworkEndpoint(netName, container, epName string) (*NetworkEndpoint, error) { return nil, nil}
-func (d *stubRTDriver) GetParent(meta *ContainerMetaExtra, pidMap map[int]string) (bool, string) { return false, ""}
+func (d *stubRTDriver) ListContainerIDs() (utils.Set, utils.Set)                  { return nil, nil }
+func (d *stubRTDriver) GetImageHistory(name string) ([]*ImageHistory, error)      { return nil, nil }
+func (d *stubRTDriver) GetImage(name string) (*ImageMeta, error)                  { return nil, nil }
+func (d *stubRTDriver) GetImageFile(id string) (io.ReadCloser, error)             { return nil, nil }
+func (d *stubRTDriver) GetNetworkEndpoint(netName, container, epName string) (*NetworkEndpoint, error) {
+	return nil, nil
+}
+func (d *stubRTDriver) GetParent(meta *ContainerMetaExtra, pidMap map[int]string) (bool, string) {
+	return false, ""
+}
 func (d *stubRTDriver) IsDaemonProcess(proc string, cmds []string) bool { return false }
 func (d *stubRTDriver) GetDefaultRegistries() []string                  { return nil }
 func (d *stubRTDriver) GetStorageDriver() string                        { return "" }
-func (d *stubRTDriver) GetService(id string) (*Service, error) { return nil, ErrMethodNotSupported }
-func (d *stubRTDriver) ListServices() ([]*Service, error) {	return make([]*Service, 0), nil }
+func (d *stubRTDriver) GetService(id string) (*Service, error)          { return nil, ErrMethodNotSupported }
+func (d *stubRTDriver) ListServices() ([]*Service, error)               { return make([]*Service, 0), nil }
 
-/////////
+// ///////
 func InitStubRtDriver(sys *system.SystemTools) (Runtime, error) {
 	var id, podname, ipaddress string
 	log.Info()
@@ -84,7 +88,8 @@ func InitStubRtDriver(sys *system.SystemTools) (Runtime, error) {
 	return &stubRTDriver{sys: sys, sysInfo: sys.GetSystemInfo(), initTime: time.Now().UTC(),
 		rootPid: ppid, selfID: id, podName: podname, nodeHostname: podname, ipAddress: ipaddress}, nil
 }
-/////////
+
+// ///////
 func (d *stubRTDriver) GetSelfID() string {
 	return d.selfID
 }
@@ -114,12 +119,12 @@ func (d *stubRTDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaEx
 	}
 
 	dev := &share.CLUSDevice{
-		ID:           d.selfID,
-		Name:         d.podName,
-		Labels:       make(map[string]string),
-		Pid:          d.rootPid,
-		CreatedAt:    d.initTime,
-		StartedAt:    d.initTime,
+		ID:        d.selfID,
+		Name:      d.podName,
+		Labels:    make(map[string]string),
+		Pid:       d.rootPid,
+		CreatedAt: d.initTime,
+		StartedAt: d.initTime,
 	}
 
 	// Read address

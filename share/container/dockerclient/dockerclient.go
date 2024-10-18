@@ -104,10 +104,8 @@ func (client *DockerClient) doStreamRequest(method string, path string, in io.Re
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	if headers != nil {
-		for header, value := range headers {
-			req.Header.Add(header, value)
-		}
+	for header, value := range headers {
+		req.Header.Add(header, value)
 	}
 	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
@@ -127,7 +125,7 @@ func (client *DockerClient) doStreamRequest(method string, path string, in io.Re
 		}
 		if len(data) > 0 {
 			// check if is image not found error
-			if strings.Index(string(data), "No such image") != -1 {
+			if strings.Contains(string(data), "No such image") {
 				return nil, ErrImageNotFound
 			}
 			return nil, errors.New(string(data))
@@ -162,11 +160,11 @@ func (client *DockerClient) Info() (*Info, error) {
 
 func (client *DockerClient) ListContainers(all bool, size bool, filters string) ([]Container, error) {
 	argAll := 0
-	if all == true {
+	if all {
 		argAll = 1
 	}
 	showSize := 0
-	if size == true {
+	if size {
 		showSize = 1
 	}
 	uri := fmt.Sprintf("/%s/containers/json?all=%d&size=%d", APIVersion, argAll, showSize)
@@ -227,7 +225,7 @@ func (client *DockerClient) CreateContainer(config *ContainerConfig, name string
 	result := &RespContainersCreate{}
 	err = json.Unmarshal(data, result)
 	if err != nil {
-		return "", fmt.Errorf(string(data))
+		return "", errors.New(string(data))
 	}
 	return result.Id, nil
 }
@@ -650,6 +648,9 @@ func (client *DockerClient) PushImage(name string, tag string, auth *AuthConfig)
 	}
 	uri := fmt.Sprintf("/%s/images/%s/push?%s", APIVersion, url.QueryEscape(name), v.Encode())
 	req, err := http.NewRequest("POST", client.URL.String()+uri, nil)
+	if err != nil {
+		return err
+	}
 	if auth != nil {
 		if encodedAuth, err := auth.encode(); err != nil {
 			return err
@@ -679,6 +680,9 @@ func (client *DockerClient) PullImage(name string, auth *AuthConfig) error {
 	v.Set("fromImage", name)
 	uri := fmt.Sprintf("/%s/images/create?%s", APIVersion, v.Encode())
 	req, err := http.NewRequest("POST", client.URL.String()+uri, nil)
+	if err != nil {
+		return err
+	}
 	if auth != nil {
 		encoded_auth, err := auth.encode()
 		if err != nil {
@@ -752,10 +756,10 @@ func (client *DockerClient) LoadImage(reader io.Reader) error {
 func (client *DockerClient) RemoveContainer(id string, force, volumes bool) error {
 	argForce := 0
 	argVolumes := 0
-	if force == true {
+	if force {
 		argForce = 1
 	}
-	if volumes == true {
+	if volumes {
 		argVolumes = 1
 	}
 	args := fmt.Sprintf("force=%d&v=%d", argForce, argVolumes)
@@ -1027,6 +1031,9 @@ func (client *DockerClient) CreateNetwork(config *NetworkCreate) (*NetworkCreate
 	}
 	ret := &NetworkCreateResponse{}
 	err = json.Unmarshal(data, ret)
+	if err != nil {
+		return nil, err
+	}
 	return ret, nil
 }
 
