@@ -14085,7 +14085,7 @@ definitions:
         example: main
       personal_access_token:
         type: string
-        example: ghp_Agk4DedP5SOHGo8WxSuXCmCcldLyBP0I7CN6
+        example: "<access token from GitHub>"
       personal_access_token_committer_name:
         type: string
         example: myuser
@@ -14127,7 +14127,7 @@ definitions:
         example: main
       personal_access_token:
         type: string
-        example: ghp_Agk4DedP5SOHGo8WxSuXCmCcldLyBP0I7CN6
+        example: "<access token from GitHub>"
       personal_access_token_committer_name:
         type: string
         example: myuser
