@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -227,7 +228,7 @@ func FedRoleChangeNotify(fedRole string) {
 	smd.fedRole = fedRole
 }
 
-func AddScanner(id string) {
+func AddScanner(id string) error {
 	log.WithFields(log.Fields{"id": id}).Info()
 
 	if regScher == nil {
@@ -235,15 +236,24 @@ func AddScanner(id string) {
 		regScher.Init()
 	}
 
-	regScher.AddProcessor(id)
+	if err := regScher.AddProcessor(id); err != nil {
+		return fmt.Errorf("failed to add processor: %w", err)
+	}
+	return nil
 }
 
-func RemoveScanner(id string) {
+func RemoveScanner(id string) error {
 	log.WithFields(log.Fields{"id": id}).Info()
 
-	if regScher != nil {
-		regScher.DelProcessor(id)
+	if regScher == nil {
+		return errors.New("registry scheduler is not initialized")
 	}
+
+	if _, err := regScher.DelProcessor(id); err != nil {
+		return fmt.Errorf("failed to remove processor: %w", err)
+	}
+
+	return nil
 }
 
 // used internally, so access control
