@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -55,7 +56,7 @@ func ReqSync(ip string, port uint16, category, from string) (*share.CLUSSyncRepl
 	return client.ReqSync(ctx, &share.CLUSSyncRequest{
 		Category: category,
 		From:     from,
-	})
+	}, grpc.UseCompressor(gzip.Name))
 }
 
 func ReqSyncStream(ip string, port uint16, category, from string) (*share.CLUSSyncReply, error) {

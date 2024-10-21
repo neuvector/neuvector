@@ -17,6 +17,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
+	_ "google.golang.org/grpc/encoding/gzip"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
@@ -97,8 +99,6 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 	opts := []grpc.ServerOption{
 		grpc.Creds(ct),
 		grpc.UnaryInterceptor(middlefunc),
-		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
-		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.MaxRecvMsgSize(GRPCMaxMsgSize),
 	}
 
@@ -164,8 +164,6 @@ func ReloadInternalCert() error {
 
 func NewGRPCServerUnix(socket string) (*GRPCServer, error) {
 	opts := []grpc.ServerOption{
-		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
-		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.MaxRecvMsgSize(GRPCMaxMsgSize),
 	}
 
@@ -310,19 +308,17 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 	if compress {
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
-			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
-			grpc.WithCompressor(grpc.NewGZIPCompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithDefaultCallOptions(grpc.WaitForReady(false)),
 		}
 	} else {
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
-			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithDefaultCallOptions(grpc.WaitForReady(false)),
 		}
 	}
 
-	conn, err := grpc.DialContext(ctx, endpoint, opts...)
+	conn, err := grpc.NewClient(endpoint, opts...)
+	//conn, err := grpc.DialContext(ctx, endpoint, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -338,19 +334,16 @@ func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback,
 	var opts []grpc.DialOption
 	if compress {
 		opts = []grpc.DialOption{
-			grpc.WithInsecure(),
-			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
-			grpc.WithCompressor(grpc.NewGZIPCompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.WaitForReady(false)),
 			grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 				return net.DialTimeout("unix", addr, timeout)
 			}),
 		}
 	} else {
 		opts = []grpc.DialOption{
-			grpc.WithInsecure(),
-			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.WaitForReady(false)),
 			grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 				return net.DialTimeout("unix", addr, timeout)
 			}),
