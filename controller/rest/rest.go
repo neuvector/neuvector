@@ -1540,7 +1540,6 @@ func InitContext(ctx *Context) {
 
 func StartRESTServer(isNewCluster bool, isLead bool) {
 	initDefaultRegistries()
-	licenseInit()
 	newRepoScanMgr()
 	newRegTestMgr()
 
@@ -1615,9 +1614,6 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.PATCH("/v1/system/config/webhook/:name", handlerSystemWebhookConfig)  // supported 'scope' query parameter values: "fed"/"local"(default).
 	r.DELETE("/v1/system/config/webhook/:name", handlerSystemWebhookDelete) // supported 'scope' query parameter values: "fed"/"local"(default).
 	r.POST("/v1/system/request", handlerSystemRequest)
-	r.GET("/v1/system/license", handlerLicenseShow)
-	r.POST("/v1/system/license/update", handlerLicenseUpdate)
-	r.DELETE("/v1/system/license", handlerLicenseDelete)
 	r.GET("/v1/domain", handlerDomainList)
 	r.PATCH("/v1/domain", handlerDomainConfig)
 	r.PATCH("/v1/domain/:name", handlerDomainEntryConfig)

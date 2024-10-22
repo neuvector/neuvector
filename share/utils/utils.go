@@ -42,7 +42,6 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/licenseinfo"
 )
 
 var IPv4Loopback = net.IPv4(127, 0, 0, 1)
@@ -1019,14 +1018,8 @@ func getPasswordSymKey() []byte {
 	return passwordSymKey
 }
 
-func GetLicenseSymKey() []byte {
-	return licenseSymKey
-}
-
 func GetLicenseInfo(license string) (string, error) { // returns license json string
-	symmetricKey := GetLicenseSymKey()
-	licValue, err := licenseinfo.GetLicenseInfo(license, symmetricKey)
-	return licValue, err
+	return "", nil
 }
 
 func DecryptPassword(encrypted string) string {
