@@ -26,7 +26,7 @@ import (
 
 	"errors"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"sigs.k8s.io/yaml"
 
 	"github.com/hashicorp/go-version"
