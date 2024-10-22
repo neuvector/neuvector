@@ -23,7 +23,6 @@ import (
 const ldapconfigmap string = "/etc/config/ldapinitcfg.yaml"
 const samlconfigmap string = "/etc/config/samlinitcfg.yaml"
 const oidcconfigmap string = "/etc/config/oidcinitcfg.yaml"
-const eulaconfigmap string = "/etc/config/eulainitcfg.yaml"
 const authconfigmap string = "/etc/config/userinitcfg.yaml"
 const roleconfigmap string = "/etc/config/roleinitcfg.yaml"
 const syscfgconfigmap string = "/etc/config/sysinitcfg.yaml"
@@ -43,32 +42,6 @@ type configMapHandlerContext struct {
 
 var cfgmapRetryTimer *time.Timer
 var cfgmapTried map[string]int = make(map[string]int) // cfg type -> tried times(<0 means no need to retry)
-
-func handleeulacfg(yaml_data []byte, load bool, skip *bool, context *configMapHandlerContext) error {
-
-	json_data, err1 := yaml.YAMLToJSON(yaml_data)
-	if err1 != nil {
-		log.WithFields(log.Fields{"error": err1}).Error("eula config to json convert error")
-		return err1
-	}
-
-	var req api.RESTLicenseKeyCfgMap
-	err := json.Unmarshal(json_data, &req)
-	if err != nil || req.LicenseKey == "" {
-		log.WithFields(log.Fields{"error": err}).Error("Request error")
-		return err
-	} else if !load && !req.AlwaysReload {
-		*skip = true
-		return nil
-	}
-
-	_, err2 := updateLicense(req.LicenseKey, true, true)
-	if err2 != nil {
-		log.WithFields(log.Fields{"err": err2}).Error("License update failed")
-		return err2
-	}
-	return nil
-}
 
 func handleldapcfg(yaml_data []byte, load bool, skip *bool, context *configMapHandlerContext) error {
 
@@ -865,7 +838,6 @@ func LoadInitCfg(load bool, platform string) bool {
 	}
 
 	configMaps := []configMap{
-		{FileName: eulaconfigmap, Type: "eula", HandlerFunc: handleeulacfg},
 		{FileName: roleconfigmap, Type: "role", HandlerFunc: handlecustomrolecfg},                   // must be before user/ldap/saml/oidc
 		{FileName: pwdprofileconfigmap, Type: "password profile", HandlerFunc: handlepwdprofilecfg}, // must be before user
 		{FileName: ldapconfigmap, Type: "ldap", HandlerFunc: handleldapcfg},
