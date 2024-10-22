@@ -1519,16 +1519,19 @@ func InitContext(ctx *Context) {
 	searchRegistries = utils.NewSet()
 
 	for _, reg := range strings.Split(ctx.SearchRegistries, ",") {
-		if parsedReg, err := url.Parse(reg); err != nil {
-			log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
-			continue
-		} else if parsedReg.Host != "" {
-			reg = parsedReg.Host
-		}
+		reg = strings.Trim(reg, " ")
+		if len(reg) > 0 {
+			if parsedReg, err := url.Parse(reg); err != nil {
+				log.WithError(err).WithFields(log.Fields{"registry": reg}).Warn("unable to parse registry")
+				continue
+			} else if parsedReg.Host != "" {
+				reg = parsedReg.Host
+			}
 
-		k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
-		if !searchRegistries.Contains(k) {
-			searchRegistries.Add(k)
+			k := fmt.Sprintf("https://%s/", strings.Trim(reg, " "))
+			if !searchRegistries.Contains(k) {
+				searchRegistries.Add(k)
+			}
 		}
 	}
 
