@@ -94,6 +94,8 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 		return nil, fmt.Errorf("failed to create new server credentials: %w", err)
 	}
 
+	//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
+	//nolint:staticcheck
 	opts := []grpc.ServerOption{
 		grpc.Creds(ct),
 		grpc.UnaryInterceptor(middlefunc),
@@ -163,6 +165,8 @@ func ReloadInternalCert() error {
 }
 
 func NewGRPCServerUnix(socket string) (*GRPCServer, error) {
+	//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
+	//nolint:staticcheck
 	opts := []grpc.ServerOption{
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
@@ -308,6 +312,8 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 	// This is to be compatible with pre-3.2 grpc server that doesn't install decompressor.
 	var opts []grpc.DialOption
 	if compress {
+		//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
+		//nolint:staticcheck
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -315,6 +321,8 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
 		}
 	} else {
+		//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
+		//nolint:staticcheck
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -337,6 +345,8 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback, compress bool) (*GRPCClient, error) {
 	var opts []grpc.DialOption
 	if compress {
+		//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
+		//nolint:staticcheck
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -347,6 +357,8 @@ func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback,
 			}),
 		}
 	} else {
+		//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
+		//nolint:staticcheck
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
