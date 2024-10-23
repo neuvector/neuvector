@@ -420,7 +420,9 @@ func replaceFedResponseRules(rulesNew map[uint32]*share.CLUSResponseRule, rhsNew
 	rhsExisting := clusHelper.GetResponseRuleList(share.FedPolicyName)
 	for _, rhExisting := range rhsExisting {
 		if _, ok := rulesNew[rhExisting.ID]; !ok { // in existing but not in latest. so delete it
-			clusHelper.DeleteResponseRuleTxn(share.FedPolicyName, txn, rhExisting.ID)
+			if err := clusHelper.DeleteResponseRuleTxn(share.FedPolicyName, txn, rhExisting.ID); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteResponseRuleTxn")
+			}
 		}
 	}
 	// write id keys
@@ -428,13 +430,17 @@ func replaceFedResponseRules(rulesNew map[uint32]*share.CLUSResponseRule, rhsNew
 		if ruleNew != nil {
 			ruleExisting, _ := clusHelper.GetResponseRule(share.FedPolicyName, ruleNew.ID)
 			if ruleExisting == nil || !reflect.DeepEqual(*ruleNew, *ruleExisting) {
-				clusHelper.PutResponseRuleTxn(share.FedPolicyName, txn, ruleNew)
+				if err := clusHelper.PutResponseRuleTxn(share.FedPolicyName, txn, ruleNew); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutResponseRuleTxn")
+				}
 			}
 		}
 	}
 	if !reflect.DeepEqual(rhsNew, rhsExisting) {
 		// overwrite rule headers list
-		clusHelper.PutResponseRuleListTxn(share.FedPolicyName, txn, rhsNew)
+		if err := clusHelper.PutResponseRuleListTxn(share.FedPolicyName, txn, rhsNew); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutResponseRuleListTxn")
+		}
 	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
@@ -544,13 +550,17 @@ func handlerResponseRuleShowWorkload(w http.ResponseWriter, r *http.Request, ps 
 
 func writeResponseRules(policyName string, txn *cluster.ClusterTransact, crs []*share.CLUSResponseRule) {
 	for _, cr := range crs {
-		clusHelper.PutResponseRuleTxn(policyName, txn, cr)
+		if err := clusHelper.PutResponseRuleTxn(policyName, txn, cr); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutResponseRuleTxn")
+		}
 	}
 }
 
 func deleteResponseRules(policyName string, txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {
-		clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
+		if err := clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32)); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteResponseRuleTxn")
+		}
 	}
 }
 
@@ -642,7 +652,9 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 
 	crhs = append(crhs[:toIdx], append(news, crhs[toIdx:]...)...)
 
-	clusHelper.PutResponseRuleListTxn(policyName, txn, crhs)
+	if err := clusHelper.PutResponseRuleListTxn(policyName, txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutResponseRuleListTxn")
+	}
 
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -864,7 +876,9 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutResponseRuleListTxn(policyName, txn, crhs)
+	if err := clusHelper.PutResponseRuleListTxn(policyName, txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutResponseRuleListTxn")
+	}
 
 	dels := utils.NewSet(uint32(id))
 	deleteResponseRules(policyName, txn, dels)
@@ -944,7 +958,9 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
+	if err := clusHelper.PutResponseRuleListTxn(policyName, txn, keeps); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutResponseRuleListTxn")
+	}
 	deleteResponseRules(policyName, txn, dels)
 
 	if ok, err := txn.Apply(); err != nil {

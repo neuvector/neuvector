@@ -407,6 +407,8 @@ func handlerSnifferGetFile(w http.ResponseWriter, r *http.Request, ps httprouter
 	h.Set("Content-Type", "application/cap")
 
 	if cfgw, err := mpw.CreatePart(h); err == nil {
-		cfgw.Write(pcap)
+		if _, err := cfgw.Write(pcap); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Write")
+		}
 	}
 }

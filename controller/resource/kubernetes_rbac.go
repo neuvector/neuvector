@@ -1023,7 +1023,9 @@ func xlateClusRoleBinding(obj metav1.Object) (string, interface{}) {
 
 func cacheRbacEvent(flavor, msg string, existOnly bool) {
 	if cacheEventFunc != nil {
-		cacheEventFunc(share.CLUSEvK8sNvRBAC, msg)
+		if err := cacheEventFunc(share.CLUSEvK8sNvRBAC, msg); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error()
+		}
 	}
 }
 

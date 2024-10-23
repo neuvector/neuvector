@@ -94,7 +94,9 @@ func (r *ibmcloud) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 		return err, err.Error()
 	}
 
-	r.newRegClient(cfg.Registry, cfg.Username, cfg.Password)
+	if err := r.newRegClient(cfg.Registry, cfg.Username, cfg.Password); err != nil {
+		return err, err.Error()
+	}
 
 	r.images = make(map[string][]*ibmImage)
 	return nil, ""

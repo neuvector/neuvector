@@ -379,7 +379,9 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			data = []byte(msg)
 		}
 
-		w.httpRequest(data, ctype, proxy)
+		if err := w.httpRequest(data, ctype, proxy); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("httpRequest")
+		}
 	}
 }
 

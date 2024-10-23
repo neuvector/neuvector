@@ -126,7 +126,9 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
 		if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
-			json.Unmarshal(value, &nvUpgradeInfo)
+			if err := json.Unmarshal(value, &nvUpgradeInfo); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+			}
 			if nvUpgradeInfo.MinUpgradeVersion.Version != "" {
 				resp.TelemetryStatus.MinUpgradeVersion = api.RESTUpgradeVersionInfo{
 					Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
@@ -517,7 +519,9 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 			// Retrieve from the cluster
 			value, rev, _ := cluster.GetRev(key)
 			if value != nil {
-				json.Unmarshal(value, &cconf)
+				if err := json.Unmarshal(value, &cconf); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+				}
 			} else {
 				cconf.Wire = share.WireDefault
 			}
@@ -2075,7 +2079,9 @@ func handlerMeterList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 func getNvUpgradeInfo() *api.RESTCheckUpgradeInfo {
 	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
 	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
-		json.Unmarshal(value, &nvUpgradeInfo)
+		if err := json.Unmarshal(value, &nvUpgradeInfo); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+		}
 	}
 
 	empty := share.CLUSCheckUpgradeVersion{}
@@ -2322,7 +2328,9 @@ func configLog(ev share.TLogEvent, login *loginSession, msg string) {
 		UserSession:    login.id,
 		Msg:            msg,
 	}
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 func rawExport(w http.ResponseWriter, sections utils.Set) error {
@@ -2448,7 +2456,9 @@ func rawImportRead(r *http.Request, tmpfile *os.File) (int, error) {
 		} else if data == "\n" || strings.HasPrefix(data, "#") {
 			continue
 		}
-		writer.WriteString(data)
+		if _, err := writer.WriteString(data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 		lines++
 	}
 	writer.Flush()
@@ -2493,7 +2503,9 @@ func multipartImportRead(r *http.Request, params map[string]string, tmpfile *os.
 				if err == io.EOF || err != nil {
 					break
 				}
-				writer.WriteString(data)
+				if _, err := writer.WriteString(data); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("WriteString")
+				}
 				lines++
 			}
 		}
@@ -2607,7 +2619,9 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			CallerRemote:   login.remote,
 			CallerID:       login.id,
 		}
-		clusHelper.PutImportTask(&importTask)
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 
 		lines := 0
 		if importType == share.IMPORT_TYPE_CONFIG {
@@ -2643,23 +2657,50 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			importTask.TotalLines = lines
 			importTask.Percentage = 3
 			importTask.LastUpdateTime = time.Now().UTC()
-			clusHelper.PutImportTask(&importTask)
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+			}
 			kv.SetImporting(1)
 			eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 			switch importType {
 			case share.IMPORT_TYPE_CONFIG:
 				value := r.Header.Get("X-As-Standalone")
 				ignoreFed, _ := strconv.ParseBool(value)
-				go cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask,
-					tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher, ignoreFed)
+				go func() {
+					if err := cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask,
+						tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher, ignoreFed); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Import")
+					}
+				}()
+
 			case share.IMPORT_TYPE_GROUP_POLICY:
-				go importGroupPolicy(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+				go func() {
+					if err := importGroupPolicy(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importGroupPolicy")
+					}
+				}()
+
 			case share.IMPORT_TYPE_ADMCTRL:
-				go importAdmCtrl(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+				go func() {
+					if err := importAdmCtrl(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importAdmCtrl")
+					}
+				}()
+
 			case share.IMPORT_TYPE_DLP:
-				go importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+				go func() {
+					if err := importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importDlp")
+					}
+				}()
+
 			case share.IMPORT_TYPE_WAF:
-				go importWaf(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+				go func() {
+					if err := importWaf(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importWaf")
+					}
+				}()
+
 			case share.IMPORT_TYPE_VULN_PROFILE:
 				option := "merge"
 				query := restParseQuery(r)
@@ -2668,9 +2709,19 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 						option = value
 					}
 				}
-				go importVulnProfile(share.ScopeLocal, option, login.domainRoles, importTask, postImportOp)
+				go func() {
+					if err := importVulnProfile(share.ScopeLocal, option, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importVulnProfile")
+					}
+				}()
+
 			case share.IMPORT_TYPE_COMP_PROFILE:
-				go importCompProfile(share.ScopeLocal, login.domainRoles, importTask, postImportOp)
+				go func() {
+					if err := importCompProfile(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importCompProfile")
+					}
+				}()
+
 			}
 
 			resp := api.RESTImportTaskData{
@@ -2692,7 +2743,9 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 
 	var msgToken string
 	importTask.Status = err.Error()
-	clusHelper.PutImportTask(&importTask)
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
 	log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Error in import")
 	restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFailImport, err.Error())
 	switch importType {
@@ -2744,7 +2797,9 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 	var msgToken string
 	switch importType {
 	case share.IMPORT_TYPE_CONFIG:
-		cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+		if _, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 		msgToken = "configurations"
 	case share.IMPORT_TYPE_GROUP_POLICY:
 		msgToken = "group policy"
@@ -2774,7 +2829,9 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 		log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Error in import")
 		configLog(share.CLUSEvImportFail, login, fmt.Sprintf("Failed to import %s(%s)", msgToken, err.Error()))
 		importTask.Status = err.Error()
-		clusHelper.PutImportTask(&importTask)
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 		return
 	}
 
@@ -2831,13 +2888,17 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 			},
 		}
 		for _, crdInfo := range nvCrdInfo {
-			CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, true)
+			if err := CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, true); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("CrossCheckCrd")
+			}
 		}
 	}
 
 	importTask.Percentage = 100
 	importTask.Status = share.IMPORT_DONE
-	clusHelper.PutImportTask(&importTask)
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
 
 	if importType == share.IMPORT_TYPE_CONFIG {
 		kickAllLoginSessionsByServer("")

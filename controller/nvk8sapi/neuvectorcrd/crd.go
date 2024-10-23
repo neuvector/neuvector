@@ -1744,7 +1744,9 @@ func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []str
 		crdConfigured, crdUpToDate, err := isCrdUpToDate(leader, crdInfo)
 		if crdConfigured {
 			if crossCheck && crdInfo.RscType != resource.RscTypeCrdNvCspUsage {
-				rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false)
+				if err := rest.CrossCheckCrd(crdInfo.SpecNamesKind, crdInfo.RscType, crdInfo.KvCrdKind, crdInfo.LockKey, false); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("CrossCheckCrd")
+				}
 			}
 
 			if !crdUpToDate {
@@ -1768,7 +1770,9 @@ func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []str
 				fedRole = m.FedRole
 				masterClusterID = m.MasterCluster.ID
 			}
-			cache.ConfigCspUsages(true, false, fedRole, masterClusterID)
+			if err := cache.ConfigCspUsages(true, false, fedRole, masterClusterID); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
+			}
 		}
 
 		if err != nil {
@@ -1812,5 +1816,7 @@ func Init(leader, crossCheck bool, cspType share.TCspType) {
 			},
 		},
 	}
-	admission.ConfigK8sAdmissionControl(&k8sResInfo, crdconf.CtrlStates[admission.NvAdmValidateType])
+	if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, crdconf.CtrlStates[admission.NvAdmValidateType]); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("ConfigK8sAdmissionControl")
+	}
 }

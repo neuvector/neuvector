@@ -352,7 +352,9 @@ func TestUserCfg(t *testing.T) {
 	mockCluster.SetCacheMockCallback(share.CLUSConfigUserRoleStore, cache.MockUserRoleConfigUpdate)
 
 	defProfile := mockCacheInstance.pwdProfiles[share.CLUSDefPwdProfileName]
-	_ = clusHelper.PutPwdProfileRev(defProfile, 0)
+	if err := clusHelper.PutPwdProfileRev(defProfile, 0); err != nil {
+		t.Errorf("PutPwdProfileRev return error:%v\n", err)
+	}
 
 	var context configMapHandlerContext
 	// test variation of  white space before/after value etc
@@ -372,7 +374,9 @@ func TestUserCfg(t *testing.T) {
 `
 	// create referenced custom role first
 	yaml_byte0 := []byte(yaml_data0)
-	_ = handlecustomrolecfg(yaml_byte0, true, &skip, &context)
+	if err := handlecustomrolecfg(yaml_byte0, true, &skip, &context); err != nil {
+		t.Errorf("handlecustomrolecfg return error:%v\n", err)
+	}
 	if s1, _, _ := clusHelper.GetCustomRoleRev("testRole123", accAdmin); s1 == nil {
 		t.Errorf("Fail to get testRole123 config\n")
 	}
@@ -477,7 +481,9 @@ func TestUserCfgNegative(t *testing.T) {
 
 	cacher = mockCacheInstance
 	defProfile := mockCacheInstance.pwdProfiles[share.CLUSDefPwdProfileName]
-	_ = clusHelper.PutPwdProfileRev(defProfile, 0)
+	if err := clusHelper.PutPwdProfileRev(defProfile, 0); err != nil {
+		t.Errorf("PutPwdProfileRev error:%v\n", err)
+	}
 
 	// negative test about user assigned a non-existing custom role
 

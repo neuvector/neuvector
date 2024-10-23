@@ -519,13 +519,17 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 
 func deletePolicyRules(txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {
-		clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+		if err := clusHelper.DeletePolicyRuleTxn(txn, id.(uint32)); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeletePolicyRuleTxn")
+		}
 	}
 }
 
 func writePolicyRules(txn *cluster.ClusterTransact, crs []*share.CLUSPolicyRule) {
 	for _, cr := range crs {
-		clusHelper.PutPolicyRuleTxn(txn, cr)
+		if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleTxn")
+		}
 	}
 }
 
@@ -853,7 +857,9 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 	crhs = append(crhs[:toIdx], append(news, crhs[toIdx:]...)...)
 
 	// Put policy rule heads
-	clusHelper.PutPolicyRuleListTxn(txn, crhs)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+	}
 
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -1336,7 +1342,9 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	}
 
 	// Write rule ID list to cluster
-	clusHelper.PutPolicyRuleListTxn(txn, newPolicys)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, newPolicys); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+	}
 
 	// Remove old rules
 	deletePolicyRules(txn, del)
@@ -1410,7 +1418,9 @@ func deletePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rule
 	defer txn.Close()
 
 	// Write rule ID list to cluster
-	clusHelper.PutPolicyRuleListTxn(txn, crhsNew)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhsNew); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+	}
 
 	// Remove rules.
 	deletePolicyRules(txn, dels)
@@ -1727,9 +1737,13 @@ func handlerPolicyRuleConfig(w http.ResponseWriter, r *http.Request, ps httprout
 		defer txn.Close()
 
 		// Write the new rule
-		clusHelper.PutPolicyRuleTxn(txn, cconf)
+		if err := clusHelper.PutPolicyRuleTxn(txn, cconf); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleTxn")
+		}
 		// Put policy rule heads
-		clusHelper.PutPolicyRuleListTxn(txn, crhs)
+		if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+		}
 
 		if ok, err := txn.Apply(); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("")
@@ -1866,7 +1880,9 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 	defer txn.Close()
 
 	// Write rule ID list to cluster
-	clusHelper.PutPolicyRuleListTxn(txn, keeps)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, keeps); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+	}
 	// Remove rules
 	deletePolicyRules(txn, dels)
 
@@ -2041,7 +2057,9 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 	for _, rhExisting := range rhsExisting {
 		if rhExisting.CfgType == share.FederalCfg {
 			if _, ok := rulesMap[rhExisting.ID]; !ok { // in existing but not in new. so delete it
-				clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID)
+				if err := clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("DeletePolicyRuleTxn")
+				}
 			}
 		} else {
 			nonFedPolicies++
@@ -2052,7 +2070,9 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 		if ruleNew != nil {
 			ruleExisting, _ := clusHelper.GetPolicyRule(ruleNew.ID)
 			if ruleExisting == nil || !reflect.DeepEqual(*ruleNew, *ruleExisting) {
-				clusHelper.PutPolicyRuleTxn(txn, ruleNew)
+				if err := clusHelper.PutPolicyRuleTxn(txn, ruleNew); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleTxn")
+				}
 			}
 		}
 	}
@@ -2066,7 +2086,9 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 	}
 
 	if !reflect.DeepEqual(rhsAll, rhsExisting) {
-		clusHelper.PutPolicyRuleListTxn(txn, rhsAll)
+		if err := clusHelper.PutPolicyRuleListTxn(txn, rhsAll); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+		}
 	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
@@ -2173,7 +2195,9 @@ LOOP_ALL_IDS:
 								proc.Action = share.PolicyActionAllow
 							}
 						}
-						clusHelper.PutProcessProfileTxn(txn, fedGrpName, pp)
+						if err := clusHelper.PutProcessProfileTxn(txn, fedGrpName, pp); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("PutProcessProfileTxn")
+						}
 					}
 
 					mon, _ := clusHelper.GetFileMonitorProfile(grpName)
@@ -2209,7 +2233,9 @@ LOOP_ALL_IDS:
 						mon.CfgType = share.FederalCfg
 						mon.Filters = filters
 						mon.FiltersCRD = emptyMonFilters
-						clusHelper.PutFileMonitorProfileTxn(txn, fedGrpName, mon)
+						if err := clusHelper.PutFileMonitorProfileTxn(txn, fedGrpName, mon); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("PutFileMonitorProfileTxn")
+						}
 
 						for key, ffm := range far.FiltersCRD {
 							far.Filters[key] = ffm
@@ -2221,7 +2247,9 @@ LOOP_ALL_IDS:
 						}
 						far.Group = fedGrpName
 						far.FiltersCRD = emptyFarFilters
-						clusHelper.PutFileAccessRuleTxn(txn, fedGrpName, far)
+						if err := clusHelper.PutFileAccessRuleTxn(txn, fedGrpName, far); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("PutFileAccessRuleTxn")
+						}
 					}
 
 					fedGroup := &share.CLUSGroup{
@@ -2233,7 +2261,9 @@ LOOP_ALL_IDS:
 						//NotScored:      grp.NotScored,
 						//PlatformRole:   grp.PlatformRole,
 					}
-					clusHelper.PutGroupTxn(txn, fedGroup)
+					if err := clusHelper.PutGroupTxn(txn, fedGroup); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PutGroupTxn")
+					}
 					fedGroupNames.Add(fedGrpName)
 				} else {
 					errMsg = fmt.Sprintf("group %s not found(for rule %d)", grpName, id)
@@ -2252,7 +2282,9 @@ LOOP_ALL_IDS:
 		} else {
 			rule.Comment = fmt.Sprintf("%s (%s)", rule.Comment, comment)
 		}
-		clusHelper.PutPolicyRuleTxn(txn, rule)
+		if err := clusHelper.PutPolicyRuleTxn(txn, rule); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleTxn")
+		}
 
 		crh := &share.CLUSRuleHead{
 			ID:      fedRuleID,
@@ -2266,7 +2298,9 @@ LOOP_ALL_IDS:
 			errMsg = "no rule to promote"
 		} else {
 			crhs = append(crhs[:topIdx], append(crhsPromoted, crhs[topIdx:]...)...)
-			clusHelper.PutPolicyRuleListTxn(txn, crhs)
+			if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+			}
 			if applyTransact(w, txn) == nil {
 				ruleTypes := []string{share.FedNetworkRulesType}
 				if fedGroupsCountOld != fedGroupNames.Cardinality() {

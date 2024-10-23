@@ -562,7 +562,9 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
 				alog.Msg = "Failed to configure admission control state."
 			}
-			evqueue.Append(&alog)
+			if err := evqueue.Append(&alog); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+			}
 		}
 		if err == nil {
 			messages := make([]string, 0, 3)
@@ -704,25 +706,35 @@ func replaceFedAdmissionRules(ruleType string, rulesNew *share.CLUSAdmissionRule
 		defer txn.Close()
 		// delete obsolete id keys
 		for _, id := range delRules {
-			clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, id)
+			if err := clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, id); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRuleTxn")
+			}
 		}
 		// write updated id keys
 		for _, ruleNew := range patchedRules {
-			clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, ruleNew)
+			if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, ruleNew); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleTxn")
+			}
 		}
 		// overwrite rule headers list
 		if rhlChanged {
-			clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, rulesNew.RuleHeads)
+			if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, rulesNew.RuleHeads); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+			}
 		}
 		return applyTransact(nil, txn) == nil
 	} else {
 		// delete obsolete id keys
 		for _, id := range delRules {
-			clusHelper.DeleteAdmissionRule(admission.NvAdmValidateType, ruleType, id)
+			if err := clusHelper.DeleteAdmissionRule(admission.NvAdmValidateType, ruleType, id); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRule")
+			}
 		}
 		// write updated  id keys
 		for _, ruleNew := range patchedRules {
-			clusHelper.PutAdmissionRule(admission.NvAdmValidateType, ruleType, ruleNew)
+			if err := clusHelper.PutAdmissionRule(admission.NvAdmValidateType, ruleType, ruleNew); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRule")
+			}
 		}
 		// overwrite rule headers list
 		if rhlChanged {
@@ -868,9 +880,13 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 		txn.Close()
 
 		for ruleTypeKey, delRuleType := range delRuleTypes {
-			clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, delRuleType.keepRuleList)
+			if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, delRuleType.keepRuleList); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+			}
 			for id := range delRuleType.delRules.Iter() {
-				clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, id.(uint32))
+				if err := clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, id.(uint32)); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRuleTxn")
+				}
 				opa.DeletePolicy(id.(uint32))
 			}
 			if ruleTypeKey == share.FedAdmCtrlExceptRulesType || ruleTypeKey == share.FedAdmCtrlDenyRulesType {
@@ -886,7 +902,9 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 				break
 			} else {
 				for id := range delRuleType.delRules.Iter() {
-					clusHelper.DeleteAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, id.(uint32))
+					if err := clusHelper.DeleteAdmissionRule(admission.NvAdmValidateType, ruleTypeKey, id.(uint32)); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRule")
+					}
 					opa.DeletePolicy(id.(uint32))
 				}
 				if ruleTypeKey == share.FedAdmCtrlExceptRulesType || ruleTypeKey == share.FedAdmCtrlDenyRulesType {
@@ -1075,14 +1093,18 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, clusConf)
+	if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, clusConf); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleTxn")
+	}
 	arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
 	rh := &share.CLUSRuleHead{
 		ID:      ruleCfg.ID,
 		CfgType: cfgType,
 	}
 	arhs = append(arhs, rh)
-	clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, arhs)
+	if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, arhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+	}
 
 	if applyTransact(w, txn) != nil {
 		return
@@ -1282,7 +1304,9 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 	if idx == -1 {
 		// force writing the same header list value to kv so that cacher can do self-check
-		clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey, arhs)
+		if err := clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey, arhs); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleList")
+		}
 		log.WithFields(log.Fields{"id": id, "ruleTypeKey": ruleTypeKey}).Error("Admission rule doesn't exist")
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		return
@@ -1296,8 +1320,12 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, arhs)
-	clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, id)
+	if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleTypeKey, arhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+	}
+	if err := clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleTypeKey, id); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRuleTxn")
+	}
 	opa.DeletePolicy(id)
 
 	if applyTransact(w, txn) != nil {
@@ -1501,7 +1529,9 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
 
 	var err error
 	var crdHandler nvCrdHandler
@@ -1516,7 +1546,9 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 		} else {
 			progress += inc
 			importTask.Percentage = int(progress)
-			clusHelper.PutImportTask(&importTask)
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+			}
 
 			acc := access.NewAdminAccessControl()
 			// [2] import admission control configuration described in the yaml file
@@ -1534,7 +1566,9 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+				}
 			}
 			if err == nil && parsedCfg.AdmCtrlRulesCfg != nil {
 				// [3] delete all user-created non-default admission control rules
@@ -1544,18 +1578,24 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+				}
 				if err == nil && len(parsedCfg.AdmCtrlRulesCfg) > 0 {
 					var cacheRecord share.CLUSCrdSecurityRule
 					// [4] import all admission control rules defined in the yaml file
 					crdHandler.crdHandleAdmCtrlRules(scope, parsedCfg.AdmCtrlRulesCfg, &cacheRecord, share.ReviewTypeImportAdmCtrl)
 					progress += inc
 					importTask.Percentage = int(progress)
-					clusHelper.PutImportTask(&importTask)
+					if err := clusHelper.PutImportTask(&importTask); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+					}
 				}
 			}
 			importTask.Percentage = 90
-			clusHelper.PutImportTask(&importTask)
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+			}
 		}
 	}
 
@@ -1654,7 +1694,9 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 		} else {
 			rule.Comment = fmt.Sprintf("%s (%s)", rule.Comment, comment)
 		}
-		clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, fedRuleTypeKey, rule)
+		if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, fedRuleTypeKey, rule); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleTxn")
+		}
 
 		if arhs, ok := fedArhs[fedRuleTypeKey]; ok {
 			rh := &share.CLUSRuleHead{
@@ -1673,7 +1715,9 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 			for ruleTypes := range ruleTypesUpdated.Iter() {
 				fedRuleTypeKey := ruleTypes.(string)
 				if arhs, ok := fedArhs[fedRuleTypeKey]; ok {
-					clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, fedRuleTypeKey, arhs)
+					if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, fedRuleTypeKey, arhs); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+					}
 				}
 			}
 			if applyTransact(w, txn) == nil {

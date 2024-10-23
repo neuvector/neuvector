@@ -198,7 +198,9 @@ func LeadChangeNotify(leader bool) {
 				cn := fmt.Sprintf("%s.%s.svc", svcName, resource.NvAdmSvcNamespace)
 				if cert, _, err := clusHelper.GetObjectCertRev(cn); !cert.IsEmpty() {
 					admission.ResetCABundle(svcName, []byte(cert.Cert))
-					cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false)
+					if _, err := cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+					}
 				} else {
 					log.WithFields(log.Fields{"cn": cn, "err": err}).Error("no cert")
 				}
@@ -235,12 +237,16 @@ func LeadChangeNotify(leader bool) {
 		if cfg, _ := clusHelper.GetSystemConfigRev(access.NewReaderAccessControl()); cfg != nil {
 			if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 				var param interface{} = &cfg.IBMSAConfig
-				StartStopFedPingPoll(share.StartPostToIBMSA, 0, param)
+				if err := StartStopFedPingPoll(share.StartPostToIBMSA, 0, param); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("StartStopFedPingPoll")
+				}
 			}
 		}
 	} else {
 		// if this controller just lost leadership, do not post to IBM SA in this controller until it becomes leader again
-		StartStopFedPingPoll(share.StopPostToIBMSA, 0, nil)
+		if err := StartStopFedPingPoll(share.StopPostToIBMSA, 0, nil); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("StartStopFedPingPoll")
+		}
 	}
 }
 
@@ -259,7 +265,9 @@ func cacheFedEvent(ev share.TLogEvent, msg, fullname, remote, session string, ro
 			UserSession:    session,
 			Msg:            msg,
 		}
-		evqueue.Append(&alog)
+		if err := evqueue.Append(&alog); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+		}
 	}
 
 	return nil
@@ -972,7 +980,9 @@ func informFedDismissed(joinedCluster share.CLUSFedJointClusterInfo, bodyTo []by
 	os.Remove(jointKeyPath)
 	os.Remove(jointCertPath)
 	_setFedJointPrivateKey(joinedCluster.ID, nil)
-	clusHelper.DeleteFedJointCluster(joinedCluster.ID)
+	if err := clusHelper.DeleteFedJointCluster(joinedCluster.ID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteFedJointCluster")
+	}
 	if ch != nil {
 		ch <- true
 	}
@@ -996,7 +1006,9 @@ func revertFedRoles(acc *access.AccessControl) {
 	users := clusHelper.GetAllUsers(acc)
 	for _, user := range users {
 		if adjusted, ok := fedAdjusted[user.Role]; ok {
-			clusHelper.ConfigFedRole(user.Fullname, adjusted, acc)
+			if err := clusHelper.ConfigFedRole(user.Fullname, adjusted, acc); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("ConfigFedRole")
+			}
 		}
 	}
 
@@ -1049,12 +1061,18 @@ func cleanFedRules() {
 	defer txn.Close()
 
 	txn.Delete(share.CLUSFedKey(share.CFGEndpointSystem))
-	clusHelper.PutFedRulesRevision(txn, share.CLUSEmptyFedRulesRevision())
-	clusHelper.PutFedSettings(txn, share.CLUSFedSettings{})
+	if err := clusHelper.PutFedRulesRevision(txn, share.CLUSEmptyFedRulesRevision()); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutFedRulesRevision")
+	}
+	if err := clusHelper.PutFedSettings(txn, share.CLUSFedSettings{}); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutFedSettings")
+	}
 	txn.Delete(share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey))
 	fedRegs := clusHelper.GetAllRegistry(share.ScopeFed)
 	for _, reg := range fedRegs {
-		clusHelper.DeleteRegistry(txn, reg.Name)
+		if err := clusHelper.DeleteRegistry(txn, reg.Name); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteRegistry")
+		}
 	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
@@ -1077,13 +1095,21 @@ func leaveFedCleanup(masterID, jointID string, lockAcquired bool) {
 	os.Remove(masterCaCertPath)
 	os.Remove(jointKeyPath)
 	os.Remove(jointCertPath)
-	clusHelper.DeleteFedJointClusterStatus(masterID)
-	clusHelper.DeleteFedJointClusterStatus(jointID)
+	if err := clusHelper.DeleteFedJointClusterStatus(masterID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteFedJointClusterStatus")
+	}
+	if err := clusHelper.DeleteFedJointClusterStatus(jointID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteFedJointClusterStatus")
+	}
 	delAllFedSessionTokens()
 	resetFedJointKeys()
 	cleanFedRules()
-	cluster.Delete(share.CLUSUserKey(common.ReservedFedUser))
-	clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName)
+	if err := cluster.Delete(share.CLUSUserKey(common.ReservedFedUser)); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Delete")
+	}
+	if err := clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteRegistryKeys")
+	}
 }
 
 func updateSystemClusterName(newName string, acc *access.AccessControl) string {
@@ -1158,7 +1184,9 @@ func updateClusterState(id, masterClusterID string, status int, cspUsage *share.
 		}
 	}
 	if changed {
-		clusHelper.PutFedJointClusterStatus(id, &cached)
+		if err := clusHelper.PutFedJointClusterStatus(id, &cached); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutFedJointClusterStatus")
+		}
 	}
 
 	return true
@@ -1296,7 +1324,12 @@ func pingJointClusters() bool {
 					jointCluster := cacher.GetFedJoinedCluster(id, acc)
 					if jointCluster.ID == id {
 						ping++
-						go pingJointCluster(_tagPingJointCluster, "v1/fed/ping_internal", jointCluster, ch, acc)
+						go func() {
+							if _, _, err := pingJointCluster(_tagPingJointCluster, "v1/fed/ping_internal", jointCluster, ch, acc); err != nil {
+								log.WithFields(log.Fields{"error": err}).Error("pingJointCluster")
+							}
+						}()
+
 					}
 				}
 			}
@@ -1435,7 +1468,9 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 			newCfg.DeployRepoScanData = *reqData.DeployRepoScanData
 		}
 		if newCfg != fedCfg {
-			clusHelper.PutFedSettings(nil, newCfg)
+			if err := clusHelper.PutFedSettings(nil, newCfg); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutFedSettings")
+			}
 		}
 	}
 
@@ -1553,7 +1588,9 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 	// Any admin-role user(local user or not) who promotes a cluster to fed master is automatically promoted to fedAdmin role
 	// However, Rancher SSO user's role is defined in Rancher so we don't promote the shadow user created by Rancher SSO
 	if login.fullname != common.DefaultAdminUser && login.server != share.FlavorRancher {
-		clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc)
+		if err := clusHelper.ConfigFedRole(login.fullname, api.UserRoleFedAdmin, acc); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("ConfigFedRole")
+		}
 	}
 
 	var masterID string
@@ -1599,14 +1636,22 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 	if reqData.DeployRepoScanData != nil {
 		cfg.DeployRepoScanData = *reqData.DeployRepoScanData
 	}
-	clusHelper.PutFedSettings(nil, cfg)
+	if err := clusHelper.PutFedSettings(nil, cfg); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutFedSettings")
+	}
 
 	revisions := share.CLUSEmptyFedRulesRevision()
-	clusHelper.PutFedRulesRevision(nil, revisions)
-	clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
+	if err := clusHelper.PutFedRulesRevision(nil, revisions); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
+	if err := clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
 
 	accFedAdmin := access.NewFedAdminAccessControl()
-	cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles)
+	if err := cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+	}
 	user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accFedAdmin)
 	if user != nil {
 		kickLoginSessions(user)
@@ -1618,7 +1663,9 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 		}
 	}
 
-	cache.ConfigCspUsages(false, false, api.FedRoleMaster, masterID)
+	if err := cache.ConfigCspUsages(false, false, api.FedRoleMaster, masterID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
+	}
 
 	return membership, http.StatusOK, 0, nil
 }
@@ -1713,7 +1760,9 @@ func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *l
 			}
 		}
 	}
-	clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{})
+	if err := clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{}); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutFedJointClusterList")
+	}
 
 	masterCluster := cacher.GetFedMasterCluster(acc)
 	if masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, ""); masterCaCertPath != "" {
@@ -1730,15 +1779,21 @@ func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *l
 		return membership, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err
 	}
 
-	cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles)
+	if err := cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+	}
 	evqueue.Flush()
 	revertFedRoles(acc)
 	cleanFedRules()
 
-	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+	if err := cache.ConfigCspUsages(false, false, api.FedRoleNone, ""); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
+	}
 	membership.PendingDismiss = false
 	membership.PendingDismissAt = time.Time{}
-	clusHelper.PutFedMembership(&membership)
+	if err := clusHelper.PutFedMembership(&membership); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutFedMembership")
+	}
 
 	return membership, http.StatusOK, 0, nil
 }
@@ -1947,13 +2002,19 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 				UseProxy: useProxy,
 			}
 			if err = clusHelper.PutFedMembership(&membership); err == nil {
-				clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil)
+				if err := clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{ScannedRegRevs: make(map[string]uint64)}, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutFedScanRevisions")
+				}
 				updateClusterState(respTo.MasterCluster.ID, respTo.MasterCluster.ID, _fedClusterConnected, nil, acc)
 				updateClusterState(jointID, "", _fedClusterJoined, nil, acc)
 				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, masterRestInfo.Server)
-				cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles)
+				if err := cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+				}
 				atomic.StoreUint32(&_fedFullPolling, 1)
-				cache.ConfigCspUsages(false, true, api.FedRoleJoint, respTo.MasterCluster.ID)
+				if err := cache.ConfigCspUsages(false, true, api.FedRoleJoint, respTo.MasterCluster.ID); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
+				}
 				return membership, http.StatusOK, 0, nil
 			}
 			if mtlsAvailable { // error happened if it reaches here
@@ -1971,7 +2032,7 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 			} else if restErr.Code == _fedJointUpgradeRequired {
 				code = api.RESTErrJointUpgradeRequired
 			}
-			return membership, statusCode, code, fmt.Errorf(restErrMessage[code])
+			return membership, statusCode, code, fmt.Errorf("%s", restErrMessage[code])
 		}
 	}
 
@@ -2056,7 +2117,9 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 			}
 
 			if err := clusHelper.PutFedMembership(&membership); err == nil {
-				cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles)
+				if err := cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+				}
 				evqueue.Flush()
 				if w == nil {
 					// called by configmap
@@ -2077,7 +2140,9 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 	}
 
 	// after leaving federation, standalone NV reports its usage to CSP
-	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+	if err := cache.ConfigCspUsages(false, false, api.FedRoleNone, ""); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
+	}
 
 	return membership, httpStatus, code, err99
 }
@@ -2153,7 +2218,9 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		restRespErrorMessage(w, status, code, "Fail to dismiss managed cluster")
 	} else {
 		msg := fmt.Sprintf("Dismiss cluster %s(%s) from federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-		cacheFedEvent(share.CLUSEvFedKick, msg, login.fullname, login.remote, login.id, login.domainRoles)
+		if err := cacheFedEvent(share.CLUSEvFedKick, msg, login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+		}
 		restRespSuccess(w, r, nil, acc, login, nil, "Dismiss managed cluster")
 	}
 }
@@ -2314,9 +2381,16 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 		_, resp.CspType = common.GetMappedCspType(nil, &cctx.CspType) // master cluster's billing csp type
 		msg := fmt.Sprintf("Cluster %s(%s) joins federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-		cacheFedEvent(share.CLUSEvFedJoin, msg, reqData.User, reqData.Remote, "", reqData.UserRoles)
+		if err := cacheFedEvent(share.CLUSEvFedJoin, msg, reqData.User, reqData.Remote, "", reqData.UserRoles); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+		}
 		jointCluster.ID = reqData.JointCluster.ID
-		go pingJointCluster(_tagJoinPending, "v1/fed/ping_internal", jointCluster, nil, access.NewAdminAccessControl())
+		go func() {
+			if _, _, err := pingJointCluster(_tagJoinPending, "v1/fed/ping_internal", jointCluster, nil, access.NewAdminAccessControl()); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("pingJointCluster")
+			}
+		}()
+
 		restRespSuccess(w, r, &resp, nil, nil, nil, "Join federation by managed cluster's request")
 		return
 	} else {
@@ -2357,7 +2431,9 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 		if err := jwtValidateFedJoinTicket(req.JointTicket, joinedCluster.Secret); err == nil {
 			if status, code = removeFromFederation(&joinedCluster, accReadAll); status == http.StatusOK {
 				msg := fmt.Sprintf("Cluster %s(%s) leaves federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-				cacheFedEvent(share.CLUSEvFedLeave, msg, req.User, req.Remote, "", req.UserRoles)
+				if err := cacheFedEvent(share.CLUSEvFedLeave, msg, req.User, req.Remote, "", req.UserRoles); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+				}
 				restRespSuccess(w, r, nil, nil, nil, nil, "Leave federation by managed cluster's request")
 				return
 			} else {
@@ -2444,12 +2520,16 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
-	cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles)
+	if err := cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+	}
 	evqueue.Flush()
 	go leaveFedCleanup(masterCluster.ID, jointCluster.ID, false)
 
 	// after being kicked out of federation, standalone NV reports its usage to CSP
-	cache.ConfigCspUsages(false, false, api.FedRoleNone, "")
+	if err := cache.ConfigCspUsages(false, false, api.FedRoleNone, ""); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
+	}
 
 	restRespSuccess(w, r, nil, acc, login, nil, "Leave federation by primary cluster's request")
 }
@@ -2477,7 +2557,9 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *acc
 		}
 	}
 	if deleted || !found {
-		clusHelper.DeleteFedJointCluster(joinedCluster.ID)
+		if err := clusHelper.DeleteFedJointCluster(joinedCluster.ID); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 		_, clientKeyPath, clientCertPath := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
 		os.Remove(clientKeyPath)
 		os.Remove(clientCertPath)
@@ -2628,9 +2710,13 @@ func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint
 		}
 	}
 	if updated {
-		cacheFedEvent(share.CLUSEvFedPolicySync, "Sync up policy with primary cluster", "", "", "", nil)
+		if err := cacheFedEvent(share.CLUSEvFedPolicySync, "Sync up policy with primary cluster", "", "", "", nil); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("cacheFedEvent")
+		}
 		data := share.CLUSFedRulesRevision{Revisions: localRevs, LastUpdateTime: time.Now().UTC()}
-		clusHelper.PutFedRulesRevision(nil, &data)
+		if err := clusHelper.PutFedRulesRevision(nil, &data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutFedRulesRevision")
+		}
 		log.WithFields(log.Fields{"revs": localRevs}).Info("applied fed rules")
 	}
 
@@ -2661,9 +2747,13 @@ func workFedScanData(cachedScanResultMD5 map[string]map[string]string, respTo *a
 			// 1-1. "the fed registry/repo is deleted on master cluster" or "scan result of images in the fed registry/repo should not be deployed to managed cluster"
 			delete(cachedScanResultMD5, regName)
 			delRegs += 1
-			clusHelper.DeleteRegistryKeys(regName)
+			if err := clusHelper.DeleteRegistryKeys(regName); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteRegistryKeys")
+			}
 			if regName != common.RegistryFedRepoScanName {
-				clusHelper.DeleteRegistry(nil, regName)
+				if err := clusHelper.DeleteRegistry(nil, regName); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("DeleteRegistry")
+				}
 			}
 		} else if cachedImagesMD5, ok := cachedScanResultMD5[regName]; ok {
 			// 1-2. in this fed registry/repo, some images' scan result has been deleted on master cluster
@@ -2790,7 +2880,9 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					if respTo.DeployRepoScanData != fedCfg.DeployRepoScanData {
 						// fed scan data deployment option is changed on master cluster.
 						// delete fed repo scan result stored on managed cluster if fed repo scan data deployment is disabled on master cluster
-						clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName)
+						if err := clusHelper.DeleteRegistryKeys(common.RegistryFedRepoScanName); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("DeleteRegistryKeys")
+						}
 						for i := 0; i < 3; i++ {
 							if scanRevs, rev, err := clusHelper.GetFedScanRevisions(); err == nil {
 								scanRevs.ScannedRepoRev = 0
@@ -2801,7 +2893,9 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 							}
 						}
 						fedCfg.DeployRepoScanData = respTo.DeployRepoScanData
-						clusHelper.PutFedSettings(nil, fedCfg)
+						if err := clusHelper.PutFedSettings(nil, fedCfg); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("PutFedSettings")
+						}
 					}
 					if respTo.Settings != nil {
 						var settings api.RESTFedRulesSettings
@@ -2831,7 +2925,9 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		} else {
 			if m := time.Now().Minute() % 10; m == 0 {
 				respErr := api.RESTError{}
-				json.Unmarshal(respData, &respErr)
+				if err := json.Unmarshal(respData, &respErr); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+				}
 				log.WithFields(log.Fields{"err": err, "msg": respErr, "proxyUsed": proxyUsed}).Error("Request failed")
 			}
 			if statusCode == http.StatusGone {
@@ -2930,7 +3026,9 @@ func getFedRegScanData(forcePulling bool, fedCfg share.CLUSFedSettings, masterSc
 					ScannedRegRevs: masterScanDataRevs.ScannedRegRevs,
 					ScannedRepoRev: masterScanDataRevs.ScannedRepoRev,
 				}
-				clusHelper.PutFedScanRevisions(&scanRevs, nil)
+				if err := clusHelper.PutFedScanRevisions(&scanRevs, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutFedScanRevisions")
+				}
 			}
 			log.WithFields(log.Fields{"iter": i, "forcePulling": forcePulling, "updated": updated, "deleted": deleted, "delRegs": delRegs, "interrupt": interrupt}).Info()
 		}
@@ -2985,7 +3083,9 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	enc.Encode(&reqTo)
+	if err := enc.Encode(&reqTo); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Encode")
+	}
 	bodyTo := buf.Bytes()
 	// call master cluster for polling fed scan data
 	var respData []byte
@@ -3032,7 +3132,9 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultMD5 map[string]
 	} else {
 		if m := time.Now().Minute() % 10; m == 0 {
 			respErr := api.RESTError{}
-			json.Unmarshal(respData, &respErr)
+			if err := json.Unmarshal(respData, &respErr); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+			}
 			log.WithFields(log.Fields{"err": err, "msg": respErr, "statusCode": statusCode, "proxyUsed": proxyUsed}).Error("Request failed")
 		}
 		return 0, updated, deleted, delRegs, true
@@ -3098,7 +3200,9 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 					if req.RestVersion != jointCluster.RestVersion {
 						c.RestVersion = req.RestVersion
 					}
-					clusHelper.PutFedJointCluster(c)
+					if err := clusHelper.PutFedJointCluster(c); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PutFedJointCluster")
+					}
 				}
 				clusHelper.ReleaseLock(lock)
 			}

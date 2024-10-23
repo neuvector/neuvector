@@ -46,7 +46,7 @@ func TestUserCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get user: status=%v.", w.status)
 	}
-	_ = json.Unmarshal(w.body, &resp)
+	unmarshalJSON(t, w.body, &resp)
 	if len(resp.Users) != 1 {
 		t.Errorf("Incorrect user count in rest: count=%v expect=1", len(resp.Users))
 	}
@@ -72,7 +72,7 @@ func TestUserCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get user: status=%v.", w.status)
 	}
-	_ = json.Unmarshal(w.body, &resp)
+	unmarshalJSON(t, w.body, &resp)
 	if len(resp.Users) != 0 {
 		t.Errorf("Incorrect user count in rest: count=%v expect=0", len(resp.Users))
 	}
@@ -92,8 +92,12 @@ func TestUserConfig(t *testing.T) {
 
 	user1 := makeLocalUser("user1", "111111", api.UserRoleAdmin)
 	user2 := makeLocalUser("user2", "222222", api.UserRoleReader)
-	_ = clusHelper.CreateUser(user1)
-	_ = clusHelper.CreateUser(user2)
+	if err := clusHelper.CreateUser(user1); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
+	if err := clusHelper.CreateUser(user2); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
 
 	// Login as admin
 	w := login("user1", "111111")
@@ -144,8 +148,12 @@ func TestUserConfigKick(t *testing.T) {
 
 	user1 := makeLocalUser("user1", "111111", api.UserRoleAdmin)
 	user2 := makeLocalUser("user2", "222222", api.UserRoleReader)
-	_ = clusHelper.CreateUser(user1)
-	_ = clusHelper.CreateUser(user2)
+	if err := clusHelper.CreateUser(user1); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
+	if err := clusHelper.CreateUser(user2); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
 
 	// Login both
 	w := login("user1", "111111")
@@ -284,8 +292,12 @@ func TestUserConfigNegative(t *testing.T) {
 
 	user1 := makeLocalUser("user1", "111111", api.UserRoleAdmin)
 	user2 := makeLocalUser("user2", "222222", api.UserRoleReader)
-	_ = clusHelper.CreateUser(user1)
-	_ = clusHelper.CreateUser(user2)
+	if err := clusHelper.CreateUser(user1); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
+	if err := clusHelper.CreateUser(user2); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
 
 	// Login as admin
 	w := login("user1", "111111")
@@ -458,7 +470,9 @@ func TestUserRoleSelf(t *testing.T) {
 	user1 := makeLocalUserWithRole("user1", "111111", api.UserRoleReader,
 		map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}},
 	)
-	_ = clusHelper.CreateUser(user1)
+	if err := clusHelper.CreateUser(user1); err != nil {
+		t.Errorf("CreateUser error=%v", err)
+	}
 
 	w := login("user1", "111111")
 	token1 := getLoginToken(w)
@@ -605,7 +619,7 @@ func TestApikeyCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get apikey: status=%v.", w.status)
 	}
-	_ = json.Unmarshal(w.body, &resp)
+	unmarshalJSON(t, w.body, &resp)
 	if len(resp.Apikeys) != 1 {
 		t.Errorf("Incorrect apikey count in rest: count=%v expect=1", len(resp.Apikeys))
 	}
@@ -631,7 +645,7 @@ func TestApikeyCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to get user: status=%v.", w.status)
 	}
-	_ = json.Unmarshal(w.body, &resp)
+	unmarshalJSON(t, w.body, &resp)
 	if len(resp.Apikeys) != 0 {
 		t.Errorf("Incorrect apikey count in rest: count=%v expect=0", len(resp.Apikeys))
 	}

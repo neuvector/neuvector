@@ -291,7 +291,9 @@ func ScannerDBChange(db *share.CLUSScannerDB) {
 					} else {
 						smd.scanLog.WithFields(log.Fields{"registry": reg.config.Name}).Debug("CVE Database updated. Start re-scan")
 						state := &share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-						clusHelper.PutRegistryState(reg.config.Name, state)
+						if err := clusHelper.PutRegistryState(reg.config.Name, state); err != nil {
+							smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+						}
 					}
 				}
 				reg.stateUnlock()
