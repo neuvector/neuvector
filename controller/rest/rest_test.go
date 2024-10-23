@@ -630,3 +630,26 @@ func TestNewestVersion(t *testing.T) {
 		t.Errorf("Incorrect newest version: %v %s", vers, getNewestVersion(vers))
 	}
 }
+
+func TestInitSearchRegistries(t *testing.T) {
+	var ctx Context
+
+	ctx.SearchRegistries = "docker.io, index.docker.io/library ,http://registry.hub.docker.com:8080/lib,https://registry-1.docker.io/ , http://local.registry.net:8080/abc "
+	initSearchRegistries(&ctx)
+	expected := []string{
+		"https://docker.io/",
+		"https://index.docker.io/",
+		"http://registry.hub.docker.com:8080/",
+		"https://registry-1.docker.io/",
+		"http://local.registry.net:8080/",
+	}
+	if searchRegistries.Cardinality() != len(expected) {
+		t.Errorf("Unexpected searchRegistries result: %+v\n", searchRegistries)
+	} else {
+		for _, reg := range expected {
+			if !searchRegistries.Contains(reg) {
+				t.Errorf("Expected element not found in searchRegistries: %+v\n", reg)
+			}
+		}
+	}
+}
