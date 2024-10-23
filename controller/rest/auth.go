@@ -805,15 +805,9 @@ func getAccessControl(w http.ResponseWriter, r *http.Request, op access.AccessOP
 	if rc != userOK {
 		status := http.StatusUnauthorized
 		code := api.RESTErrUnauthorized
-		if rsessToken == "" {
-			if rc == userTimeout {
-				status = http.StatusRequestTimeout
-			}
-		} else {
+		if rsessToken != "" {
 			code = api.RESTErrRancherUnauthorized
-			if rc == userTimeout {
-				status = http.StatusRequestTimeout
-			} else if rc == userNoPlatformAuth {
+			if rc == userNoPlatformAuth {
 				code = api.RESTErrPlatformAuthDisabled
 			}
 		}
@@ -2418,15 +2412,15 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		login, rc = loginUser(user, nil, nil, remote, mainSessionID, mainSessionUser, fedRole, nil)
 	}
 	if rc != userOK {
+		ev := share.CLUSEvAuthLoginFailed
+		errMsg := "User login failed"
 		if rc == userTimeout {
-			log.WithFields(log.Fields{"user": auth.Password.Username}).Error("User login timeout")
-			authLog(share.CLUSEvAuthTimeout, auth.Password.Username, remote, "", nil, "")
-			restRespError(w, http.StatusRequestTimeout, api.RESTErrUnauthorized)
-		} else {
-			log.WithFields(log.Fields{"user": auth.Password.Username}).Error("User login failed")
-			authLog(share.CLUSEvAuthLoginFailed, auth.Password.Username, remote, "", nil, "")
-			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+			ev = share.CLUSEvAuthTimeout
+			errMsg = "User login timeout"
 		}
+		log.WithFields(log.Fields{"user": auth.Password.Username}).Error(errMsg)
+		authLog(ev, auth.Password.Username, remote, "", nil, "")
+		restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 		return
 	}
 
@@ -2748,15 +2742,15 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	// Login user accounting
 	login, rc := loginUser(user, nil, nil, remote, _interactiveSessionID, "", fedRole, &sso)
 	if rc != userOK {
+		ev := share.CLUSEvAuthLoginFailed
+		errMsg := "User login failed"
 		if rc == userTimeout {
-			log.WithFields(log.Fields{"user": user.Fullname}).Error("User login timeout")
-			authLog(share.CLUSEvAuthTimeout, user.Fullname, remote, "", nil, "")
-			restRespError(w, http.StatusRequestTimeout, api.RESTErrUnauthorized)
-		} else {
-			log.WithFields(log.Fields{"user": user.Fullname}).Error("User login failed")
-			authLog(share.CLUSEvAuthLoginFailed, user.Fullname, remote, "", nil, "")
-			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+			ev = share.CLUSEvAuthTimeout
+			errMsg = "User login timeout"
 		}
+		log.WithFields(log.Fields{"user": user.Fullname}).Error(errMsg)
+		authLog(ev, user.Fullname, remote, "", nil, "")
+		restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
 		return
 	}
 
