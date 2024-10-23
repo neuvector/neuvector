@@ -9,18 +9,13 @@ ROOTDIR = $(TOPDIR)/..
 GCC_VERSION = $(shell gcc -dumpversion)
 
 CFLAGS = -Wall -Werror -Wno-unused-result -Wno-unused-function -fstrict-aliasing -Wstrict-aliasing -g
-CFLAGS += -I./ -I$(TOPDIR)/ -I$(TOPDIR)/third-party/.objs/include
+CFLAGS += $(shell pkg-config --cflags libnfnetlink)
+CFLAGS += $(shell pkg-config --cflags libnetfilter_queue)
+CFLAGS += -I./ -I$(TOPDIR)/
 ifdef DISABLE_OPT
 CFLAGS += -O0
 else
 CFLAGS += -Os
-endif
-
-# -no-pie is supported since gcc 6
-ifeq ("6.0",$(firstword $(sort "$(GCC_VERSION)" "6.0")))
-LDFLAGS = -no-pie -L$(TOPDIR)/third-party/.objs/lib
-else
-LDFLAGS = -L$(TOPDIR)/third-party/.objs/lib
 endif
 
 CSRCS += $(wildcard *.c)
