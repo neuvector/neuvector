@@ -48,7 +48,7 @@ func TestMask(t *testing.T) {
 
 	var user maskUser
 	body, _ := m.Marshal(&u1)
-	_ = json.Unmarshal(body, &user)
+	unmarshalJSON(t, body, &user)
 	if user.Password != api.RESTMaskedValue || *user.Secret != api.RESTMaskedValue {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
 	}
@@ -56,7 +56,7 @@ func TestMask(t *testing.T) {
 	var pair maskUserPair
 	p := maskUserPair{User1: u1, User2: &u2}
 	body, _ = m.Marshal(&p)
-	_ = json.Unmarshal(body, &pair)
+	unmarshalJSON(t, body, &pair)
 	if pair.User1.Password != api.RESTMaskedValue || *pair.User1.Secret != api.RESTMaskedValue ||
 		pair.User2.Password != api.RESTMaskedValue || *pair.User2.Secret != api.RESTMaskedValue {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
@@ -65,7 +65,7 @@ func TestMask(t *testing.T) {
 	var list maskUserList
 	l := maskUserList{Users: []*maskUser{&u1, &u2}}
 	body, _ = m.Marshal(&l)
-	_ = json.Unmarshal(body, &list)
+	unmarshalJSON(t, body, &list)
 	if list.Users[0].Password != api.RESTMaskedValue || *list.Users[0].Secret != api.RESTMaskedValue ||
 		list.Users[1].Password != api.RESTMaskedValue || *list.Users[1].Secret != api.RESTMaskedValue {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
@@ -78,14 +78,14 @@ func TestMaskEmpty(t *testing.T) {
 
 	d1 := maskEmpty{Map: make(map[string]int), List: make([]int, 0)}
 	body, _ := m.Marshal(&d1)
-	_ = json.Unmarshal(body, &d)
+	unmarshalJSON(t, body, &d)
 	if d.Map == nil || d.List == nil {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
 	}
 
 	d1 = maskEmpty{}
 	body, _ = m.Marshal(&d1)
-	_ = json.Unmarshal(body, &d)
+	unmarshalJSON(t, body, &d)
 	if d.Map != nil || d.List != nil {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
 	}
@@ -101,7 +101,9 @@ func TestEncrypt(t *testing.T) {
 
 	var user maskUser
 	body, _ := enc.Marshal(&u1)
-	_ = dec.Unmarshal(body, &user)
+	if err := dec.Unmarshal(body, &user); err != nil {
+		t.Errorf("Unmarshal error: %v", err)
+	}
 	if !reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
 		body, _ = json.Marshal(&user)
@@ -111,7 +113,9 @@ func TestEncrypt(t *testing.T) {
 	var pair maskUserPair
 	p := maskUserPair{User1: u1, User2: &u2}
 	body, _ = enc.Marshal(&p)
-	_ = dec.Unmarshal(body, &pair)
+	if err := dec.Unmarshal(body, &pair); err != nil {
+		t.Errorf("Unmarshal error: %v", err)
+	}
 	if !reflect.DeepEqual(pair.User1, u1) || !reflect.DeepEqual(*pair.User2, u2) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
 		body, _ = json.Marshal(&pair)
@@ -135,7 +139,9 @@ func TestSpecialType(t *testing.T) {
 		IPs: []net.IP{net.IPv4(1, 2, 3, 4), net.IPv4(9, 8, 7, 6)},
 	}
 	body, _ := enc.Marshal(&a)
-	_ = dec.Unmarshal(body, &b)
+	if err := dec.Unmarshal(body, &b); err != nil {
+		t.Errorf("Unmarshal error: %v", err)
+	}
 	if !reflect.DeepEqual(a, b) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
 	}
@@ -145,15 +151,21 @@ func TestAuthServer(t *testing.T) {
 	body := "{\"config\":{\"ldap\":{\"base_dn\":\"abc\",\"bind_dn\":\"abc\",\"bind_password\":\"very sensitive\",\"directory\":\"OpenLDAP\",\"enable\":true,\"hostname\":\"1.2.3.4\",\"role_groups\":{\"admin\":[],\"reader\":[]}},\"name\":\"ldap1\"}}"
 
 	var rconf api.RESTServerConfigData
-	_ = json.Unmarshal([]byte(body), &rconf)
+	unmarshalJSON(t, []byte(body), &rconf)
 
 	var m MaskMarshaller
 	masked, _ := m.Marshal(&rconf)
 
 	var maskedConf api.RESTServerConfigData
-	_ = json.Unmarshal(masked, &maskedConf)
+	unmarshalJSON(t, masked, &maskedConf)
 
 	if *maskedConf.Config.LDAP.BindPasswd != api.RESTMaskedValue {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(masked[:]))
+	}
+}
+
+func unmarshalJSON(t *testing.T, data []byte, v interface{}) {
+	if err := json.Unmarshal(data, v); err != nil {
+		t.Errorf("Unmarshal error: %v", err)
 	}
 }

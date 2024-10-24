@@ -16,8 +16,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-var TESTDbPerf bool
-
 func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -39,13 +37,6 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	queryFilter, err := db.GetVulnerabilityQuery(r)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
-		return
-	}
-
-	// For performance testing
-	if TESTDbPerf && queryFilter.CreateDummyAsset_Enable == 1 {
-		err = perf_createDummyVulAssets(queryFilter)
-		restRespSuccess(w, r, "done.", acc, login, nil, "CreateDummyAsset done.")
 		return
 	}
 
@@ -78,12 +69,6 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	allowed := getAllAllowedResourceId(acc)
 	elapsed := time.Since(start)
-
-	// For performance testing, when enabled it will treat all workload ID as allowed.
-	//if TESTDbPerf && queryFilter.PerfTest == 1 {
-	if TESTDbPerf {
-		db.Perf_getAllWorkloadIDs(allowed)
-	}
 
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("1/4, get allowed resources, workloads_count=%d, took=%v", allowed[db.AssetWorkload].Cardinality(), elapsed))
 

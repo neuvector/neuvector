@@ -98,7 +98,9 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 				}
 				value, _ := json.Marshal(u)
 				key := share.CLUSUserKey(common.ReservedNvSystemUser)
-				cluster.PutIfNotExist(key, value, false)
+				if err := cluster.PutIfNotExist(key, value, false); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
+				}
 				user, rev, _ = clusHelper.GetUserRev(common.ReservedNvSystemUser, acc)
 			}
 			if user == nil {

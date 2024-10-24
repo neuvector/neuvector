@@ -14,17 +14,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-// type testDriver struct {
-// 	registryDriver
-// }
-
-// func (d *testDriver) Login(cfg *share.CLUSRegistryConfig) (bool, error) {
-// 	return false, nil
-// }
-
-// func (d *testDriver) Logout() {
-// }
-
 func preTest() {
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&utils.LogFormatter{Module: "TEST"})
@@ -37,12 +26,6 @@ func preTest() {
 
 	smd = &scanMethod{isLeader: true, isScanner: true, scanLog: scanLog}
 }
-
-// func preTestDebug() {
-// 	preTest()
-// 	log.SetLevel(log.DebugLevel)
-// 	smd.scanLog.Level = log.DebugLevel
-// }
 
 func postTest() {
 	log.SetLevel(log.DebugLevel)

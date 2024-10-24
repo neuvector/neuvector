@@ -411,7 +411,9 @@ func handlerControllerConfig(w http.ResponseWriter, r *http.Request, ps httprout
 		// Retrieve from the cluster
 		value, rev, _ := cluster.GetRev(key)
 		if value != nil {
-			json.Unmarshal(value, &cconf)
+			if err := json.Unmarshal(value, &cconf); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+			}
 		}
 
 		if rconf.Config.Debug != nil {
@@ -520,7 +522,9 @@ func handlerAgentConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		// Retrieve from the cluster
 		value, rev, _ := cluster.GetRev(key)
 		if value != nil {
-			json.Unmarshal(value, &cconf)
+			if err := json.Unmarshal(value, &cconf); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+			}
 		}
 
 		if rconf.Config.Debug != nil {

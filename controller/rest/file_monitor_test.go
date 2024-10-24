@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"encoding/json"
 	"net/http"
 	"reflect"
 	"testing"
@@ -103,7 +102,7 @@ func TestFileRuleShow(t *testing.T) {
 		w := restCall("GET", "/v1/file_monitor/containers", nil, api.UserRoleAdmin)
 		if w.status == http.StatusOK {
 			var resp api.RESTFileMonitorProfileData
-			json.Unmarshal(w.body, &resp)
+			unmarshalJSON(t, w.body, &resp)
 			if !reflect.DeepEqual(resp.Profile.Filters, ff) {
 				t.Errorf("Status is OK but a wrong content")
 				t.Logf("  Resp: %+v\n", ff)

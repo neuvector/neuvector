@@ -531,7 +531,9 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if config.CfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, "")
+			if err := clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, ""); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("UpdateFedScanDataRevisions")
+			}
 		}
 	}
 
@@ -839,7 +841,9 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if cfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, "")
+			if err := clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, ""); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("UpdateFedScanDataRevisions")
+			}
 		}
 	}
 
@@ -1177,7 +1181,9 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if cfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, "")
+			if err := clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, ""); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("UpdateFedScanDataRevisions")
+			}
 		}
 	}
 

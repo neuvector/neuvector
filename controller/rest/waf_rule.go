@@ -391,10 +391,14 @@ func createWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, cfgTy
 		sensor.RuleListNames[rdr.Name] = rdr.Name
 	}
 	//save full rule with pattern in default sensor
-	clusHelper.PutWafSensor(defsensor, false)
+	if err := clusHelper.PutWafSensor(defsensor, false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensor")
+	}
 
 	//create new sensor
-	clusHelper.PutWafSensor(sensor, true)
+	if err := clusHelper.PutWafSensor(sensor, true); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensor")
+	}
 
 	return nil
 }
@@ -703,9 +707,16 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutWafSensorTxn(txn, defsensor)
-	clusHelper.PutWafSensorTxn(txn, sensor)
-	txn.Apply()
+	if err := clusHelper.PutWafSensorTxn(txn, defsensor); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+	}
+	if err := clusHelper.PutWafSensorTxn(txn, sensor); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+	}
+
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 
 	return nil
 }
@@ -984,10 +995,16 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 	for _, rn := range wafsensor.RuleListNames {
 		delete(defsensor.RuleList, rn)
 	}
-	clusHelper.PutWafSensorTxn(txn, defsensor)
-	clusHelper.DeleteWafSensorTxn(txn, name)
+	if err := clusHelper.PutWafSensorTxn(txn, defsensor); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+	}
+	if err := clusHelper.DeleteWafSensorTxn(txn, name); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteWafSensorTxn")
+	}
 
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 
 	return nil
 }
@@ -1166,7 +1183,9 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey)
@@ -1187,7 +1206,9 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 		if err == nil {
 			progress += inc
 			importTask.Percentage = int(progress)
-			clusHelper.PutImportTask(&importTask)
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+			}
 
 			// [2]: import a waf sensor in the yaml file
 			for _, parsedCfg := range parsedWafCfgs {
@@ -1200,11 +1221,15 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 					}
 					progress += inc
 					importTask.Percentage = int(progress)
-					clusHelper.PutImportTask(&importTask)
+					if err := clusHelper.PutImportTask(&importTask); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+					}
 				}
 			}
 			importTask.Percentage = 90
-			clusHelper.PutImportTask(&importTask)
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+			}
 		}
 	}
 

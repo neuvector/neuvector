@@ -753,7 +753,9 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		}
 		user.Locale = ruser.Locale
 
-		normalizeUserRoles(user)
+		if err := normalizeUserRoles(user); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("normalizeUserRoles")
+		}
 
 		if ruser.Fullname == common.DefaultAdminUser && ruser.Server == "" {
 			context.defAdminLoaded = true
@@ -822,7 +824,9 @@ func k8sResourceLog(ev share.TLogEvent, msg string, detail []string) {
 	} else {
 		clog.Msg = msg
 	}
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 func LoadInitCfg(load bool, platform string) bool {
@@ -974,22 +978,37 @@ func handlefedcfg(yaml_data []byte) (string, error) {
 		if membership.FedRole == api.FedRoleMaster {
 			if membership.UseProxy != rconf.UseProxy {
 				membership.UseProxy = rconf.UseProxy
-				clusHelper.PutFedMembership(membership)
+				if err := clusHelper.PutFedMembership(membership); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutFedMembership")
+				}
 			}
 			if rconf.DeployRepoScanData != nil && fedSettings.DeployRepoScanData != *rconf.DeployRepoScanData {
 				var cfg share.CLUSFedSettings = share.CLUSFedSettings{DeployRepoScanData: *rconf.DeployRepoScanData}
-				clusHelper.PutFedSettings(nil, cfg)
+				if err := clusHelper.PutFedSettings(nil, cfg); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutFedSettings")
+				}
 			}
 			// check whether any published fed server info is different
 			if membership.MasterCluster.RestInfo != rconf.PrimaryRestInfo {
 				// it's already a master cluster but with different fed rest host/port. restart fed rest server
-				StartStopFedPingPoll(share.StopFedRestServer, 0, nil)
+				if err := StartStopFedPingPoll(share.StopFedRestServer, 0, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("StartStopFedPingPoll")
+				}
 				membership.LocalRestInfo = rconf.PrimaryRestInfo
 				membership.MasterCluster.User = common.ReservedNvSystemUser
 				membership.MasterCluster.RestInfo = rconf.PrimaryRestInfo
-				clusHelper.PutFedMembership(membership)
-				clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{})
-				go StartStopFedPingPoll(share.StartFedRestServer, 0, nil)
+				if err := clusHelper.PutFedMembership(membership); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutFedMembership")
+				}
+				if err := clusHelper.PutFedJointClusterList(&share.CLUSFedJoinedClusterList{}); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutFedJointClusterList")
+				}
+				go func() {
+					err := StartStopFedPingPoll(share.StartFedRestServer, 0, nil)
+					if err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("StartStopFedPingPoll")
+					}
+				}()
 			}
 			promote = false
 			if rconf.ClusterName != "" {

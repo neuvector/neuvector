@@ -174,10 +174,14 @@ func (h *nvCrdHandler) crdDelAll(k8sKind, kvCrdKind string, recordList map[strin
 			h.crdHandleGroupRecordDel(record, record.Groups, false, recordList)
 			h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, record.ProfileName, recordList)
 		case resource.NvDlpSecurityRuleKind:
-			deleteDlpSensor(nil, record.DlpSensor, share.ReviewTypeCRD, true, h.acc, nil)
+			if err := deleteDlpSensor(nil, record.DlpSensor, share.ReviewTypeCRD, true, h.acc, nil); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("deleteDlpSensor")
+			}
 			h.crdDeleteRecord(k8sKind, recordName)
 		case resource.NvWafSecurityRuleKind:
-			deleteWafSensor(nil, record.WafSensor, share.ReviewTypeCRD, true, h.acc, nil)
+			if err := deleteWafSensor(nil, record.WafSensor, share.ReviewTypeCRD, true, h.acc, nil); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("deleteWafSensor")
+			}
 			h.crdDeleteRecord(k8sKind, recordName)
 		case resource.NvVulnProfileSecurityRuleKind, resource.NvCompProfileSecurityRuleKind:
 			h.resetObjCfgType(k8sKind)
@@ -246,7 +250,9 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 
 			}
 			if updateKV {
-				clusHelper.PutGroupTxn(txn, cg)
+				if err := clusHelper.PutGroupTxn(txn, cg); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutGroupTxn")
+				}
 			}
 			groupsInCR = append(groupsInCR, group.Name)
 			continue
@@ -328,7 +334,9 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 			}
 
 			if updateKV {
-				clusHelper.PutGroupTxn(txn, cg)
+				if err := clusHelper.PutGroupTxn(txn, cg); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutGroupTxn")
+				}
 			}
 			groupsInCR = append(groupsInCR, group.Name)
 		} else {
@@ -404,7 +412,9 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 
 			}
 
-			clusHelper.PutGroupTxn(txn, cg)
+			if err := clusHelper.PutGroupTxn(txn, cg); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutGroupTxn")
+			}
 			groupsInCR = append(groupsInCR, group.Name)
 		}
 		if cg.Name == targetGroup && cg.Kind == share.GroupKindContainer {
@@ -412,7 +422,9 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 		}
 	}
 
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 	txn.Close()
 
 	return groupsInCR, targetGroupDlpWAF
@@ -431,15 +443,21 @@ func (h *nvCrdHandler) crdDeleteNetworkRules(delRules map[string]uint32) {
 	crhsNew := make([]*share.CLUSRuleHead, 0, len(crhs))
 	for _, id := range delRules {
 		delRuleIDs.Add(id)
-		clusHelper.DeletePolicyRuleTxn(txn, id)
+		if err := clusHelper.DeletePolicyRuleTxn(txn, id); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeletePolicyRuleTxn")
+		}
 	}
 	for _, crh := range crhs {
 		if crh.CfgType != share.GroundCfg || !delRuleIDs.Contains(crh.ID) {
 			crhsNew = append(crhsNew, crh)
 		}
 	}
-	clusHelper.PutPolicyRuleListTxn(txn, crhsNew)
-	txn.Apply()
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhsNew); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+	}
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 }
 
 func (h *nvCrdHandler) crdDeleteAdmCtrlRules() {
@@ -456,20 +474,28 @@ func (h *nvCrdHandler) crdDeleteAdmCtrlRules() {
 					if r := clusHelper.GetAdmissionRule(admission.NvAdmValidateType, ruleType, arh.ID); r != nil {
 						if r.CfgType != share.UserCreated {
 							r.CfgType = share.UserCreated
-							clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, r)
+							if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, r); err != nil {
+								log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRuleTxn")
+							}
 						}
 					}
 					ruleHead = append(ruleHead, arh)
 				} else {
-					clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, arh.ID)
+					if err := clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, arh.ID); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRuleTxn")
+					}
 				}
 			} else {
 				ruleHead = append(ruleHead, arh)
 			}
 		}
-		clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, ruleHead)
+		if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, ruleHead); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+		}
 	}
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 }
 
 // Compare the added group with the group in the record, find the group removed from crd to delete
@@ -508,11 +534,19 @@ func (h *nvCrdHandler) crdDeleteGroup(delGroup []string) {
 	kv.DeleteResponseRuleByGroups(names)
 	txn := cluster.Transact()
 	for _, name := range names {
-		clusHelper.DeleteDlpGroup(txn, name)
-		clusHelper.DeleteWafGroup(txn, name)
-		clusHelper.DeleteGroupTxn(txn, name)
+		if err := clusHelper.DeleteDlpGroup(txn, name); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteDlpGroup")
+		}
+		if err := clusHelper.DeleteWafGroup(txn, name); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteWafGroup")
+		}
+		if err := clusHelper.DeleteGroupTxn(txn, name); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteGroupTxn")
+		}
 	}
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 	txn.Close()
 }
 
@@ -531,7 +565,9 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 		} else {
 			cg.CfgType = share.UserCreated
 		}
-		clusHelper.PutGroupTxn(txn, cg)
+		if err := clusHelper.PutGroupTxn(txn, cg); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+		}
 
 		dlpGroup := clusHelper.GetDlpGroup(name)
 		if dlpGroup == nil {
@@ -539,7 +575,9 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 			continue
 		}
 		dlpGroup.CfgType = share.UserCreated
-		clusHelper.PutDlpGroupTxn(txn, dlpGroup)
+		if err := clusHelper.PutDlpGroupTxn(txn, dlpGroup); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+		}
 
 		wafGroup := clusHelper.GetWafGroup(name)
 		if wafGroup == nil {
@@ -547,10 +585,14 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 			continue
 		}
 		wafGroup.CfgType = share.UserCreated
-		clusHelper.PutWafGroupTxn(txn, wafGroup)
+		if err := clusHelper.PutWafGroupTxn(txn, wafGroup); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+		}
 	}
 
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 }
 
 func (h *nvCrdHandler) resetObjCfgType(kind string) {
@@ -572,10 +614,14 @@ func (h *nvCrdHandler) resetObjCfgType(kind string) {
 				}
 			}
 			if modified {
-				clusHelper.PutDlpSensorTxn(txn, sensor)
+				if err := clusHelper.PutDlpSensorTxn(txn, sensor); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutDlpSensorTxn")
+				}
 			}
 		}
-		txn.Apply()
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		}
 		txn.Close()
 	case resource.NvWafSecurityRuleKind:
 		txn := cluster.Transact()
@@ -594,10 +640,14 @@ func (h *nvCrdHandler) resetObjCfgType(kind string) {
 				}
 			}
 			if modified {
-				clusHelper.PutWafSensorTxn(txn, sensor)
+				if err := clusHelper.PutWafSensorTxn(txn, sensor); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+				}
 			}
 		}
-		txn.Apply()
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+		}
 		txn.Close()
 	case resource.NvVulnProfileSecurityRuleKind:
 		for _, vp := range clusHelper.GetAllVulnerabilityProfiles(h.acc) {
@@ -607,7 +657,9 @@ func (h *nvCrdHandler) resetObjCfgType(kind string) {
 				modified = true
 			}
 			if modified {
-				clusHelper.PutVulnerabilityProfile(vp, nil)
+				if err := clusHelper.PutVulnerabilityProfile(vp, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutVulnerabilityProfile")
+				}
 			}
 		}
 	case resource.NvCompProfileSecurityRuleKind:
@@ -618,7 +670,9 @@ func (h *nvCrdHandler) resetObjCfgType(kind string) {
 				modified = true
 			}
 			if modified {
-				clusHelper.PutComplianceProfile(cp, nil)
+				if err := clusHelper.PutComplianceProfile(cp, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutComplianceProfile")
+				}
 			}
 		}
 	}
@@ -631,7 +685,9 @@ func (h *nvCrdHandler) crdDeleteVulnProfile(name string) {
 				// never delete default vul profile. just change it back to user-created
 				vp.Entries = make([]*share.CLUSVulnerabilityProfileEntry, 0)
 				vp.CfgType = share.UserCreated
-				clusHelper.PutVulnerabilityProfile(vp, nil)
+				if err := clusHelper.PutVulnerabilityProfile(vp, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutVulnerabilityProfile")
+				}
 			}
 		}
 	}
@@ -645,7 +701,9 @@ func (h *nvCrdHandler) crdDeleteCompProfile(name string) {
 				cp.DisableSystem = false
 				cp.Entries = make(map[string]share.CLUSComplianceProfileEntry)
 				cp.CfgType = share.UserCreated
-				clusHelper.PutComplianceProfile(cp, nil)
+				if err := clusHelper.PutComplianceProfile(cp, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutComplianceProfile")
+				}
 			}
 		}
 	}
@@ -741,7 +799,9 @@ func (h *nvCrdHandler) crdHandleProcessProfile(group, mode string, profile *api.
 		txn := cluster.Transact()
 		// force overwrite process profile kv key
 		cacher.CreateProcessProfileTxn(txn, group, mode, profile.Baseline, cfgType)
-		txn.Apply()
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		}
 		txn.Close()
 	}
 	pp := clusHelper.GetProcessProfile(group)
@@ -805,7 +865,9 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 		txn := cluster.Transact()
 		// force overwrite file monitor/rule kv keys with default file rules
 		cacher.CreateGroupFileMonitorTxn(txn, group, mode, cfgType)
-		txn.Apply()
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		}
 		txn.Close()
 	}
 	mon, rev_m := clusHelper.GetFileMonitorProfile(group)
@@ -1165,7 +1227,9 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 		if newId, ok := newRules[cacheName]; ok && newId == cacheId {
 			continue
 		}
-		clusHelper.DeletePolicyRuleTxn(txn, cacheId)
+		if err := clusHelper.DeletePolicyRuleTxn(txn, cacheId); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeletePolicyRuleTxn")
+		}
 		delete(ruleHead, cacheId)
 	}
 
@@ -1187,8 +1251,12 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 		newPlus = news
 	}
 	crhs = append(crhs[:startIdx], newPlus...)
-	clusHelper.PutPolicyRuleListTxn(txn, crhs)
-	txn.Apply()
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+	}
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 	return &newRules
 }
 
@@ -1297,7 +1365,9 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 				cr.RuleMode = ruleConf.RuleMode
 				cr.Containers = ruleConf.Containers
 				cr.CfgType = cfgType
-				clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr)
+				if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleTxn")
+				}
 				newRules[ruleName] = ruleID
 			}
 		}
@@ -1314,14 +1384,18 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 				} else {
 					ruleType := ss[0] // ss[0] is ruleType
 					if cacheId >= api.AdmCtrlCrdRuleIDBase && cacheId < api.AdmCtrlCrdRuleIDMax {
-						clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cacheId)
+						if err := clusHelper.DeleteAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cacheId); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("DeleteAdmissionRuleTxn")
+						}
 						delRules.Add(cacheId)
 					} else {
 						// default rule cannot be deleted
 						if cr := clusHelper.GetAdmissionRule(admission.NvAdmValidateType, ruleType, cacheId); cr != nil {
 							if cr.CfgType != share.UserCreated {
 								cr.CfgType = share.UserCreated
-								clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr)
+								if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr); err != nil {
+									log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleTxn")
+								}
 							}
 						}
 					}
@@ -1342,12 +1416,18 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(scope string, allAdmCtrlRules map[s
 					ruleHead = append(ruleHead, arh)
 				}
 			}
-			clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, ruleHead)
+			if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, ruleHead); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+			}
 		} else {
-			clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, arhsNew)
+			if err := clusHelper.PutAdmissionRuleListTxn(txn, admission.NvAdmValidateType, ruleType, arhsNew); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleListTxn")
+			}
 		}
 	}
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+	}
 
 	return newRules
 }
@@ -1416,7 +1496,9 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(scope string, crdConfig *resource.
 				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
 				alog.Msg = "Failed to configure admission control state."
 			}
-			evqueue.Append(&alog)
+			if err := evqueue.Append(&alog); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+			}
 		}
 		if err != nil {
 			status, code, _, _ := setAdmCtrlStateInCluster(&origConf.Enable, &origConf.Mode, &origConf.DefaultAction, &origConf.AdmClientMode, &origConf.FailurePolicy, origConf.CfgType)
@@ -1462,7 +1544,9 @@ func (h *nvCrdHandler) crdHandleDlpGroup(txn *cluster.ClusterTransact, name stri
 				CfgType: cfgType,
 			}
 			dlpGroup.Status = dlpGroupCfg.Status
-			clusHelper.PutDlpGroupTxn(txn, dlpGroup)
+			if err := clusHelper.PutDlpGroupTxn(txn, dlpGroup); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutDlpGroupTxn")
+			}
 			return sensors
 		} else {
 			sensors := make([]string, len(dlpGroupCfg.RepSensors))
@@ -1553,7 +1637,9 @@ func (h *nvCrdHandler) crdHandleWafGroup(txn *cluster.ClusterTransact, name stri
 				CfgType: cfgType,
 			}
 			wafGroup.Status = wafGroupCfg.Status
-			clusHelper.PutWafGroupTxn(txn, wafGroup)
+			if err := clusHelper.PutWafGroupTxn(txn, wafGroup); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutWafGroupTxn")
+			}
 			return sensors
 		} else {
 			sensors := make([]string, len(wafGroupCfg.RepSensors))
@@ -2949,10 +3035,14 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		txn := cluster.Transact()
 		crdRecord.DlpGroupSensors = h.crdHandleDlpGroup(txn, crdCfgRet.TargetName, crdCfgRet.DlpGroupCfg, share.GroundCfg)
 		crdRecord.WafGroupSensors = h.crdHandleWafGroup(txn, crdCfgRet.TargetName, crdCfgRet.WafGroupCfg, share.GroundCfg)
-		txn.Apply()
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		}
 		txn.Close()
 	}
-	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
+	if err := clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutCrdSecurityRuleRecord")
+	}
 	// when it's CrossCheck(), all cached records(i.e. recordList) should be the same.
 	if !h.crossCheck || crossCheckRecord == nil {
 		recordList[recordName] = crdRecord
@@ -2998,15 +3088,19 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 	// handle admission control rule part of crd
 	ruleNew := h.crdHandleAdmCtrlRules(share.ScopeLocal, crdCfgRet.AdmCtrlRulesCfg, crdRecord, share.ReviewTypeCRD)
 	crdRecord.AdmCtrlRules = ruleNew
-	h.crdHandleAdmCtrlConfig(share.ScopeLocal, crdCfgRet.AdmCtrlCfg, crdRecord, share.ReviewTypeCRD)
+	if err := h.crdHandleAdmCtrlConfig(share.ScopeLocal, crdCfgRet.AdmCtrlCfg, crdRecord, share.ReviewTypeCRD); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("crdHandleAdmCtrlConfig")
+	}
 	if crdCfgRet.AdmCtrlCfg != nil {
 		subMsgs = append(subMsgs, "mode")
 	}
 	if len(ruleNew) > 0 {
 		subMsgs = append(subMsgs, fmt.Sprintf("%d rules", len(ruleNew)))
 	}
-	crInfo = fmt.Sprintf("%s", strings.Join(subMsgs, ", "))
-	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
+	crInfo = strings.Join(subMsgs, ", ")
+	if err := clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutCrdSecurityRuleRecord")
+	}
 
 	return crInfo, crWarning
 }
@@ -3049,18 +3143,28 @@ func (h *nvCrdHandler) crdProcessRuleRecord(crdCfgRet *resource.NvSecurityParse,
 	switch kind {
 	case resource.NvDlpSecurityRuleKind:
 		// handle dlp part of crd (dlp sensor definition, not per-group's sensors association)
-		h.crdHandleDlpSensor(share.ScopeLocal, crdCfgRet.DlpSensorCfg, crdRecord, share.ReviewTypeCRD)
+		if err := h.crdHandleDlpSensor(share.ScopeLocal, crdCfgRet.DlpSensorCfg, crdRecord, share.ReviewTypeCRD); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("crdHandleDlpSensor")
+		}
 	case resource.NvWafSecurityRuleKind:
 		// handle waf part of crd (waf sensor definition, not per-group's sensors association)
-		h.crdHandleWafSensor(share.ScopeLocal, crdCfgRet.WafSensorCfg, crdRecord, share.ReviewTypeCRD)
+		if err := h.crdHandleWafSensor(share.ScopeLocal, crdCfgRet.WafSensorCfg, crdRecord, share.ReviewTypeCRD); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("crdHandleWafSensor")
+		}
 	case resource.NvVulnProfileSecurityRuleKind:
 		// handle vulnerability profile part of crd
-		h.crdHandleVulnProfile(crdCfgRet.VulnProfileCfg, "replace", crdRecord, share.ReviewTypeCRD)
+		if err := h.crdHandleVulnProfile(crdCfgRet.VulnProfileCfg, "replace", crdRecord, share.ReviewTypeCRD); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("crdHandleVulnProfile")
+		}
 	case resource.NvCompProfileSecurityRuleKind:
 		// handle compliance profile part of crd
-		h.crdHandleCompProfile(crdCfgRet.CompProfileCfg, crdRecord, share.ReviewTypeCRD)
+		if err := h.crdHandleCompProfile(crdCfgRet.CompProfileCfg, crdRecord, share.ReviewTypeCRD); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("crdHandleCompProfile")
+		}
 	}
-	clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord)
+	if err := clusHelper.PutCrdSecurityRuleRecord(kind, recordName, crdRecord); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutCrdSecurityRuleRecord")
+	}
 
 	return crWarning
 }
@@ -3159,10 +3263,14 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				setAdmCtrlStateInCluster(nil, nil, nil, nil, nil, share.UserCreated)
 				h.crdDeleteRecord(kind, recordName)
 			case resource.NvDlpSecurityRuleKind:
-				deleteDlpSensor(nil, crdRecord.DlpSensor, share.ReviewTypeCRD, true, h.acc, nil)
+				if err := deleteDlpSensor(nil, crdRecord.DlpSensor, share.ReviewTypeCRD, true, h.acc, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("deleteDlpSensor")
+				}
 				h.crdDeleteRecord(kind, recordName)
 			case resource.NvWafSecurityRuleKind:
-				deleteWafSensor(nil, crdRecord.WafSensor, share.ReviewTypeCRD, true, h.acc, nil)
+				if err := deleteWafSensor(nil, crdRecord.WafSensor, share.ReviewTypeCRD, true, h.acc, nil); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("deleteWafSensor")
+				}
 				h.crdDeleteRecord(kind, recordName)
 			case resource.NvVulnProfileSecurityRuleKind:
 				h.crdDeleteVulnProfile(req.Name)
@@ -3400,7 +3508,9 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 func (h *nvCrdHandler) crdDeleteRecord(kind, recordName string) {
 	if recordName != "" {
-		clusHelper.DeleteCrdSecurityRuleRecord(kind, recordName)
+		if err := clusHelper.DeleteCrdSecurityRuleRecord(kind, recordName); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteCrdSecurityRuleRecord")
+		}
 	}
 }
 
@@ -3744,10 +3854,14 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[
 	}
 
 	// update process rules
-	h.crdHandleProcessProfile(groupName, profileMode, pprofile, reviewType)
+	if err := h.crdHandleProcessProfile(groupName, profileMode, pprofile, reviewType); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("crdHandleProcessProfile")
+	}
 
 	// update file rules
-	h.crdHandleFileProfile(groupName, profileMode, fprofile, reviewType)
+	if err := h.crdHandleFileProfile(groupName, profileMode, fprofile, reviewType); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("crdHandleFileProfile")
+	}
 
 	return profileMode, baseline
 }

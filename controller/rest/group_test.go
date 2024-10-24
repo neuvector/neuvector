@@ -111,12 +111,12 @@ func TestServiceCreate(t *testing.T) {
 		}
 
 		cases = map[string]api.RESTServiceConfig{
-			"g1":         {"g1", "", nil, nil, nil, nil, nil},
-			"g1.default": {"g1", "default", nil, nil, nil, nil, nil},
-			".":          {"", "", nil, nil, nil, nil, nil},
-			".default":   {"", "default", nil, nil, nil, nil, nil},
-			"g2":         {"g2", "", nil, &modeEmpty, &modeEmpty, nil, nil},
-			"g3.default": {"g2", "default", nil, &modeWrong, &modeWrong, nil, nil},
+			"g1":         {Name: "g1", Domain: "", Comment: nil, PolicyMode: nil, ProfileMode: nil, BaselineProfile: nil, NotScored: nil},
+			"g1.default": {Name: "g1", Domain: "default", Comment: nil, PolicyMode: nil, ProfileMode: nil, BaselineProfile: nil, NotScored: nil},
+			".":          {Name: "", Domain: "", Comment: nil, PolicyMode: nil, ProfileMode: nil, BaselineProfile: nil, NotScored: nil},
+			".default":   {Name: "", Domain: "default", Comment: nil, PolicyMode: nil, ProfileMode: nil, BaselineProfile: nil, NotScored: nil},
+			"g2":         {Name: "g2", Domain: "", Comment: nil, PolicyMode: &modeEmpty, ProfileMode: &modeEmpty, BaselineProfile: nil, NotScored: nil},
+			"g3.default": {Name: "g2", Domain: "default", Comment: nil, PolicyMode: &modeWrong, ProfileMode: &modeWrong, BaselineProfile: nil, NotScored: nil},
 		}
 
 		for _, c := range cases {

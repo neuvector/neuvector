@@ -335,7 +335,9 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 				users := clusHelper.GetAllUsers(acc)
 				for _, user := range users {
 					user.PwdResetTime = now
-					clusHelper.PutUser(user)
+					if err := clusHelper.PutUser(user); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("PutUser")
+					}
 				}
 			}
 			if kvProfileUpdateOK && kvActiveProfileNameUpdateOK {

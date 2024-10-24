@@ -33,8 +33,12 @@ func (r *openshift) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 	if cfg.AuthWithToken {
 		smd.scanLog.WithFields(log.Fields{"registry": r.regCfg.Name}).Debug("Login with token")
 		r.lastLoginAt = time.Now()
-		r.newRegClient(cfg.Registry, unusedAccount, cfg.AuthToken)
-		r.rc.Alive()
+		if err := r.newRegClient(cfg.Registry, unusedAccount, cfg.AuthToken); err != nil {
+			return err, err.Error()
+		}
+		if _, err := r.rc.Alive(); err != nil {
+			return err, err.Error()
+		}
 		return nil, ""
 	} else {
 		username, token, err := global.ORCH.Login(cfg.Username, cfg.Password)
@@ -44,7 +48,9 @@ func (r *openshift) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 
 		smd.scanLog.WithFields(log.Fields{"registry": r.regCfg.Name}).Debug("Login succeeded")
 		r.lastLoginAt = time.Now()
-		r.newRegClient(cfg.Registry, username, token)
+		if err := r.newRegClient(cfg.Registry, username, token); err != nil {
+			return err, err.Error()
+		}
 		return nil, ""
 	}
 }
@@ -56,7 +62,9 @@ func (r *openshift) Logout(force bool) {
 
 	smd.scanLog.WithFields(log.Fields{"registry": r.regCfg.Name}).Debug("Force logout")
 	if !r.regCfg.AuthWithToken {
-		global.ORCH.Logout(r.username, r.password)
+		if err := global.ORCH.Logout(r.username, r.password); err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Debug("logout")
+		}
 	}
 	r.lastLoginAt = time.Time{} // reset timer
 }

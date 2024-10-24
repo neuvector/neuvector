@@ -202,7 +202,9 @@ func DeleteQuerySessionByToken(queryToken string) error {
 	}
 
 	// delete the session table in file-based db, ignore the error
-	deleteSessionFileDb(queryToken)
+	if err := deleteSessionFileDb(queryToken); err != nil {
+		return err
+	}
 
 	return nil
 }

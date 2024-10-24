@@ -605,7 +605,9 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockCompKey)
@@ -621,13 +623,17 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 				cmpProfilesCfg = append(cmpProfilesCfg, cpCfgRet)
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+				}
 			}
 		}
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		clusHelper.PutImportTask(&importTask)
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 
 		if err == nil {
 			// [2]: import compliance profile defined in the yaml file
@@ -638,11 +644,15 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+				}
 			}
 		}
 		importTask.Percentage = 90
-		clusHelper.PutImportTask(&importTask)
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+		}
 	}
 
 	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)

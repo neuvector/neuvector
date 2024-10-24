@@ -89,7 +89,9 @@ func replaceFedFileMonitorProfiles(profiles []*share.CLUSFileMonitorProfile, acc
 			fmp, _ = clusHelper.GetFileMonitorProfile(profile.Group)
 		}
 		if fmp == nil || !reflect.DeepEqual(profile, fmp) { // not found in existing or it's different/modified
-			clusHelper.PutFileMonitorProfileTxn(txn, profile.Group, profile)
+			if err := clusHelper.PutFileMonitorProfileTxn(txn, profile.Group, profile); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutFileMonitorProfileTxn")
+			}
 		}
 		if existing.Contains(profile.Group) {
 			existing.Remove(profile.Group)
@@ -97,7 +99,9 @@ func replaceFedFileMonitorProfiles(profiles []*share.CLUSFileMonitorProfile, acc
 	}
 	// delete obsolete file monitor profile keys
 	for name := range existing.Iter() {
-		clusHelper.DeleteFileMonitorTxn(txn, name.(string))
+		if err := clusHelper.DeleteFileMonitorTxn(txn, name.(string)); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteFileMonitorTxn")
+		}
 	}
 
 	existing = clusHelper.GetAllFileAccessRuleSubKeys(share.ScopeFed)
@@ -107,7 +111,9 @@ func replaceFedFileMonitorProfiles(profiles []*share.CLUSFileMonitorProfile, acc
 			far, _ = clusHelper.GetFileAccessRule(accessRule.Group)
 		}
 		if far == nil || !reflect.DeepEqual(accessRule, far) { // not found in existing or it's different/modified
-			clusHelper.PutFileAccessRuleTxn(txn, accessRule.Group, accessRule)
+			if err := clusHelper.PutFileAccessRuleTxn(txn, accessRule.Group, accessRule); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutFileAccessRuleTxn")
+			}
 		}
 		if existing.Contains(accessRule.Group) {
 			existing.Remove(accessRule.Group)
@@ -115,7 +121,9 @@ func replaceFedFileMonitorProfiles(profiles []*share.CLUSFileMonitorProfile, acc
 	}
 	// delete obsolete file access rule keys
 	for name := range existing.Iter() {
-		clusHelper.DeleteFileAccessRuleTxn(txn, name.(string))
+		if err := clusHelper.DeleteFileAccessRuleTxn(txn, name.(string)); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteFileAccessRuleTxn")
+		}
 	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {

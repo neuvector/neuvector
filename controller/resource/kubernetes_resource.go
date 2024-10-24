@@ -1379,36 +1379,43 @@ func (d *kubernetes) listResource(rt, namespace string) ([]interface{}, error) {
 
 func (d *kubernetes) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
 	var err error
-	for range []bool{true} {
-		if rt == RscTypeRBAC {
-			if err = d.startWatchResource(k8sRscTypeRole, ns, d.cbResourceRole, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
-			}
-			if err = d.startWatchResource(K8sRscTypeClusRole, ns, d.cbResourceRole, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
-			}
-			if err = d.startWatchResource(k8sRscTypeRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
-			}
-			if err = d.startWatchResource(K8sRscTypeClusRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
-			}
-			d.lock.Lock()
-			d.watchers[rt] = &resourceWatcher{cb: wcb}
-			d.lock.Unlock()
-		} else {
-			err = d.startWatchResource(rt, ns, wcb, scb)
+
+	if rt == RscTypeRBAC {
+		resources := []struct {
+			rscType string
+			cb      orchAPI.WatchCallback
+		}{
+			{k8sRscTypeRole, d.cbResourceRole},
+			{K8sRscTypeClusRole, d.cbResourceRole},
+			{k8sRscTypeRoleBinding, d.cbResourceRoleBinding},
+			{K8sRscTypeClusRoleBinding, d.cbResourceRoleBinding},
 		}
+
+		for _, res := range resources {
+			if err = d.startWatchResource(res.rscType, ns, res.cb, scb); err != nil {
+				d.handleStopWatchError(rt)
+				break
+			}
+		}
+
+		d.lock.Lock()
+		d.watchers[rt] = &resourceWatcher{cb: wcb}
+		d.lock.Unlock()
+	} else {
+		err = d.startWatchResource(rt, ns, wcb, scb)
 	}
+
 	if err != nil {
 		log.WithFields(log.Fields{"watch": rt, "error": err}).Error()
 	}
 
 	return err
+}
+
+func (d *kubernetes) handleStopWatchError(rt string) {
+	if stopErr := d.StopWatchResource(rt); stopErr != nil {
+		log.WithFields(log.Fields{"error": stopErr}).Error("stop watch")
+	}
 }
 
 func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb orchAPI.StateCallback) error {
@@ -1491,10 +1498,18 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 
 func (d *kubernetes) StopWatchResource(rt string) error {
 	if rt == RscTypeRBAC {
-		d.stopWatchResource(k8sRscTypeRole)
-		d.stopWatchResource(K8sRscTypeClusRole)
-		d.stopWatchResource(k8sRscTypeRoleBinding)
-		d.stopWatchResource(K8sRscTypeClusRoleBinding)
+		if err := d.stopWatchResource(k8sRscTypeRole); err != nil {
+			return err
+		}
+		if err := d.stopWatchResource(K8sRscTypeClusRole); err != nil {
+			return err
+		}
+		if err := d.stopWatchResource(k8sRscTypeRoleBinding); err != nil {
+			return err
+		}
+		if err := d.stopWatchResource(K8sRscTypeClusRoleBinding); err != nil {
+			return err
+		}
 		return nil
 	} else {
 		return d.stopWatchResource(rt)

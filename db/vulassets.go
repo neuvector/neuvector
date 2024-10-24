@@ -195,7 +195,9 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 		nTotalCVE++
 
 		// CVE details might be incomplete during Consul restore, do this first
-		fillCVERecordV2(vulasset)
+		if err := fillCVERecordV2(vulasset); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("fillCVERecordV2")
+		}
 
 		// CVE based filter
 		if !meetCVEBasedFilter(vulasset, queryFilter) {
@@ -395,7 +397,9 @@ func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
 
 	// delete session table in memory, allow some time for the ongoing read operation to complete before proceeding
 	time.Sleep(30 * time.Second)
-	deleteSessionTempTableInMemDb(sessionToken)
+	if err := deleteSessionTempTableInMemDb(sessionToken); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("deleteSessionTempTableInMemDb")
+	}
 
 	return nil
 }
@@ -653,7 +657,9 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 	if memoryDb {
 		memTables := GetAllTableInMemoryDb()
 		if !strings.Contains(memTables, sessionToken) {
-			reopenMemoryDb()
+			if err := reopenMemoryDb(); err != nil {
+				return err
+			}
 
 			log.WithFields(log.Fields{"sessionToken": sessionToken}).Error("CeateSessionVulAssetTable error, missing session table in memdb. Recreate it.")
 			err := createSessionVulAssetTable(memoryDbHandle, sessionToken)
@@ -886,7 +892,7 @@ func fillCVERecordV2(record *DbVulAsset) error {
 }
 
 func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*api.AssetCVECount, error) {
-	allowedAssets := []string{}
+	var allowedAssets []string
 
 	buildWhereClause := func(assetType string, allowedID []string) exp.ExpressionList {
 		part1_type := goqu.Ex{
@@ -978,6 +984,8 @@ func buildAssetFilterWhereClause(queryFilter *api.VulQueryFilterViewModel) exp.E
 
 func batchProessFillVulPackages(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsBytes []byte, idnsStr string, cveList *[]string) {
 	pool.Submit(func() {
-		funcFillVulPackages(mu, cvePackages, vulsBytes, idnsStr, cveList, nil)
+		if err := funcFillVulPackages(mu, cvePackages, vulsBytes, idnsStr, cveList, nil); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("funcFillVulPackages")
+		}
 	})
 }

@@ -530,7 +530,9 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		// Retrieve from the cluster
 		value, rev, _ := cluster.GetRev(key)
 		if value != nil {
-			json.Unmarshal(value, &cconf)
+			if err := json.Unmarshal(value, &cconf); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+			}
 		} else {
 			cconf.Wire = share.WireDefault
 		}

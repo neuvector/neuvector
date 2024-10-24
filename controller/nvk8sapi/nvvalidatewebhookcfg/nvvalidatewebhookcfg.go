@@ -94,7 +94,6 @@ var svcLabelKeys = make(map[string]*WebhookSvcLabelKey) // key is service name
 
 var admCtrlTypes []string
 
-var defAllowedNamespaces utils.Set  // namespaces in critical(default) allow rules only
 var allowedNamespaces utils.Set     // all effectively allowed namespaces that do no contain wildcard character
 var allowedNamespacesWild utils.Set // all effectively allowed namespaces that contain wildcard character
 var nsSelectorValue string
@@ -105,7 +104,6 @@ func InitK8sNsSelectorInfo(allowedNS, allowedNsWild, defAllowedNS utils.Set, sel
 	nsSelectorValue = selectorValue
 	allowedNamespaces = allowedNS
 	allowedNamespacesWild = allowedNsWild
-	defAllowedNamespaces = defAllowedNS
 	if objs, err := global.ORCH.ListResource(resource.RscTypeNamespace, ""); len(objs) > 0 {
 		for _, obj := range objs {
 			if nsObj, ok := obj.(*resource.Namespace); nsObj != nil && ok {
@@ -167,7 +165,9 @@ func VerifyK8sNs(admCtrlEnabled bool, nsName string, nsLabels map[string]string)
 		if shouldExist != nil {
 			_, exists := nsLabels[labelKey]
 			if (*shouldExist && !exists) || (!*shouldExist && exists) {
-				workSingleK8sNsLabels(nsName, labelKeys)
+				if err := workSingleK8sNsLabels(nsName, labelKeys); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("workSingleK8sNsLabels")
+				}
 				break
 			}
 		}

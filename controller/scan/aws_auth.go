@@ -31,8 +31,14 @@ func (r *awsDriver) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 		return err, err.Error()
 	}
 
-	r.newRegClient(cfg.Registry, auth.Username, auth.Password)
-	r.rc.Alive()
+	if err := r.newRegClient(cfg.Registry, auth.Username, auth.Password); err != nil {
+		return err, err.Error()
+	}
+
+	if _, err := r.rc.Alive(); err != nil {
+		return err, err.Error()
+	}
+
 	return nil, ""
 }
 

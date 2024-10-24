@@ -111,7 +111,9 @@ func getLoginToken(w *mockResponseWriter) string {
 func checkUserAttrs(w *mockResponseWriter, server, user, role string, tmo uint32) error {
 	// Check returned User attributes
 	var data api.RESTTokenData
-	_ = json.Unmarshal(w.body, &data)
+	if err := json.Unmarshal(w.body, &data); err != nil {
+		return fmt.Errorf("Error in unmarshal: %v", err)
+	}
 	if data.Token.Server != server || data.Token.Username != user || data.Token.Role != role {
 		return fmt.Errorf("Error in user attributes: %+v", *data.Token)
 	}
@@ -138,7 +140,9 @@ func TestLocalLogin(t *testing.T) {
 	clusHelper = &mockCluster
 
 	user := makeLocalUser("user", "pass", api.UserRoleReader)
-	_ = clusHelper.CreateUser(user)
+	if err := clusHelper.CreateUser(user); err != nil {
+		t.Errorf("CreateUser error: %v", err)
+	}
 
 	cacher = &mockCache{}
 
@@ -184,7 +188,9 @@ func TestLDAPLogin(t *testing.T) {
 			},
 		},
 	}
-	_ = clusHelper.PutServerRev(&ldap, 0)
+	if err := clusHelper.PutServerRev(&ldap, 0); err != nil {
+		t.Errorf("PutServerRev error: %v", err)
+	}
 
 	mockAuther := mockRemoteAuth{users: make(map[string]*passwordUser)}
 	// User group membership doesn't match role group mapping
@@ -219,7 +225,9 @@ func TestLDAPLogin(t *testing.T) {
 	// Revert user group membership, add default role to server
 	mockAuther.addPasswordUser("user", "pass", []string{"group2"})
 	ldap.LDAP.DefaultRole = api.UserRoleAdmin
-	_ = clusHelper.PutServerRev(&ldap, 0)
+	if err := clusHelper.PutServerRev(&ldap, 0); err != nil {
+		t.Errorf("PutServerRev error: %v", err)
+	}
 
 	w = login("user", "pass")
 	if w.status != http.StatusOK {
@@ -383,7 +391,9 @@ func TestLocalLoginServer(t *testing.T) {
 	clusHelper = &mockCluster
 
 	user := makeLocalUser("user", "pass", api.UserRoleAdmin)
-	_ = clusHelper.CreateUser(user)
+	if err := clusHelper.CreateUser(user); err != nil {
+		t.Errorf("CreateUser error: %v", err)
+	}
 
 	cacher = &mockCache{}
 
@@ -436,7 +446,9 @@ func TestLDAPLoginServer(t *testing.T) {
 			},
 		},
 	}
-	_ = clusHelper.PutServerRev(&ldap, 0)
+	if err := clusHelper.PutServerRev(&ldap, 0); err != nil {
+		t.Errorf("PutServerRev error: %v", err)
+	}
 
 	mockAuther := mockRemoteAuth{users: make(map[string]*passwordUser)}
 	// User group membership doesn't match role group mapping
@@ -485,7 +497,9 @@ func TestSAMLLogin(t *testing.T) {
 			},
 		},
 	}
-	_ = clusHelper.PutServerRev(&ldap, 0)
+	if err := clusHelper.PutServerRev(&ldap, 0); err != nil {
+		t.Errorf("PutServerRev error: %v", err)
+	}
 
 	// Not enabled
 	saml := share.CLUSServer{
@@ -505,7 +519,9 @@ func TestSAMLLogin(t *testing.T) {
 			X509Cert: "cert",
 		},
 	}
-	_ = clusHelper.PutServerRev(&saml, 0)
+	if err := clusHelper.PutServerRev(&saml, 0); err != nil {
+		t.Errorf("PutServerRev error: %s", err)
+	}
 
 	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
 	mockAuther.addSAMLUser("token", map[string][]string{"Email": {"joe@example.com"}})
@@ -570,7 +586,9 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 			X509Cert: "cert",
 		},
 	}
-	_ = clusHelper.PutServerRev(&saml, 0)
+	if err := clusHelper.PutServerRev(&saml, 0); err != nil {
+		t.Errorf("PutServerRev error: %v", err)
+	}
 
 	username := "joe"
 	mockAuther := mockRemoteAuth{samlUsers: make(map[string]*samlUser)}
@@ -612,7 +630,9 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 
 	// Modify user's timeout and role by admin
 	admin := makeLocalUser("admin", "admin", api.UserRoleAdmin)
-	_ = clusHelper.CreateUser(admin)
+	if err := clusHelper.CreateUser(admin); err != nil {
+		t.Errorf("CreateUser error: %v", err)
+	}
 	w = login("admin", "admin")
 	tokenAdmin := getLoginToken(w)
 
@@ -828,7 +848,9 @@ func TestOIDCLogin(t *testing.T) {
 			},
 		},
 	}
-	_ = clusHelper.PutServerRev(&ldap, 0)
+	if err := clusHelper.PutServerRev(&ldap, 0); err != nil {
+		t.Errorf("PutServerRev error: %v", err)
+	}
 
 	// Not enabled
 	oidc := share.CLUSServer{
@@ -846,7 +868,9 @@ func TestOIDCLogin(t *testing.T) {
 			Issuer: "issuer",
 		},
 	}
-	_ = clusHelper.PutServerRev(&oidc, 0)
+	if err := clusHelper.PutServerRev(&oidc, 0); err != nil {
+		t.Errorf("PutServerRev error: %s", err)
+	}
 
 	mockAuther := mockRemoteAuth{oidcUsers: make(map[string]*oidcUser)}
 	mockAuther.addOIDCUser("token", map[string]interface{}{oidcPreferredNameKey: "joe@example.com"})

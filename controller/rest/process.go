@@ -51,7 +51,9 @@ func replaceFedProcessProfiles(profiles []*share.CLUSProcessProfile) bool {
 			pp = clusHelper.GetProcessProfile(profile.Group)
 		}
 		if pp == nil || !reflect.DeepEqual(profile, pp) {
-			clusHelper.PutProcessProfileTxn(txn, profile.Group, profile)
+			if err := clusHelper.PutProcessProfileTxn(txn, profile.Group, profile); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutProcessProfileTxn")
+			}
 		}
 		if existing.Contains(profile.Group) {
 			existing.Remove(profile.Group)
@@ -59,7 +61,9 @@ func replaceFedProcessProfiles(profiles []*share.CLUSProcessProfile) bool {
 	}
 	// delete obsolete file access rule keys
 	for name := range existing.Iter() {
-		clusHelper.DeleteProcessProfileTxn(txn, name.(string))
+		if err := clusHelper.DeleteProcessProfileTxn(txn, name.(string)); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteProcessProfileTxn")
+		}
 	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
@@ -372,7 +376,9 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 		}
 	}
 
-	clusHelper.PutProcessProfile(group, profile)
+	if err := clusHelper.PutProcessProfile(group, profile); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutProcessProfile")
+	}
 	if profile.CfgType == share.FederalCfg {
 		updateFedRulesRevision([]string{share.FedProcessProfilesType}, acc, login)
 	}

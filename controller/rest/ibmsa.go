@@ -333,7 +333,9 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 		}
 		value, _ := json.Marshal(u)
 		key := share.CLUSUserKey(common.ReservedUserNameIBMSA)
-		cluster.PutIfNotExist(key, value, false)
+		if err := cluster.PutIfNotExist(key, value, false); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
+		}
 		user, _, _ = clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
 	}
 	if user != nil {
@@ -811,7 +813,9 @@ func ibmsaPoster() {
 		noteIDs := []string{_ibmFindingCard, _ibmFindingThreat}
 		for _, noteID := range noteIDs {
 			if token, err := ibmsaGetToken(&cfg.IBMSAConfig); err == nil {
-				ibmsaGetNvNote(token, noteID, &cfg.IBMSAConfig)
+				if err := ibmsaGetNvNote(token, noteID, &cfg.IBMSAConfig); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("ibmsaGetNvNote")
+				}
 			}
 		}
 	} else {
@@ -855,7 +859,9 @@ Loop:
 			} else if f.ProtoName != "N/A" {
 				f.ProtoName = ipPortoName[f.Protocol]
 			}
-			ibmsaPostThreatFinding(&f)
+			if err := ibmsaPostThreatFinding(&f); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("ibmsaPostThreatFinding")
+			}
 		case <-ibmsaStopChan:
 			log.Info("Stopped posting to IBM SA")
 			break Loop

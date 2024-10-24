@@ -115,7 +115,9 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 
 		// store the scan result so it can be used by admission control
 		scan.FixRegRepoForAdmCtrl(result)
-		scanner.StoreRepoScanResult(result)
+		if err := scanner.StoreRepoScanResult(result); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("StoreRepoScanResult")
+		}
 
 		// build image compliance list and filter the list
 		cpf := &complianceProfileFilter{filter: make(map[string][]string)}
@@ -184,7 +186,7 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 	// Add "library" for dockerhub if not exist
-	if dockerRegistries.Contains(req.Registry) && strings.Index(req.Repository, "/") == -1 {
+	if dockerRegistries.Contains(req.Registry) && !strings.Contains(req.Repository, "/") {
 		req.Repository = fmt.Sprintf("library/%s", req.Repository)
 	}
 	if req.Tag == "" {

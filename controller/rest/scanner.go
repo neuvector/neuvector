@@ -846,7 +846,9 @@ func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.
 	} else {
 		var data scanUtils.CacherData
 		uzb := utils.GunzipBytes(res.DataZb)
-		json.Unmarshal([]byte(uzb), &data)
+		if err := json.Unmarshal([]byte(uzb), &data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+		}
 		resp := &api.RESTScanCacheData{
 			MissCnt:    data.MissCnt,
 			HitCnt:     data.HitCnt,

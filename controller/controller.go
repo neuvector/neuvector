@@ -180,7 +180,9 @@ func likelyNewCluster() bool {
 func flushEventQueue() {
 	evqueue.Flush()
 	auditQueue.Flush()
-	cacher.FlushAdmCtrlStats()
+	if err := cacher.FlushAdmCtrlStats(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("FlushAdmCtrlStats")
+	}
 }
 
 type localSystemInfo struct {
@@ -366,12 +368,16 @@ func main() {
 		k8sVer, ocVer := global.ORCH.GetVersion(false, false)
 		if flavor == "" && resource.IsRancherFlavor() {
 			flavor = share.FlavorRancher
-			global.ORCH.SetFlavor(flavor)
+			if err := global.ORCH.SetFlavor(flavor); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("SetFlavor")
+			}
 		} else if k8sVer != "" && ocVer == "" {
 			if err := global.ORCH.RegisterResource(resource.RscTypeImage); err == nil {
 				// Use ImageStream as an indication of OpenShift
 				flavor = share.FlavorOpenShift
-				global.ORCH.SetFlavor(flavor)
+				if err := global.ORCH.SetFlavor(flavor); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("SetFlavor")
+				}
 				ocImageRegistered = true
 			}
 		}
@@ -562,7 +568,9 @@ func main() {
 	auditQueue = cluster.NewObjectQueue(auditLogKey, 128)
 	messenger = cluster.NewMessenger(Host.ID, Ctrler.ID)
 
-	db.CreateVulAssetDb(false)
+	if err := db.CreateVulAssetDb(false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("CreateVulAssetDb")
+	}
 
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData, evqueue)
 	ruleid.Init()
@@ -687,7 +695,9 @@ func main() {
 				ReportedAt:     time.Now().UTC(),
 				Msg:            fmt.Sprintf("Restored kv version: %s", restoredKvVersion),
 			}
-			evqueue.Append(&clog)
+			if err := evqueue.Append(&clog); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+			}
 		}
 		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
@@ -707,7 +717,9 @@ func main() {
 			cfg := common.DefaultSystemConfig
 			cfg.InternalSubnets = subnets
 
-			clusHelper.PutSystemConfigRev(&cfg, 0)
+			if err := clusHelper.PutSystemConfigRev(&cfg, 0); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutSystemConfigRev")
+			}
 		}
 	}
 
@@ -738,7 +750,9 @@ func main() {
 	if Ctrler.Leader {
 		kv.ValidateWebhookCert()
 		if isNewCluster && *noDefAdmin {
-			clusHelper.DeleteUser(common.DefaultAdminUser)
+			if err := clusHelper.DeleteUser(common.DefaultAdminUser); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteUser")
+			}
 		}
 		setConfigLoaded()
 	} else {
@@ -756,7 +770,9 @@ func main() {
 			// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
 			// nvSemanticVersion : in the format v{major}.{minor}.{patch}
 			var ver share.CLUSCtrlVersion
-			json.Unmarshal(value, &ver)
+			if err := json.Unmarshal(value, &ver); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+			}
 			if strings.HasPrefix(ver.CtrlVersion, "interim/") {
 				// it's daily dev build image
 				if *teleCurrentVer == "" {
@@ -789,14 +805,11 @@ func main() {
 		*teleNeuvectorEP = ""
 	}
 
-	if strings.HasSuffix(*teleNeuvectorEP, "dbperftest") {
-		rest.TESTDbPerf = true
-		*teleNeuvectorEP = ""
-	}
-
 	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
 		var ver share.CLUSCtrlVersion
-		json.Unmarshal(value, &ver)
+		if err := json.Unmarshal(value, &ver); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+		}
 		if !strings.HasPrefix(ver.CtrlVersion, "interim/") {
 			// it's official release image
 			if *teleNeuvectorEP == "" {
@@ -870,7 +883,9 @@ func main() {
 			msgs = append(msgs, clusterRoleBindingErrors...)
 			msgs = append(msgs, roleErrors...)
 			msgs = append(msgs, roleBindingErrors...)
-			cache.CacheEvent(share.CLUSEvK8sNvRBAC, strings.Join(msgs, "\n"))
+			if err := cache.CacheEvent(share.CLUSEvK8sNvRBAC, strings.Join(msgs, "\n")); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("CacheEvent")
+			}
 		}
 	}
 
@@ -964,7 +979,9 @@ func main() {
 	if platform == share.PlatformKubernetes {
 		rest.LeadChangeNotify(Ctrler.Leader)
 		if Ctrler.Leader {
-			cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+			if _, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+			}
 		}
 		go rest.CleanupSessCfgCache()
 		go rest.AdmissionRestServer(*admctrlPort, false, debug)
@@ -1009,7 +1026,12 @@ func main() {
 		log.WithFields(log.Fields{"Controlled_Limit": ctrlEnv.memoryLimit, "Controlled_At": memStatsControllerResetMark}).Info("Memory Resource")
 
 		// for allinone and controller
-		go global.SYS.MonitorMemoryPressureEvents(memStatsControllerResetMark, memoryPressureNotification)
+		go func() {
+			if err := global.SYS.MonitorMemoryPressureEvents(memStatsControllerResetMark, memoryPressureNotification); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("MonitorMemoryPressureEvents")
+			}
+		}()
+
 		for {
 			select {
 			case <-ticker:
