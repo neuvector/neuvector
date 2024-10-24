@@ -219,6 +219,8 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		w.WriteHeader(http.StatusNotModified)
 	} else {
 		ret := result.(*repoScanResult)
+		// Clear password field for registry data
+		data.Request.Password = ""
 		if ret.errCode == api.RESTErrClusterRPCError {
 			restRespError(w, http.StatusInternalServerError, ret.errCode)
 		} else if ret.errCode != 0 {
