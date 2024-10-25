@@ -11,7 +11,6 @@ import (
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/probe/netlink"
-	"github.com/neuvector/neuvector/agent/probe/ringbuffer"
 	"github.com/neuvector/neuvector/agent/workerlet"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
@@ -96,7 +95,7 @@ type Probe struct {
 
 	// helper: process event history
 	getAllContainerList func() utils.Set
-	procHistoryMap      map[string]*ringbuffer.RingBuffer // per container
+	procHistoryMap      map[string][]*procInternal // per container
 	pMsgAggregates      map[string]*probeMsgAggregate
 	msgAggregatesMux    sync.Mutex
 	fsnCtr              *FileNotificationCtr // anchor profile helper
@@ -312,7 +311,7 @@ func New(pc *ProbeConfig, logLevel string) (*Probe, error) {
 		intfMonMap:     make(map[string]chan struct{}),
 		inodesMap:      make(map[uint32]*inodeEntry),
 		chanEvalAppPid: make(chan int, 2048),
-		procHistoryMap: make(map[string]*ringbuffer.RingBuffer),
+		procHistoryMap: make(map[string][]*procInternal),
 		pMsgAggregates: make(map[string]*probeMsgAggregate),
 	}
 

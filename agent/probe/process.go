@@ -11,7 +11,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/neuvector/neuvector/agent/probe/ringbuffer"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
@@ -398,11 +397,10 @@ func (p *Probe) GetContainerProcHistory(id string) []*share.CLUSProcess {
 	p.lockProcMux()
 	defer p.unlockProcMux()
 
-	if r, ok := p.procHistoryMap[id]; ok {
-		history := r.DumpExt()
+	if history, ok := p.procHistoryMap[id]; ok {
 		procs := make([]*share.CLUSProcess, len(history))
 		for i, proc := range history {
-			procs[i] = p.proc2CLUS(proc.(*procInternal))
+			procs[i] = p.proc2CLUS(proc)
 		}
 		return procs
 	} else {
@@ -2630,29 +2628,10 @@ func (p *Probe) ProcessLookup(pid int) *fsmon.ProcInfo {
 }
 
 // ///////////////////////////////////////////////////////////////////
-/* removed by golint
-func printLastProcElements(list []*procInternal, nLastItems int) {
-	start := 0
-	length := len(list)
-	if nLastItems == -1 || nLastItems > length {
-		// all
-	} else if nLastItems <= length {
-		start = length - nLastItems
-	}
-
-	// log.WithFields(log.Fields{"nLastItems": nLastItems, "length": length, "start": start}).Debug("PROC:")
-
-	for i := start; i < length; i++ {
-		log.WithFields(log.Fields{"i": i, "cmds": list[i].cmds}).Debug("PROC:")
-	}
-}
-*/
-
 // ////// only from netlink monitor, already guarded by procMux
-func (p *Probe) addProcHistory(id string, proc *procInternal, bFromMonitor bool) {
-	var histProc *ringbuffer.RingBuffer
-	var ok bool
+const processHistoryLength = 400
 
+func (p *Probe) addProcHistory(id string, proc *procInternal, bFromMonitor bool) {
 	// no history for host
 	if id == "" {
 		return
@@ -2670,37 +2649,31 @@ func (p *Probe) addProcHistory(id string, proc *procInternal, bFromMonitor bool)
 		defer p.unlockProcMux()
 	}
 
-	if histProc, ok = p.procHistoryMap[id]; !ok {
-		histProc = ringbuffer.New(400) // TODO: more ?
-		p.procHistoryMap[id] = histProc
+	histProc, ok := p.procHistoryMap[id]
+	if !ok {
+		histProc = make([]*procInternal, 0)
 	}
 
-	histProc.Write(proc)
-
-	// Verification section, test only
-	// log.WithFields(log.Fields{"path": proc.path, "id": id, "cnt": histProc.Length()}).Debug("PROC: ")
-	// if histProc.Length()() == 400 {
-	//		var list []*procInternal
-	//		elements := histProc.DumpExt()
-	//		for i := 0; i < len(elements); i++ {
-	//			list = append(list, elements[i].(*procInternal))
-	//		}
-	//		printLastProcElements(list, 10)
-	//	}
+	// cap the history length to 400 entries
+	if len(histProc) < processHistoryLength {
+		histProc = append(histProc, proc)
+	} else {
+		histProc = append(histProc[1:], proc)
+	}
+	p.procHistoryMap[id] = histProc
 }
 
 // Patch for newly created conatiners, not for host
 func (p *Probe) PutBeginningProcEventsBackToWork(id string) int {
 	var cnt int
-	// log.Debug("PROC:")
+
 	// TODO:check the calling function, should be guarded only by procMux
 	p.lockProcMux()
 	defer p.unlockProcMux()
 
-	if histProc, ok := p.procHistoryMap[id]; ok {
-		elements := histProc.DumpExt()
+	if elements, ok := p.procHistoryMap[id]; ok {
 		for i := 0; i < len(elements); i++ {
-			proc := elements[i].(*procInternal)
+			proc := elements[i]
 
 			// filter the docker run events since the path is not in the containers
 			if global.RT.IsRuntimeProcess(proc.name, nil) {
@@ -2733,10 +2706,9 @@ func (p *Probe) purgeProcHistory() int {
 
 	p.lockProcMux()
 	defer p.unlockProcMux()
-	for id, histProc := range p.procHistoryMap {
+	for id := range p.procHistoryMap {
 		if !containerList.Contains(id) {
 			// purge it out of list
-			histProc.Clear()
 			delete(p.procHistoryMap, id)
 			cnt++
 			log.WithFields(log.Fields{"id": id}).Debug("PROC:")
