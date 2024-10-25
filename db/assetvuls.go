@@ -1166,8 +1166,9 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 
 			repo_name_exp := goqu.C("I_repository_name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 			repo_url_exp := goqu.C("I_repository_url").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			fname_exp := goqu.L("? || ':' || ?", goqu.C("name"), goqu.C("I_tag")).Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 
-			return goqu.Or(repo_exp, id_exp, os_exp, createat_exp, scanned_exp, repo_name_exp, repo_url_exp)
+			return goqu.Or(repo_exp, id_exp, os_exp, createat_exp, scanned_exp, repo_name_exp, repo_url_exp, fname_exp)
 		}
 
 		return goqu.And(goqu.Ex{})
