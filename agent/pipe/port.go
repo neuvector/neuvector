@@ -62,6 +62,7 @@ type InterceptPair struct {
 	BCMAC  net.HardwareAddr
 	UCMAC  net.HardwareAddr
 	Addrs  []share.CLUSIPAddr
+	Vxlan  bool
 }
 
 func (m *InterceptPair) InPort() string {
@@ -885,6 +886,7 @@ func readAllContainerPorts(pid int, existPairs map[string]*InterceptPair) ([]*In
 
 	// Used to notify data-path process
 	intcpPairs := make([]*InterceptPair, 0)
+	hasVxlan := false
 
 	// TODO: handle MACVLAN port
 	for _, link := range links {
@@ -935,6 +937,10 @@ func readAllContainerPorts(pid int, existPairs map[string]*InterceptPair) ([]*In
 			}
 		}
 
+		if link.Type() == "vxlan" {
+			hasVxlan = true
+			log.Debug("Container has vxlan interface.")
+		}
 		// Ignore ports that have no IPv4 address, to be consistent with interception logic
 		if len(pair.Addrs) == 0 {
 			continue
@@ -943,6 +949,12 @@ func readAllContainerPorts(pid int, existPairs map[string]*InterceptPair) ([]*In
 		log.WithFields(log.Fields{"port": attrs.Name, "pair": pair}).Debug()
 
 		intcpPairs = append(intcpPairs, &pair)
+	}
+	//container has vxlan
+	if hasVxlan {
+		for _, pair := range intcpPairs {
+			pair.Vxlan = true
+		}
 	}
 
 	return intcpPairs, nil

@@ -1306,11 +1306,8 @@ func updateContainerNetworks(c *containerData, info *container.ContainerMetaExtr
 
 func isMultiNetworkContainer(c *containerData) bool {
 	if c.intcpPairs != nil {
-		if len(c.intcpPairs) < 2 {
-			return false
-		}
 		for _, pair := range c.intcpPairs {
-			if pair.Peer == "" {
+			if pair.Peer == "" || pair.Vxlan {
 				return true
 			}
 		}
