@@ -229,6 +229,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					}
 					cache.cluster.Disabled = cluster.Disabled
 					cache.cluster.ProxyRequired = cluster.ProxyRequired
+					cache.cluster.RestVersion = cluster.RestVersion
 				}
 				if isLeader() && cluster.Disabled {
 					data := share.CLUSFedClusterStatus{Status: 207} // _fedLicenseDisallowed
