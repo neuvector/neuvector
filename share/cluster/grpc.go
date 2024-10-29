@@ -102,6 +102,7 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.MaxRecvMsgSize(GRPCMaxMsgSize),
+		grpc.MaxSendMsgSize(GRPCMaxMsgSize),
 	}
 
 	listen, err := net.Listen("tcp", endpoint)
@@ -171,6 +172,7 @@ func NewGRPCServerUnix(socket string) (*GRPCServer, error) {
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.MaxRecvMsgSize(GRPCMaxMsgSize),
+		grpc.MaxSendMsgSize(GRPCMaxMsgSize),
 	}
 
 	listen, err := net.Listen("unix", socket)
@@ -318,7 +320,10 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 			grpc.WithTransportCredentials(ct),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
 			grpc.WithCompressor(grpc.NewGZIPCompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithDefaultCallOptions(
+				grpc.FailFast(true),
+				grpc.MaxCallRecvMsgSize(GRPCMaxMsgSize),
+				grpc.MaxCallSendMsgSize(GRPCMaxMsgSize)),
 		}
 	} else {
 		//TODO: addressing go-linter "SA1019: grpc.NewGZIPDecompressor is deprecated: use package encoding/gzip. (staticcheck)"
@@ -326,7 +331,10 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithDefaultCallOptions(
+				grpc.FailFast(true),
+				grpc.MaxCallRecvMsgSize(GRPCMaxMsgSize),
+				grpc.MaxCallSendMsgSize(GRPCMaxMsgSize)),
 		}
 	}
 
@@ -351,7 +359,10 @@ func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback,
 			grpc.WithInsecure(),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
 			grpc.WithCompressor(grpc.NewGZIPCompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithDefaultCallOptions(
+				grpc.FailFast(true),
+				grpc.MaxCallRecvMsgSize(GRPCMaxMsgSize),
+				grpc.MaxCallSendMsgSize(GRPCMaxMsgSize)),
 			grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 				return net.DialTimeout("unix", addr, timeout)
 			}),
@@ -362,7 +373,10 @@ func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback,
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
-			grpc.WithDefaultCallOptions(grpc.FailFast(true)),
+			grpc.WithDefaultCallOptions(
+				grpc.FailFast(true),
+				grpc.MaxCallRecvMsgSize(GRPCMaxMsgSize),
+				grpc.MaxCallSendMsgSize(GRPCMaxMsgSize)),
 			grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 				return net.DialTimeout("unix", addr, timeout)
 			}),
