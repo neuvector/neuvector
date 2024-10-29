@@ -2222,9 +2222,7 @@ targetpass:
 	var defPolicyMode, defProfileMode string
 	if utils.DoesGroupHavePolicyMode(crdCfgRet.TargetName) {
 		if policyModeCfg != nil {
-			if *policyModeCfg != share.PolicyModeLearn &&
-				*policyModeCfg != share.PolicyModeEvaluate &&
-				*policyModeCfg != share.PolicyModeEnforce {
+			if !share.IsValidPolicyMode(*policyModeCfg) {
 				errMsg = fmt.Sprintf("%s Rule format error:   Target group %s invalide policy mode %s",
 					reviewTypeDisplay, crdCfgRet.TargetName, *policyModeCfg)
 				errCount++
@@ -2318,9 +2316,7 @@ targetpass:
 			if gfwrule.Spec.ProcessProfile != nil && gfwrule.Spec.ProcessProfile.Mode != nil {
 				// Mode is configured for process profile (in yaml)
 				profileModeCfg := *gfwrule.Spec.ProcessProfile.Mode
-				if profileModeCfg != share.PolicyModeLearn &&
-					profileModeCfg != share.PolicyModeEvaluate &&
-					profileModeCfg != share.PolicyModeEnforce {
+				if !share.IsValidPolicyMode(profileModeCfg) {
 					errMsg = fmt.Sprintf("%s Rule format error:   invalide profile mode %s", reviewTypeDisplay, profileModeCfg)
 					buffer.WriteString(errMsg)
 					errCount++
@@ -3358,6 +3354,15 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 		// export process and file profiles
 		exportProcessRule(gname, &rconf, &(resptmp.Spec), acc)
+		if utils.DoesGroupHavePolicyMode(gname) {
+			for attribute, mode := range map[string]*string{"policy": resptmp.Spec.Target.PolicyMode, "profile": resptmp.Spec.ProcessProfile.Mode} {
+				if mode != nil && !share.IsValidPolicyMode(*mode) {
+					e := fmt.Sprintf("group can't be exported because of invalid %s mode %s", attribute, *mode)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return
+				}
+			}
+		}
 		if gname != api.AllHostGroup { // TODO: skip file for now
 			exportFileRule(gname, &(resptmp.Spec), acc)
 		}
