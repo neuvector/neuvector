@@ -1,9 +1,5 @@
 name: golangci-lint
 on:
-  push:
-    branches:
-      - main
-      - master
   pull_request:
 
 permissions:
@@ -16,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: stable
@@ -23,6 +21,5 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.60
-          only-new-issues: true
-          args: --timeout=30m
+          args: --timeout=30m --new-from-rev=${{ github.event.pull_request.base.sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
