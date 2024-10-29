@@ -423,44 +423,29 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	rc := req.Request
-	if rc.PolicyMode != nil && *rc.PolicyMode == share.PolicyModeEnforce &&
-		!licenseAllowEnforce() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-	if rc.ProfileMode != nil && *rc.ProfileMode == share.PolicyModeEnforce &&
-		!licenseAllowEnforce() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-	policy_mode := ""
-	if rc.PolicyMode != nil {
-		switch *rc.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-		default:
-			e := "Invalid policy mode"
-			log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+
+	if rc.PolicyMode != nil || rc.ProfileMode != nil {
+		for attribute, mode := range map[string]*string{"policy": rc.PolicyMode, "profile": rc.ProfileMode} {
+			if mode != nil && !share.IsValidPolicyMode(*mode) {
+				e := fmt.Sprintf("Invalid %s mode", attribute)
+				log.WithFields(log.Fields{"mode": *mode}).Error(e)
+				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+				return
+			}
+		}
+		policy_mode := ""
+		if rc.PolicyMode != nil {
+			policy_mode = *rc.PolicyMode
+		}
+		profile_mode := ""
+		if rc.ProfileMode != nil {
+			profile_mode = *rc.ProfileMode
+		}
+		if err := setServicePolicyModeAll(policy_mode, profile_mode, acc); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Fail to set policy and  profile mode")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 			return
 		}
-		policy_mode = *rc.PolicyMode
-	}
-	profile_mode := ""
-	if rc.ProfileMode != nil {
-		switch *rc.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-		default:
-			e := "Invalid profile mode"
-			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return
-		}
-		profile_mode = *rc.ProfileMode
-	}
-	if err := setServicePolicyModeAll(policy_mode, profile_mode, acc); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Fail to set policy and  profile mode")
-		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return
 	}
 
 	if rc.BaselineProfile != nil {
@@ -1044,13 +1029,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 	var rc *api.RESTSystemConfigConfig
 	if scope == share.ScopeLocal && rconf.Config != nil {
 		rc = rconf.Config
-		/*
-			if rc.NewServicePolicyMode != nil && *rc.NewServicePolicyMode == share.PolicyModeEnforce &&
-				licenseAllowEnforce() == false {
-				restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-				return
-			}
-		*/
+
 		if rc.WebhookUrl != nil {
 			*rc.WebhookUrl = strings.TrimSpace(*rc.WebhookUrl)
 		}
@@ -1095,22 +1074,13 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 
 			// global network service policy mode
 			if nc.NetServicePolicyMode != nil {
-				/*
-					if *nc.NetServicePolicyMode == share.PolicyModeEnforce &&
-						licenseAllowEnforce() == false {
-						restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-						return
-					}
-				*/
-				switch *nc.NetServicePolicyMode {
-				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-					cconf.NetServicePolicyMode = *nc.NetServicePolicyMode
-				default:
+				if !share.IsValidPolicyMode(*nc.NetServicePolicyMode) {
 					e := "Invalid network service policy mode"
 					log.WithFields(log.Fields{"net_service_policy_mode": *nc.NetServicePolicyMode}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 					return kick, errors.New(e)
 				}
+				cconf.NetServicePolicyMode = *nc.NetServicePolicyMode
 			}
 			if nc.DisableNetPolicy != nil {
 				cconf.DisableNetPolicy = *nc.DisableNetPolicy
@@ -1179,30 +1149,24 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				}
 			}
 
-			// New policy mode
+			// Default policy/profile modes for new services
+			for attribute, mode := range map[string]*string{"policy": rc.NewServicePolicyMode, "profile": rc.NewServiceProfileMode} {
+				if mode != nil {
+					if !share.IsValidPolicyMode(*mode) {
+						e := fmt.Sprintf("Invalid new service %s mode", attribute)
+						log.WithFields(log.Fields{"mode": *mode}).Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return kick, errors.New(e)
+					}
+				}
+			}
 			if rc.NewServicePolicyMode != nil {
-				switch *rc.NewServicePolicyMode {
-				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-					cconf.NewServicePolicyMode = *rc.NewServicePolicyMode
-				default:
-					e := "Invalid new service policy mode"
-					log.WithFields(log.Fields{"new_service_policy_mode": *rc.NewServicePolicyMode}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return kick, errors.New(e)
-				}
+				cconf.NewServicePolicyMode = *rc.NewServicePolicyMode
 			}
-			// New profile mode
 			if rc.NewServiceProfileMode != nil {
-				switch *rc.NewServiceProfileMode {
-				case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-					cconf.NewServiceProfileMode = *rc.NewServiceProfileMode
-				default:
-					e := "Invalid new service profile mode"
-					log.WithFields(log.Fields{"new_service_profile_mode": *rc.NewServiceProfileMode}).Error(e)
-					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return kick, errors.New(e)
-				}
+				cconf.NewServiceProfileMode = *rc.NewServiceProfileMode
 			}
+
 			// New baseline profile setting
 			if rc.NewServiceProfileBaseline != nil {
 				blValue := strings.ToLower(*rc.NewServiceProfileBaseline)

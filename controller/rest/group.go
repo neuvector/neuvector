@@ -317,22 +317,10 @@ func validateServiceConfig(rg *api.RESTServiceConfig) (int, string) {
 		return api.RESTErrInvalidName, e
 	}
 
-	if rg.PolicyMode != nil {
-		switch *rg.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-		default:
-			e := fmt.Sprintf("Invalid policy mode %s", *rg.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rg.PolicyMode}).Error("Invalide policy mode")
-			return api.RESTErrInvalidRequest, e
-		}
-	}
-
-	if rg.ProfileMode != nil {
-		switch *rg.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-		default:
-			e := fmt.Sprintf("Invalid profile mode %s", *rg.ProfileMode)
-			log.WithFields(log.Fields{"profile_mode": *rg.ProfileMode}).Error("Invalide profile mode")
+	for attribute, mode := range map[string]*string{"policy": rg.PolicyMode, "profile": rg.ProfileMode} {
+		if mode != nil && !share.IsValidPolicyMode(*mode) {
+			e := fmt.Sprintf("Invalid %s mode %s", attribute, *mode)
+			log.Error(e)
 			return api.RESTErrInvalidRequest, e
 		}
 	}
@@ -1077,35 +1065,10 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 
 	rc := rconf.Config
 
-	if rc.PolicyMode != nil {
-		switch *rc.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The policy mode is not enabled in the license"
-				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
-			e := fmt.Sprintf("Invalid policy mode %s", *rc.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error("Invalide policy mode")
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return
-		}
-	}
-
-	if rc.ProfileMode != nil {
-		switch *rc.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The profile mode is not enabled in the license"
-				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
-			e := fmt.Sprintf("Invalid profile mode %s", *rc.ProfileMode)
-			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error("Invalide profile mode")
+	for attribute, mode := range map[string]*string{"policy": rc.PolicyMode, "profile": rc.ProfileMode} {
+		if mode != nil && !share.IsValidPolicyMode(*mode) {
+			e := fmt.Sprintf("Invalid %s mode %s", attribute, *mode)
+			log.Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
@@ -1529,17 +1492,9 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 	rc := rconf.Config
 
 	if rc.PolicyMode != nil {
-		switch *rc.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The policy mode is not enabled in the license"
-				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
+		if !share.IsValidPolicyMode(*rc.PolicyMode) {
 			e := fmt.Sprintf("Invalid policy mode %s", *rc.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error("Invalide policy mode")
+			log.Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
@@ -1632,17 +1587,9 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 	rc := rconf.Config
 
 	if rc.ProfileMode != nil {
-		switch *rc.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The profile mode is not enabled in the license"
-				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
+		if !share.IsValidPolicyMode(*rc.ProfileMode) {
 			e := fmt.Sprintf("Invalid profile mode %s", *rc.ProfileMode)
-			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error("Invalide profile mode")
+			log.Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
