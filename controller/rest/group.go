@@ -615,10 +615,17 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Do not lock, reply on cluster.PutIfNotExist() for consistency
-	if exist, _ := cacher.DoesGroupExist(rg.Name, acc); exist {
+	if exist, err := cacher.DoesGroupExist(rg.Name, acc); exist {
 		e := "Group already exists"
 		log.WithFields(log.Fields{"name": rg.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
+		return
+	} else if err != common.ErrObjectNotFound {
+		if err == common.ErrObjectAccessDenied {
+			restRespAccessDenied(w, login)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, 0, err.Error())
+		}
 		return
 	}
 
