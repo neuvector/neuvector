@@ -1208,7 +1208,7 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
         xff = true;
         if (s->xff_app == 0) {
             //no X-Forwarded-Proto in header
-            s->xff_app = s->app?s->app:(s->base_app?s->base_app:DP_POLICY_APP_UNKNOWN);
+            s->xff_app = s->app?s->app:(s->base_app?s->base_app:(uint16_t)(DP_POLICY_APP_UNKNOWN));
         }
         if (dstlo) {
             //in service mesh's case, if dst ip is lo ip we need to

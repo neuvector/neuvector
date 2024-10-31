@@ -698,7 +698,7 @@ static int check_group_coordinator_request(dpi_packet_t *p, kafka_data_t * data,
         return size_left < 0 ? -1 : str_len;
     } 
     str_len = get_short_string_len(ptr, pleft);
-    ptr += str_len; size_left -= str_len;
+    size_left -= str_len;
     if (str_len <= 0 || size_left < 0) {
         DEBUG_LOG(DBG_PARSER, p, "Not Kafka group coordinator group id\n");
         return size_left < 0 ? -1 : str_len;
@@ -715,7 +715,7 @@ static int check_controlled_shutdown_request(dpi_packet_t *p, kafka_data_t * dat
     DEBUG_LOG(DBG_PARSER, p, "Kafka Controlled shutdown request\n");
 
     str_len = get_short_string_len(ptr, pleft);
-    ptr += str_len; size_left -= str_len;
+    size_left -= str_len;
     if (str_len <= 0 || size_left < 0) {
         DEBUG_LOG(DBG_PARSER, p, "Not Kafka client id\n");
         return size_left < 0 ? -1 : str_len;
@@ -758,6 +758,7 @@ static int check_api_key(dpi_packet_t *p, kafka_data_t * data, uint16_t api_key,
     case LIST_GROUPS              :
     default:
         DEBUG_LOG(DBG_PARSER, p, "Kafka unchecked api key: %d\n",api_key);
+        data->checked_request = false;
         return 1;
     }
 }
@@ -1035,14 +1036,14 @@ static void kafka_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_kafka = {
-    new_session: kafka_new_session,
-    delete_data: kafka_delete_data,
-    parser:      kafka_parser,
-    new_mid_sess:kafka_new_mid_sess,
-    midstream:   kafka_midstream,
-    name:        "kafka",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_KAFKA,
+    .new_session = kafka_new_session,
+    .delete_data = kafka_delete_data,
+    .parser = kafka_parser,
+    .new_mid_sess = kafka_new_mid_sess,
+    .midstream = kafka_midstream,
+    .name = "kafka",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_KAFKA,
 };
 
 dpi_parser_t *dpi_kafka_parser(void)

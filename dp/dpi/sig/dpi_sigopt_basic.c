@@ -26,8 +26,8 @@ static dpi_sigopt_status_t dpi_sigopt_sig_id_parser (char *value, dpi_sig_t *sig
 }
 
 static dpi_sigopt_api_t SIGOPTSigID = {
-    type:   DPI_SIGOPT_SIG_ID,
-    parser: dpi_sigopt_sig_id_parser,
+    .type = DPI_SIGOPT_SIG_ID,
+    .parser = dpi_sigopt_sig_id_parser,
 };
 
 dpi_sigopt_api_t *dpi_sigopt_sig_id_register (void)
@@ -74,8 +74,8 @@ static dpi_sigopt_status_t dpi_sigopt_name_parser (char *value, dpi_sig_t *sig)
 }
 
 static dpi_sigopt_api_t SIGOPTName = {
-    type:   DPI_SIGOPT_NAME,
-    parser: dpi_sigopt_name_parser,
+    .type = DPI_SIGOPT_NAME,
+    .parser = dpi_sigopt_name_parser,
 };
 
 dpi_sigopt_api_t *dpi_sigopt_name_register (void)

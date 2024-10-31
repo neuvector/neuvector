@@ -157,8 +157,8 @@ static int net_run(const char *in_iface)
     pthread_t timer_thr;
     pthread_t bld_dlp_thr;
     pthread_t dp_thr[MAX_DP_THREADS];
-    int i, timer_thr_id, bld_dlp_thr_id, thr_id[MAX_DP_THREADS];
-
+    int i, j, timer_thr_id, bld_dlp_thr_id, thr_id[MAX_DP_THREADS];
+    bool thr_create[MAX_DP_THREADS];
     DEBUG_FUNC_ENTRY(DBG_INIT);
 
     g_running = true;
@@ -168,6 +168,9 @@ static int net_run(const char *in_iface)
     signal(SIGQUIT, dp_signal_exit);
     signal(SIGUSR1, dp_signal_dump_policy);
 
+    for (j = 0; j < MAX_DP_THREADS; j++) {
+        thr_create[j] = false;
+    }
     // Calculate number of dp threads
     if (g_dp_threads == 0) {
         g_dp_threads = count_cpu();
@@ -184,6 +187,7 @@ static int net_run(const char *in_iface)
 
     for (i = 0; i < g_dp_threads; i ++) {
         thr_id[i] = i;
+        thr_create[i] = true;
         pthread_create(&dp_thr[i], NULL, dp_data_thr, &thr_id[i]);
     }
 
@@ -197,7 +201,9 @@ static int net_run(const char *in_iface)
     pthread_join(timer_thr, NULL);
     pthread_join(bld_dlp_thr, NULL);
     for (i = 0; i < g_dp_threads; i ++) {
-        pthread_join(dp_thr[i], NULL);
+        if (thr_create[i]) {
+            pthread_join(dp_thr[i], NULL);
+        }
     }
 
     return 0;

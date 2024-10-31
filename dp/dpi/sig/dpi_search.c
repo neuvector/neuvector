@@ -381,6 +381,7 @@ dpi_sig_user_t* dpi_find_sig_user(struct cds_list_head *sig_user_list, dpi_sig_t
     dpi_sig_user_link_t *new_sig_user_link = (dpi_sig_user_link_t *)calloc(1, sizeof(dpi_sig_user_link_t));
     if (!new_sig_user_link) {
         DEBUG_DLP("OOM while creating new sig user link\n");
+        free(new_user);
         return NULL;
     }
     new_sig_user_link->sig_user = new_user;
@@ -461,47 +462,47 @@ typedef struct dpi_dlp_context_status_ {
 } dpi_dlp_context_status_t;
 
 static dpi_dlp_context_status_t base_app_dlp_context_status[] = {
-[DPI_APP_HTTP - DPI_APP_BASE_START]             {1, 1, 1,},
-[DPI_APP_SSL - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_SSH - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_DNS - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_DHCP - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_NTP - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_TFTP - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_ECHO - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_RTSP - DPI_APP_BASE_START]             {0, 0, 0,},
-[DPI_APP_SIP - DPI_APP_BASE_START]             {0, 0, 0,},
+[DPI_APP_HTTP - DPI_APP_BASE_START] = {1, 1, 1,},
+[DPI_APP_SSL - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_SSH - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_DNS - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_DHCP - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_NTP - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_TFTP - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_ECHO - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_RTSP - DPI_APP_BASE_START] = {0, 0, 0,},
+[DPI_APP_SIP - DPI_APP_BASE_START] = {0, 0, 0,},
 };
 
 static dpi_dlp_context_status_t app_dlp_context_status[] = {
-[DPI_APP_MYSQL - DPI_APP_PROTO_MARK]                 {0, 0, 0,},
-[DPI_APP_REDIS - DPI_APP_PROTO_MARK]                 {0, 0, 0,},
-[DPI_APP_ZOOKEEPER - DPI_APP_PROTO_MARK]             {0, 0, 0,},
-[DPI_APP_CASSANDRA - DPI_APP_PROTO_MARK]             {0, 0, 0,},
-[DPI_APP_MONGODB - DPI_APP_PROTO_MARK]               {0, 0, 0,},
-[DPI_APP_POSTGRESQL - DPI_APP_PROTO_MARK]            {0, 0, 0,},
-[DPI_APP_KAFKA - DPI_APP_PROTO_MARK]                 {0, 0, 0,},
-[DPI_APP_COUCHBASE - DPI_APP_PROTO_MARK]             {0, 0, 0,},
-[DPI_APP_WORDPRESS - DPI_APP_PROTO_MARK]             {1, 1, 1,},
-[DPI_APP_ACTIVEMQ - DPI_APP_PROTO_MARK]              {0, 0, 0,},
-[DPI_APP_COUCHDB - DPI_APP_PROTO_MARK]               {1, 1, 1,},
-[DPI_APP_ELASTICSEARCH - DPI_APP_PROTO_MARK]         {0, 0, 0,},
-[DPI_APP_MEMCACHED - DPI_APP_PROTO_MARK]             {0, 0, 0,},
-[DPI_APP_RABBITMQ - DPI_APP_PROTO_MARK]              {0, 0, 0,},
-[DPI_APP_RADIUS - DPI_APP_PROTO_MARK]                {0, 0, 0,},
-[DPI_APP_VOLTDB - DPI_APP_PROTO_MARK]                {0, 0, 0,},
-[DPI_APP_CONSUL - DPI_APP_PROTO_MARK]                {0, 0, 0,},
-[DPI_APP_SYSLOG - DPI_APP_PROTO_MARK]                {0, 0, 0,},
-[DPI_APP_ETCD - DPI_APP_PROTO_MARK]                  {1, 1, 1,},
-[DPI_APP_SPARK - DPI_APP_PROTO_MARK]                 {0, 0, 0,},
-[DPI_APP_APACHE - DPI_APP_PROTO_MARK]                {1, 1, 1,},
-[DPI_APP_NGINX - DPI_APP_PROTO_MARK]                 {1, 1, 1,},
-[DPI_APP_JETTY - DPI_APP_PROTO_MARK]                 {1, 1, 1,},
-[DPI_APP_NODEJS - DPI_APP_PROTO_MARK]                {0, 0, 0,},
-[DPI_APP_ERLANG_EPMD - DPI_APP_PROTO_MARK]           {0, 0, 0,},
-[DPI_APP_TNS - DPI_APP_PROTO_MARK]                   {0, 0, 0,},
-[DPI_APP_TDS - DPI_APP_PROTO_MARK]                   {0, 0, 0,},
-[DPI_APP_GRPC - DPI_APP_PROTO_MARK]                  {0, 0, 0,},
+[DPI_APP_MYSQL - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_REDIS - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_ZOOKEEPER - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_CASSANDRA - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_MONGODB - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_POSTGRESQL - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_KAFKA - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_COUCHBASE - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_WORDPRESS - DPI_APP_PROTO_MARK] = {1, 1, 1,},
+[DPI_APP_ACTIVEMQ - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_COUCHDB - DPI_APP_PROTO_MARK] = {1, 1, 1,},
+[DPI_APP_ELASTICSEARCH - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_MEMCACHED - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_RABBITMQ - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_RADIUS - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_VOLTDB - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_CONSUL - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_SYSLOG - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_ETCD - DPI_APP_PROTO_MARK] = {1, 1, 1,},
+[DPI_APP_SPARK - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_APACHE - DPI_APP_PROTO_MARK] = {1, 1, 1,},
+[DPI_APP_NGINX - DPI_APP_PROTO_MARK] = {1, 1, 1,},
+[DPI_APP_JETTY - DPI_APP_PROTO_MARK] = {1, 1, 1,},
+[DPI_APP_NODEJS - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_ERLANG_EPMD - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_TNS - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_TDS - DPI_APP_PROTO_MARK] = {0, 0, 0,},
+[DPI_APP_GRPC - DPI_APP_PROTO_MARK] = {0, 0, 0,},
 };
 
 static bool dpi_support_dlp_context (dpi_packet_t *p, dpi_sig_context_class_t c)
@@ -900,7 +901,6 @@ bool dpi_process_detector(dpi_packet_t *p)
     p->dlp_candidates = 0;
     p->dlp_candidates_overflow = 0;
     p->has_dlp_candidates = 0;
-    continue_detect = true;
 
     continue_detect = dpi_dlp_search_detector_tree(p, tree);
 

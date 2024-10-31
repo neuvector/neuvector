@@ -112,7 +112,6 @@ static void cassandra_parser(dpi_packet_t *p)
         }
     }
     uint32_t    packet_len;
-    uint32_t    left=len;
     uint32_t    opcode;
     if (version < 3) {
         if (len < 8) {
@@ -120,14 +119,12 @@ static void cassandra_parser(dpi_packet_t *p)
         }
         opcode = ptr[3];
         packet_len = ntohl(*(uint32_t *)(ptr+4));
-        left -=8;
     } else if (version <= 4) {
         if (len < 9) {
             return;
         }
         opcode = ptr[4];
         packet_len = ntohl(*(uint32_t *)(ptr+5));
-        left -=9;
     } else {
         dpi_fire_parser(p);
         DEBUG_LOG(DBG_PARSER, p, "Not cassandra: version should be 0-4\n");
@@ -172,12 +169,12 @@ static void cassandra_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_cassandra = {
-    new_session: cassandra_new_session,
-    delete_data: cassandra_delete_data,
-    parser:      cassandra_parser,
-    name:        "cassandra",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_CASSANDRA,
+    .new_session = cassandra_new_session,
+    .delete_data = cassandra_delete_data,
+    .parser = cassandra_parser,
+    .name = "cassandra",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_CASSANDRA,
 };
 
 dpi_parser_t *dpi_cassandra_parser(void)

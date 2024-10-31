@@ -129,7 +129,7 @@ uint16_t get_ip_cksum(struct iphdr *iph)
 
 int dpi_parse_embed_icmp(dpi_packet_t *p)
 {
-    struct icmphdr *icmph = (struct icmphdr *)(p->pkt + p->l4);
+    struct icmphdr *icmph;
     uint16_t icmp_len = p->len - p->l4;
     struct iphdr *iph;
     uint16_t ip_len, iph_len;
@@ -235,7 +235,7 @@ static int dpi_parse_ipv6_ext4embed_icmp(struct ip6_hdr *ip6h, uint8_t *ptr, uin
 
 int dpi_parse_embed_icmpv6(dpi_packet_t *p)
 {
-    struct icmp6_hdr *icmp6h = (struct icmp6_hdr *)(p->pkt + p->l4);
+    struct icmp6_hdr *icmp6h;
     uint16_t icmp6_len = p->len - p->l4;
     struct ip6_hdr *ip6h;
     int offset;
@@ -450,22 +450,22 @@ static int dpi_parse_udp(dpi_packet_t *p)
 }
 
 static uint8_t tcp_opt_len[TCP_OPT_MAX] = {
-    [TCP_OPT_EOL]          1,
-    [TCP_OPT_NOP]          1,
-    [TCP_OPT_MSS]          4,
-    [TCP_OPT_WSCALE]       3,
-    [TCP_OPT_SACKOK]       2,
-    [TCP_OPT_ECHO]         6,
-    [TCP_OPT_ECHOREPLY]    6,
-    [TCP_OPT_TIMESTAMP]    10,
-    [TCP_OPT_PARTIAL_PERM] 2,
-    [TCP_OPT_PARTIAL_SVC]  3,
-    [TCP_OPT_CC]           6,
-    [TCP_OPT_CC_NEW]       6,
-    [TCP_OPT_CC_ECHO]      6,
-    [TCP_OPT_ALTCSUM_ALGO] 3,
-    [TCP_OPT_TRAILER_CSUM] 3,
-    [TCP_OPT_MD5]          18,
+    [TCP_OPT_EOL] = 1,
+    [TCP_OPT_NOP] = 1,
+    [TCP_OPT_MSS] = 4,
+    [TCP_OPT_WSCALE] = 3,
+    [TCP_OPT_SACKOK] = 2,
+    [TCP_OPT_ECHO] = 6,
+    [TCP_OPT_ECHOREPLY] = 6,
+    [TCP_OPT_TIMESTAMP] = 10,
+    [TCP_OPT_PARTIAL_PERM] = 2,
+    [TCP_OPT_PARTIAL_SVC] = 3,
+    [TCP_OPT_CC] = 6,
+    [TCP_OPT_CC_NEW] = 6,
+    [TCP_OPT_CC_ECHO] = 6,
+    [TCP_OPT_ALTCSUM_ALGO] = 3,
+    [TCP_OPT_TRAILER_CSUM] = 3,
+    [TCP_OPT_MD5] = 18,
 };
 
 static int dpi_parse_tcp_options(dpi_packet_t *p)

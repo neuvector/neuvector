@@ -44,12 +44,12 @@ static void dhcp_new_session(dpi_packet_t *p)
 }
 
 static dpi_parser_t dpi_parser_dhcp = {
-    new_session: dhcp_new_session,
-    delete_data: NULL,
-    parser:      dhcp_parser,
-    name:        "dhcp",
-    ip_proto:    IPPROTO_UDP,
-    type:        DPI_PARSER_DHCP,
+    .new_session = dhcp_new_session,
+    .delete_data = NULL,
+    .parser = dhcp_parser,
+    .name = "dhcp",
+    .ip_proto = IPPROTO_UDP,
+    .type = DPI_PARSER_DHCP,
 };
 
 dpi_parser_t *dpi_dhcp_parser(void)

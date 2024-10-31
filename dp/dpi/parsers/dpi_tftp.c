@@ -121,7 +121,7 @@ static void tftp_udp_parser(dpi_packet_t *p)
     uint16_t opcode = htons(*(uint16_t *)(ptr));
 
     if (opcode != TFTP_RRQ && opcode != TFTP_WRQ && opcode != TFTP_DATA && 
-            opcode != TFTP_ACK && opcode != TFTP_ERROR && opcode != TFTP_OACK && TFTP_INFO) {
+            opcode != TFTP_ACK && opcode != TFTP_ERROR && opcode != TFTP_OACK && opcode != TFTP_INFO) {
         dpi_fire_parser(p);
         return ;
     }
@@ -168,12 +168,12 @@ static void tftp_new_session(dpi_packet_t *p)
 }
 
 static dpi_parser_t dpi_parser_tftp_udp = {
-    new_session: tftp_new_session,
-    delete_data: NULL,
-    parser:      tftp_udp_parser,
-    name:        "tftp",
-    ip_proto:    IPPROTO_UDP,
-    type:        DPI_PARSER_TFTP,
+    .new_session = tftp_new_session,
+    .delete_data = NULL,
+    .parser = tftp_udp_parser,
+    .name = "tftp",
+    .ip_proto = IPPROTO_UDP,
+    .type = DPI_PARSER_TFTP,
 };
 
 dpi_parser_t *dpi_tftp_udp_parser(void)

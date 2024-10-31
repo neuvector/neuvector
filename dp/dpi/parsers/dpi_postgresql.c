@@ -216,12 +216,12 @@ static void postgresql_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_postgresql = {
-    new_session: postgresql_new_session,
-    delete_data: postgresql_delete_data,
-    parser:      postgresql_parser,
-    name:        "postgresql",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_POSTGRESQL,
+    .new_session = postgresql_new_session,
+    .delete_data = postgresql_delete_data,
+    .parser = postgresql_parser,
+    .name = "postgresql",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_POSTGRESQL,
 };
 
 dpi_parser_t *dpi_postgresql_parser(void)

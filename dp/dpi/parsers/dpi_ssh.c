@@ -139,7 +139,6 @@ static void ssh_parser(dpi_packet_t *p)
         }
     } else if (dpi_is_seq_in_pkt(p, w->seq)) {
         uint32_t shift = u32_distance(dpi_pkt_seq(p), w->seq);
-        ptr = dpi_pkt_ptr(p) + shift;
         len = dpi_pkt_len(p) - shift;
     } else {
         dpi_fire_parser(p);
@@ -162,12 +161,12 @@ static void ssh_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_ssh = {
-    new_session: ssh_new_session,
-    delete_data: ssh_delete_data,
-    parser:      ssh_parser,
-    name:        "ssh",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_SSH,
+    .new_session = ssh_new_session,
+    .delete_data = ssh_delete_data,
+    .parser = ssh_parser,
+    .name = "ssh",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_SSH,
 };
 
 dpi_parser_t *dpi_ssh_parser(void)

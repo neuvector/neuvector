@@ -73,8 +73,8 @@ static dpi_sigopt_status_t dpi_sigopt_context_parser (char *value, dpi_sig_t *si
 }
 
 dpi_sigopt_api_t SIGOPTContext = {
-    type:    DPI_SIGOPT_CONTEXT,
-    parser:  dpi_sigopt_context_parser,
+    .type = DPI_SIGOPT_CONTEXT,
+    .parser = dpi_sigopt_context_parser,
 };
 
 dpi_sigopt_api_t *dpi_sigopt_context_register (void)
@@ -533,10 +533,10 @@ static dpi_sigopt_status_t dpi_sigopt_pcre_parser (char *value, dpi_sig_t *sig)
 }
 
 dpi_sigopt_api_t SIGOPTIONPcre = {
-    type:    DPI_SIGOPT_PCRE,
-    parser:  dpi_sigopt_pcre_parser, 
-    handler: dpi_sigopt_pcre_handler,
-    release: dpi_sigopt_pcre_pattern_release,
+    .type = DPI_SIGOPT_PCRE,
+    .parser = dpi_sigopt_pcre_parser, 
+    .handler = dpi_sigopt_pcre_handler,
+    .release = dpi_sigopt_pcre_pattern_release,
 };
 
 dpi_sigopt_api_t *dpi_sigopt_pcre_register (void)

@@ -401,12 +401,12 @@ static void couchbase_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_couchbase = {
-    new_session: couchbase_new_session,
-    delete_data: couchbase_delete_data,
-    parser:      couchbase_parser,
-    name:        "couchbase",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_COUCHBASE,
+    .new_session = couchbase_new_session,
+    .delete_data = couchbase_delete_data,
+    .parser = couchbase_parser,
+    .name = "couchbase",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_COUCHBASE,
 };
 
 dpi_parser_t *dpi_couchbase_parser(void)

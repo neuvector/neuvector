@@ -144,12 +144,12 @@ static void mongodb_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_mongodb = {
-    new_session: mongodb_new_session,
-    delete_data: mongodb_delete_data,
-    parser:      mongodb_parser,
-    name:        "mongodb",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_MONGODB,
+    .new_session = mongodb_new_session,
+    .delete_data = mongodb_delete_data,
+    .parser = mongodb_parser,
+    .name = "mongodb",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_MONGODB,
 };
 
 dpi_parser_t *dpi_mongodb_parser(void)

@@ -317,7 +317,7 @@ char **str_split (const char *s, const char *delim, int *count)
 {
     char *str, *p, *token, *dummy;
     char **tokens;
-    int i;
+    int i, len;
 
     *count = 0;
 
@@ -329,14 +329,17 @@ char **str_split (const char *s, const char *delim, int *count)
     if (str == NULL) {
         return NULL;
     }
-
+    len = strlen(str);
     p = str;
     token = strtok_r(p, delim, &dummy);
     while (token) {
         (*count) ++;
         token = strtok_r(NULL, delim, &dummy);
     }
-
+    if (*count == 0) {
+        free(str);
+        return NULL;
+    }
     tokens = (char **)calloc(*count, sizeof(char *));
     if (tokens == NULL) {
         free(str);
@@ -344,7 +347,7 @@ char **str_split (const char *s, const char *delim, int *count)
         return NULL;
     }
 
-    strcpy(str, s);
+    strlcpy(str, s, len+1);
     p = str;
     i = 0;
 

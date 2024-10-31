@@ -425,7 +425,7 @@ static int dns_parser(dpi_packet_t *p, uint8_t *ptr, uint32_t len)
         }
     }
 
-    if (qt_count > 0 && aw_count > 0) {
+    if (qt_count > 0 && aw_count > 0 && questions != NULL && answers != NULL) {
         get_domain_ip_mapping(p, questions, qd, answers, an);
     }
     if (questions != NULL){
@@ -601,21 +601,21 @@ static void dns_udp_new_session(dpi_packet_t *p)
 }
 
 static dpi_parser_t dpi_parser_dns_tcp = {
-    new_session: dns_tcp_new_session,
-    delete_data: dns_tcp_delete_data,
-    parser:      dns_tcp_parser,
-    name:        "dns",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_DNS,
+    .new_session = dns_tcp_new_session,
+    .delete_data = dns_tcp_delete_data,
+    .parser = dns_tcp_parser,
+    .name = "dns",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_DNS,
 };
 
 static dpi_parser_t dpi_parser_dns_udp = {
-    new_session: dns_udp_new_session,
-    delete_data: NULL,
-    parser:      dns_udp_parser,
-    name:        "dns",
-    ip_proto:    IPPROTO_UDP,
-    type:        DPI_PARSER_DNS,
+    .new_session = dns_udp_new_session,
+    .delete_data = NULL,
+    .parser = dns_udp_parser,
+    .name = "dns",
+    .ip_proto = IPPROTO_UDP,
+    .type = DPI_PARSER_DNS,
 };
 
 dpi_parser_t *dpi_dns_tcp_parser(void)

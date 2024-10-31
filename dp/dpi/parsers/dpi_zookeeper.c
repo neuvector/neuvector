@@ -74,7 +74,6 @@ static bool parse_zk_election(dpi_packet_t *p,uint8_t * ptr,uint32_t len, zookee
     } else if (dp->elec_status == ELECT_STATUS_INIT) {
         if (check_len(ptr, 32, len)) {
             pkt_len = GET_BIG_INT32(ptr);
-            ptr += 4;
             if (pkt_len != 0x1c) {
                 DEBUG_LOG(DBG_PARSER, p, "Not Zookeeper Election second packet: %d\n",pkt_len);
                 dp->elec_status = ELECT_STATUS_INVALID;
@@ -91,7 +90,6 @@ static bool parse_zk_election(dpi_packet_t *p,uint8_t * ptr,uint32_t len, zookee
     } else if (dp->elec_status == ELECT_STATUS_FOLLOW) {
         if (check_len(ptr, 32, len)) {
             pkt_len = GET_BIG_INT32(ptr);
-            ptr += 4;
             if (pkt_len != 0x1c) {
                 DEBUG_LOG(DBG_PARSER, p, "Not Zookeeper Election second packet: %d\n",pkt_len);
                 dp->elec_status = ELECT_STATUS_INVALID;
@@ -409,14 +407,14 @@ static void zookeeper_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_zookeeper_tcp = {
-    new_session: zookeeper_new_session,
-    delete_data: zookeeper_delete_data,
-    parser:      zookeeper_tcp_parser,
-    new_mid_sess:zookeeper_new_mid_sess,
-    midstream:   zookeeper_tcp_midstream,
-    name:        "zookeeper",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_ZOOKEEPER,
+    .new_session = zookeeper_new_session,
+    .delete_data = zookeeper_delete_data,
+    .parser = zookeeper_tcp_parser,
+    .new_mid_sess = zookeeper_new_mid_sess,
+    .midstream = zookeeper_tcp_midstream,
+    .name = "zookeeper",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_ZOOKEEPER,
 };
 
 dpi_parser_t *dpi_zookeeper_tcp_parser(void)
@@ -425,12 +423,12 @@ dpi_parser_t *dpi_zookeeper_tcp_parser(void)
 }
 
 static dpi_parser_t dpi_parser_zookeeper_udp = {
-    new_session: zookeeper_new_session,
-    delete_data: zookeeper_delete_data,
-    parser:      zookeeper_udp_parser,
-    name:        "zookeeper",
-    ip_proto:    IPPROTO_UDP,
-    type:        DPI_PARSER_ZOOKEEPER,
+    .new_session = zookeeper_new_session,
+    .delete_data = zookeeper_delete_data,
+    .parser = zookeeper_udp_parser,
+    .name = "zookeeper",
+    .ip_proto = IPPROTO_UDP,
+    .type = DPI_PARSER_ZOOKEEPER,
 };
 
 dpi_parser_t *dpi_zookeeper_udp_parser(void)

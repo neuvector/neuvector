@@ -52,12 +52,12 @@ uint32_t debug_name2level(const char *name)
 }
 
 static char *action_name[] = {
-[DPI_ACTION_NONE]   "NONE",
-[DPI_ACTION_ALLOW]  "ALLOW",
-[DPI_ACTION_DROP]   "DROP",
-[DPI_ACTION_RESET]  "RESET",
-[DPI_ACTION_BYPASS] "BYPASS",
-[DPI_ACTION_BLOCK]  "BLOCK",
+[DPI_ACTION_NONE] = "NONE",
+[DPI_ACTION_ALLOW] = "ALLOW",
+[DPI_ACTION_DROP] = "DROP",
+[DPI_ACTION_RESET] = "RESET",
+[DPI_ACTION_BYPASS] = "BYPASS",
+[DPI_ACTION_BLOCK] = "BLOCK",
 };
 
 const char *debug_action_name(int act)

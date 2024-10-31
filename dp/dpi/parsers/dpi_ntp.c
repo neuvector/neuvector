@@ -77,12 +77,12 @@ static void ntp_new_session(dpi_packet_t *p)
 }
 
 static dpi_parser_t dpi_parser_ntp_udp = {
-    new_session: ntp_new_session,
-    delete_data: NULL,
-    parser:      ntp_udp_parser,
-    name:        "ntp",
-    ip_proto:    IPPROTO_UDP,
-    type:        DPI_PARSER_NTP,
+    .new_session = ntp_new_session,
+    .delete_data = NULL,
+    .parser = ntp_udp_parser,
+    .name = "ntp",
+    .ip_proto = IPPROTO_UDP,
+    .type = DPI_PARSER_NTP,
 };
 
 dpi_parser_t *dpi_ntp_udp_parser(void)

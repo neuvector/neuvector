@@ -660,12 +660,12 @@ static void tns_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_tns = {
-    new_session: tns_new_session,
-    delete_data: tns_delete_data,
-    parser:      tns_parser,
-    name:        "tns",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_TNS,
+    .new_session = tns_new_session,
+    .delete_data = tns_delete_data,
+    .parser = tns_parser,
+    .name = "tns",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_TNS,
 };
 
 dpi_parser_t *dpi_tns_tcp_parser(void)
