@@ -450,8 +450,10 @@ static int dp_ctrl_add_mac(json_t *msg)
     DEBUG_CTRL("mac=%s ucmac=%s oldmac=%s pmac=%s\n", mac_str, ucmac_str, oldmac_str, pmac_str);
 
     buf = calloc(1, sizeof(io_mac_t) * 3 + sizeof(*ep));
-    if (buf == NULL) return -1;
-
+    if (buf == NULL) {
+        free(pips);
+        return -1;
+    }
     // buf ->
     //   io_mac_t:     mac
     //   io_mac_t:     ucmac
@@ -1545,6 +1547,7 @@ static int dp_ctrl_cfg_internal_net(json_t *msg, bool internal)
             } else {
                 DEBUG_ERROR(DBG_CTRL, "missed policy addr msg start!\n");
             }
+            free(subnet4);
             return -1;
         }
         tsubnet4 = calloc(sizeof(io_internal_subnet4_t) + (t_internal_subnet4->count + count) * sizeof(io_subnet4_t), 1);
@@ -1642,6 +1645,7 @@ static int dp_ctrl_cfg_specialip_net(json_t *msg)
     } else {
         if (!t_specialip_subnet4) {
             DEBUG_ERROR(DBG_CTRL, "missed special ip msg start!\n");
+            free(subnet4);
             return -1;
         }
         tsubnet4 = calloc(sizeof(io_spec_internal_subnet4_t) + (t_specialip_subnet4->count + count) * sizeof(io_spec_subnet4_t), 1);

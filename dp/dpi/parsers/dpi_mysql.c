@@ -150,7 +150,7 @@ static int server_greet(dpi_packet_t *p, uint8_t *ptr, int pkt_len)
         if (cap2 & MYSQL_CAP2_PLUGIN_AUTH) {
             eos = consume_string(ptr, len);
             if (eos == NULL || eos - ptr != auth_len) return -1;
-            ptr = eos + 1; len = end - ptr;
+            ptr = eos + 1;
         }
 
         // end is reached
@@ -249,8 +249,6 @@ static void mysql_parser(dpi_packet_t *p)
         uint32_t shift = u32_distance(dpi_pkt_seq(p), w->seq);
         ptr = dpi_pkt_ptr(p) + shift;
         len = dpi_pkt_len(p) - shift;
-
-        expect = GET_LITTLE_INT24(ptr);
     } else {
         dpi_fire_parser(p);
         return;
@@ -414,12 +412,12 @@ static void mysql_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_mysql = {
-    new_session: mysql_new_session,
-    delete_data: mysql_delete_data,
-    parser:      mysql_parser,
-    name:        "mysql",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_MYSQL,
+    .new_session = mysql_new_session,
+    .delete_data = mysql_delete_data,
+    .parser = mysql_parser,
+    .name = "mysql",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_MYSQL,
 };
 
 dpi_parser_t *dpi_mysql_parser(void)

@@ -142,7 +142,7 @@ static void ipfrag_hold(ip4frag_trac_t *trac, dpi_packet_t *p)
 
 static bool ipfrag_construct(ip4frag_trac_t *trac, dpi_packet_t *p)
 {
-    struct iphdr *iph = (struct iphdr *)(p->pkt + p->l3);
+    struct iphdr *iph;
     clip_t cons;
     asm_result_t ret;
 
@@ -311,7 +311,7 @@ static void ip6frag_hold(ip6frag_trac_t *trac, dpi_packet_t *p)
 
 static bool ip6frag_construct(ip6frag_trac_t *trac, dpi_packet_t *p)
 {
-    struct ip6_hdr *ip6h = (struct ip6_hdr *)(p->pkt + p->l3);
+    struct ip6_hdr *ip6h;
     clip_t cons;
     asm_result_t ret;
 

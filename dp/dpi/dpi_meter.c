@@ -13,13 +13,13 @@ void log_session_flags(DPMsgThreatLog *log, dpi_session_t *sess);
 void log_session_detail(DPMsgThreatLog *log, dpi_session_t *sess);
 
 static meter_info_t meter_info[] = {
-[DPI_METER_SYN_FLOOD]      {"syn_flood", METER_ID_SYN_FLOOD, DPI_THRT_TCP_FLOOD, true, false, true, false,
+[DPI_METER_SYN_FLOOD] = {"syn_flood", METER_ID_SYN_FLOOD, DPI_THRT_TCP_FLOOD, true, false, true, false,
                             3, 30, 1, 200, 200},
-[DPI_METER_ICMP_FLOOD]     {"icmp_flood", METER_ID_ICMP_FLOOD, DPI_THRT_ICMP_FLOOD, true, false, true, false,
+[DPI_METER_ICMP_FLOOD] = {"icmp_flood", METER_ID_ICMP_FLOOD, DPI_THRT_ICMP_FLOOD, true, false, true, false,
                             3, 30, 1, 100, 100},
-[DPI_METER_IP_SRC_SESSION] {"ip_src_session", METER_ID_IP_SRC_SESSION, DPI_THRT_IP_SRC_SESSION, false, false, true, true,
+[DPI_METER_IP_SRC_SESSION] = {"ip_src_session", METER_ID_IP_SRC_SESSION, DPI_THRT_IP_SRC_SESSION, false, false, true, true,
                             3, 30, 1, 2000, 2000},
-[DPI_METER_TCP_NODATA]     {"tcp_nodata", METER_ID_TCP_NODATA, DPI_THRT_TCP_NODATA, true, false, true, false,
+[DPI_METER_TCP_NODATA] = {"tcp_nodata", METER_ID_TCP_NODATA, DPI_THRT_TCP_NODATA, true, false, true, false,
                             10, 0, 10, 10, 10},
 };
 
@@ -217,7 +217,7 @@ int dpi_meter_packet_inc(uint8_t type, dpi_packet_t *p)
     if (!dpi_threat_status(log_id)) return DPI_METER_ACTION_NONE;
     // if (!(p->flags & DPI_PKT_FLAG_INGRESS)) return DPI_METER_ACTION_NONE;
 
-    bool ipv4, fire = false, create = false;
+    bool ipv4 = false, fire = false, create = false;
     uint8_t *peer_ip;
 
     if (likely(p->eth_type == ETH_P_IP)) {

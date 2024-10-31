@@ -237,14 +237,14 @@ static void spark_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_spark = {
-    new_session: spark_new_session,
-    delete_data: spark_delete_data,
-    parser:      spark_parser,
-    new_mid_sess:spark_new_mid_sess,
-    midstream:   spark_midstream,
-    name:        "spark",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_SPARK,
+    .new_session = spark_new_session,
+    .delete_data = spark_delete_data,
+    .parser = spark_parser,
+    .new_mid_sess = spark_new_mid_sess,
+    .midstream = spark_midstream,
+    .name = "spark",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_SPARK,
 };
 
 dpi_parser_t *dpi_spark_parser(void)

@@ -121,12 +121,12 @@ typedef struct proc_info_ {
 #define RC_CONFIG_OVS 2
 
 static proc_info_t g_procs[PROC_MAX] = {
-[PROC_CTRL]                {"ctrl", "/usr/local/bin/controller", },
-[PROC_SCANNER]             {"scanner", "/usr/local/bin/scanner", },
-[PROC_DP]                  {"dp", "/usr/local/bin/dp", },
-[PROC_AGENT]               {"agent", "/usr/local/bin/agent", },
-[PROC_SCANNER_STANDALONE]  {"scanner", "/usr/local/bin/scanner", },
-[PROC_CTRL_OPA]            {"opa", "/usr/local/bin/opa", },
+[PROC_CTRL] = {"ctrl", "/usr/local/bin/controller", },
+[PROC_SCANNER] = {"scanner", "/usr/local/bin/scanner", },
+[PROC_DP] = {"dp", "/usr/local/bin/dp", },
+[PROC_AGENT] = {"agent", "/usr/local/bin/agent", },
+[PROC_SCANNER_STANDALONE] = {"scanner", "/usr/local/bin/scanner", },
+[PROC_CTRL_OPA] = {"opa", "/usr/local/bin/opa", },
 };
 
 static uint32_t g_dp_last_hb[MAX_DP_THREADS], g_dp_miss_hb[MAX_DP_THREADS];
@@ -895,7 +895,6 @@ int main (int argc, char **argv)
         g_dp_last_hb[i] = g_dp_miss_hb[i] = g_shm->dp_hb[i] = 0;
     }
 
-    ret = 0;
     switch (g_mode) {
     case MODE_CTRL:
         g_procs[PROC_CTRL].active = true;
@@ -908,7 +907,10 @@ int main (int argc, char **argv)
         break;
     case MODE_AGENT:
         ret = system(SCRIPT_SYSCTL);
-
+        if (ret != 0) {
+            debug("WARNING: sysctl failed to load /etc/sysctl.conf (including net.core.somaxconn and net.unix.max_dgram_qlen)."
+                  "It might have a performance implication on the system. rc = %d.\n", ret);
+        }
         g_procs[PROC_DP].active = true;
         g_procs[PROC_AGENT].active = true;
 
@@ -921,6 +923,10 @@ int main (int argc, char **argv)
         break;
     case MODE_CTRL_AGENT:
         ret = system(SCRIPT_SYSCTL);
+        if (ret != 0) {
+            debug("WARNING: sysctl failed to load /etc/sysctl.conf (including net.core.somaxconn and net.unix.max_dgram_qlen)."
+                  "It might have a performance implication on the system. rc = %d.\n", ret);
+        }
 
         g_procs[PROC_CTRL].active = true;
         // disable scanner in controller

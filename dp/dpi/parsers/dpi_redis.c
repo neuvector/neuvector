@@ -191,12 +191,12 @@ static void redis_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_redis = {
-    new_session: redis_new_session,
-    delete_data: redis_delete_data,
-    parser:      redis_parser,
-    name:        "redis",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_REDIS,
+    .new_session = redis_new_session,
+    .delete_data = redis_delete_data,
+    .parser = redis_parser,
+    .name = "redis",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_REDIS,
 };
 
 dpi_parser_t *dpi_redis_parser(void)

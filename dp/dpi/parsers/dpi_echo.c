@@ -25,12 +25,12 @@ static void echo_new_session(dpi_packet_t *p)
 }
 
 static dpi_parser_t dpi_parser_echo_tcp = {
-    new_session: echo_new_session,
-    delete_data: NULL,
-    parser:      echo_parser,
-    name:        "echo",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_ECHO,
+    .new_session = echo_new_session,
+    .delete_data = NULL,
+    .parser = echo_parser,
+    .name = "echo",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_ECHO,
 };
 
 dpi_parser_t *dpi_echo_tcp_parser(void)
@@ -39,12 +39,12 @@ dpi_parser_t *dpi_echo_tcp_parser(void)
 }
 
 static dpi_parser_t dpi_parser_echo_udp = {
-    new_session: echo_new_session,
-    delete_data: NULL,
-    parser:      echo_parser,
-    name:        "echo",
-    ip_proto:    IPPROTO_UDP,
-    type:        DPI_PARSER_ECHO,
+    .new_session = echo_new_session,
+    .delete_data = NULL,
+    .parser = echo_parser,
+    .name = "echo",
+    .ip_proto = IPPROTO_UDP,
+    .type = DPI_PARSER_ECHO,
 };
 
 dpi_parser_t *dpi_echo_udp_parser(void)

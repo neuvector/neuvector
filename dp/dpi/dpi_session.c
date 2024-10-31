@@ -1101,17 +1101,17 @@ void dpi_ip_tracker(dpi_packet_t *p)
 }
 
 static char *tcp_state_name[] = {
-[TCP_ESTABLISHED] "ESTABLISHED",
-[TCP_SYN_SENT]    "SYN_SENT",
-[TCP_SYN_RECV]    "SYN_RECV",
-[TCP_FIN_WAIT1]   "FIN_WAIT1",
-[TCP_FIN_WAIT2]   "FIN_WAIT2",
-[TCP_TIME_WAIT]   "TIME_WAIT",
-[TCP_CLOSE]       "CLOSE",
-[TCP_CLOSE_WAIT]  "CLOSE_WAIT",
-[TCP_LAST_ACK]    "LAST_ACK",
-[TCP_LISTEN]      "LISTEN",
-[TCP_CLOSING]     "CLOSING",
+[TCP_ESTABLISHED] = "ESTABLISHED",
+[TCP_SYN_SENT] = "SYN_SENT",
+[TCP_SYN_RECV] = "SYN_RECV",
+[TCP_FIN_WAIT1] = "FIN_WAIT1",
+[TCP_FIN_WAIT2] = "FIN_WAIT2",
+[TCP_TIME_WAIT] = "TIME_WAIT",
+[TCP_CLOSE] = "CLOSE",
+[TCP_CLOSE_WAIT] = "CLOSE_WAIT",
+[TCP_LAST_ACK] = "LAST_ACK",
+[TCP_LISTEN] = "LISTEN",
+[TCP_CLOSING] = "CLOSING",
 };
 
 const char *dpi_get_tcp_state_name(int state)
@@ -1177,13 +1177,13 @@ static int tcp_is_in_window(dpi_packet_t *p)
 #define TCP_EVT_RST    6
 
 static char *tcp_event_name[] = {
-[TCP_EVT_NORMAL] "ACK",
-[TCP_EVT_SYN]    "SYN",
-[TCP_EVT_SYNACK] "SYNACK",
-[TCP_EVT_TWH]    "HANDSHAKE",
-[TCP_EVT_SPLIT]  "SPLIT",
-[TCP_EVT_FIN]    "FIN",
-[TCP_EVT_RST]    "RESET",
+[TCP_EVT_NORMAL] = "ACK",
+[TCP_EVT_SYN] = "SYN",
+[TCP_EVT_SYNACK] = "SYNACK",
+[TCP_EVT_TWH] = "HANDSHAKE",
+[TCP_EVT_SPLIT] = "SPLIT",
+[TCP_EVT_FIN] = "FIN",
+[TCP_EVT_RST] = "RESET",
 };
 
 const char *get_tcp_event_name(int evt)

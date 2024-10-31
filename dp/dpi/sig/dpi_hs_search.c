@@ -474,12 +474,12 @@ static void dpi_dlp_hs_search_release (void *context)
 
 
 static dpi_sig_search_api_t DPI_HS_Search = {
-    init:        dpi_dlp_hs_search_init,
-    create:      dpi_dlp_hs_search_create,
-    add_sig:     dpi_dlp_hs_search_add_dlprule,
-    compile:     dpi_dlp_hs_search_compile,
-    detect:      dpi_dlp_hs_search_detect,
-    release:     dpi_dlp_hs_search_release,
+    .init = dpi_dlp_hs_search_init,
+    .create = dpi_dlp_hs_search_create,
+    .add_sig = dpi_dlp_hs_search_add_dlprule,
+    .compile = dpi_dlp_hs_search_compile,
+    .detect = dpi_dlp_hs_search_detect,
+    .release = dpi_dlp_hs_search_release,
 };
 
 dpi_sig_search_api_t *dpi_dlp_hs_search_register (void)

@@ -94,25 +94,25 @@ typedef struct tds_data_ {
 } tds_data_t;
 
 static const char* packet_type_names[] = {
-    [TDS_ZERO_PKT]         "",
-    [TDS_QUERY_PKT]        "SQL batch",
-    [TDS_LOGIN_PKT]        "Pre-TDS7 login",
-    [TDS_RPC_PKT]          "Remote Procedure Call",
-    [TDS_RESP_PKT]         "Response",
-    [TDS_RAW_PKT]          "Unused",
-    [TDS_ATTENTION_PKT]    "Attention",
-    [TDS_BULK_DATA_PKT]    "Bulk load data",
-    [TDS_OPEN_CHN_PKT]     "Unused",
-    [TDS_CLOSE_CHN_PKT]    "Unused",
-    [TDS_RES_ERROR_PKT]    "Unused",
-    [TDS_LOG_CHN_ACK_PKT]  "Unused",
-    [TDS_ECHO_PKT]         "Unused",
-    [TDS_LOGOUT_CHN_PKT]   "Unused",
-    [TDS_TRANS_MGR_PKT]    "Transaction Manager Request",
-    [TDS_QUERY5_PKT]       "TDS5 query",
-    [TDS_LOGIN7_PKT]       "TDS7 login",
-    [TDS_SSPI_PKT]         "SSPI message",
-    [TDS_PRELOGIN_PKT]     "TDS7 pre-login message"
+    [TDS_ZERO_PKT] = "",
+    [TDS_QUERY_PKT] = "SQL batch",
+    [TDS_LOGIN_PKT] = "Pre-TDS7 login",
+    [TDS_RPC_PKT] = "Remote Procedure Call",
+    [TDS_RESP_PKT] = "Response",
+    [TDS_RAW_PKT] = "Unused",
+    [TDS_ATTENTION_PKT] = "Attention",
+    [TDS_BULK_DATA_PKT] = "Bulk load data",
+    [TDS_OPEN_CHN_PKT] = "Unused",
+    [TDS_CLOSE_CHN_PKT] = "Unused",
+    [TDS_RES_ERROR_PKT] = "Unused",
+    [TDS_LOG_CHN_ACK_PKT] = "Unused",
+    [TDS_ECHO_PKT] = "Unused",
+    [TDS_LOGOUT_CHN_PKT] = "Unused",
+    [TDS_TRANS_MGR_PKT] = "Transaction Manager Request",
+    [TDS_QUERY5_PKT] = "TDS5 query",
+    [TDS_LOGIN7_PKT] = "TDS7 login",
+    [TDS_SSPI_PKT] = "SSPI message",
+    [TDS_PRELOGIN_PKT] = "TDS7 pre-login message"
 };
 
 extern void check_sql_query(dpi_packet_t *p, uint8_t *query, int len, int app);
@@ -254,7 +254,7 @@ static bool tds_parse_prelogin7(dpi_packet_t *p, uint8_t *ptr, uint32_t len)
 static bool tds_parse_login7(dpi_packet_t *p, uint8_t *ptr, uint32_t len)
 {
     uint8_t *tds_login7_start = ptr + TDS_HDR_LEN;
-    uint8_t *tds_login7_ptr = tds_login7_start;
+    uint8_t *tds_login7_ptr;
     uint32_t tds_ver;
     uint16_t offset, prev_offset, tlen;
     int i;
@@ -639,12 +639,12 @@ static void tds_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_tds = {
-    new_session: tds_new_session,
-    delete_data: tds_delete_data,
-    parser:      tds_parser,
-    name:        "tds",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_TDS,
+    .new_session = tds_new_session,
+    .delete_data = tds_delete_data,
+    .parser = tds_parser,
+    .name = "tds",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_TDS,
 };
 
 dpi_parser_t *dpi_tds_tcp_parser(void)

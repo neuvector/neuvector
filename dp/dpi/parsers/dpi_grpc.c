@@ -42,18 +42,18 @@ static uint8_t http2clientmagic[] = {
 };
 
 static const char* http2_type_vals[] = {
-    [HTTP2_DATA]          "DATA",
-    [HTTP2_HEADERS]       "HEADERS",
-    [HTTP2_PRIORITY]      "PRIORITY",
-    [HTTP2_RST_STREAM]    "RST_STREAM",
-    [HTTP2_SETTINGS]      "SETTINGS",
-    [HTTP2_PUSH_PROMISE]  "PUSH_PROMISE",
-    [HTTP2_PING]          "PING",
-    [HTTP2_GOAWAY]        "GOAWAY",
-    [HTTP2_WINDOW_UPDATE] "WINDOW_UPDATE",
-    [HTTP2_CONTINUATION]  "CONTINUATION",
-    [HTTP2_ALTSVC]        "ALTSVC",
-    [HTTP2_BLOCKED]       "BLOCKED",
+    [HTTP2_DATA] = "DATA",
+    [HTTP2_HEADERS] = "HEADERS",
+    [HTTP2_PRIORITY] = "PRIORITY",
+    [HTTP2_RST_STREAM] = "RST_STREAM",
+    [HTTP2_SETTINGS] = "SETTINGS",
+    [HTTP2_PUSH_PROMISE] = "PUSH_PROMISE",
+    [HTTP2_PING] = "PING",
+    [HTTP2_GOAWAY] = "GOAWAY",
+    [HTTP2_WINDOW_UPDATE] = "WINDOW_UPDATE",
+    [HTTP2_CONTINUATION] = "CONTINUATION",
+    [HTTP2_ALTSVC] = "ALTSVC",
+    [HTTP2_BLOCKED] = "BLOCKED",
 };
 
 typedef struct grpc_wing_ {
@@ -287,12 +287,12 @@ static void grpc_delete_data(void *data)
 }
 
 static dpi_parser_t dpi_parser_grpc = {
-    new_session: grpc_new_session,
-    delete_data: grpc_delete_data,
-    parser:      grpc_parser,
-    name:        "grpc",
-    ip_proto:    IPPROTO_TCP,
-    type:        DPI_PARSER_GRPC,
+    .new_session = grpc_new_session,
+    .delete_data = grpc_delete_data,
+    .parser = grpc_parser,
+    .name = "grpc",
+    .ip_proto = IPPROTO_TCP,
+    .type = DPI_PARSER_GRPC,
 };
 
 dpi_parser_t *dpi_grpc_tcp_parser(void)

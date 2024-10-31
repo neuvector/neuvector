@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
     }
-
+    ret = 0;
     if (strcmp(act, "exist") == 0) {
         ret = nsexist(mntns, filepath);
     } else if (strcmp(act, "run") == 0) {

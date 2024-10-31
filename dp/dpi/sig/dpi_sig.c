@@ -12,7 +12,7 @@ dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
                             dpi_sig_t *rule, void *dlpdetector);
 
 static dpi_dlp_parser_t DlpRuleParser = {
-    parse_dlpopts:    dpi_dlp_parse_opts_routine,
+    .parse_dlpopts = dpi_dlp_parse_opts_routine,
 };
 
 static dpi_sigopt_status_t
@@ -325,11 +325,11 @@ dpi_action_cate_t dpi_dlp_get_action_category(int act)
 }
 
 static dpi_sig_context_class_t ContextType2Class[DPI_SIG_CONTEXT_TYPE_MAX] = {
-    [DPI_SIG_CONTEXT_TYPE_URI_ORIGIN]         DPI_SIG_CONTEXT_CLASS_URI,
-    [DPI_SIG_CONTEXT_TYPE_HEADER]             DPI_SIG_CONTEXT_CLASS_HEADER,
-    [DPI_SIG_CONTEXT_TYPE_BODY]               DPI_SIG_CONTEXT_CLASS_BODY,
-    [DPI_SIG_CONTEXT_TYPE_SQL_QUERY]          DPI_SIG_CONTEXT_CLASS_BODY,
-    [DPI_SIG_CONTEXT_TYPE_PACKET_ORIGIN]      DPI_SIG_CONTEXT_CLASS_PACKET,
+    [DPI_SIG_CONTEXT_TYPE_URI_ORIGIN] = DPI_SIG_CONTEXT_CLASS_URI,
+    [DPI_SIG_CONTEXT_TYPE_HEADER] = DPI_SIG_CONTEXT_CLASS_HEADER,
+    [DPI_SIG_CONTEXT_TYPE_BODY] = DPI_SIG_CONTEXT_CLASS_BODY,
+    [DPI_SIG_CONTEXT_TYPE_SQL_QUERY] = DPI_SIG_CONTEXT_CLASS_BODY,
+    [DPI_SIG_CONTEXT_TYPE_PACKET_ORIGIN] = DPI_SIG_CONTEXT_CLASS_PACKET,
 };
 
 dpi_sig_context_class_t dpi_dlp_ctxt_type_2_cat (dpi_sig_context_type_t t)
