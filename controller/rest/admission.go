@@ -753,6 +753,9 @@ func handlerGetAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprou
 	allRules := make(map[string][]*api.RESTAdmissionRule, 7)
 	for _, ruleType := range ruleTypes {
 		rules := cacher.GetAdmissionRules(admission.NvAdmValidateType, ruleType, acc)
+		for _, rule := range rules {
+			rule.Criteria = cache.MergeAdmRuleCriteriaREST(rule.Criteria)
+		}
 		switch ruleType {
 		case share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType:
 			allRules[ruleType] = rules
@@ -952,6 +955,9 @@ func handlerGetAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	}
+
+	rule.Criteria = cache.MergeAdmRuleCriteriaREST(rule.Criteria)
+
 	resp := api.RESTAdmissionRuleData{Rule: rule}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get admission control rule")
@@ -1432,6 +1438,9 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 				restRespNotFoundLogAccessDenied(w, login, err)
 				return
 			}
+
+			rule.Criteria = cache.MergeAdmRuleCriteriaREST(rule.Criteria)
+
 			action := &actionDeny
 			if rule.RuleType == api.ValidatingExceptRuleType || rule.RuleType == share.FedAdmCtrlExceptRulesType {
 				action = &actionAllow

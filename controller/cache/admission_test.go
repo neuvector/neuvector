@@ -54,6 +54,486 @@ func TestAdmCriteria2CLUS(t *testing.T) {
 	}
 }
 
+func TestAdmCriteriaMerge2CLUS(t *testing.T) {
+	reservedRegs["dockerhub"] = []string{"https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/"}
+
+	{
+		restCrtArr := []*api.RESTAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyImageRegistry,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "https://index.docker.io",
+			},
+			{
+				Name:  share.CriteriaKeyImageRegistry,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "index.docker.io",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+			{
+				Name:  share.CriteriaKeyNamespace,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: " ns-1,ns-2,, ,",
+			},
+			{
+				Name:  share.CriteriaKeyImageRegistry,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http",
+			},
+			{
+				Name: share.CriteriaKeyRequestLimit,
+				SubCriteria: []*api.RESTAdmRuleCriterion{
+					{
+						Name:  share.SubCriteriaCpuLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "2",
+					},
+					{
+						Name:  share.SubCriteriaMemoryRequest,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "102400000",
+					},
+					{
+						Name:  share.SubCriteriaMemoryLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "204800000",
+					},
+				},
+			},
+			{
+				Name:  share.CriteriaKeyNamespace,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: "",
+			},
+			{
+				Name:  share.CriteriaKeyNamespace,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: "ns-3, ns-4 ",
+			},
+			{
+				Name:  share.CriteriaKeyNamespace,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "production,finance",
+			},
+			{
+				Name:  share.CriteriaKeyRunAsPrivileged,
+				Op:    share.CriteriaOpEqual,
+				Value: "true",
+			},
+			{
+				Name:  share.CriteriaKeyImageRegistry,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "10.1.127.3:5000/neuvector",
+			},
+		}
+
+		clusCrtArr, _ := AdmCriteria2CLUS(restCrtArr) //[]*share.CLUSAdmRuleCriterion
+		expectedCrtArr := []*share.CLUSAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyImageRegistry,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "https://index.docker.io/,https://10.1.127.3:5000/",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+			{
+				Name:  share.CriteriaKeyNamespace,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: "ns-1,ns-2,ns-3,ns-4",
+			},
+			{
+				Name: share.CriteriaKeyRequestLimit,
+				SubCriteria: []*share.CLUSAdmRuleCriterion{
+					{
+						Name:  share.SubCriteriaCpuLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "2",
+					},
+					{
+						Name:  share.SubCriteriaMemoryRequest,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "102400000",
+					},
+					{
+						Name:  share.SubCriteriaMemoryLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "204800000",
+					},
+				},
+			},
+			{
+				Name:  share.CriteriaKeyNamespace,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "production,finance",
+			},
+			{
+				Name:  share.CriteriaKeyRunAsPrivileged,
+				Op:    share.CriteriaOpEqual,
+				Value: "true",
+			},
+		}
+
+		if len(clusCrtArr) == len(expectedCrtArr) {
+			for i, clusCrt := range clusCrtArr {
+				expectedCrt := expectedCrtArr[i]
+				if clusCrt.Name != expectedCrt.Name || clusCrt.Op != expectedCrt.Op || clusCrt.Path != expectedCrt.Path ||
+					clusCrt.Value != expectedCrt.Value || clusCrt.Kind != expectedCrt.Kind {
+					t.Errorf("[1] Unexpected criteria[%d]: %+v for %+v\n", i, *clusCrt, *expectedCrt)
+				}
+				if len(clusCrt.SubCriteria) != len(expectedCrt.SubCriteria) {
+					t.Errorf("[1] Unexpected: len(clusCrt.SubCriteria)=%d for len(expectedCrt.SubCriteria)=%d\n",
+						len(clusCrt.SubCriteria), len(expectedCrt.SubCriteria))
+				} else {
+					for j, clusSubCrt := range clusCrt.SubCriteria {
+						expectedSubCrt := expectedCrt.SubCriteria[j]
+						if clusSubCrt.Name != expectedSubCrt.Name || clusSubCrt.Op != expectedSubCrt.Op || clusSubCrt.Path != expectedSubCrt.Path ||
+							clusSubCrt.Value != expectedSubCrt.Value || clusSubCrt.Kind != expectedSubCrt.Kind {
+							t.Errorf("[1] Unexpected subCriteria[%d]: %+v for %+v\n", j, *clusSubCrt, *expectedSubCrt)
+						}
+					}
+				}
+			}
+		} else {
+			t.Errorf("[1] Unexpected: len(clusCrtArr)=%d for len(expectedCrtArr)=%d\n", len(clusCrtArr), len(expectedCrtArr))
+		}
+	}
+
+	{
+		restCrtArr := []*api.RESTAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyImageVerifiers,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: "AKDB/cosign",
+			},
+			{
+				Name:  share.CriteriaKeyImageVerifiers,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "ABC/cosign",
+			},
+			{
+				Name:  share.CriteriaKeyImage,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "https://index.docker.io/iperf",
+			},
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyImage,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "index.docker.io/iperf",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+			{
+				Name:  share.CriteriaKeyImage,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http",
+			},
+			{
+				Name:  share.CriteriaKeyRunAsPrivileged,
+				Op:    share.CriteriaOpEqual,
+				Value: "true",
+			},
+			{
+				Name:  share.CriteriaKeyImage,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "10.1.127.3:5000/neuvector/scanner",
+			},
+			{
+				Name:  share.CriteriaKeyImageVerifiers,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: "OZG/cosign",
+			},
+		}
+
+		clusCrtArr, _ := AdmCriteria2CLUS(restCrtArr) //[]*share.CLUSAdmRuleCriterion
+		expectedCrtArr := []*share.CLUSAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyImageVerifiers,
+				Op:    share.CriteriaOpNotContainsAny,
+				Value: "AKDB/cosign,OZG/cosign",
+			},
+			{
+				Name:  share.CriteriaKeyImageVerifiers,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "ABC/cosign",
+			},
+			{
+				Name:  share.CriteriaKeyImage,
+				Op:    share.CriteriaOpContainsAny,
+				Value: "https://index.docker.io/iperf,https://10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http,https://10.1.127.3:5000/neuvector/scanner",
+			},
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+			{
+				Name:  share.CriteriaKeyRunAsPrivileged,
+				Op:    share.CriteriaOpEqual,
+				Value: "true",
+			},
+		}
+
+		if len(clusCrtArr) == len(expectedCrtArr) {
+			for i, clusCrt := range clusCrtArr {
+				expectedCrt := expectedCrtArr[i]
+				if clusCrt.Name != expectedCrt.Name || clusCrt.Op != expectedCrt.Op || clusCrt.Path != expectedCrt.Path ||
+					clusCrt.Value != expectedCrt.Value || clusCrt.Kind != expectedCrt.Kind {
+					t.Errorf("[2] Unexpected criteria[%d]: %+v for %+v\n", i, *clusCrt, *expectedCrt)
+				}
+			}
+		} else {
+			t.Errorf("[2] Unexpected: len(clusCrtArr)=%d for len(expectedCrtArr)=%d\n", len(clusCrtArr), len(expectedCrtArr))
+		}
+	}
+
+	{
+		restCrtArr := []*api.RESTAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyImageVerifiers,
+				Op:    share.CriteriaOpContainsAll,
+				Value: "AKDB/cosign",
+			},
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyImage,
+				Op:    share.CriteriaOpRegex,
+				Value: "*iperf",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+		}
+
+		clusCrtArr, _ := AdmCriteria2CLUS(restCrtArr) //[]*share.CLUSAdmRuleCriterion
+		expectedCrtArr := restCrtArr
+
+		if len(clusCrtArr) == len(expectedCrtArr) {
+			for i, clusCrt := range clusCrtArr {
+				expectedCrt := expectedCrtArr[i]
+				if clusCrt.Name != expectedCrt.Name || clusCrt.Op != expectedCrt.Op || clusCrt.Path != expectedCrt.Path ||
+					clusCrt.Value != expectedCrt.Value || clusCrt.Kind != expectedCrt.Kind {
+					t.Errorf("[3] Unexpected criteria[%d]: %+v for %+v\n", i, *clusCrt, *expectedCrt)
+				}
+			}
+		} else {
+			t.Errorf("[3] Unexpected: len(clusCrtArr)=%d for len(expectedCrtArr)=%d\n", len(clusCrtArr), len(expectedCrtArr))
+		}
+	}
+
+	{
+		restCrtArr := []*api.RESTAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyMountVolumes,
+				Op:    share.CriteriaOpContainsOtherThan,
+				Value: "abc",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+			{
+				Name:  share.CriteriaKeyK8sGroups,
+				Op:    share.CriteriaOpContainsOtherThan,
+				Value: "g1,g2",
+			},
+			{
+				Name: share.CriteriaKeyRequestLimit,
+				SubCriteria: []*api.RESTAdmRuleCriterion{
+					{
+						Name:  share.SubCriteriaCpuLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "2",
+					},
+					{
+						Name:  share.SubCriteriaMemoryRequest,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "102400000",
+					},
+					{
+						Name:  share.SubCriteriaMemoryLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "204800000",
+					},
+				},
+			},
+			{
+				Name:  share.CriteriaKeyUser,
+				Op:    share.CriteriaOpRegex,
+				Value: "temp",
+			},
+			{
+				Name:  share.CriteriaKeyRunAsRoot,
+				Op:    share.CriteriaOpEqual,
+				Value: "true",
+			},
+			{
+				Name:  share.CriteriaKeySaBindRiskyRole,
+				Op:    share.CriteriaOpContainsTagAny,
+				Value: "admin",
+			},
+			{
+				Name:  share.CriteriaKeyHasPssViolation,
+				Op:    share.CriteriaOpEqual,
+				Value: share.PssPolicyRestricted,
+			},
+			{
+				Name:  share.CriteriaKeySaBindRiskyRole,
+				Op:    share.CriteriaOpContainsTagAny,
+				Value: "administrator",
+			},
+		}
+
+		clusCrtArr, _ := AdmCriteria2CLUS(restCrtArr) //[]*share.CLUSAdmRuleCriterion
+		expectedCrtArr := []*share.CLUSAdmRuleCriterion{
+			{
+				Name:  share.CriteriaKeyCustomPath,
+				Op:    share.CriteriaOpContainsAny,
+				Path:  "spec.template.spec.imagePullSecrets",
+				Value: "regsecret",
+				Kind:  "podTemplate",
+			},
+			{
+				Name:  share.CriteriaKeyMountVolumes,
+				Op:    share.CriteriaOpContainsOtherThan,
+				Value: "abc",
+			},
+			{
+				Name:  share.CriteriaKeyImageScanned,
+				Op:    share.CriteriaOpEqual,
+				Value: "false",
+			},
+			{
+				Name:  share.CriteriaKeyK8sGroups,
+				Op:    share.CriteriaOpContainsOtherThan,
+				Value: "g1,g2",
+			},
+			{
+				Name: share.CriteriaKeyRequestLimit,
+				SubCriteria: []*share.CLUSAdmRuleCriterion{
+					{
+						Name:  share.SubCriteriaCpuLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "2",
+					},
+					{
+						Name:  share.SubCriteriaMemoryRequest,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "102400000",
+					},
+					{
+						Name:  share.SubCriteriaMemoryLimit,
+						Op:    share.CriteriaOpBiggerThan,
+						Value: "204800000",
+					},
+				},
+			},
+			{
+				Name:  share.CriteriaKeyUser,
+				Op:    share.CriteriaOpRegex,
+				Value: "temp",
+			},
+			{
+				Name:  share.CriteriaKeyRunAsRoot,
+				Op:    share.CriteriaOpEqual,
+				Value: "true",
+			},
+			{
+				Name:  share.CriteriaKeySaBindRiskyRole,
+				Op:    share.CriteriaOpContainsTagAny,
+				Value: "admin",
+			},
+			{
+				Name:  share.CriteriaKeyHasPssViolation,
+				Op:    share.CriteriaOpEqual,
+				Value: share.PssPolicyRestricted,
+			},
+			{
+				Name:  share.CriteriaKeySaBindRiskyRole,
+				Op:    share.CriteriaOpContainsTagAny,
+				Value: "administrator",
+			},
+		}
+
+		if len(clusCrtArr) == len(expectedCrtArr) {
+			for i, clusCrt := range clusCrtArr {
+				expectedCrt := expectedCrtArr[i]
+				if clusCrt.Name != expectedCrt.Name || clusCrt.Op != expectedCrt.Op || clusCrt.Path != expectedCrt.Path ||
+					clusCrt.Value != expectedCrt.Value || clusCrt.Kind != expectedCrt.Kind {
+					t.Errorf("[1] Unexpected criteria[%d]: %+v for %+v\n", i, *clusCrt, *expectedCrt)
+				}
+				if len(clusCrt.SubCriteria) != len(expectedCrt.SubCriteria) {
+					t.Errorf("[1] Unexpected: len(clusCrt.SubCriteria)=%d for len(expectedCrt.SubCriteria)=%d\n",
+						len(clusCrt.SubCriteria), len(expectedCrt.SubCriteria))
+				} else {
+					for j, clusSubCrt := range clusCrt.SubCriteria {
+						expectedSubCrt := expectedCrt.SubCriteria[j]
+						if clusSubCrt.Name != expectedSubCrt.Name || clusSubCrt.Op != expectedSubCrt.Op || clusSubCrt.Path != expectedSubCrt.Path ||
+							clusSubCrt.Value != expectedSubCrt.Value || clusSubCrt.Kind != expectedSubCrt.Kind {
+							t.Errorf("[1] Unexpected subCriteria[%d]: %+v for %+v\n", j, *clusSubCrt, *expectedSubCrt)
+						}
+					}
+				}
+			}
+		} else {
+			t.Errorf("[1] Unexpected: len(clusCrtArr)=%d for len(expectedCrtArr)=%d\n", len(clusCrtArr), len(expectedCrtArr))
+		}
+	}
+}
+
 func TestNormalizeImageValue(t *testing.T) {
 	preTest()
 

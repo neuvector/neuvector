@@ -288,7 +288,7 @@ func selectAdminPolicyCache(admType, ruleType string) *share.CLUSAdmissionRules 
 	return nil
 }
 
-func admissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
+func AdmissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 	criteria := make([]*api.RESTAdmRuleCriterion, 0, len(rule.Criteria))
 	for _, crit := range rule.Criteria {
 		c := &api.RESTAdmRuleCriterion{
@@ -343,6 +343,8 @@ func admissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 	if len(r.Containers) == 0 {
 		r.Containers = []string{share.AdmCtrlRuleContainers}
 	}
+
+	r.Criteria = MergeAdmRuleCriteriaREST(r.Criteria)
 
 	return &r
 }
@@ -2233,10 +2235,50 @@ func (m CacheMethod) FlushAdmCtrlStats() error {
 	return nil
 }
 
+// simplified handling to consolidate rule criteria that have the same name/operator(containsAny/notContainsAny)
+// ex:
+// criteria: imageVerifiers notContainsAny {AKDB/cosign}, imageVerifiers notContainsAny {OZG/cosign}
+// is merged to criteria: imageVerifiers notContainsAny {AKDB/cosign, OZG/cosign}
+func MergeAdmRuleCriteriaREST(criteria []*api.RESTAdmRuleCriterion) []*api.RESTAdmRuleCriterion {
+	merged := false
+	newCriteria := make([]*api.RESTAdmRuleCriterion, 0, len(criteria))
+	opNameCriterion := map[string]map[string]*api.RESTAdmRuleCriterion{
+		share.CriteriaOpContainsAny:    nil,
+		share.CriteriaOpNotContainsAny: nil,
+	}
+	for _, crt := range criteria {
+		if (crt.Op != share.CriteriaOpContainsAny && crt.Op != share.CriteriaOpNotContainsAny) ||
+			crt.Name == share.CriteriaKeyCustomPath || len(crt.SubCriteria) > 0 {
+			newCriteria = append(newCriteria, crt)
+			continue
+		}
+		nameCriterion := opNameCriterion[crt.Op]
+		if nameCriterion == nil {
+			nameCriterion = make(map[string]*api.RESTAdmRuleCriterion)
+			opNameCriterion[crt.Op] = nameCriterion
+		}
+		if cFirst := nameCriterion[crt.Name]; cFirst != nil {
+			cFirst.Value = fmt.Sprintf("%s,%s", cFirst.Value, crt.Value)
+			merged = true
+		} else {
+			nameCriterion[crt.Name] = crt
+			newCriteria = append(newCriteria, crt)
+		}
+	}
+
+	if merged {
+		return newCriteria
+	}
+
+	return criteria
+}
+
 func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRuleCriterion, error) {
 	if criteria == nil {
 		return make([]*share.CLUSAdmRuleCriterion, 0), nil
 	}
+	criteria = MergeAdmRuleCriteriaREST(criteria)
+
 	var err error
 	clus := make([]*share.CLUSAdmRuleCriterion, 0, len(criteria))
 	for _, crit := range criteria {
@@ -2273,45 +2315,39 @@ func AdmCriteria2CLUS(criteria []*api.RESTAdmRuleCriterion) ([]*share.CLUSAdmRul
 			c.Name = c.Type
 		}
 
-		set := utils.NewSet()
+		uniqueValues := utils.NewSet()
+		values := make([]string, 0, len(critValues))
 		for _, crtValue := range critValues {
+			var value string
 			if c.Name == share.CriteriaKeyCVENames {
-				value := strings.ToUpper(crtValue)
-				if !set.Contains(value) {
-					set.Add(value)
-				}
+				value = strings.ToUpper(crtValue)
 			} else if c.Name == share.CriteriaKeyImageRegistry {
 				if regs, exist := reservedRegs[crtValue]; exist {
 					for _, reg := range regs {
-						if !set.Contains(reg) {
-							set.Add(reg)
+						if !uniqueValues.Contains(reg) {
+							uniqueValues.Add(reg)
+							values = append(values, reg)
 						}
 					}
+					continue
 				} else {
-					value := normalizeImageValue(crtValue, true)
-					if value != "" && !set.Contains(value) {
-						set.Add(value)
-					}
+					value = normalizeImageValue(crtValue, true)
 				}
 			} else if c.Name == share.CriteriaKeyImage {
-				if c.Op == share.CriteriaOpRegex {
-					set.Add(crtValue)
-				} else {
-					value := normalizeImageValue(crtValue, false)
-					if value != "" && !set.Contains(value) {
-						set.Add(value)
-					}
+				value = crtValue
+				if c.Op != share.CriteriaOpRegex {
+					value = normalizeImageValue(crtValue, false)
 				}
-			} else if c.Name == share.CriteriaKeyRequestLimit {
-				set.Add("")
 			} else {
-				if crtValue != "" && !set.Contains(crtValue) {
-					set.Add(crtValue)
-				}
+				value = crtValue
+			}
+			if value != "" && !uniqueValues.Contains(value) {
+				uniqueValues.Add(value)
+				values = append(values, value)
 			}
 		}
-		if set.Cardinality() > 0 {
-			c.Value = strings.Join(set.ToStringSlice(), setDelim)
+		if len(values) > 0 || c.Name == share.CriteriaKeyRequestLimit {
+			c.Value = strings.Join(values, setDelim)
 			if len(crit.SubCriteria) > 0 {
 				if c.SubCriteria, err = AdmCriteria2CLUS(crit.SubCriteria); err != nil {
 					return nil, fmt.Errorf("Invalid criterion value")
@@ -2388,7 +2424,7 @@ func (m CacheMethod) GetAdmissionRule(admType, ruleType string, id uint32, acc *
 		if !acc.Authorize(rule, nil) {
 			return nil, common.ErrObjectAccessDenied
 		}
-		return admissionRule2REST(rule), nil
+		return AdmissionRule2REST(rule), nil
 	}
 	return nil, common.ErrObjectNotFound
 }
@@ -2409,7 +2445,7 @@ func (m CacheMethod) GetAdmissionRules(admType, ruleType string, acc *access.Acc
 			if !acc.Authorize(rule, nil) {
 				continue
 			}
-			rules = append(rules, admissionRule2REST(rule))
+			rules = append(rules, AdmissionRule2REST(rule))
 		}
 	}
 	return rules
