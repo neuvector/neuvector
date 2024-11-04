@@ -96,7 +96,11 @@ func (d *swarm) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback, scb
 			}
 		}
 	}
-	go global.RT.MonitorEvent(d.cpEventCallback, true)
+	go func() {
+		if err := global.RT.MonitorEvent(d.cpEventCallback, true); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("monitor event")
+		}
+	}()
 	return nil
 }
 

@@ -321,8 +321,7 @@ var ocVersionMajor int
 var cacheEventFunc common.CacheEventFunc
 
 var nvQueryK8sVerFunc NvQueryK8sVerFunc
-var nvVerifyK8sNsFunc NvVerifyK8sNsFunc
-var isLeader bool
+
 var cspType share.TCspType
 
 var watchFailedFlag int32
@@ -1381,25 +1380,30 @@ func (d *kubernetes) StartWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 	var err error
 	for range []bool{true} {
 		if rt == RscTypeRBAC {
-			if err = d.startWatchResource(k8sRscTypeRole, ns, d.cbResourceRole, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
+			resources := []struct {
+				rscType string
+				cb      orchAPI.WatchCallback
+			}{
+				{k8sRscTypeRole, d.cbResourceRole},
+				{K8sRscTypeClusRole, d.cbResourceRole},
+				{k8sRscTypeRoleBinding, d.cbResourceRoleBinding},
+				{K8sRscTypeClusRoleBinding, d.cbResourceRoleBinding},
 			}
-			if err = d.startWatchResource(K8sRscTypeClusRole, ns, d.cbResourceRole, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
+
+			for _, res := range resources {
+				if err = d.startWatchResource(res.rscType, ns, res.cb, scb); err != nil {
+					if stopErr := d.StopWatchResource(rt); stopErr != nil {
+						log.WithFields(log.Fields{"error": stopErr}).Error("stop watch")
+					}
+					break
+				}
 			}
-			if err = d.startWatchResource(k8sRscTypeRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
+
+			if err == nil {
+				d.lock.Lock()
+				d.watchers[rt] = &resourceWatcher{cb: wcb}
+				d.lock.Unlock()
 			}
-			if err = d.startWatchResource(K8sRscTypeClusRoleBinding, ns, d.cbResourceRoleBinding, scb); err != nil {
-				d.StopWatchResource(rt)
-				break
-			}
-			d.lock.Lock()
-			d.watchers[rt] = &resourceWatcher{cb: wcb}
-			d.lock.Unlock()
 		} else {
 			err = d.startWatchResource(rt, ns, wcb, scb)
 		}
@@ -1432,6 +1436,8 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 
 		for {
 			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			d.lock.Lock()
 			watcher, err := d.client.Watch(ctx, ns, maker.newObject())
 			d.lock.Unlock()
@@ -1491,10 +1497,18 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 
 func (d *kubernetes) StopWatchResource(rt string) error {
 	if rt == RscTypeRBAC {
-		d.stopWatchResource(k8sRscTypeRole)
-		d.stopWatchResource(K8sRscTypeClusRole)
-		d.stopWatchResource(k8sRscTypeRoleBinding)
-		d.stopWatchResource(K8sRscTypeClusRoleBinding)
+		if err := d.stopWatchResource(k8sRscTypeRole); err != nil {
+			return err
+		}
+		if err := d.stopWatchResource(K8sRscTypeClusRole); err != nil {
+			return err
+		}
+		if err := d.stopWatchResource(k8sRscTypeRoleBinding); err != nil {
+			return err
+		}
+		if err := d.stopWatchResource(K8sRscTypeClusRoleBinding); err != nil {
+			return err
+		}
 		return nil
 	} else {
 		return d.stopWatchResource(rt)
@@ -1888,9 +1902,8 @@ func AdjustAdmResForOC() {
 	}
 }
 
-func AdjustAdmWebhookName(f1 NvQueryK8sVerFunc, f2 NvVerifyK8sNsFunc, cspType_ share.TCspType) {
+func AdjustAdmWebhookName(f1 NvQueryK8sVerFunc, cspType_ share.TCspType) {
 	nvQueryK8sVerFunc = f1
-	nvVerifyK8sNsFunc = f2
 	cspType = cspType_
 	NvAdmMutatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmMutatingName, NvAdmSvcNamespace)           // ex: neuvector-mutating-admission-webhook.neuvector.svc
 	NvAdmValidatingWebhookName = fmt.Sprintf("%s.%s.svc", NvAdmValidatingName, NvAdmSvcNamespace)       // ex: neuvector-validating-admission-webhook.neuvector.svc
@@ -2048,10 +2061,6 @@ func IsRancherFlavor() bool {
 	}
 
 	return false
-}
-
-func SetLeader(lead bool) {
-	isLeader = lead
 }
 
 func UpdateDeploymentReplicates(name string, replicas int32) error {

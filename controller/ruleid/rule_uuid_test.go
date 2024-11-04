@@ -227,27 +227,3 @@ func TestDeleteProcGroup(t *testing.T) {
 		}
 	}
 }
-
-// Temporarily commented out since this test function is not currently in use.
-// func testAddProcRulesMemoryLoop(t *testing.T) {
-// 	pworker, pp := testSetup(100000)
-
-// 	accAdmin := access.NewAdminAccessControl()
-
-// 	for {
-// 		pworker.handleProcessProfile(pp, false, accAdmin)
-// 		time.Sleep(time.Millisecond * 10)
-// 	}
-
-// 	// verify by lookup uuid
-// 	for i, ppe := range pp.Process {
-// 		if pRule, ok := pworker.findProcessRule(ppe.Uuid, accAdmin); ok {
-// 			// t.Logf("ppe[%d]: %v, %v, %v", i, ppe.Uuid, pRule.rule.Name, pRule.rule.Path)
-// 			if pRule.Rule.Name != ppe.Name || pRule.Rule.Path != ppe.Path {
-// 				t.Errorf("Mismatched[%d]: %v[%v], %v[%v]\n", i, pRule.Rule.Name, ppe.Name, pRule.Rule.Path, ppe.Path)
-// 			}
-// 		} else {
-// 			t.Errorf("Not found[%d]: %v\n", i, ppe.Uuid)
-// 		}
-// 	}
-// }

@@ -75,7 +75,9 @@ func addScannedImage(rs *Registry, id string, sumMap map[string]*imageSummary, v
 			if s, ok := sumMap[id]; !ok || sum.ScannedAt.After(s.summary.ScannedAt) {
 				refreshScanCache(rs, id, sum, c, vpf)
 				sumMap[id] = &imageSummary{summary: sum, cache: c, vulNames: utils.NewSet()}
-				fillImageVulModule(rs, id, sumMap[id], vpf)
+				if err := fillImageVulModule(rs, id, sumMap[id], vpf); err != nil {
+					log.WithFields(log.Fields{"err": err}).Error()
+				}
 			}
 		}
 	}
@@ -372,7 +374,9 @@ func (m *scanMethod) StoreRepoScanResult(result *share.ScanResult) error {
 		ScanResult: *result,
 	}
 
-	clusHelper.PutRegistryImageSummaryAndReport(common.RegistryRepoScanName, result.ImageID, smd.fedRole, sum, &report)
+	if err := clusHelper.PutRegistryImageSummaryAndReport(common.RegistryRepoScanName, result.ImageID, smd.fedRole, sum, &report); err != nil {
+		smd.scanLog.WithFields(log.Fields{"err": err}).Error()
+	}
 
 	if len(rs.summary) > api.ScanPersistImageMax+scanPersistImageExtra {
 		rs.cleanupOldImages()

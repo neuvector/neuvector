@@ -21,7 +21,7 @@ func TestParseReqImageName(t *testing.T) {
 		defaultRegistries = utils.NewSet("https://index.docker.io/", "https://registry.hub.docker.com/", "https://registry-1.docker.io/") // all on lower-case
 
 		admContainerInfo := &nvsysadmission.AdmContainerInfo{Image: "docker.io/iperf"}
-		parseReqImageName(admContainerInfo)
+		_ = parseReqImageName(admContainerInfo)
 		if admContainerInfo.ImageRegistry.Intersect(defaultRegistries).Cardinality() != 3 || admContainerInfo.ImageRepo != "library/iperf" || admContainerInfo.ImageTag != "latest" {
 			t.Errorf("Unexpected parseReqImageName result(%+v) for: %+v\n", admContainerInfo, admContainerInfo.Image)
 		}
@@ -48,7 +48,7 @@ func TestParseReqImageName(t *testing.T) {
 		}
 		for _, testImage := range testImages {
 			admContainerInfo.Image = testImage.image
-			parseReqImageName(admContainerInfo)
+			_ = parseReqImageName(admContainerInfo)
 			if admContainerInfo.ImageRegistry.Cardinality() != 1 || !admContainerInfo.ImageRegistry.Contains(testImage.expectedRegistry) ||
 				admContainerInfo.ImageRepo != testImage.expectedImageRepo || admContainerInfo.ImageTag != testImage.expectedImageTag {
 				t.Errorf("Unexpected parseReqImageName result(%+v) for: %+v\n", admContainerInfo, admContainerInfo.Image)
@@ -75,7 +75,7 @@ func TestParseReqImageName(t *testing.T) {
 		}
 		for _, testImage := range testImages {
 			admContainerInfo.Image = testImage.image
-			parseReqImageName(admContainerInfo)
+			_ = parseReqImageName(admContainerInfo)
 			if admContainerInfo.ImageRegistry.Cardinality() != 1 || !admContainerInfo.ImageRegistry.Contains(testImage.expectedRegistry) ||
 				admContainerInfo.ImageRepo != testImage.expectedImageRepo || admContainerInfo.ImageTag != testImage.expectedImageTag {
 				t.Errorf("Unexpected parseReqImageName result(%+v) for: %+v\n", admContainerInfo, admContainerInfo.Image)

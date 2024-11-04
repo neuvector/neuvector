@@ -26,7 +26,9 @@ func createEnforcerServiceWrapper(conn *grpc.ClientConn) cluster.Service {
 func CreateEnforcerServerDest(id string, ip string, port uint16) {
 	endpoint := fmt.Sprintf("%s:%v", ip, port)
 	key := getKeyForEnforcerService(id)
-	cluster.CreateGRPCClient(key, endpoint, false, createEnforcerServiceWrapper)
+	if err := cluster.CreateGRPCClient(key, endpoint, false, createEnforcerServiceWrapper); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("CreateGRPCClient")
+	}
 }
 
 func RemoveEnforcerServerDest(id string) {

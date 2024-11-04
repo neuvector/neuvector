@@ -75,7 +75,9 @@ func getScannerServiceClient(sid string, forScan bool) (share.ScannerServiceClie
 	// endpoint is also the key
 	endpoint := getScannerEndpoint(s.scanner)
 	if cluster.GetGRPCClientEndpoint(endpoint) == "" {
-		cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper)
+		if err := cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("CreateGRPCClient")
+		}
 	}
 
 	c, err := cluster.GetGRPCClient(endpoint, nil, nil)
@@ -113,7 +115,9 @@ func RunTaskForEachScanner(cb func(share.ScannerServiceClient) error) error {
 	for id, scanner := range activeScanners {
 		endpoint := getScannerEndpoint(&scanner)
 		if cluster.GetGRPCClientEndpoint(endpoint) == "" {
-			cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper)
+			if err := cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("CreateGRPCClient")
+			}
 		}
 
 		c, err := cluster.GetGRPCClient(endpoint, nil, nil)
@@ -196,7 +200,9 @@ func ScanRunning(scanner string, agentID, id string, objType share.ScanObjectTyp
 	})
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.PutScannerStats(scanner, objType, result)
+	if err2 := clusHelper.PutScannerStats(scanner, objType, result); err2 != nil {
+		log.WithFields(log.Fields{"error": err2}).Error("PutScannerStats")
+	}
 
 	return result, err
 }
@@ -275,7 +281,9 @@ func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest)
 	}
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.PutScannerStats(scanner, share.ScanObjectType_IMAGE, result)
+	if err2 := clusHelper.PutScannerStats(scanner, share.ScanObjectType_IMAGE, result); err2 != nil {
+		log.WithFields(log.Fields{"error": err2}).Error("PutScannerStats")
+	}
 
 	return result, err
 }
@@ -301,7 +309,9 @@ func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.Scan
 	result, err := client.ScanAppPackage(ctx, req)
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result)
+	if err2 := clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result); err2 != nil {
+		log.WithFields(log.Fields{"err": err2}).Error("PutScannerStats")
+	}
 
 	return result, err
 }
@@ -342,7 +352,9 @@ func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInpu
 	}
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result)
+	if err2 := clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result); err2 != nil {
+		log.WithFields(log.Fields{"err": err2}).Error("PutScannerStats")
+	}
 
 	return result, err
 }

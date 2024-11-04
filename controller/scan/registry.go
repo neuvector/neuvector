@@ -218,7 +218,10 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var config share.CLUSRegistryConfig
-		json.Unmarshal(value, &config)
+		if err := json.Unmarshal(value, &config); err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("Unmarshal")
+			return
+		}
 
 		if isFullFuncReg {
 			// var oldFilters []string
@@ -258,7 +261,9 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 						if reg.state.Status == api.RegistryStatusScanning {
 							// stopScan() will be called
 							state := share.CLUSRegistryState{Status: api.RegistryStatusIdle, StartedAt: reg.state.StartedAt}
-							clusHelper.PutRegistryState(reg.config.Name, &state)
+							if err := clusHelper.PutRegistryState(reg.config.Name, &state); err != nil {
+								log.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+							}
 						}
 						reg.stateUnlock()
 					}
@@ -323,7 +328,9 @@ func RegistryConfigHandler(nType cluster.ClusterNotifyType, key string, value []
 					if reg.state.Status == api.RegistryStatusIdle {
 						// Start scanning if not
 						state := share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-						clusHelper.PutRegistryState(reg.config.Name, &state)
+						if err := clusHelper.PutRegistryState(reg.config.Name, &state); err != nil {
+							log.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+						}
 					}
 					reg.stateUnlock()
 				} //else if config.Schedule == api.ScanSchAuto && !reflect.DeepEqual(oldFilters, config.Filters) {
@@ -1042,13 +1049,17 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 		}
 
 		if vulnResultUpdated || signatureResultUpdated {
-			clusHelper.PutRegistryImageSummaryAndReport(rs.config.Name, id, smd.fedRole, sum, report)
+			if err := clusHelper.PutRegistryImageSummaryAndReport(rs.config.Name, id, smd.fedRole, sum, report); err != nil {
+				smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummaryAndReport")
+			}
 
 			if len(rs.summary) > api.ScanPersistImageMax+scanPersistImageExtra {
 				rs.cleanupOldImages()
 			}
 		} else {
-			clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum)
+			if err := clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum); err != nil {
+				smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+			}
 		}
 	}
 
@@ -1057,7 +1068,9 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 		// stopScan() will be called
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name}).Debug("Registry scan done")
 		state := share.CLUSRegistryState{Status: api.RegistryStatusIdle, StartedAt: rs.state.StartedAt}
-		clusHelper.PutRegistryState(rs.config.Name, &state)
+		if err := clusHelper.PutRegistryState(rs.config.Name, &state); err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+		}
 	}
 
 	return count
@@ -1089,7 +1102,9 @@ func (rs *Registry) checkAndPutImageScanning(sctx *scanContext, task *regScanTas
 	}
 
 	sum.Status = api.ScanStatusScanning
-	clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum)
+	if err := clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum); err != nil {
+		smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+	}
 	return sum
 }
 
@@ -1114,7 +1129,9 @@ func (rs *Registry) checkAndPutRegState(ctx context.Context, errMsg string) bool
 			ErrDetail: rs.errDetail,
 			StartedAt: rs.state.StartedAt,
 		}
-		clusHelper.PutRegistryState(rs.config.Name, &state)
+		if err := clusHelper.PutRegistryState(rs.config.Name, &state); err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+		}
 		return false
 	}
 
@@ -1217,7 +1234,9 @@ func (rs *Registry) imageScanAdd(img *share.CLUSImage) {
 		} else {
 			// Not scanning, start scan
 			state = &share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-			clusHelper.PutRegistryState(rs.config.Name, state)
+			if err := clusHelper.PutRegistryState(rs.config.Name, state); err != nil {
+				smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+			}
 
 			smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "image": img}).Debug("Start scan")
 		}
@@ -1258,7 +1277,9 @@ func (rs *Registry) imageScanStart(sctx *scanContext) {
 	if count == 0 {
 		// stopScan() will be called
 		state := share.CLUSRegistryState{Status: api.RegistryStatusIdle, StartedAt: rs.state.StartedAt}
-		clusHelper.PutRegistryState(rs.config.Name, &state)
+		if err := clusHelper.PutRegistryState(rs.config.Name, &state); err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+		}
 	}
 
 	rs.stateUnlock()
@@ -1274,7 +1295,9 @@ func (rs *Registry) startScan() {
 			Status: api.RegistryStatusIdle, ErrMsg: registryErrMsgConnect,
 			ErrDetail: rs.errDetail, StartedAt: rs.state.StartedAt,
 		}
-		clusHelper.PutRegistryState(rs.config.Name, &state)
+		if err := clusHelper.PutRegistryState(rs.config.Name, &state); err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+		}
 	} else {
 		rs.sctx = sctx
 		go rs.imageScanStart(sctx)
@@ -1289,13 +1312,17 @@ func (rs *Registry) resumeScan() {
 			Status: api.RegistryStatusIdle, ErrMsg: registryErrMsgConnect,
 			ErrDetail: rs.errDetail, StartedAt: rs.state.StartedAt,
 		}
-		clusHelper.PutRegistryState(rs.config.Name, &state)
+		if err := clusHelper.PutRegistryState(rs.config.Name, &state); err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+		}
 	} else {
 		rs.sctx = sctx
 		for id, sum := range rs.summary {
 			if sum.Status == api.ScanStatusScheduled || sum.Status == api.ScanStatusScanning {
 				sum.Status = api.ScanStatusScheduled
-				clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+				if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+					smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+				}
 
 				task := &regScanTask{sctx: sctx, reg: rs, imageID: sum.ImageID}
 				regScher.AddTask(task, false)
@@ -1321,7 +1348,9 @@ func (rs *Registry) stopScan() {
 			sum.Version = ""
 			sum.Result = share.ScanErrorCode_ScanErrNone
 
-			clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+			if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+				smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+			}
 			if regScher != nil {
 				regScher.DeleteTask(id, scheduler.PriorityLow)
 				rs.taskQueue.Remove(id)
@@ -1334,7 +1363,9 @@ func (rs *Registry) stopScan() {
 
 func (rs *Registry) cleanup() {
 	// cleanup cluster, data and state
-	clusHelper.DeleteRegistryKeys(rs.config.Name)
+	if err := clusHelper.DeleteRegistryKeys(rs.config.Name); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("DeleteRegistryKeys")
+	}
 }
 
 // Lock protected,
@@ -1359,7 +1390,9 @@ func (rs *Registry) cleanupOldImages() {
 
 // Lock protected
 func (rs *Registry) cleanupOneImage(id string) {
-	clusHelper.DeleteRegistryImageSummaryAndReport(rs.config.Name, id, smd.fedRole)
+	if err := clusHelper.DeleteRegistryImageSummaryAndReport(rs.config.Name, id, smd.fedRole); err != nil {
+		smd.scanLog.WithFields(log.Fields{"err": err}).Error("DeleteRegistryImageSummaryAndReport")
+	}
 	// rs.summary will be cleaned up when responding the key removal
 }
 
@@ -1387,7 +1420,9 @@ func (rs *Registry) removeImageWithDifferentID(meta *imageMeta) {
 							// Remove the old entry
 							sum.Images[i] = sum.Images[l-1]
 							sum.Images = sum.Images[:l-1]
-							clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum)
+							if err := clusHelper.PutRegistryImageSummary(rs.config.Name, id, sum); err != nil {
+								smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+							}
 							break
 						}
 					}
@@ -1465,7 +1500,9 @@ func (rs *Registry) scheduleScanImagesOnDemand(sctx *scanContext, imageMap map[s
 				}).Debug("Skip scanned image")
 
 				if imageChanged {
-					clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+					if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+						smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+					}
 				}
 				continue
 			}
@@ -1473,13 +1510,17 @@ func (rs *Registry) scheduleScanImagesOnDemand(sctx *scanContext, imageMap map[s
 			if sum.Status == api.ScanStatusScheduled {
 				smd.scanLog.WithFields(log.Fields{"images": meta.images}).Debug("Image already scheduled")
 				if imageChanged {
-					clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+					if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+						smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+					}
 				}
 				continue
 			}
 
 			sum.Status = api.ScanStatusScheduled
-			clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+			if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+				smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+			}
 		} else {
 			sum = &share.CLUSRegistryImageSummary{
 				ImageID:  meta.id,
@@ -1496,7 +1537,9 @@ func (rs *Registry) scheduleScanImagesOnDemand(sctx *scanContext, imageMap map[s
 			}
 			rs.summary[meta.id] = sum
 			// update status in cluster
-			clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+			if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+				smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+			}
 		}
 
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "images": meta.images}).Debug("Schedule image scan")
@@ -1639,7 +1682,9 @@ func (rs *Registry) scheduleScanImages(
 				}
 
 				if imageChanged {
-					clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+					if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+						smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+					}
 				}
 			} else {
 				sum = &share.CLUSRegistryImageSummary{
@@ -1667,7 +1712,9 @@ func (rs *Registry) scheduleScanImages(
 				}
 
 				// update status in cluster
-				clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum)
+				if err := clusHelper.PutRegistryImageSummary(rs.config.Name, sum.ImageID, sum); err != nil {
+					smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryImageSummary")
+				}
 			}
 
 			if scanTypesRequired.Vulnerability || scanTypesRequired.Signature {
@@ -1805,7 +1852,9 @@ func (rs *Registry) polling(ctx context.Context) {
 				if state == nil || state.Status != api.RegistryStatusScanning {
 					smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name}).Debug("Start polling images")
 					state := &share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-					clusHelper.PutRegistryState(rs.config.Name, state)
+					if err := clusHelper.PutRegistryState(rs.config.Name, state); err != nil {
+						smd.scanLog.WithFields(log.Fields{"err": err}).Debug("PutRegistryState")
+					}
 				}
 				rs.stateUnlock()
 			}

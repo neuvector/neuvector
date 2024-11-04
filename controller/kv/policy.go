@@ -144,7 +144,7 @@ func deleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string, cfg
 		if dels.Cardinality() > 0 {
 			_ = clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
 			for id := range dels.Iter() {
-				_ = clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
+				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
 			}
 			delCount += dels.Cardinality()
 		}
@@ -195,7 +195,7 @@ func deleteResponseRuleByGroupsTxn(txn *cluster.ClusterTransact, names []string)
 		if dels.Cardinality() > 0 {
 			_ = clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
 			for id := range dels.Iter() {
-				_ = clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
+				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
 			}
 			delCount += dels.Cardinality()
 		}

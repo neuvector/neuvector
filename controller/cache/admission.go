@@ -2162,7 +2162,7 @@ func (m CacheMethod) IsAdmControlEnabled(uri *string) (bool, string, int, string
 	return false, share.AdmCtrlModeMonitor, nvsysadmission.AdmCtrlActionAllow, "", ""
 }
 
-func (m CacheMethod) UpdateLocalAdmCtrlStats(category string, stats int) error {
+func (m CacheMethod) UpdateLocalAdmCtrlStats(category string, stats int) {
 	if category == admission.AdmRuleCatK8s {
 		switch stats {
 		case nvsysadmission.ReqAllowed:
@@ -2176,8 +2176,6 @@ func (m CacheMethod) UpdateLocalAdmCtrlStats(category string, stats int) error {
 		}
 	}
 	atomic.AddInt64(&admLocalStats.K8sProcessingRequests, -1)
-
-	return nil
 }
 
 func (m CacheMethod) IncrementAdmCtrlProcessing() {

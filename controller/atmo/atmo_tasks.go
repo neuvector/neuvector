@@ -41,7 +41,11 @@ func (t *task) Expire() {
 	if err != nil {
 		// remove the task
 		t.CancelTimer()
-		go t.cmplFunc(t.mover, t.id, err)
+		go func() {
+			if err := t.cmplFunc(t.mover, t.id, err); err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("cmplFunc")
+			}
+		}()
 		return
 	}
 
@@ -59,7 +63,11 @@ func (t *task) Expire() {
 	if t.runs >= t.lifeFunc(t.mover) {
 		// completed
 		t.CancelTimer()
-		go t.cmplFunc(t.mover, t.id, nil)
+		go func() {
+			if err := t.cmplFunc(t.mover, t.id, nil); err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("cmplFunc")
+			}
+		}()
 	} else {
 		// re-queued
 		t.StartTimer()

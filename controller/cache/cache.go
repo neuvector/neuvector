@@ -266,8 +266,6 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	cacher.isLeader = isLeader
 	cacher.leadAddr = leadAddr
 
-	resource.SetLeader(isLeader)
-
 	if leadAddr != "" {
 		cacher.leaderElectedAt = time.Now()
 	}

@@ -181,8 +181,14 @@ func reportTelemetryData(rawData common.TelemetryData) {
 			}
 			upgradeInfo.LastUploadTime = uploadTime
 			key := share.CLUSTelemetryStore + "controller"
-			value, _ := json.Marshal(&upgradeInfo)
-			cluster.Put(key, value)
+			value, err := json.Marshal(&upgradeInfo)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Marshal")
+				return
+			}
+			if err := cluster.Put(key, value); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("cluster.Put")
+			}
 		}
 	} else if logError {
 		lastTeleErrorDay = today

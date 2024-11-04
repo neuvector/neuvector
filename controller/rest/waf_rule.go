@@ -391,10 +391,16 @@ func createWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, cfgTy
 		sensor.RuleListNames[rdr.Name] = rdr.Name
 	}
 	//save full rule with pattern in default sensor
-	clusHelper.PutWafSensor(defsensor, false)
+	if err := clusHelper.PutWafSensor(defsensor, false); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
 
 	//create new sensor
-	clusHelper.PutWafSensor(sensor, true)
+	if err := clusHelper.PutWafSensor(sensor, true); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
 
 	return nil
 }
@@ -479,13 +485,19 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	if lock, err := lockClusKey(w, share.CLUSLockPolicyKey); err == nil {
-		defer clusHelper.ReleaseLock(lock)
-
-		if err := createWafSensor(w, conf, share.UserCreated); err == nil {
-			restRespSuccess(w, r, nil, acc, login, &rconf, "Create waf sensor")
-		}
+	var lock cluster.LockInterface
+	if lock, err = lockClusKey(w, share.CLUSLockPolicyKey); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return
 	}
+	defer clusHelper.ReleaseLock(lock)
+
+	if err := createWafSensor(w, conf, share.UserCreated); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return
+	}
+
+	restRespSuccess(w, r, nil, acc, login, &rconf, "Create waf sensor")
 }
 
 func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, reviewType share.TReviewType, sensor *share.CLUSWafSensor) error {
@@ -703,9 +715,19 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutWafSensorTxn(txn, defsensor)
-	clusHelper.PutWafSensorTxn(txn, sensor)
-	txn.Apply()
+	if err := clusHelper.PutWafSensorTxn(txn, defsensor); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
+	if err := clusHelper.PutWafSensorTxn(txn, sensor); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
 
 	return nil
 }
@@ -984,10 +1006,18 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 	for _, rn := range wafsensor.RuleListNames {
 		delete(defsensor.RuleList, rn)
 	}
-	clusHelper.PutWafSensorTxn(txn, defsensor)
+
+	if err := clusHelper.PutWafSensorTxn(txn, defsensor); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
 	clusHelper.DeleteWafSensorTxn(txn, name)
 
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return err
+	}
 
 	return nil
 }
@@ -1166,7 +1196,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey)
@@ -1187,7 +1217,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 		if err == nil {
 			progress += inc
 			importTask.Percentage = int(progress)
-			clusHelper.PutImportTask(&importTask)
+			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 			// [2]: import a waf sensor in the yaml file
 			for _, parsedCfg := range parsedWafCfgs {
@@ -1200,11 +1230,11 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 					}
 					progress += inc
 					importTask.Percentage = int(progress)
-					clusHelper.PutImportTask(&importTask)
+					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 				}
 			}
 			importTask.Percentage = 90
-			clusHelper.PutImportTask(&importTask)
+			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 		}
 	}
 
