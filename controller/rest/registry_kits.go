@@ -206,7 +206,9 @@ func (r *regTestTask) Run(arg interface{}, signal SignalFunc) {
 		steps:  make([]*api.RESTRegistryTestStep, 0),
 	}
 
-	scanner.TestRegistry(ctx, config, r.tracer)
+	if err := scanner.TestRegistry(ctx, config, r.tracer); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("TestRegistry")
+	}
 }
 
 func (r *regTestTask) Delete() {

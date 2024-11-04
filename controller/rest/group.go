@@ -1405,6 +1405,7 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 
 	txn := cluster.Transact()
 	defer txn.Close()
+	var hasError bool
 
 	existing := clusHelper.GetAllGroups(share.ScopeFed, acc)
 	for name, g := range existing {
@@ -1412,11 +1413,26 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 			continue
 		}
 		if _, ok := gpsMap[name]; !ok { // in existing but not in latest. so delete it
-			kv.DeletePolicyByGroupTxn(txn, name)
-			kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
+			deleteOps := []struct {
+				action string
+				fn     func() error
+			}{
+				{"DeletePolicyByGroupTxn", func() error { return kv.DeletePolicyByGroupTxn(txn, name) }},
+				{"DeleteResponseRuleByGroupTxn", func() error { return kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg) }},
+				{"DeleteProcessProfileTxn", func() error { return clusHelper.DeleteProcessProfileTxn(txn, name) }},
+				{"DeleteFileMonitorTxn", func() error { return clusHelper.DeleteFileMonitorTxn(txn, name) }},
+			}
+
+			for _, op := range deleteOps {
+				err := op.fn()
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Error(op.action)
+					hasError = true
+					break
+				}
+			}
+
 			clusHelper.DeleteGroupTxn(txn, name)
-			clusHelper.DeleteProcessProfileTxn(txn, name)
-			clusHelper.DeleteFileMonitorTxn(txn, name)
 			clusHelper.DeleteFileAccessRuleTxn(txn, name)
 		}
 	}
@@ -1425,7 +1441,10 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 		if gp != nil {
 			_, found := existing[gp.Name]
 			if !found || (found && !reflect.DeepEqual(*gp, *existing[gp.Name])) {
-				clusHelper.PutGroupTxn(txn, gp)
+				if err := clusHelper.PutGroupTxn(txn, gp); err != nil {
+					hasError = true
+					break
+				}
 				if !found { // for new fed groups, create process/file profiles here instead of in groupConfigUpdate()
 					cacher.CreateProcessProfileTxn(txn, gp.Name, gp.PolicyMode, "", gp.CfgType)
 					cacher.CreateGroupFileMonitorTxn(txn, gp.Name, gp.PolicyMode, gp.CfgType)
@@ -1434,8 +1453,13 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 		}
 	}
 
+	if hasError {
+		return false
+	}
+
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+		return false
 	}
 
 	return true
@@ -1452,16 +1476,27 @@ func deleteFedGroupPolicy() { // delete all fed groups(caller must be fedAdmin),
 	txn := cluster.Transact()
 	defer txn.Close()
 
+	var hasError bool
+
 	kv.DeletePolicyByCfgTypeTxn(txn, share.FederalCfg)
 
 	gpsMap := clusHelper.GetAllGroups(share.ScopeFed, access.NewFedAdminAccessControl())
 	for name := range gpsMap {
-		kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
+		if err := kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteResponseRuleByGroupTxn")
+			hasError = true
+			break
+		}
 		if name == api.LearnedExternal {
 			continue
 		}
 		clusHelper.DeleteGroupTxn(txn, name)
 	}
+
+	if hasError {
+		return
+	}
+
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
 	}
@@ -1785,7 +1820,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey)
@@ -1813,7 +1848,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		clusHelper.PutImportTask(&importTask)
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 		if err == nil {
 			var updatedGroups utils.Set
@@ -1836,7 +1871,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 			}
 
 			if err == nil {
@@ -1844,7 +1879,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 				kv.DeletePolicyByGroups(targetGroups)
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 				// [4]: import network policy rules/process profile/file access rules/group policy mode
 				for i, grpCfgRet := range parsedGrpCfg {
@@ -1892,18 +1927,20 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						crdHandler.crdHandleDlpGroup(txn, grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
 						// [5]: import waf group data
 						crdHandler.crdHandleWafGroup(txn, grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
-						txn.Apply()
+						if ok, err := txn.Apply(); err != nil || !ok {
+							log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+						}
 						txn.Close()
 					}
 
 					progress += inc
 					importTask.Percentage = int(progress)
-					clusHelper.PutImportTask(&importTask)
+					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 				}
 
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 			}
 		}
 	}
@@ -1934,10 +1971,18 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 		} else if group.Criteria != nil {
 			groupCriteria = *group.Criteria
 		}
+
+		reserved := false
 		for _, prefix := range reservedPrefix {
 			if strings.HasPrefix(group.Name, prefix) {
-				continue
+				log.WithFields(log.Fields{"group_name": group.Name, "prefix": prefix}).Debug("use reserved prefix")
+				reserved = true
+				break
 			}
+		}
+
+		if reserved {
+			continue
 		}
 
 		create := true
@@ -2011,7 +2056,10 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 
 		}
 
-		clusHelper.PutGroupTxn(txn, cg)
+		if err := clusHelper.PutGroupTxn(txn, cg); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutGroupTxn")
+		}
+
 		updatedGroups.Add(cg.Name)
 	}
 	ok, err := txn.Apply()
@@ -2058,6 +2106,7 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 	txn := cluster.Transact()
 	defer txn.Close()
 
+	var hasError bool
 	for _, ruleConf := range rulesCfg {
 		ruleConf.ID = common.GetAvailablePolicyID(idsUserCreated, share.UserCreated)
 		idsUserCreated.Add(ruleConf.ID)
@@ -2092,10 +2141,22 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 		cr.Comment = "imported policy"
 		cr.LastModAt = time.Now().UTC()
 		//cr.Priority = ruleConf.Priority
-		clusHelper.PutPolicyRuleTxn(txn, cr)
+		if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleTxn")
+			hasError = true
+			break
+		}
 	}
 	crhs = append(crhs[:startIdx], append(newRules, crhs[startIdx:]...)...)
-	clusHelper.PutPolicyRuleListTxn(txn, crhs)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+		hasError = true
+	}
+
+	if hasError {
+		log.Error("Atomic write failed")
+		return
+	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"error": err, "ok": ok}).Error("Atomic write failed")

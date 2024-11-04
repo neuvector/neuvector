@@ -326,7 +326,9 @@ func mcastAllController(f mcastGraphRPC, ops *share.CLUSGraphOps) {
 	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 	for _, ep := range eps {
 		go func(ClusterIP string, RPCServerPort uint16) {
-			f(ClusterIP, RPCServerPort, ops)
+			if err := f(ClusterIP, RPCServerPort, ops); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+			}
 		}(ep.ClusterIP, ep.RPCServerPort)
 	}
 }

@@ -108,7 +108,7 @@ func (t *TimerWheel) AddTask(task TimerTask, delay time.Duration) (string, error
 	return tid, err
 }
 
-func (t *TimerWheel) RemoveTask(taskId string) error {
+func (t *TimerWheel) RemoveTask(taskId string) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -119,7 +119,6 @@ func (t *TimerWheel) RemoveTask(taskId string) error {
 			}
 		}
 	}
-	return nil
 }
 
 func (t *TimerWheel) scheduleTimeOut(timeOut *WheelTimeOut) (string, error) {

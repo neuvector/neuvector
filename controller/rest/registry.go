@@ -531,7 +531,9 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if config.CfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, "")
+			if err := clusHelper.UpdateFedScanDataRevisions(resource.Update, "", config.Name, ""); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("UpdateFedScanDataRevisions")
+			}
 		}
 	}
 
@@ -839,7 +841,9 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if cfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, "")
+			if err := clusHelper.UpdateFedScanDataRevisions(resource.Update, "", name, ""); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("UpdateFedScanDataRevisions")
+			}
 		}
 	}
 
@@ -1177,26 +1181,14 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if cfgType == share.FederalCfg {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster {
-			clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, "")
+			if err := clusHelper.UpdateFedScanDataRevisions(resource.Delete, "", name, ""); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("UpdateFedScanDataRevisions")
+			}
 		}
 	}
 
 	restRespSuccess(w, r, nil, acc, login, nil, "Registry delete")
 }
-
-// func diffStringSlices(a, b []string) []string {
-// 	mb := make(map[string]struct{}, len(b))
-// 	for _, x := range b {
-// 		mb[x] = struct{}{}
-// 	}
-// 	var diff []string
-// 	for _, x := range a {
-// 		if _, found := mb[x]; !found {
-// 			diff = append(diff, x)
-// 		}
-// 	}
-// 	return diff
-// }
 
 // called by managed clusters
 func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {

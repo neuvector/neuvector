@@ -49,7 +49,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	if w := restCall("GET", "/v1/system/config", nil, api.UserRoleAdmin); w.status != http.StatusOK {
 		t.Fatalf("Failed to get IBM SA integration config: status=%v.", w.status)
 	} else {
-		_ = json.Unmarshal(w.body, &resp)
+		unmarshalJSON(t, w.body, &resp)
 		if resp.Config == nil {
 			t.Fatalf("Nil IBM SA integration config by REST")
 		} else {
@@ -137,7 +137,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	if w := restCall("GET", "/v1/partner/ibm_sa_ep", nil, api.UserRoleAdmin); w.status != http.StatusOK {
 		t.Fatalf("Failed to get IBM SA setup URL: status=%v.", w.status)
 	} else {
-		_ = json.Unmarshal(w.body, &respIBMSASetupUrl)
+		unmarshalJSON(t, w.body, &respIBMSASetupUrl)
 		if i := strings.Index(respIBMSASetupUrl.URL, "/v1/partner/ibm_sa/"); i < 0 {
 			t.Fatalf("Invalid IBM SA Endpoint URL in NV")
 		} else {
@@ -177,18 +177,22 @@ func TestIBMSAIntegration(t *testing.T) {
 		Timeout:      300,
 		LoginCount:   1,
 	}
-	_ = clusHelper.PutUserRev(user, 0)
+	if err := clusHelper.PutUserRev(user, 0); err != nil {
+		t.Errorf("PutUserRev return error:%v", err)
+	}
 	// Get a login token(with IBMSA role/permission only) from NV. This token generation makes loginSessions size to increase by 1
 	var respIBMSASetupToken api.RESTIBMSASetupToken
 	if w := restCall("GET", setupURI, nil, api.UserRoleAdmin); w.status != http.StatusOK {
 		t.Fatalf("Failed to get login token: status=%v.", w.status)
 	} else {
-		_ = json.Unmarshal(w.body, &respIBMSASetupToken)
+		unmarshalJSON(t, w.body, &respIBMSASetupToken)
 		if respIBMSASetupToken.AccessToken == "" {
 			t.Fatalf("Invalid NV login token")
 		}
 	}
-	_ = clusHelper.DeleteUser(common.ReservedUserNameIBMSA)
+	if err := clusHelper.DeleteUser(common.ReservedUserNameIBMSA); err != nil {
+		t.Errorf("DeleteUser return error:%v", err)
+	}
 	if len(loginSessions) != 1 {
 		t.Fatalf("Incorrect number of login users: %v", len(loginSessions))
 	}
@@ -346,7 +350,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	if w := restCall("GET", "/v1/partner/ibm_sa_config", nil, api.UserRoleAdmin); w.status != http.StatusOK {
 		t.Fatalf("Failed to check IBM SA setup configuration: status=%v.", w.status)
 	} else {
-		_ = json.Unmarshal(w.body, &setupConfig)
+		unmarshalJSON(t, w.body, &setupConfig)
 		if setupConfig.AccountID != cfg.AccountID || setupConfig.APIKey != cfg.APIKey || setupConfig.ProviderID != cfg.ProviderID ||
 			setupConfig.FindingsURL != cfg.FindingsURL || setupConfig.TokenURL != cfg.TokenURL {
 			t.Fatalf("Invalid IBM SA Endpoint setup configuration in NV: %v", setupConfig)
@@ -413,7 +417,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	if w := restCall("GET", "/v1/system/config", nil, api.UserRoleAdmin); w.status != http.StatusOK {
 		t.Fatalf("Failed to get IBM SA integration config: status=%v.", w.status)
 	} else {
-		_ = json.Unmarshal(w.body, &resp)
+		unmarshalJSON(t, w.body, &resp)
 		if resp.Config == nil {
 			t.Fatalf("Nil IBM SA integration config by REST")
 		} else {
@@ -425,4 +429,10 @@ func TestIBMSAIntegration(t *testing.T) {
 	}
 
 	postTest()
+}
+
+func unmarshalJSON(t *testing.T, data []byte, v interface{}) {
+	if err := json.Unmarshal(data, v); err != nil {
+		t.Errorf("Unmarshal error: %v", err)
+	}
 }

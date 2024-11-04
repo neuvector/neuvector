@@ -252,7 +252,7 @@ func TestServerConfig(t *testing.T) { // for 4.2-)
 
 		var sdata api.RESTServerData
 		w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-		_ = json.Unmarshal(w.body, &sdata)
+		unmarshalJSON(t, w.body, &sdata)
 		if len(sdata.Server.LDAP.GroupMappedRoles) != 1 {
 			t.Errorf("Incorrect configuration of group role mapping. len=%+v", len(sdata.Server.LDAP.GroupMappedRoles))
 		}
@@ -289,7 +289,7 @@ func TestServerConfig2(t *testing.T) { // for 4.2(-)
 
 	var sdata api.RESTServerData
 	w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-	_ = json.Unmarshal(w.body, &sdata)
+	unmarshalJSON(t, w.body, &sdata)
 	groupRoleMappings := sdata.Server.LDAP.GroupMappedRoles
 	expects := []*share.GroupRoleMapping{
 		{
@@ -367,7 +367,7 @@ func TestServerConfigNew(t *testing.T) { // for 4.3(+)
 
 		var sdata api.RESTServerData
 		w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-		_ = json.Unmarshal(w.body, &sdata)
+		unmarshalJSON(t, w.body, &sdata)
 		if len(sdata.Server.LDAP.GroupMappedRoles) != 1 {
 			t.Errorf("Incorrect configuration of group role mapping. len=%+v", len(sdata.Server.LDAP.GroupMappedRoles))
 		}
@@ -407,7 +407,7 @@ func TestServerConfigNew(t *testing.T) { // for 4.3(+)
 		}
 		var sdata2 api.RESTServerData
 		w = restCall("GET", fmt.Sprintf("/v1/server/%v", data.Config.Name), nil, api.UserRoleAdmin)
-		_ = json.Unmarshal(w.body, &sdata2)
+		unmarshalJSON(t, w.body, &sdata2)
 		if len(sdata2.Server.LDAP.GroupMappedRoles) != 0 {
 			t.Errorf("Incorrect configuration of group role mapping. result len=%+v, expect 0", len(sdata2.Server.LDAP.GroupMappedRoles))
 		}
@@ -612,7 +612,7 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		if w.status != http.StatusOK {
 			t.Errorf("Get server failed: %v", w.status)
 		}
-		_ = json.Unmarshal(w.body, &sdata)
+		unmarshalJSON(t, w.body, &sdata)
 		if sdata.Server == nil {
 			t.Errorf("No server data")
 		} else if sdata.Server.LDAP == nil {
@@ -658,7 +658,7 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		}
 		var sdataRet api.RESTServerData
 		w = restCall("GET", "/v1/server/s1", nil, api.UserRoleAdmin)
-		_ = json.Unmarshal(w.body, &sdataRet)
+		unmarshalJSON(t, w.body, &sdataRet)
 		compareGroupMappedData("2", sdataRet.Server.LDAP.GroupMappedRoles, expected2, t)
 	}
 
@@ -734,7 +734,7 @@ func TestServerConfigNewForFed(t *testing.T) { // for 4.3(+), for a mpped-to-fed
 		}
 		var sdataRet api.RESTServerData
 		w = restCall("GET", "/v1/server/s1", nil, api.UserRoleAdmin)
-		_ = json.Unmarshal(w.body, &sdataRet)
+		unmarshalJSON(t, w.body, &sdataRet)
 		compareGroupMappedData("3", sdataRet.Server.LDAP.GroupMappedRoles, expected3, t)
 
 		/*
@@ -828,9 +828,13 @@ func TestServerDelete(t *testing.T) {
 
 	// Used by auth order
 	mockCluster.Init(nil, nil)
-	_ = mockCluster.PutServerRev(&s1, 0)
+	if err := mockCluster.PutServerRev(&s1, 0); err != nil {
+		t.Errorf("PutServerRev returns error: %v", err)
+	}
 	sysc := share.CLUSSystemConfig{AuthOrder: []string{"s1", "local"}}
-	_ = mockCluster.PutSystemConfigRev(&sysc, 0)
+	if err := mockCluster.PutSystemConfigRev(&sysc, 0); err != nil {
+		t.Errorf("PutSystemConfigRev returns error: %v", err)
+	}
 	clusHelper = &mockCluster
 
 	w := restCall("DELETE", "/v1/server/s1", nil, api.UserRoleAdmin)
@@ -840,9 +844,13 @@ func TestServerDelete(t *testing.T) {
 
 	// Not used
 	mockCluster.Init(nil, nil)
-	_ = mockCluster.PutServerRev(&s1, 0)
+	if err := mockCluster.PutServerRev(&s1, 0); err != nil {
+		t.Errorf("PutServerRev returns error: %v", err)
+	}
 	sysc = share.CLUSSystemConfig{AuthOrder: []string{"local"}}
-	_ = mockCluster.PutSystemConfigRev(&sysc, 0)
+	if err := mockCluster.PutSystemConfigRev(&sysc, 0); err != nil {
+		t.Errorf("PutSystemConfigRev returns error: %v", err)
+	}
 
 	w = restCall("DELETE", "/v1/server/s1", nil, api.UserRoleAdmin)
 	if w.status != http.StatusOK {
@@ -858,21 +866,27 @@ func TestOIDCUpdate(t *testing.T) {
 	}
 	accAdmin := access.NewAdminAccessControl()
 	oidc := api.RESTServerOIDCConfig{}
-	_ = updateOIDCServer(&cs, &oidc, accAdmin, nil)
+	if err := updateOIDCServer(&cs, &oidc, accAdmin, nil); err != nil {
+		t.Errorf("updateOIDCServer returns error: %v", err)
+	}
 	if !reflect.DeepEqual(cs.OIDC.Scopes, auth.DefaultOIDCScopes) {
 		t.Errorf("Invalid OIDC scopes update: %v", cs.OIDC.Scopes)
 	}
 
 	scopes := []string{"one"}
 	oidc = api.RESTServerOIDCConfig{Scopes: &scopes}
-	_ = updateOIDCServer(&cs, &oidc, accAdmin, nil)
+	if err := updateOIDCServer(&cs, &oidc, accAdmin, nil); err != nil {
+		t.Errorf("updateOIDCServer returns error: %v", err)
+	}
 	if len(cs.OIDC.Scopes) != 2 || cs.OIDC.Scopes[0] != "openid" || cs.OIDC.Scopes[1] != "one" {
 		t.Errorf("Invalid OIDC scopes update: %v", cs.OIDC.Scopes)
 	}
 
 	scopes = []string{"openid", "two"}
 	oidc = api.RESTServerOIDCConfig{Scopes: &scopes}
-	_ = updateOIDCServer(&cs, &oidc, accAdmin, nil)
+	if err := updateOIDCServer(&cs, &oidc, accAdmin, nil); err != nil {
+		t.Errorf("updateOIDCServer returns error: %v", err)
+	}
 	if len(cs.OIDC.Scopes) != 2 || cs.OIDC.Scopes[0] != "openid" || cs.OIDC.Scopes[1] != "two" {
 		t.Errorf("Invalid OIDC scopes update: %v", cs.OIDC.Scopes)
 	}

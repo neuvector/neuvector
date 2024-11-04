@@ -110,7 +110,9 @@ func (ss *ScanService) registerFailureCleanup(newDBStore string) {
 	// Remove new keys that have been written
 	newKeys, _ := cluster.GetStoreKeys(newDBStore)
 	for _, key := range newKeys {
-		cluster.Delete(key)
+		if err := cluster.Delete(key); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Delete")
+		}
 	}
 }
 
@@ -251,12 +253,16 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 			CVEDBCreateTime: data.CVEDBCreateTime,
 			CVEDBEntries:    len(data.CVEDB),
 		}
-		clusHelper.PutScannerTxn(txn, &dbVerScanner)
+		if err := clusHelper.PutScannerTxn(txn, &dbVerScanner); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutScannerTxn")
+		}
 
 		log.WithFields(log.Fields{"cvedb": newStore}).Info("CVE database written")
 	}
 
-	clusHelper.PutScannerTxn(txn, &newScanner)
+	if err := clusHelper.PutScannerTxn(txn, &newScanner); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutScannerTxn")
+	}
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to write scanner to the cluster")
 		if writeDB {
@@ -275,11 +281,15 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 		for _, store := range oldStores {
 			txn.DeleteTree(store)
 		}
-		txn.Apply()
+		if _, err := txn.Apply(); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		}
 	}
 
 	// Create scanner stats if not exist
-	clusHelper.CreateScannerStats(newScanner.ID)
+	if err := clusHelper.CreateScannerStats(newScanner.ID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("CreateScannerStats")
+	}
 
 	return nil
 }
@@ -288,7 +298,9 @@ func (ss *ScanService) ScannerDeregister(ctx context.Context, data *share.Scanne
 	log.WithFields(log.Fields{"scanner": data.ID}).Info()
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.DeleteScanner(data.ID)
+	if err := clusHelper.DeleteScanner(data.ID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("DeleteScanner")
+	}
 	return &share.RPCVoid{}, nil
 }
 
@@ -352,7 +364,7 @@ func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*sh
 	return &c, nil
 }
 
-func (sas *ScanAdapterService) ScanImage(ctx context.Context, req *share.AdapterScanImageRequest) (*share.ScanResult, error) {
+func (sas *ScanAdapterService) ScanImage(ctxunused context.Context, req *share.AdapterScanImageRequest) (*share.ScanResult, error) {
 	log.WithFields(log.Fields{"request": req}).Debug("Scan image request")
 
 	ctx, cancel := context.WithTimeout(context.Background(), repoScanTimeout)
@@ -374,7 +386,9 @@ func (sas *ScanAdapterService) ScanImage(ctx context.Context, req *share.Adapter
 
 	// store the scan result so it can be used by admission control
 	scan.FixRegRepoForAdmCtrl(result)
-	scanner.StoreRepoScanResult(result)
+	if err := scanner.StoreRepoScanResult(result); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("StoreRepoScanResult")
+	}
 
 	// Fill the detail and filter the result
 	for _, v := range result.Vuls {
@@ -416,25 +430,24 @@ func (s *UpgradeService) UpgradeScannerDB(stream share.ControllerUpgradeService_
 const reportChanSize = 128
 
 func agentReportWorker(ch chan []*share.CLUSConnection) {
-	for {
-		select {
-		case conns := <-ch:
-			cache.UpdateConnections(conns)
+	for conns := range ch {
+		cache.UpdateConnections(conns)
 
-			var wg sync.WaitGroup
-			eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
-			for _, ep := range eps {
-				if ep.ID != Ctrler.ID {
-					wg.Add(1)
-					go func(ClusterIP string, RPCServerPort uint16) {
-						// TODO: what if this fail? Or we could just transfer the graph update
-						rpc.ReportConnections(ClusterIP, RPCServerPort, conns)
-						wg.Done()
-					}(ep.ClusterIP, ep.RPCServerPort)
-				}
+		var wg sync.WaitGroup
+		eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
+		for _, ep := range eps {
+			if ep.ID != Ctrler.ID {
+				wg.Add(1)
+				go func(ClusterIP string, RPCServerPort uint16) {
+					// TODO: what if this fail? Or we could just transfer the graph update
+					if _, err := rpc.ReportConnections(ClusterIP, RPCServerPort, conns); err != nil {
+						log.WithFields(log.Fields{"error": err}).Debug("ReportConnections")
+					}
+					wg.Done()
+				}(ep.ClusterIP, ep.RPCServerPort)
 			}
-			wg.Wait()
 		}
+		wg.Wait()
 	}
 }
 
@@ -544,11 +557,15 @@ func (cs *ControllerService) ReqSyncStream(req *share.CLUSSyncRequest, stream sh
 	for {
 		if size-offset < ctrlSyncChunkSize {
 			reply.Data = data[offset:]
-			stream.Send(reply)
+			if err := stream.Send(reply); err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("Send")
+			}
 			break
 		} else {
 			reply.Data = data[offset : offset+ctrlSyncChunkSize]
-			stream.Send(reply)
+			if err := stream.Send(reply); err != nil {
+				log.WithFields(log.Fields{"error": err}).Debug("Send")
+			}
 			offset += ctrlSyncChunkSize
 		}
 	}

@@ -852,32 +852,6 @@ func parseCVEDbKey(cvedbkey string) (string, string, string) {
 	return name, dbkey, fix
 }
 
-// for perf testing
-func Perf_getAllWorkloadIDs(allowed map[string]utils.Set) error {
-	// select assetid from assetvuls where type='workload'
-	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid").Where(goqu.C("type").Eq("workload")).Prepared(true).ToSQL()
-
-	rows, err := dbHandle.Query(statement, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var assetID string
-
-		err = rows.Scan(&assetID)
-		if err != nil {
-			return err
-		}
-
-		allowed[AssetWorkload].Add(assetID)
-	}
-
-	return nil
-}
-
 func hasNamespaceFilter(queryFilter *api.VulQueryFilterViewModel) bool {
 	if queryFilter.MatchType4Ns != "" && len(queryFilter.SelectedDomains) > 0 {
 		return true
@@ -888,7 +862,9 @@ func hasNamespaceFilter(queryFilter *api.VulQueryFilterViewModel) bool {
 func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsBytes []byte, idnsStr string, vulnerabilities *[]string, vulMap map[string]*DbVulAsset, cveStat map[string]*int) {
 	pool.Submit(func() {
 		cveList := make([]string, 0)
-		funcFillVulPackages(mu, cvePackages, vulsBytes, idnsStr, &cveList, cveStat)
+		if err := funcFillVulPackages(mu, cvePackages, vulsBytes, idnsStr, &cveList, cveStat); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("funcFillVulPackages")
+		}
 
 		for _, c := range cveList {
 			name, _, _ := parseCVEDbKey(c)
@@ -1119,7 +1095,9 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 
 	// delete session table in memory, allow some time for the ongoing read operation to complete before proceeding
 	time.Sleep(30 * time.Second)
-	deleteSessionTempTableInMemDb(sessionToken)
+	if err := deleteSessionTempTableInMemDb(sessionToken); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("deleteSessionTempTableInMemDb")
+	}
 
 	return nil
 }

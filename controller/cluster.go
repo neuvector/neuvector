@@ -57,7 +57,9 @@ func recordLeadChangeEvent(ev share.TLogEvent, newLead, oldLead string) {
 		ReportedAt:     time.Now().UTC(),
 		Msg:            msg,
 	}
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 func setConfigLoaded() {
@@ -149,7 +151,9 @@ func leadChangeHandler(newLead, oldLead string) {
 						ReportedAt:     time.Now().UTC(),
 						Msg:            fmt.Sprintf("Restored kv version: %s", restoredKvVersion),
 					}
-					evqueue.Append(&clog)
+					if err := evqueue.Append(&clog); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+					}
 				}
 				kv.ValidateWebhookCert()
 				setConfigLoaded()
@@ -258,7 +262,9 @@ func logController(ev share.TLogEvent) {
 		clog.ReportedAt = time.Now().UTC()
 	}
 
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 var snapshotIndex int
@@ -372,7 +378,9 @@ func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool
 	}
 
 	b := new(bytes.Buffer)
-	json.NewEncoder(b).Encode(report)
+	if err := json.NewEncoder(b).Encode(report); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Encode")
+	}
 	msg := b.String()
 
 	// log.WithFields(log.Fields{"msg": msg}).Debug()
@@ -384,7 +392,9 @@ func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool
 		ReportedAt:     time.Now().UTC(),
 		Msg:            msg,
 	}
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 func ctlrPutLocalInfo() {
@@ -432,5 +442,7 @@ func ctrlDeleteLocalInfo() {
 	}
 
 	clusHelper := kv.GetClusterHelper()
-	clusHelper.DeleteScanner(Ctrler.ID)
+	if err := clusHelper.DeleteScanner(Ctrler.ID); err != nil {
+		log.WithFields(log.Fields{"error": err, "id": Ctrler.ID}).Error("DeleteScanner")
+	}
 }

@@ -116,7 +116,6 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 			if foundInVts {
 				j += 1
 			}
-			i += 1
 			continue
 		}
 
@@ -167,7 +166,6 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 		if foundInVts {
 			j += 1
 		}
-		i += 1
 	}
 	vulPublishDate := map[string]map[string]share.CLUSScannedVulInfo{
 		share.VulnSeverityCritical: criticalVulPublishDate,
@@ -181,28 +179,31 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 }
 
 func imageWatcher() {
-	for {
-		select {
-		case ev := <-smd.scanChan:
-			smd.scanLog.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Debug("Event received")
-			if ev.ResourceNew == nil && ev.ResourceOld == nil {
-				break
+	for ev := range smd.scanChan {
+		smd.scanLog.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Debug("Event received")
+
+		// Skip the event if both ResourceNew and ResourceOld are nil
+		if ev.ResourceNew == nil && ev.ResourceOld == nil {
+			continue
+		}
+
+		switch ev.ResourceType {
+		case resource.RscTypeImage:
+			var n, o *resource.Image
+			if ev.ResourceNew != nil {
+				n = ev.ResourceNew.(*resource.Image)
 			}
-			switch ev.ResourceType {
-			case resource.RscTypeImage:
-				var n, o *resource.Image
-				if ev.ResourceNew != nil {
-					n = ev.ResourceNew.(*resource.Image)
-				}
-				if ev.ResourceOld != nil {
-					o = ev.ResourceOld.(*resource.Image)
-				}
-				if n != nil {
-					imageBankUpdate(n)
-				} else if n == nil && o != nil {
-					imageBankDelete(o)
-				}
+			if ev.ResourceOld != nil {
+				o = ev.ResourceOld.(*resource.Image)
 			}
+
+			if n != nil {
+				imageBankUpdate(n)
+			} else if o != nil {
+				imageBankDelete(o)
+			}
+		default:
+			smd.scanLog.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Debug("Unhandled resource type")
 		}
 	}
 }
@@ -291,7 +292,9 @@ func ScannerDBChange(db *share.CLUSScannerDB) {
 					} else {
 						smd.scanLog.WithFields(log.Fields{"registry": reg.config.Name}).Debug("CVE Database updated. Start re-scan")
 						state := &share.CLUSRegistryState{Status: api.RegistryStatusScanning, StartedAt: time.Now().Unix()}
-						clusHelper.PutRegistryState(reg.config.Name, state)
+						if err := clusHelper.PutRegistryState(reg.config.Name, state); err != nil {
+							smd.scanLog.WithFields(log.Fields{"err": err}).Error("PutRegistryState")
+						}
 					}
 				}
 				reg.stateUnlock()

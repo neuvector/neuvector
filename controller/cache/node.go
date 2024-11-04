@@ -122,7 +122,7 @@ func scheduleHostRemoval(cache *hostCache) {
 		if !cache.timerSched.IsZero() && time.Since(cache.timerSched) > hostRemovalDelay {
 			log.WithFields(log.Fields{"host": cache.host.ID}).Info("Force remove the host")
 			cache.state = api.StateLeft
-			_ = cctx.TimerWheel.RemoveTask(cache.timerTask)
+			cctx.TimerWheel.RemoveTask(cache.timerTask)
 			deleteHostFromCluster(cache.host.ID)
 		}
 		return
@@ -147,7 +147,7 @@ func cancelHostRemoval(cache *hostCache) {
 		log.WithFields(log.Fields{
 			"host": cache.host.ID,
 		}).Info("cancel host removal")
-		_ = cctx.TimerWheel.RemoveTask(cache.timerTask)
+		cctx.TimerWheel.RemoveTask(cache.timerTask)
 		cache.timerTask = ""
 		cache.timerSched = time.Time{}
 	}
@@ -208,7 +208,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if ac.timerTask != "" {
 				log.Debug("remove old timer")
-				_ = cctx.TimerWheel.RemoveTask(ac.timerTask)
+				cctx.TimerWheel.RemoveTask(ac.timerTask)
 				ac.timerTask = ""
 			}
 
@@ -252,7 +252,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if ac.timerTask != "" {
 				log.Debug("remove old timer")
-				_ = cctx.TimerWheel.RemoveTask(ac.timerTask)
+				cctx.TimerWheel.RemoveTask(ac.timerTask)
 				ac.timerTask = ""
 			}
 
@@ -288,7 +288,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if cc.timerTask != "" {
 				log.Debug("remove old cc timer")
-				_ = cctx.TimerWheel.RemoveTask(cc.timerTask)
+				cctx.TimerWheel.RemoveTask(cc.timerTask)
 				cc.timerTask = ""
 			}
 
@@ -324,7 +324,7 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 
 			if cc.timerTask != "" {
 				log.Debug("remove old cc timer")
-				_ = cctx.TimerWheel.RemoveTask(cc.timerTask)
+				cctx.TimerWheel.RemoveTask(cc.timerTask)
 				cc.timerTask = ""
 			}
 
@@ -543,7 +543,7 @@ func AgentAdmissionRequest(req *share.CLUSAdmissionRequest) *share.CLUSAdmission
 			// A host can only have one enforcer on it, so delete the old one
 			if ac.timerTask != "" {
 				log.Debug("remove old timer")
-				_ = cctx.TimerWheel.RemoveTask(ac.timerTask)
+				cctx.TimerWheel.RemoveTask(ac.timerTask)
 				ac.timerTask = ""
 			}
 			if ac.agent.ID != req.ID {

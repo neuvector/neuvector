@@ -224,11 +224,8 @@ func (pc *uuidPRuleCache) ruleIdTimerLoop() {
 	acc := access.NewFedAdminAccessControl()
 	calculateTicker := time.Tick(time.Second * time.Duration(calculateInterval))
 	log.Info("UUID: timer starts")
-	for {
-		select {
-		case <-calculateTicker:
-			pc.calculte_uuid_rules(acc)
-		}
+	for range calculateTicker {
+		pc.calculte_uuid_rules(acc)
 	}
 }
 
