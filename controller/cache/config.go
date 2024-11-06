@@ -76,9 +76,7 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 
 func setControllerDebug(debug []string, debugCPath bool) {
 	var hasCPath, hasConn, hasMutex, hasScan, hasCluster, hasK8sMonitor bool
-	if len(debug) == 0 && !debugCPath {
-		return
-	}
+
 	for _, d := range debug {
 		switch d {
 		case "cpath":
@@ -678,6 +676,20 @@ func configInit() {
 	}
 	if !utils.CompareSliceWithoutOrder(systemConfigCache.ControllerDebug, cctx.Debug) {
 		systemConfigCache.ControllerDebug = cctx.Debug
+		// Refresh cfg and rev before updating ControllerDebug
+		cfg, rev = clusHelper.GetSystemConfigRev(acc)
+		retry := 0
+		for retry < 3 {
+			cfg.ControllerDebug = cctx.Debug
+			if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+				if cfg, rev = clusHelper.GetSystemConfigRev(acc); cfg == nil {
+					break
+				}
+				retry++
+			} else {
+				break
+			}
+		}
 	}
 	setControllerDebug(systemConfigCache.ControllerDebug, cctx.DebugCPath)
 	scan.UpdateProxy(&systemConfigCache.RegistryHttpProxy, &systemConfigCache.RegistryHttpsProxy)
