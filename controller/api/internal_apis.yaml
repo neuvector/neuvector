@@ -7,6 +7,9 @@ info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
   title: NeuVector Internal API
   version: '1.0'
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 schemes:
   - https
 
@@ -24,6 +27,7 @@ paths:
   /v1/token_auth_server/{server}:
     get:
       summary: Generate login request for integration, e.g., OIDC or SAML.
+      security: []
       tags:
         - Authentication
       parameters:
@@ -33,6 +37,11 @@ paths:
           required: true
           schema:
             $ref: '#/definitions/RESTGenerateServerLoginRequest'
+        - name: server
+          in: path
+          description: the resource name
+          type: string
+          required: true
       produces:
         - application/json
       responses:
@@ -46,6 +55,7 @@ paths:
             $ref: '#/definitions/RESTError'
     post:
       summary: Create login token via integration, e.g., OIDC or SAML.
+      security: []
       tags:
         - Authentication
       parameters:
@@ -55,6 +65,11 @@ paths:
           required: true
           schema:
             $ref: '#/definitions/RESTGenerateServerLoginRequest'
+        - name: server
+          in: path
+          description: the resource name
+          type: string
+          required: true
       produces:
         - application/json
       responses:
@@ -71,8 +86,7 @@ paths:
       summary: Create redirect url for Single Signout request.  Currently only SAML is supported.
       tags:
         - Authentication
-      security:
-        - TokenAuth: []
+      security: []
       parameters:
         - in: body
           name: body
@@ -80,6 +94,11 @@ paths:
           required: true
           schema:
             $ref: '#/definitions/RESTGenerateServerLogoutRequest'
+        - name: server
+          in: path
+          description: the resource name
+          type: string
+          required: true
       produces:
         - application/json
       responses:
@@ -113,8 +132,6 @@ definitions:
         type: string
         example: 'https://<server>/token_auth_server'
   RESTGenerateServerLoginResponse:
-    required:
-      - 'redirect_endpoint'
     type: object
     properties:
       redirect:
