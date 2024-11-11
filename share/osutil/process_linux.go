@@ -268,7 +268,7 @@ func GetContainerSocketTable(rootPid int) map[uint32]SocketInfo {
 func getConnectionByFile(fileName string, inodes utils.Set, tcp bool, sport uint16) *Connection {
 	f, err := os.Open(fileName)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("open net/tcp,udp")
+		log.WithFields(log.Fields{"error": err}).Debug("open net/tcp,udp")
 		return nil
 	}
 	defer f.Close()
