@@ -202,7 +202,7 @@ func createConfigFile(cc *ClusterConfig) error {
 			Serf_lan: lanPort,
 			Serf_wan: -1,
 		},
-		Tls_cipher_suites: "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+		Tls_cipher_suites: "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
 		Performance: tConsulConfigPerformance{
 			Rpc_hold_timeout: fmt.Sprintf("%ds", 300),
 		},
