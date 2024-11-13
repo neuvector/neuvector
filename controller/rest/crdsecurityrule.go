@@ -3995,7 +3995,8 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		return nil
 	}
 	crdHandler.crossCheck = true
-	log.WithFields(log.Fields{"rscType": rscType, "kvCrdKind": kvCrdKind, "kvOnly": kvOnly, "len(recordList)": len(recordList), "len(objs)": len(objs)}).Info()
+	log.WithFields(log.Fields{"kind": kind, "rscType": rscType, "kvCrdKind": kvCrdKind, "kvOnly": kvOnly,
+		"len(recordList)": len(recordList), "len(objs)": len(objs)}).Info()
 
 	acc := access.NewAdminAccessControl()
 	switch kind {
@@ -4042,8 +4043,6 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		var crdMd5 string
 		var mdNameDisplay string
 		var recordName string
-		var gfwRule resource.NvSecurityRule
-		var objOrig interface{}
 
 		metaData, ok := obj.(metav1.Object)
 		if !ok {
@@ -4059,12 +4058,6 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		if crdMd5, skip, _ = crdHandler.getCrInfo(obj); skip {
 			continue
 		}
-		if kind == resource.NvClusterSecurityRuleKind {
-			objOrig = obj
-			r := obj.(*resource.NvClusterSecurityRule)
-			gfwRule = resource.NvSecurityRule(*r)
-			obj = &gfwRule
-		}
 		if !crdHandler.AcquireLock(clusterLockWait) {
 			continue
 		}
@@ -4074,9 +4067,6 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 				log.WithFields(log.Fields{"error": errMsg, "name": mdNameDisplay}).Error()
 				e := fmt.Sprintf("%s deleted due to error: %s", mdNameDisplay, errMsg)
 				deleted = append(deleted, e)
-				if kind == resource.NvClusterSecurityRuleKind {
-					obj = objOrig
-				}
 				if err := global.ORCH.DeleteResource(rscType, obj); err != nil {
 					log.WithFields(log.Fields{"rscType": rscType, "name": mdNameDisplay, "err": err}).Error()
 				}
