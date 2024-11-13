@@ -679,7 +679,7 @@ func (s *ScanApps) parseWordpressPackage(filename, fullpath string) {
 	}
 }
 
-func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
+func (s *ScanApps) parseDotNetPackage(filename string, fullpath string) {
 	if fi, err := os.Stat(fullpath); err != nil {
 		log.WithFields(log.Fields{"err": err, "fullpath": fullpath, "filename": filename}).Error("Failed to stat file")
 		return
@@ -736,7 +736,8 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 			// it is possible that there are multiple core versions in different dependencies
 			//    Microsoft.NETCore.App/2.2.8   ==> 2.2.8
 			//    Microsoft.AspNetCore.ApplicationInsights.HostingStartup/2.2.0 ==> 2.2.0 (x)
-			if strings.HasPrefix(target, "Microsoft.NETCore.App/") || strings.HasPrefix(target, "Microsoft.AspNetCore.App/") {
+			if strings.HasPrefix(target, "Microsoft.NETCore.App/") || strings.HasPrefix(target, "Microsoft.AspNetCore.App/") ||
+				strings.HasPrefix(target, "Microsoft.NETCore.App.Runtime") || strings.HasPrefix(target, "Microsoft.AspNetCore.App.Runtime") {
 				if o := strings.Index(target, "/"); o != -1 {
 					version := target[o+1:]
 					if o = strings.Index(version, "-"); o != -1 {
@@ -759,26 +760,41 @@ func (s *ScanApps) parseDotNetPackage(filename, fullpath string) {
 					pkgs = append(pkgs, pkg)
 				}
 			}
-		}
-	}
 
-	if coreVersion != "" {
-		key := fmt.Sprintf("%s-%s", ".NET:Core", coreVersion)
-		if !dedup.Contains(key) {
-			dedup.Add(key)
-			pkg := AppPackage{
-				AppName:    ".NET",
-				ModuleName: ".NET:Core",
-				Version:    coreVersion,
-				FileName:   filename,
+			if coreVersion != "" {
+				name := getDotNetModuleName(target)
+				if name == "" {
+					log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename}).Error("Failed to determine .Net ModuleName")
+					continue
+				}
+				key := fmt.Sprintf(".NET:%s-%s", name, coreVersion)
+				if !dedup.Contains(key) {
+					dedup.Add(key)
+					pkg := AppPackage{
+						AppName:    ".NET",
+						ModuleName: ".NET:" + name,
+						Version:    coreVersion,
+						FileName:   filename,
+					}
+					pkgs = append(pkgs, pkg)
+				}
 			}
-			pkgs = append(pkgs, pkg)
 		}
 	}
 
 	if len(pkgs) > 0 {
 		s.pkgs[filename] = pkgs
 	}
+}
+
+func getDotNetModuleName(input string) string {
+	splits := strings.Split(input, "/")
+	for _, split := range splits {
+		if strings.HasPrefix(split, "Microsoft.NETCore.") || strings.HasPrefix(split, "Microsoft.AspNetCore.") && !strings.HasSuffix(split, ".json") {
+			return split
+		}
+	}
+	return ""
 }
 
 func (s *ScanApps) parseRLangPackage(filename, fullpath string) {
