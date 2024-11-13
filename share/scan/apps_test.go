@@ -3,6 +3,8 @@ package scan
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParsePythonPackage(t *testing.T) {
@@ -273,5 +275,21 @@ Bundle-ActivationPolicy: lazy
 	pkg, _ = parseJarManifestFile("", r)
 	if pkg.ModuleName != "JNA Development Team:com.sun.jna" && pkg.Version != "5.5.0" {
 		t.Errorf("Wrong jar package: %+v\n", pkg)
+	}
+}
+
+func TestGetDotNetModuleName(t *testing.T) {
+	tests := []struct {
+		incomingName string
+		expectedName string
+	}{
+		{"Microsoft.AspNetCore.App.Runtime.linux-musl-x64/6.0.15", "Microsoft.AspNetCore.App.Runtime.linux-musl-x64"},
+		{"Microsoft.NETCore.App.Runtime.linux-musl-x64/6.0.15", "Microsoft.NETCore.App.Runtime.linux-musl-x64"},
+		{"Microsoft.NETCored5", ""},
+	}
+
+	for _, test := range tests {
+		outgoingName := getDotNetModuleName(test.incomingName)
+		assert.Equal(t, test.expectedName, outgoingName, "Wrong module name")
 	}
 }
