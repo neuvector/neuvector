@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/scan/registry"
 	registryUtils "github.com/neuvector/neuvector/share/scan/registry"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -233,8 +234,10 @@ func (r *base) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 		return err, err.Error()
 	}
 
-	if _, err := r.rc.Alive(); err != nil {
-		return err, err.Error()
+	if code, err := r.rc.Alive(); err != nil {
+		if code != registry.ErrorAuthentication {
+			return err, err.Error()
+		}
 	}
 	return nil, ""
 }
