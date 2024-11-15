@@ -532,8 +532,6 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 				}
 			}
 		case share.CFGEndpointResponseRule:
-			var cfg share.CLUSResponseRule
-			_ = nvJsonUnmarshal(key, value, &cfg)
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSResponseRule
 				_ = nvJsonUnmarshal(key, value, &cfg)
