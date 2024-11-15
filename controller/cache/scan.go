@@ -619,7 +619,13 @@ func scannerDBChange(newVer string) {
 	go func() {
 		scanMutexLock()
 		for id, info := range scanMap {
-			if info.status == statusScanNone && info.version != newVer {
+			if info.version == newVer { // no need for new scan
+				continue
+			}
+			if info.status == statusScanning || info.status == statusScanNone {
+				if info.status == statusScanning {
+					scanScher.DeleteTask(id, scheduler.PriorityLow)
+				}
 				info.status = statusScanScheduled
 				info.priority = scheduler.PriorityLow
 				info.retry = 0
