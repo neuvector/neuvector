@@ -836,6 +836,7 @@ func main() {
 		TimerWheel:               timerWheel,
 		DebugCPath:               ctrlEnv.debugCPath,
 		Debug:                    debugLevel,
+		DefaultLogLevel:          share.CLUSGetLogLevel(*log_level),
 		EnableRmNsGroups:         enableRmNsGrps,
 		EnableIcmpPolicy:         enableIcmpPolicy,
 		ConnLog:                  connLog,

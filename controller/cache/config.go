@@ -96,32 +96,32 @@ func setControllerDebug(debug []string, debugCPath bool) {
 	if debugCPath || hasCPath {
 		log.SetLevel(log.DebugLevel)
 	} else {
-		log.SetLevel(log.InfoLevel)
+		log.SetLevel(cctx.DefaultLogLevel)
 	}
 	if hasConn {
 		cctx.ConnLog.Level = log.DebugLevel
 	} else {
-		cctx.ConnLog.Level = log.InfoLevel
+		cctx.ConnLog.Level = cctx.DefaultLogLevel
 	}
 	if hasScan || debugCPath || hasCPath {
 		cctx.ScanLog.Level = log.DebugLevel
 	} else {
-		cctx.ScanLog.Level = log.InfoLevel
+		cctx.ScanLog.Level = cctx.DefaultLogLevel
 	}
 	if hasMutex {
 		cctx.MutexLog.Level = log.DebugLevel
 	} else {
-		cctx.MutexLog.Level = log.InfoLevel
+		cctx.MutexLog.Level = cctx.DefaultLogLevel
 	}
 	if hasCluster || debugCPath {
 		cluster.SetLogLevel(log.DebugLevel)
 	} else {
-		cluster.SetLogLevel(log.InfoLevel)
+		cluster.SetLogLevel(cctx.DefaultLogLevel)
 	}
 	if hasK8sMonitor {
 		cctx.K8sResLog.Level = log.DebugLevel
 	} else {
-		cctx.K8sResLog.Level = log.InfoLevel
+		cctx.K8sResLog.Level = cctx.DefaultLogLevel
 	}
 
 	if debugCPath || hasCPath || hasConn || hasMutex ||

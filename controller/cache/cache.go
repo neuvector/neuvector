@@ -183,6 +183,7 @@ type Context struct {
 	TimerWheel               *utils.TimerWheel
 	DebugCPath               bool
 	Debug                    []string
+	DefaultLogLevel          log.Level
 	EnableRmNsGroups         bool
 	EnableIcmpPolicy         bool
 	ConnLog                  *log.Logger
