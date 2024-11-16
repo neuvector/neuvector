@@ -317,22 +317,10 @@ func validateServiceConfig(rg *api.RESTServiceConfig) (int, string) {
 		return api.RESTErrInvalidName, e
 	}
 
-	if rg.PolicyMode != nil {
-		switch *rg.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-		default:
-			e := fmt.Sprintf("Invalid policy mode %s", *rg.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rg.PolicyMode}).Error("Invalide policy mode")
-			return api.RESTErrInvalidRequest, e
-		}
-	}
-
-	if rg.ProfileMode != nil {
-		switch *rg.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate, share.PolicyModeEnforce:
-		default:
-			e := fmt.Sprintf("Invalid profile mode %s", *rg.ProfileMode)
-			log.WithFields(log.Fields{"profile_mode": *rg.ProfileMode}).Error("Invalide profile mode")
+	for attribute, mode := range map[string]*string{"policy": rg.PolicyMode, "profile": rg.ProfileMode} {
+		if mode != nil && !share.IsValidPolicyMode(*mode) {
+			e := fmt.Sprintf("Invalid %s mode %s", attribute, *mode)
+			log.Error(e)
 			return api.RESTErrInvalidRequest, e
 		}
 	}
@@ -615,10 +603,17 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Do not lock, reply on cluster.PutIfNotExist() for consistency
-	if exist, _ := cacher.DoesGroupExist(rg.Name, acc); exist {
+	if exist, err := cacher.DoesGroupExist(rg.Name, acc); exist {
 		e := "Group already exists"
 		log.WithFields(log.Fields{"name": rg.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
+		return
+	} else if err != common.ErrObjectNotFound {
+		if err == common.ErrObjectAccessDenied {
+			restRespAccessDenied(w, login)
+		} else {
+			restRespErrorMessage(w, http.StatusInternalServerError, 0, err.Error())
+		}
 		return
 	}
 
@@ -1070,35 +1065,10 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 
 	rc := rconf.Config
 
-	if rc.PolicyMode != nil {
-		switch *rc.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The policy mode is not enabled in the license"
-				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
-			e := fmt.Sprintf("Invalid policy mode %s", *rc.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error("Invalide policy mode")
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return
-		}
-	}
-
-	if rc.ProfileMode != nil {
-		switch *rc.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The profile mode is not enabled in the license"
-				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
-			e := fmt.Sprintf("Invalid profile mode %s", *rc.ProfileMode)
-			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error("Invalide profile mode")
+	for attribute, mode := range map[string]*string{"policy": rc.PolicyMode, "profile": rc.ProfileMode} {
+		if mode != nil && !share.IsValidPolicyMode(*mode) {
+			e := fmt.Sprintf("Invalid %s mode %s", attribute, *mode)
+			log.Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
@@ -1435,6 +1405,7 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 
 	txn := cluster.Transact()
 	defer txn.Close()
+	var hasError bool
 
 	existing := clusHelper.GetAllGroups(share.ScopeFed, acc)
 	for name, g := range existing {
@@ -1442,11 +1413,26 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 			continue
 		}
 		if _, ok := gpsMap[name]; !ok { // in existing but not in latest. so delete it
-			kv.DeletePolicyByGroupTxn(txn, name)
-			kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
+			deleteOps := []struct {
+				action string
+				fn     func() error
+			}{
+				{"DeletePolicyByGroupTxn", func() error { return kv.DeletePolicyByGroupTxn(txn, name) }},
+				{"DeleteResponseRuleByGroupTxn", func() error { return kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg) }},
+				{"DeleteProcessProfileTxn", func() error { return clusHelper.DeleteProcessProfileTxn(txn, name) }},
+				{"DeleteFileMonitorTxn", func() error { return clusHelper.DeleteFileMonitorTxn(txn, name) }},
+			}
+
+			for _, op := range deleteOps {
+				err := op.fn()
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Error(op.action)
+					hasError = true
+					break
+				}
+			}
+
 			clusHelper.DeleteGroupTxn(txn, name)
-			clusHelper.DeleteProcessProfileTxn(txn, name)
-			clusHelper.DeleteFileMonitorTxn(txn, name)
 			clusHelper.DeleteFileAccessRuleTxn(txn, name)
 		}
 	}
@@ -1455,7 +1441,10 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 		if gp != nil {
 			_, found := existing[gp.Name]
 			if !found || (found && !reflect.DeepEqual(*gp, *existing[gp.Name])) {
-				clusHelper.PutGroupTxn(txn, gp)
+				if err := clusHelper.PutGroupTxn(txn, gp); err != nil {
+					hasError = true
+					break
+				}
 				if !found { // for new fed groups, create process/file profiles here instead of in groupConfigUpdate()
 					cacher.CreateProcessProfileTxn(txn, gp.Name, gp.PolicyMode, "", gp.CfgType)
 					cacher.CreateGroupFileMonitorTxn(txn, gp.Name, gp.PolicyMode, gp.CfgType)
@@ -1464,8 +1453,13 @@ func replaceFedGroups(groups []*share.CLUSGroup, acc *access.AccessControl) bool
 		}
 	}
 
+	if hasError {
+		return false
+	}
+
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+		return false
 	}
 
 	return true
@@ -1482,16 +1476,27 @@ func deleteFedGroupPolicy() { // delete all fed groups(caller must be fedAdmin),
 	txn := cluster.Transact()
 	defer txn.Close()
 
+	var hasError bool
+
 	kv.DeletePolicyByCfgTypeTxn(txn, share.FederalCfg)
 
 	gpsMap := clusHelper.GetAllGroups(share.ScopeFed, access.NewFedAdminAccessControl())
 	for name := range gpsMap {
-		kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg)
+		if err := kv.DeleteResponseRuleByGroupTxn(txn, name, share.FederalCfg); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("DeleteResponseRuleByGroupTxn")
+			hasError = true
+			break
+		}
 		if name == api.LearnedExternal {
 			continue
 		}
 		clusHelper.DeleteGroupTxn(txn, name)
 	}
+
+	if hasError {
+		return
+	}
+
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
 	}
@@ -1522,17 +1527,9 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 	rc := rconf.Config
 
 	if rc.PolicyMode != nil {
-		switch *rc.PolicyMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The policy mode is not enabled in the license"
-				log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
+		if !share.IsValidPolicyMode(*rc.PolicyMode) {
 			e := fmt.Sprintf("Invalid policy mode %s", *rc.PolicyMode)
-			log.WithFields(log.Fields{"policy_mode": *rc.PolicyMode}).Error("Invalide policy mode")
+			log.Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
@@ -1625,17 +1622,9 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 	rc := rconf.Config
 
 	if rc.ProfileMode != nil {
-		switch *rc.ProfileMode {
-		case share.PolicyModeLearn, share.PolicyModeEvaluate:
-		case share.PolicyModeEnforce:
-			if !licenseAllowEnforce() {
-				e := "The profile mode is not enabled in the license"
-				log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error(e)
-				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-			}
-		default:
+		if !share.IsValidPolicyMode(*rc.ProfileMode) {
 			e := fmt.Sprintf("Invalid profile mode %s", *rc.ProfileMode)
-			log.WithFields(log.Fields{"profile_mode": *rc.ProfileMode}).Error("Invalide profile mode")
+			log.Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 			return
 		}
@@ -1831,7 +1820,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey)
@@ -1859,7 +1848,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		clusHelper.PutImportTask(&importTask)
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 		if err == nil {
 			var updatedGroups utils.Set
@@ -1882,7 +1871,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 			}
 
 			if err == nil {
@@ -1890,7 +1879,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 				kv.DeletePolicyByGroups(targetGroups)
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 				// [4]: import network policy rules/process profile/file access rules/group policy mode
 				for i, grpCfgRet := range parsedGrpCfg {
@@ -1938,18 +1927,20 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						crdHandler.crdHandleDlpGroup(txn, grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
 						// [5]: import waf group data
 						crdHandler.crdHandleWafGroup(txn, grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
-						txn.Apply()
+						if ok, err := txn.Apply(); err != nil || !ok {
+							log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+						}
 						txn.Close()
 					}
 
 					progress += inc
 					importTask.Percentage = int(progress)
-					clusHelper.PutImportTask(&importTask)
+					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 				}
 
 				progress += inc
 				importTask.Percentage = int(progress)
-				clusHelper.PutImportTask(&importTask)
+				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 			}
 		}
 	}
@@ -1980,10 +1971,18 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 		} else if group.Criteria != nil {
 			groupCriteria = *group.Criteria
 		}
+
+		reserved := false
 		for _, prefix := range reservedPrefix {
 			if strings.HasPrefix(group.Name, prefix) {
-				continue
+				log.WithFields(log.Fields{"group_name": group.Name, "prefix": prefix}).Debug("use reserved prefix")
+				reserved = true
+				break
 			}
+		}
+
+		if reserved {
+			continue
 		}
 
 		create := true
@@ -2057,7 +2056,10 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 
 		}
 
-		clusHelper.PutGroupTxn(txn, cg)
+		if err := clusHelper.PutGroupTxn(txn, cg); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutGroupTxn")
+		}
+
 		updatedGroups.Add(cg.Name)
 	}
 	ok, err := txn.Apply()
@@ -2104,6 +2106,7 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 	txn := cluster.Transact()
 	defer txn.Close()
 
+	var hasError bool
 	for _, ruleConf := range rulesCfg {
 		ruleConf.ID = common.GetAvailablePolicyID(idsUserCreated, share.UserCreated)
 		idsUserCreated.Add(ruleConf.ID)
@@ -2138,10 +2141,22 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 		cr.Comment = "imported policy"
 		cr.LastModAt = time.Now().UTC()
 		//cr.Priority = ruleConf.Priority
-		clusHelper.PutPolicyRuleTxn(txn, cr)
+		if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleTxn")
+			hasError = true
+			break
+		}
 	}
 	crhs = append(crhs[:startIdx], append(newRules, crhs[startIdx:]...)...)
-	clusHelper.PutPolicyRuleListTxn(txn, crhs)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+		hasError = true
+	}
+
+	if hasError {
+		log.Error("Atomic write failed")
+		return
+	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
 		log.WithFields(log.Fields{"error": err, "ok": ok}).Error("Atomic write failed")

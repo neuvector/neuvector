@@ -160,7 +160,9 @@ func (q *tCrdRequestsMgr) crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) (
 				}
 			}
 		}
-		clusHelper.DeleteCrdRecord(name)
+		if deleteErr := clusHelper.DeleteCrdRecord(name); deleteErr != nil {
+			log.WithFields(log.Fields{"error": deleteErr}).Error("DeleteCrdRecord")
+		}
 		return fmt.Sprintf("Enqueu crd event put error(%d entries)", len(crdEventQueue.CrdEventRecord)), err
 	}
 	return "", nil
@@ -174,7 +176,7 @@ func (q *tCrdRequestsMgr) deleteCrInK8s(rscType, recordName string, crdSecRule i
 	var err error
 	for i := 0; i < 5; i++ {
 		err = global.ORCH.DeleteResource(rscType, crdSecRule)
-		if err == nil || strings.Index(err.Error(), " 404 ") < 0 {
+		if err == nil || !strings.Contains(err.Error(), " 404 ") {
 			break
 		}
 		time.Sleep(time.Second)
@@ -200,6 +202,11 @@ func (q *tCrdRequestsMgr) writeCrOpEvent(kind, recordName, uid string, ev share.
 // Third it will call process. if failed a crd delete will issued to remove from k8s
 func (q *tCrdRequestsMgr) crdQueueProc() {
 	var recordList map[string]*share.CLUSCrdSecurityRule
+
+	// To suppress this warning
+	// the for { select { ... } } construct here is intentional: it's used for continuous polling
+	// with a select statement that checks for multiple events without ending the loop.
+	//nolint:gosimple
 	for {
 		select {
 		case <-q.crdReqProcTimer.C:
@@ -256,7 +263,9 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 				q.crdReqProcTimer.Reset(q.dur)
 				continue
 			}
-			clusHelper.DeleteCrdRecord(name)
+			if err := clusHelper.DeleteCrdRecord(name); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteCrdRecord")
+			}
 			clusHelper.ReleaseLock(lock)
 
 			var lockKey string
@@ -347,7 +356,9 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					if retryCount > 3 {
 						log.Printf("Crd dequeu proc Plicy lock FAILED")
 						// push req back to kv queue
-						q.crdProcEnqueue(record) // record is *admissionv1beta1.AdmissionReview
+						if _, err := q.crdProcEnqueue(record); err != nil { // record is *admissionv1beta1.AdmissionReview
+							log.WithFields(log.Fields{"error": err}).Error("crdProcEnqueue")
+						}
 						q.crdReqProcTimer.Reset(time.Duration(time.Second))
 						continue
 					} else {

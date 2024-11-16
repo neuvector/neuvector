@@ -27,7 +27,9 @@ func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	value, _ := cluster.Get(key)
 	if value != nil {
 		var eula share.CLUSEULA
-		json.Unmarshal(value, &eula)
+		if err := json.Unmarshal(value, &eula); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
+		}
 
 		resp.EULA = &api.RESTEULA{Accepted: eula.Accepted}
 	} else {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/mitchellh/pointerstructure"
 	log "github.com/sirupsen/logrus"
@@ -327,9 +328,10 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			var logheader string
 			//  := fmt.Sprintf("*%s: %s level*", strings.Title(category), strings.ToUpper(LevelToString(level)))
 			if comment != "" {
-				logheader = fmt.Sprintf("*%s: %s level, Comment: %s*", strings.Title(category), strings.ToUpper(LevelToString(level)), comment)
+				logheader = fmt.Sprintf("*%s: %s level, Comment: %s*", capitalizeFirstLetter(category), strings.ToUpper(LevelToString(level)), comment)
+
 			} else {
-				logheader = fmt.Sprintf("*%s: %s level*", strings.Title(category), strings.ToUpper(LevelToString(level)))
+				logheader = fmt.Sprintf("*%s: %s level*", capitalizeFirstLetter(category), strings.ToUpper(LevelToString(level)))
 			}
 
 			logheader += fmt.Sprintf("\n_%s_", title)
@@ -346,7 +348,7 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			ctype = ctypeJSON
 			fields := make(map[string]string)
 
-			logheader := fmt.Sprintf("%s: %s level", strings.Title(category), strings.ToUpper(LevelToString(level)))
+			logheader := fmt.Sprintf("%s: %s level", capitalizeFirstLetter(category), strings.ToUpper(LevelToString(level)))
 			if comment != "" {
 				logheader += fmt.Sprintf(", Comment: %s", comment)
 			}
@@ -379,7 +381,9 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			data = []byte(msg)
 		}
 
-		w.httpRequest(data, ctype, proxy)
+		if err := w.httpRequest(data, ctype, proxy); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("httpRequest")
+		}
 	}
 }
 
@@ -422,4 +426,13 @@ func (w *Webhook) httpRequest(data []byte, ctype string, proxy *share.CLUSProxy)
 	}
 	log.WithFields(log.Fields{"error": err}).Error("Webhook server internal error")
 	return err
+}
+
+func capitalizeFirstLetter(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
 }

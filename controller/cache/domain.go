@@ -319,7 +319,7 @@ func pruneGroupsByNamespace() {
 
 			txn := cluster.Transact()
 			for _, name := range groups {
-				_ = clusHelper.DeleteGroupTxn(txn, name)
+				clusHelper.DeleteGroupTxn(txn, name)
 			}
 			if ok, err1 := txn.Apply(); err1 != nil || !ok {
 				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")
@@ -417,7 +417,7 @@ func pruneOrphanGroups() {
 
 			txn := cluster.Transact()
 			for _, name := range groups {
-				_ = clusHelper.DeleteGroupTxn(txn, name)
+				clusHelper.DeleteGroupTxn(txn, name)
 			}
 			if ok, err1 := txn.Apply(); err1 != nil || !ok {
 				log.WithFields(log.Fields{"ok": ok, "error": err1}).Error("Atomic write to the cluster failed")

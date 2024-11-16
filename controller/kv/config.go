@@ -130,7 +130,7 @@ func applyTransaction(txn *cluster.ClusterTransact, importTask *share.CLUSImport
 				if importTask.Status != share.IMPORT_RUNNING {
 					importTask.Status = share.IMPORT_RUNNING
 				}
-				_ = clusHelper.PutImportTask(importTask)
+				_ = clusHelper.PutImportTask(importTask) // Ignore error because progress update is non-critical
 			}
 		}
 	}
@@ -642,7 +642,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	importTask.Percentage += 1
 	importTask.LastUpdateTime = time.Now().UTC()
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(importTask)
+	_ = clusHelper.PutImportTask(importTask) // Ignore error because progress update is non-critical
 
 	// Consul gets unexpectedly killed while importing a large file. We suspect the active write and watch
 	// actions triggers race conditions in consul, so here the object store watch is paused.
@@ -688,7 +688,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 
 	importTask.Percentage += 1
 	importTask.LastUpdateTime = time.Now().UTC()
-	_ = clusHelper.PutImportTask(importTask)
+	_ = clusHelper.PutImportTask(importTask) // Ignore error because progress update is non-critical
 
 	// Import key/value from files
 	var key, value string

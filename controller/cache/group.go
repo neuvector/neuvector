@@ -1088,7 +1088,7 @@ func rmEmptyGroupsFromCluster() {
 			log.WithFields(log.Fields{"group": name}).Error("Group doesn't exist in kv")
 			delete(groupCacheMap, name)
 		} else {
-			_ = clusHelper.DeleteGroupTxn(txn, name)
+			clusHelper.DeleteGroupTxn(txn, name)
 		}
 	}
 	if ok, err1 := txn.Apply(); err1 != nil || !ok {

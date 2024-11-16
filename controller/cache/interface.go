@@ -172,7 +172,7 @@ type CacheInterface interface {
 		containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool)
 	MatchK8sAdmissionRulesForPVC(ns, name, scName string, evalContext *nvsysadmission.AdmCtrlEvalContext) (*nvsysadmission.AdmCtrlAssessResult, bool)
 	IsAdmControlEnabled(uri *string) (bool, string, int, string, string)
-	UpdateLocalAdmCtrlStats(category string, stats int) error
+	UpdateLocalAdmCtrlStats(category string, stats int)
 	IncrementAdmCtrlProcessing()
 	FlushAdmCtrlStats() error
 	SetNvDeployStatusInCluster(resName string, value bool)

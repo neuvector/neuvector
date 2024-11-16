@@ -519,14 +519,19 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 
 func deletePolicyRules(txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {
-		clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+		// This function cannot return an error, as there is no possibility for one to occur.
+		// However, we retain the error return type to accommodate the mock dependency.
+		_ = clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
 	}
 }
 
-func writePolicyRules(txn *cluster.ClusterTransact, crs []*share.CLUSPolicyRule) {
+func writePolicyRules(txn *cluster.ClusterTransact, crs []*share.CLUSPolicyRule) error {
 	for _, cr := range crs {
-		clusHelper.PutPolicyRuleTxn(txn, cr)
+		if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // param crhs:    a list of existing CLUSRuleHead
@@ -835,7 +840,11 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	writePolicyRules(txn, newRules)
+	var lastError error
+	if err := writePolicyRules(txn, newRules); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("writePolicyRules")
+		lastError = err
+	}
 
 	// Insert to policy rule heads
 	var cfgType share.TCfgType = share.UserCreated
@@ -853,7 +862,16 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 	crhs = append(crhs[:toIdx], append(news, crhs[toIdx:]...)...)
 
 	// Put policy rule heads
-	clusHelper.PutPolicyRuleListTxn(txn, crhs)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+		lastError = err
+	}
+
+	if lastError != nil {
+		log.WithFields(log.Fields{"error": lastError}).Error("")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return lastError
+	}
 
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -1301,8 +1319,6 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		// now there is no hole in 'keep'
 		newPolicys = append(keep, new...)
 	}
-	txn := cluster.Transact()
-	defer txn.Close()
 
 	// There might be new learned rules created between GET("/v1/policy/rule") & PATCH("/v1/policy/rule") that they are not included in the the patch request payload.
 	// We try not to mistakenly delete these new learned rules.
@@ -1335,13 +1351,28 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		}
 	}
 
+	txn := cluster.Transact()
+	defer txn.Close()
+	var lastError error
+
 	// Write rule ID list to cluster
-	clusHelper.PutPolicyRuleListTxn(txn, newPolicys)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, newPolicys); err != nil {
+		lastError = err
+	}
 
 	// Remove old rules
 	deletePolicyRules(txn, del)
+
 	// Put new rules into cluster
-	writePolicyRules(txn, newRules)
+	if err := writePolicyRules(txn, newRules); err != nil {
+		lastError = err
+	}
+
+	if lastError != nil {
+		log.WithFields(log.Fields{"error": lastError}).Error("")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return lastError
+	}
 
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -1410,7 +1441,11 @@ func deletePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rule
 	defer txn.Close()
 
 	// Write rule ID list to cluster
-	clusHelper.PutPolicyRuleListTxn(txn, crhsNew)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhsNew); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutPolicyRuleListTxn")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return 0, err
+	}
 
 	// Remove rules.
 	deletePolicyRules(txn, dels)
@@ -1726,10 +1761,21 @@ func handlerPolicyRuleConfig(w http.ResponseWriter, r *http.Request, ps httprout
 		txn := cluster.Transact()
 		defer txn.Close()
 
+		var lastError error
 		// Write the new rule
-		clusHelper.PutPolicyRuleTxn(txn, cconf)
+		if err := clusHelper.PutPolicyRuleTxn(txn, cconf); err != nil {
+			lastError = err
+		}
 		// Put policy rule heads
-		clusHelper.PutPolicyRuleListTxn(txn, crhs)
+		if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+			lastError = err
+		}
+
+		if lastError != nil {
+			log.WithFields(log.Fields{"error": lastError}).Error("")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+			return
+		}
 
 		if ok, err := txn.Apply(); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("")
@@ -1866,7 +1912,12 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 	defer txn.Close()
 
 	// Write rule ID list to cluster
-	clusHelper.PutPolicyRuleListTxn(txn, keeps)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, keeps); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return
+	}
+
 	// Remove rules
 	deletePolicyRules(txn, dels)
 
@@ -2036,12 +2087,14 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 	txn := cluster.Transact()
 	defer txn.Close()
 
+	var lastError error
+
 	nonFedPolicies := 0
 	rhsExisting := clusHelper.GetPolicyRuleList()
 	for _, rhExisting := range rhsExisting {
 		if rhExisting.CfgType == share.FederalCfg {
 			if _, ok := rulesMap[rhExisting.ID]; !ok { // in existing but not in new. so delete it
-				clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID)
+				_ = clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID)
 			}
 		} else {
 			nonFedPolicies++
@@ -2052,7 +2105,10 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 		if ruleNew != nil {
 			ruleExisting, _ := clusHelper.GetPolicyRule(ruleNew.ID)
 			if ruleExisting == nil || !reflect.DeepEqual(*ruleNew, *ruleExisting) {
-				clusHelper.PutPolicyRuleTxn(txn, ruleNew)
+				if err := clusHelper.PutPolicyRuleTxn(txn, ruleNew); err != nil {
+					lastError = err
+					break
+				}
 			}
 		}
 	}
@@ -2066,7 +2122,14 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 	}
 
 	if !reflect.DeepEqual(rhsAll, rhsExisting) {
-		clusHelper.PutPolicyRuleListTxn(txn, rhsAll)
+		if err := clusHelper.PutPolicyRuleListTxn(txn, rhsAll); err != nil {
+			lastError = err
+		}
+	}
+
+	if lastError != nil {
+		log.WithFields(log.Fields{"error": lastError}).Error("Atomic write to the cluster failed")
+		return false
 	}
 
 	if ok, err := txn.Apply(); err != nil || !ok {
@@ -2118,6 +2181,8 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 
 	txn := cluster.Transact()
 	defer txn.Close()
+
+	var lastTxnError error
 
 LOOP_ALL_IDS:
 	for _, id := range promoteData.Request.IDs {
@@ -2173,7 +2238,9 @@ LOOP_ALL_IDS:
 								proc.Action = share.PolicyActionAllow
 							}
 						}
-						clusHelper.PutProcessProfileTxn(txn, fedGrpName, pp)
+						if err := clusHelper.PutProcessProfileTxn(txn, fedGrpName, pp); err != nil {
+							lastTxnError = err
+						}
 					}
 
 					mon, _ := clusHelper.GetFileMonitorProfile(grpName)
@@ -2209,7 +2276,9 @@ LOOP_ALL_IDS:
 						mon.CfgType = share.FederalCfg
 						mon.Filters = filters
 						mon.FiltersCRD = emptyMonFilters
-						clusHelper.PutFileMonitorProfileTxn(txn, fedGrpName, mon)
+						if err := clusHelper.PutFileMonitorProfileTxn(txn, fedGrpName, mon); err != nil {
+							lastTxnError = err
+						}
 
 						for key, ffm := range far.FiltersCRD {
 							far.Filters[key] = ffm
@@ -2221,7 +2290,9 @@ LOOP_ALL_IDS:
 						}
 						far.Group = fedGrpName
 						far.FiltersCRD = emptyFarFilters
-						clusHelper.PutFileAccessRuleTxn(txn, fedGrpName, far)
+						if err := clusHelper.PutFileAccessRuleTxn(txn, fedGrpName, far); err != nil {
+							lastTxnError = err
+						}
 					}
 
 					fedGroup := &share.CLUSGroup{
@@ -2233,7 +2304,9 @@ LOOP_ALL_IDS:
 						//NotScored:      grp.NotScored,
 						//PlatformRole:   grp.PlatformRole,
 					}
-					clusHelper.PutGroupTxn(txn, fedGroup)
+					if err := clusHelper.PutGroupTxn(txn, fedGroup); err != nil {
+						lastTxnError = err
+					}
 					fedGroupNames.Add(fedGrpName)
 				} else {
 					errMsg = fmt.Sprintf("group %s not found(for rule %d)", grpName, id)
@@ -2252,7 +2325,9 @@ LOOP_ALL_IDS:
 		} else {
 			rule.Comment = fmt.Sprintf("%s (%s)", rule.Comment, comment)
 		}
-		clusHelper.PutPolicyRuleTxn(txn, rule)
+		if err := clusHelper.PutPolicyRuleTxn(txn, rule); err != nil {
+			lastTxnError = err
+		}
 
 		crh := &share.CLUSRuleHead{
 			ID:      fedRuleID,
@@ -2261,22 +2336,37 @@ LOOP_ALL_IDS:
 		crhsPromoted = append(crhsPromoted, crh)
 		fedIdInUse.Add(fedRuleID)
 	}
-	if errMsg == "" {
-		if len(crhsPromoted) == 0 {
-			errMsg = "no rule to promote"
-		} else {
-			crhs = append(crhs[:topIdx], append(crhsPromoted, crhs[topIdx:]...)...)
-			clusHelper.PutPolicyRuleListTxn(txn, crhs)
-			if applyTransact(w, txn) == nil {
-				ruleTypes := []string{share.FedNetworkRulesType}
-				if fedGroupsCountOld != fedGroupNames.Cardinality() {
-					ruleTypes = append(ruleTypes, share.FedGroupType, share.FedProcessProfilesType, share.FedFileMonitorProfilesType)
-				}
-				updateFedRulesRevision(ruleTypes, acc, login)
-				restRespSuccess(w, r, nil, acc, login, nil, "Promote policy")
-			}
-			return
-		}
+
+	if errMsg != "" {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
+		return
 	}
-	restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, errMsg)
+
+	if lastTxnError != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, lastTxnError.Error())
+		return
+	}
+
+	if len(crhsPromoted) == 0 {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, "no rule to promote")
+		return
+	}
+
+	crhs = append(crhs[:topIdx], append(crhsPromoted, crhs[topIdx:]...)...)
+	if err := clusHelper.PutPolicyRuleListTxn(txn, crhs); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, err.Error())
+		return
+	}
+
+	if err := applyTransact(w, txn); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrPromoteFail, err.Error())
+		return
+	}
+
+	ruleTypes := []string{share.FedNetworkRulesType}
+	if fedGroupsCountOld != fedGroupNames.Cardinality() {
+		ruleTypes = append(ruleTypes, share.FedGroupType, share.FedProcessProfilesType, share.FedFileMonitorProfilesType)
+	}
+	updateFedRulesRevision(ruleTypes, acc, login)
+	restRespSuccess(w, r, nil, acc, login, nil, "Promote policy")
 }

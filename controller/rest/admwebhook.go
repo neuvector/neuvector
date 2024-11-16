@@ -124,16 +124,6 @@ var sidecarImages = []*ContainerImage{
 	{registry: "https://docker.io/", imageRepo: "istio/proxyv2"},
 }
 
-/*
-	func init() {
-		_ = corev1.AddToScheme(runtimeScheme)
-		_ = admissionregistrationv1beta1.AddToScheme(runtimeScheme)
-		// defaulting with webhooks:
-		// https://github.com/kubernetes/kubernetes/issues/57982
-		_ = appsv1.AddToScheme(runtimeScheme)
-		_ = batchv1beta1.AddToScheme(runtimeScheme)
-	}
-*/
 func checkAggrLogsCache(alwaysFlush bool) {
 	var err error
 	aggrLogsCacheMutex.Lock()
@@ -149,7 +139,9 @@ func checkAggrLogsCache(alwaysFlush bool) {
 						alog.ReportedAt = time.Now().UTC()
 					}
 					delete(alog.Props, nvsysadmission.AuditLogPropLastLogAt)
-					auditQueue.Append(alog)
+					if err := auditQueue.Append(alog); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("auditQueue.Append")
+					}
 				}
 			}
 		} else {
@@ -540,7 +532,9 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([3][]*nv
 			}
 			admContainerInfo.Name = c.Name
 			admContainerInfo.Image = c.Image
-			parseReqImageName(admContainerInfo)
+			if err := parseReqImageName(admContainerInfo); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("parseReqImageName")
+			}
 			isSidecar := false
 			for imageRegistry := range admContainerInfo.ImageRegistry.Iter() {
 				for _, sidecar := range sidecarImages {
@@ -681,17 +675,15 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	var allContainers [3][]*nvsysadmission.AdmContainerInfo
 	var saName string
 	if podSpec != nil {
-		switch podSpec.(type) {
+		switch ps := podSpec.(type) {
 		case *corev1.PodTemplateSpec:
-			podTemplateSpec, _ := podSpec.(*corev1.PodTemplateSpec)
-			allContainers, _ = parsePodSpec(objectMeta, &podTemplateSpec.Spec)
-			specLabels = podTemplateSpec.ObjectMeta.Labels
-			specAnnotations = podTemplateSpec.ObjectMeta.Annotations
-			saName = podTemplateSpec.Spec.ServiceAccountName
+			allContainers, _ = parsePodSpec(objectMeta, &ps.Spec)
+			specLabels = ps.ObjectMeta.Labels
+			specAnnotations = ps.ObjectMeta.Annotations
+			saName = ps.Spec.ServiceAccountName
 		case *corev1.PodSpec:
-			podSpec, _ := podSpec.(*corev1.PodSpec)
-			allContainers, _ = parsePodSpec(objectMeta, podSpec)
-			saName = podSpec.ServiceAccountName
+			allContainers, _ = parsePodSpec(objectMeta, ps)
+			saName = ps.ServiceAccountName
 		default:
 			return nil, errors.New("unsupported podSpec type")
 		}
@@ -940,7 +932,10 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, reqResult *nvsysadmission.AdmCtr
 			_, alog = aggregateDenyLogs(reqResult, admResObject.OwnerUIDs[0], alog)
 		}
 		if alog != nil {
-			auditQueue.Append(alog)
+			if err := auditQueue.Append(alog); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("auditQueue.Append")
+				return err
+			}
 		}
 	}
 
@@ -1273,7 +1268,9 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 		if len(violatedContainers) > 0 {
 			reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control monitor-mode rule(s). %s%s",
 				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, strings.Join(violatedContainers, " "), unscannedImagesMsg)
-			cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqViolation, &reqEvalResult, nil, nil, admResObject)
+			if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqViolation, &reqEvalResult, nil, nil, admResObject); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
+			}
 		}
 
 		if reqEvalResult.ReqAction != "" {
@@ -1288,7 +1285,9 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 				}
 				reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied because of %sdeny rule id %d with criteria: %s.%s",
 					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, criticalMatch.RuleID, criticalMatch.RuleDetails, unscannedImagesMsg)
-				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqDenied, &reqEvalResult, criticalAssessment, &criticalMatch.ImageInfo, admResObject)
+				if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqDenied, &reqEvalResult, criticalAssessment, &criticalMatch.ImageInfo, admResObject); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
+				}
 			} else {
 				allowedContainers := make([]string, 0, 4) // containers that explicitly match allow rule
 				for _, assessResult := range reqEvalResult.AssessResults {
@@ -1310,13 +1309,17 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 					criticalAssessment = nil
 					matchedImageInfo = nil
 				}
-				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, criticalAssessment, matchedImageInfo, admResObject)
+				if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, criticalAssessment, matchedImageInfo, admResObject); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
+				}
 			}
 		} else {
 			// doesn't match any rule
 			reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because it doesn't match any decisive rule.%s",
 				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, unscannedImagesMsg)
-			cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, nil, nil, admResObject)
+			if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, nil, nil, admResObject); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
+			}
 		}
 	}
 
@@ -1511,7 +1514,9 @@ func restartWebhookServer(svcName string) error {
 	}
 	if leader := atomic.LoadUint32(&_isLeader); leader == 1 {
 		if nvAdmName, ok := k8sInfo[svcName]; ok {
-			cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false)
+			if _, err := cacher.SyncAdmCtrlStateToK8s(svcName, nvAdmName, false); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("SyncAdmCtrlStateToK8s")
+			}
 		}
 	}
 

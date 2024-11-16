@@ -8,13 +8,17 @@ jobs:
   unitest:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
       with:
-        go-version: '1.22.1'
+        go-version: '1.22.9'
     - run: |
         ./unitest.sh
-    - name: openapi-lint 
-      uses: mbowman100/swagger-validator-action@master
+    - uses: actions/setup-node@v4
       with:
-        files: controller/api/apis.yaml
+        node-version: 18
+    - name: openapi-lint 
+      run: |
+        npm i -g @redocly/cli@1.25.11
+        redocly lint controller/api/apis.yaml --skip-rule operation-operationId --skip-rule operation-4xx-response --skip-rule no-ambiguous-paths --skip-rule security-defined
+        redocly lint controller/api/internal_apis.yaml --skip-rule operation-operationId

@@ -23,7 +23,9 @@ func createControllerServiceWrapper(conn *grpc.ClientConn) cluster.Service {
 func createControllerServerDest(ip string, port uint16) {
 	endpoint := fmt.Sprintf("%s:%v", ip, port)
 	key := getKeyForControllerService(ip)
-	cluster.CreateGRPCClient(key, endpoint, true, createControllerServiceWrapper)
+	if err := cluster.CreateGRPCClient(key, endpoint, true, createControllerServiceWrapper); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("CreateGRPCClient")
+	}
 }
 
 func getControllerServiceClient(ip string, port uint16) (share.ControllerCtrlServiceClient, error) {

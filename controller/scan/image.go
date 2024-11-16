@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/scan/registry"
 	registryUtils "github.com/neuvector/neuvector/share/scan/registry"
 	"github.com/neuvector/neuvector/share/utils"
 )
@@ -229,8 +230,15 @@ func (r *base) SetTracer(tracer httptrace.HTTPTrace) {
 }
 
 func (r *base) Login(cfg *share.CLUSRegistryConfig) (error, string) {
-	r.newRegClient(cfg.Registry, cfg.Username, cfg.Password)
-	r.rc.Alive()
+	if err := r.newRegClient(cfg.Registry, cfg.Username, cfg.Password); err != nil {
+		return err, err.Error()
+	}
+
+	if code, err := r.rc.Alive(); err != nil {
+		if code != registry.ErrorAuthentication {
+			return err, err.Error()
+		}
+	}
 	return nil, ""
 }
 

@@ -499,10 +499,16 @@ func createDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, cfgTy
 		sensor.RuleListNames[rdr.Name] = rdr.Name
 	}
 	//save full rule with pattern in default sensor
-	clusHelper.PutDlpSensor(defsensor, false)
+	if err := clusHelper.PutDlpSensor(defsensor, false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutDlpSensor")
+		return err
+	}
 
 	//create new sensor
-	clusHelper.PutDlpSensor(sensor, true)
+	if err := clusHelper.PutDlpSensor(sensor, true); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutDlpSensor")
+		return err
+	}
 
 	return nil
 }
@@ -592,8 +598,10 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 
 		if err := createDlpSensor(w, conf, share.UserCreated); err == nil {
 			restRespSuccess(w, r, nil, acc, login, &rconf, "Create dlp sensor")
+			return
 		}
 	}
+	restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 }
 
 func handlerDlpRuleCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -685,7 +693,11 @@ func handlerDlpRuleCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 	sensor.RuleList[cdr.Name] = &cdr
 
-	clusHelper.PutDlpSensor(sensor, false)
+	if err := clusHelper.PutDlpSensor(sensor, false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutDlpSensor")
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return
+	}
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Create dlp rule")
 }
 
@@ -905,9 +917,16 @@ func updateDlpSensor(w http.ResponseWriter, conf *api.RESTDlpSensorConfig, revie
 	txn := cluster.Transact()
 	defer txn.Close()
 
-	clusHelper.PutDlpSensorTxn(txn, defsensor)
-	clusHelper.PutDlpSensorTxn(txn, sensor)
-	txn.Apply()
+	if err := clusHelper.PutDlpSensorTxn(txn, defsensor); err != nil {
+		return err
+	}
+	if err := clusHelper.PutDlpSensorTxn(txn, sensor); err != nil {
+		return err
+	}
+	if _, err := txn.Apply(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("txn.Apply")
+		return err
+	}
 
 	return nil
 }
@@ -995,9 +1014,12 @@ func handlerDlpSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 		} else {
 			if err := updateDlpSensor(w, conf, 0, sensor); err == nil {
 				restRespSuccess(w, r, nil, acc, login, &rconf, "Configure waf sensor")
+				return
 			}
 		}
 	}
+
+	restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 }
 
 func handlerDlpRuleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1094,7 +1116,11 @@ func handlerDlpRuleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	cdr.ID = tcdr.ID
 	sensor.RuleList[cdr.Name] = &cdr
 
-	clusHelper.PutDlpSensor(sensor, false)
+	if err := clusHelper.PutDlpSensor(sensor, false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutDlpSensor")
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return
+	}
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Edit dlp rule")
 }
 
@@ -1312,10 +1338,15 @@ func deleteDlpSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 	for _, rn := range dlpsensor.RuleListNames {
 		delete(defsensor.RuleList, rn)
 	}
-	clusHelper.PutDlpSensorTxn(txn, defsensor)
+
+	if err := clusHelper.PutDlpSensorTxn(txn, defsensor); err != nil {
+		return err
+	}
 	clusHelper.DeleteDlpSensorTxn(txn, name)
 
-	txn.Apply()
+	if _, err := txn.Apply(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -1386,7 +1417,11 @@ func handlerDlpRuleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.
 		}
 		return
 	}
-	clusHelper.PutDlpSensor(sensor, false)
+
+	if err := clusHelper.PutDlpSensor(sensor, false); err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
+		return
+	}
 	restRespSuccess(w, r, nil, acc, login, nil, "Delete dlp rule")
 }
 
@@ -1728,7 +1763,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	clusHelper.PutImportTask(&importTask)
+	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey)
@@ -1749,7 +1784,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 		if err == nil {
 			progress += inc
 			importTask.Percentage = int(progress)
-			clusHelper.PutImportTask(&importTask)
+			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 			// [2]: import a dlp sensor in the yaml file
 			for _, parsedCfg := range parsedDlpCfgs {
@@ -1762,11 +1797,11 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 					}
 					progress += inc
 					importTask.Percentage = int(progress)
-					clusHelper.PutImportTask(&importTask)
+					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 				}
 			}
 			importTask.Percentage = 90
-			clusHelper.PutImportTask(&importTask)
+			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 		}
 	}
 

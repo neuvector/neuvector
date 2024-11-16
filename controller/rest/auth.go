@@ -855,7 +855,9 @@ func authLog(ev share.TLogEvent, fullname, remote, session string, roles map[str
 		}
 	}
 
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 // parameters extraPermits/extraPermitsDomains/remoteRolePermits are for Rancher SSO only
@@ -1091,7 +1093,12 @@ func kickLoginSessionsOnOtherCtrlers(kickInfo share.CLUSKickLoginSessionsRequest
 	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 	for _, ep := range eps {
 		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
-			go rpc.KickLoginSessions(ep.ClusterIP, ep.RPCServerPort, kickInfo)
+			go func() {
+				err := rpc.KickLoginSessions(ep.ClusterIP, ep.RPCServerPort, kickInfo)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("KickLoginSessions")
+				}
+			}()
 		}
 	}
 }
@@ -1100,7 +1107,12 @@ func resetLoginTokenTimer(tokenInfo share.CLUSLoginTokenInfo) {
 	eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 	for _, ep := range eps {
 		if ep.ClusterIP != localDev.Ctrler.ClusterIP {
-			go rpc.ResetLoginTokenTimer(ep.ClusterIP, ep.RPCServerPort, tokenInfo)
+			go func() {
+				err := rpc.ResetLoginTokenTimer(ep.ClusterIP, ep.RPCServerPort, tokenInfo)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("ResetLoginTokenTimer")
+				}
+			}()
 		}
 	}
 }
@@ -1895,7 +1907,9 @@ func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
 		return nil, err
 	}
 
-	global.ORCH.Logout(pw.Username, token)
+	if err := global.ORCH.Logout(pw.Username, token); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Logout")
+	}
 
 	log.WithFields(log.Fields{"server": server, "user": pw.Username}).Debug("Authenticated by platform")
 
@@ -1996,7 +2010,9 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 					user.FailedLoginCount = uint32(pwdProfile.BlockAfterFailedCount)
 				}
 				user.BlockLoginSince = time.Now().UTC()
-				clusHelper.PutUserRev(user, rev)
+				if err := clusHelper.PutUserRev(user, rev); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutUserRev")
+				}
 				result.blockedForFailedLogin = true
 				return nil, result, fmt.Errorf("User %s is temporarily blocked from login because of too many failed login attempts", pw.Username)
 			} else {
@@ -2022,7 +2038,9 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 				}
 			}
 			if user.FailedLoginCount != origFailedLoginCount || user.BlockLoginSince != origBlockLoginSince {
-				clusHelper.PutUserRev(user, rev)
+				if err := clusHelper.PutUserRev(user, rev); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutUserRev")
+				}
 			}
 			return nil, result, errors.New("Wrong password")
 		} else {
@@ -2123,7 +2141,9 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 		}
 		value, _ := json.Marshal(u)
 		key := share.CLUSUserKey(userName)
-		cluster.PutIfNotExist(key, value, false)
+		if err := cluster.PutIfNotExist(key, value, false); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
+		}
 		user, _, _ = clusHelper.GetUserRev(userName, acc)
 	}
 	if user == nil || user.Server != "" {
@@ -2184,7 +2204,7 @@ func isPasswordExpired(localAuthed bool, userName string, pwdResetTime time.Time
 				if time.Now().UTC().After(pwdExpireTime) {
 					return 0, 0, true
 				} else {
-					hours := int(pwdExpireTime.Sub(time.Now()).Hours())
+					hours := int(time.Until(pwdExpireTime).Hours())
 					pwdDaysUntilExpire = hours / 24
 					pwdHoursUntilExpire = hours % 24
 				}
@@ -2453,7 +2473,9 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				if acceptedAlerts.Cardinality() != len(user.AcceptedAlerts) {
 					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
 						user.AcceptedAlerts = acceptedAlerts.ToStringSlice()
-						clusHelper.PutUserRev(user, rev)
+						if err := clusHelper.PutUserRev(user, rev); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("PutUserRev")
+						}
 					}
 				}
 			}

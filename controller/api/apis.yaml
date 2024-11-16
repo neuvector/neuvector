@@ -6,6 +6,9 @@ swagger: '2.0'
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
   version: '5.4'
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
   title: NeuVector API
   contact:
     email: support@neuvector.com
@@ -5427,7 +5430,7 @@ definitions:
         type: array
         items:
           type: string
-        enum: [containers, init_containers, ephemeral_containers]
+          enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfig:
     type: object
     required:
@@ -5472,7 +5475,7 @@ definitions:
         type: array
         items:
           type: string
-        enum: [containers, init_containers, ephemeral_containers]
+          enum: [containers, init_containers, ephemeral_containers]
   RESTAdmissionRuleConfigData:
     type: object
     required:

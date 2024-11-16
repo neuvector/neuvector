@@ -69,7 +69,6 @@ const gzipThreshold = 1200 // On most Ethernet NICs MTU is 1500 bytes. Let's giv
 var evqueue cluster.ObjectQueueInterface
 var auditQueue cluster.ObjectQueueInterface
 
-var messenger cluster.MessengerInterface
 var clusHelper kv.ClusterHelper
 var cfgHelper kv.ConfigHelper
 var cacher cache.CacheInterface
@@ -80,8 +79,6 @@ var k8sPlatform bool
 
 var fedRestServerMutex sync.Mutex
 var fedRestServerState uint64
-
-var crdEventProcTicker *time.Ticker
 
 var dockerRegistries utils.Set
 var defaultRegistries utils.Set
@@ -110,8 +107,6 @@ const defFedSSLCertFile = "/etc/neuvector/certs/fed-ssl-cert.pem"
 const defFedSSLKeyFile = "/etc/neuvector/certs/fed-ssl-cert.key"
 
 const restErrMessageDefault string = "Unknown error"
-
-const crdEventProcPeriod = time.Duration(time.Second * 10)
 
 var restErrNeedAgentWorkloadFilter = errors.New("Enforcer or workload filter must be provided")
 var restErrNeedAgentFilter = errors.New("Enforcer filter must be provided")
@@ -195,7 +190,9 @@ func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, hea
 	}
 	w.WriteHeader(statusCode)
 	if data != nil {
-		w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Write")
+		}
 	}
 }
 
@@ -223,7 +220,9 @@ func restRespPartial(w http.ResponseWriter, r *http.Request, resp interface{}) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusPartialContent)
 	if data != nil {
-		w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Write")
+		}
 	}
 }
 
@@ -241,7 +240,9 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 			if accept == "application/gob" {
 				var buf bytes.Buffer
 				enc := gob.NewEncoder(&buf)
-				enc.Encode(resp)
+				if err := enc.Encode(resp); err != nil {
+					log.WithFields(log.Fields{"error": err}).Debug("Encode")
+				}
 				data = buf.Bytes()
 				ct = accept
 			} else {
@@ -270,7 +271,9 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
 	if data != nil {
-		w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Write")
+		}
 	}
 
 	if msg != "" {
@@ -305,8 +308,14 @@ func restRespErrorMessage(w http.ResponseWriter, status int, code int, msg strin
 		msg = e
 	}
 	resp := api.RESTError{Code: code, Error: e, Message: msg}
-	value, _ := json.Marshal(resp)
-	w.Write(value)
+	value, err := json.Marshal(resp)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Marshal")
+		return
+	}
+	if _, err := w.Write(value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Write")
+	}
 }
 
 func restRespErrorMessageEx(w http.ResponseWriter, status int, code int, msg string, i interface{}) {
@@ -336,8 +345,14 @@ func restRespErrorMessageEx(w http.ResponseWriter, status int, code int, msg str
 		// v has type api.RESTImportTaskData
 		resp.ImportTaskData = &v
 	}
-	value, _ := json.Marshal(resp)
-	w.Write(value)
+	value, err := json.Marshal(resp)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Marshal")
+		return
+	}
+	if _, err := w.Write(value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Write")
+	}
 }
 
 func restRespError(w http.ResponseWriter, status int, code int) {
@@ -365,8 +380,14 @@ func restRespErrorReadOnlyRules(w http.ResponseWriter, status int, code int, msg
 		},
 		ReadOnlyRuleIDs: readOnlyRuleIDs,
 	}
-	value, _ := json.Marshal(resp)
-	w.Write(value)
+	value, err := json.Marshal(resp)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Marshal")
+		return
+	}
+	if _, err := w.Write(value); err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Write")
+	}
 }
 
 func restRespAccessDenied(w http.ResponseWriter, login *loginSession) {
@@ -1011,7 +1032,9 @@ func restEventLog(r *http.Request, body []byte, login *loginSession, fields rest
 		}
 	}
 
-	evqueue.Append(&clog)
+	if err := evqueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
+	}
 }
 
 // --
@@ -1348,7 +1371,7 @@ func initCertificates() error {
 		RenewThreshold:    renewThreshold,
 		ExpiryCheckPeriod: expiryCheckPeriod,
 	})
-	CertManager.Register(share.CLUSJWTKey, &kv.CertManagerCallback{
+	err := CertManager.Register(share.CLUSJWTKey, &kv.CertManagerCallback{
 		NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 			cert, key, err := kv.GenTlsKeyCert(share.CLUSJWTKey, "", "", kv.ValidityPeriod{Day: jwtCertValidityPeriodDay}, x509.ExtKeyUsageAny)
 			if err != nil {
@@ -1411,6 +1434,9 @@ func initCertificates() error {
 			}).Info("new certificate is loaded")
 		},
 	})
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("CertManager.Register")
+	}
 
 	tlsCertNotfound := false
 	if _, err := os.Stat(defaultSSLCertFile); errors.Is(err, os.ErrNotExist) {
@@ -1422,7 +1448,7 @@ func initCertificates() error {
 	}
 
 	if tlsCertNotfound {
-		CertManager.Register(share.CLUSTLSCert, &kv.CertManagerCallback{
+		err := CertManager.Register(share.CLUSTLSCert, &kv.CertManagerCallback{
 			NewCert: func(*share.CLUSX509Cert) (*share.CLUSX509Cert, error) {
 				cert, key, err := kv.GenTlsKeyCert(share.CLUSTLSCert, "", "", kv.ValidityPeriod{Day: tlsCertValidityPeriodDay}, x509.ExtKeyUsageServerAuth)
 				if err != nil {
@@ -1471,10 +1497,19 @@ func initCertificates() error {
 				}).Info("new certificate is loaded")
 			},
 		})
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("CertManager.Register")
+		}
 	}
 	// Create and setup certificate.
-	CertManager.CheckAndRenewCerts()
-	go CertManager.Run(context.TODO())
+	if err := CertManager.CheckAndRenewCerts(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("CheckAndRenewCerts")
+	}
+	go func() {
+		if err := CertManager.Run(context.TODO()); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("CertManager.Run")
+		}
+	}()
 	return nil
 }
 
@@ -1486,7 +1521,6 @@ func PreInitContext(ctx *Context) {
 	scanner = ctx.Scanner
 	evqueue = ctx.EvQueue
 	auditQueue = ctx.AuditQueue
-	messenger = ctx.Messenger
 
 	remoteAuther = auth.NewRemoteAuther(nil)
 	clusHelper = kv.GetClusterHelper()
@@ -1529,7 +1563,6 @@ func InitContext(ctx *Context) {
 	_restPort = ctx.RESTPort
 	_fedPort = ctx.FedPort
 	_fedServerChan = make(chan bool, 1)
-	crdEventProcTicker = time.NewTicker(crdEventProcPeriod)
 	checkCrdSchemaFunc = ctx.CheckCrdSchemaFunc
 
 	if ctx.PwdValidUnit < _pwdValidPerDayUnit && ctx.PwdValidUnit > 0 {
@@ -2067,11 +2100,15 @@ Loop:
 		case <-_fedServerChan:
 			log.Info("Got master cluster demoted signal, shutting down fed REST server gracefully...")
 			kickFedLoginSessions()
-			server.Shutdown(context.Background())
+			if err := server.Shutdown(context.Background()); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Shutdown")
+			}
 			break Loop
 		case <-osSignalChan:
 			log.Info("Got OS shutdown signal, shutting down fed REST server gracefully...")
-			server.Shutdown(context.Background())
+			if err := server.Shutdown(context.Background()); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("Shutdown")
+			}
 			break Loop
 		case <-_fedPingTimer.C:
 			if leader := atomic.LoadUint32(&_isLeader); leader == 1 {
@@ -2187,7 +2224,11 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	case share.RestartWebhookServer:
 		if param1 != nil {
 			if svcName, ok := param1.(*string); ok && svcName != nil {
-				go restartWebhookServer(*svcName)
+				go func() {
+					if err := restartWebhookServer(*svcName); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("restartWebhookServer")
+					}
+				}()
 			} else {
 				err = fmt.Errorf("wrong type")
 			}
@@ -2242,7 +2283,9 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 		w.Header().Set("Content-Encoding", "gzip")
 		data = utils.GzipBytes(data)
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("Write")
+		}
 	}
 }
 
