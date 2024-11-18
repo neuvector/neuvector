@@ -216,6 +216,23 @@ func getSubdomainFromRepo(repo string) (string, string) {
 	return "", ""
 }
 
+// Only be called by in jfrog, since the api is not working for it, create it as a callback function.
+func (r *jfrog) GetArtifactoryTags(repositoryStr string, rc *scanUtils.RegClient) ([]string, error) {
+	tags := make([]string, 0)
+	var err error
+	parts := strings.Split(repositoryStr, "/")
+	if len(parts) != 2 {
+		log.WithFields(log.Fields{"repository": repositoryStr}).Error("Invalid input format")
+		return tags, err
+	}
+
+	key := parts[0]
+	repository := parts[1]
+
+	url := r.url("/artifactory/api/docker/%s/v2/%s/tags/list", key, repository)
+	return rc.FetchTagsPaginated(url, repositoryStr)
+}
+
 func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 	smd.scanLog.Debug()
 
@@ -232,7 +249,12 @@ func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 		}
 		repo = subRepo
 	}
-	return rc.Tags(repo)
+
+	if tags, err := rc.Tags(repo); len(tags) > 0 {
+		return tags, err
+	}
+
+	return r.GetArtifactoryTags(repo, rc)
 }
 
 func (r *jfrog) GetAllImages() (map[share.CLUSImage][]string, error) {
