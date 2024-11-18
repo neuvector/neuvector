@@ -8,14 +8,14 @@ type tagsResponse struct {
 	Tags []string `json:"tags"`
 }
 
-func (r *Registry) FetchTagsPaginated(url, repositoryStr string) ([]string, error) {
+func (r *Registry) FetchTagsPaginated(url, repository string) ([]string, error) {
 	tags := make([]string, 0)
 	var response tagsResponse
 	var err error
 
 	r.Client.SetTimeout(longTimeout)
 	for {
-		log.WithFields(log.Fields{"url": url, "repository": repositoryStr}).Debug()
+		log.WithFields(log.Fields{"url": url, "repository": repository}).Debug()
 		url, err = r.getPaginatedJson(url, &response)
 		switch err {
 		case ErrNoMorePages:
