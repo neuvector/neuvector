@@ -3036,6 +3036,7 @@ type RESTProcessProfileConfigData struct {
 
 const MinDlpRuleID = 20000
 const MinDlpPredefinedRuleID = 30000
+const MinDlpFedPredefinedRuleID = 35000
 const MaxDlpPredefinedRuleID = 40000
 
 type RESTDlpCriteriaEntry struct {
@@ -3078,7 +3079,7 @@ type RESTDlpGroup struct {
 	Name    string            `json:"name"`
 	Status  bool              `json:"status"`
 	Sensors []*RESTDlpSetting `json:"sensors"`
-	CfgType string            `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType string            `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
 }
 
 type RESTDlpGroupData struct {
@@ -3113,7 +3114,7 @@ type RESTDlpSensor struct {
 	RuleList  []*RESTDlpRule `json:"rules"`
 	Comment   string         `json:"comment"`
 	Predefine bool           `json:"predefine"`
-	CfgType   string         `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround
+	CfgType   string         `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
 }
 
 type RESTDlpSensorData struct {
@@ -3130,6 +3131,7 @@ type RESTDlpSensorConfig struct {
 	RuleDelList *[]RESTDlpRule `json:"delete,omitempty"` //delete list used by CLI
 	Rules       *[]RESTDlpRule `json:"rules,omitempty"`  //replace list used by GUI
 	Comment     *string        `json:"comment,omitempty"`
+	CfgType     string         `json:"cfg_type"` //CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
 }
 
 type RESTDlpSensorConfigData struct {
@@ -3241,6 +3243,7 @@ type RESTWafSensorConfig struct {
 	RuleDelList *[]RESTWafRule `json:"delete,omitempty"` //delete list used by CLI
 	Rules       *[]RESTWafRule `json:"rules,omitempty"`  //replace list used by GUI
 	Comment     *string        `json:"comment,omitempty"`
+	CfgType     string         `json:"cfg_type"` //CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
 }
 
 type RESTWafSensorConfigData struct {

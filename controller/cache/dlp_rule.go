@@ -116,8 +116,7 @@ func dlpRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 }
 
 func isCreateDlpGroup(group *share.CLUSGroup) bool {
-	if group == nil || group.Kind != share.GroupKindContainer ||
-		strings.HasPrefix(group.Name, api.FederalGroupPrefix) {
+	if group == nil || group.Kind != share.GroupKindContainer {
 		return false
 	}
 	if _, ok := dlpGroups[group.Name]; !ok {
@@ -128,6 +127,11 @@ func isCreateDlpGroup(group *share.CLUSGroup) bool {
 }
 
 func createDlpGroup(group string, cfgType share.TCfgType) {
+	cg := clusHelper.GetDlpGroup(group) //cover federal promotion case
+	if cg != nil {
+		log.WithFields(log.Fields{"group": group}).Debug("Dlp group already exist")
+		return
+	}
 	dlpgroup := &share.CLUSDlpGroup{
 		Name:    group,
 		Status:  true,
@@ -1061,17 +1065,36 @@ func (m *CacheMethod) GetDlpRules(acc *access.AccessControl) ([]*api.RESTDlpRule
 	}
 }
 
-func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlpSensor {
+func (m *CacheMethod) GetAllDlpSensors(scope string, acc *access.AccessControl) []*api.RESTDlpSensor {
 	log.Debug("")
+	var getLocal, getFed bool
+	if scope == share.ScopeLocal {
+		getLocal = true
+	} else if scope == share.ScopeFed {
+		getFed = true
+	} else if scope == share.ScopeAll {
+		getLocal = true
+		getFed = true
+	} else {
+		return nil
+	}
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
+	localSensors := make([]*api.RESTDlpSensor, 0)
+	fedSensors := make([]*api.RESTDlpSensor, 0)
 	ret := make([]*api.RESTDlpSensor, 0)
 	for _, cdr := range dlpSensors {
 		if !acc.Authorize(cdr, nil) {
 			continue
 		}
 		if cdr.Name == share.CLUSDlpDefaultSensor {
+			continue
+		}
+		if getLocal && !getFed && cdr.CfgType == share.FederalCfg {
+			continue
+		}
+		if getFed && !getLocal && cdr.CfgType != share.FederalCfg {
 			continue
 		}
 		resp := api.RESTDlpSensor{
@@ -1085,11 +1108,12 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 		for name := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
 		}
-		if cdr.Name == share.CLUSDlpDefaultSensor {
-			//user created rule
-			for _, cdre := range cdr.RuleList {
+
+		for _, cdrename := range cdr.RuleListNames {
+			cdre := getDlpRuleFromDefaultSensor(cdrename)
+			if cdre != nil {
 				rdre := &api.RESTDlpRule{
-					Name:    cdre.Name,
+					Name:    common.GetOrigDlpRuleName(cdre.Name),
 					ID:      cdre.ID,
 					CfgType: cfgTypeMapping[cdre.CfgType],
 				}
@@ -1105,33 +1129,9 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 					})
 				}
 				resp.RuleList = append(resp.RuleList, rdre)
-			}
-			//predefined rule
-			for _, cdrelist := range cdr.PreRuleList {
+			} else { //try predefined rule
+				cdrelist := getPreDlpRuleFromDefaultSensor(cdrename)
 				for _, cdre := range cdrelist {
-					rdre := &api.RESTDlpRule{
-						Name:    cdre.Name,
-						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
-					}
-					for _, cpt := range cdre.Patterns {
-						if cpt.Context == "" {
-							cpt.Context = share.DlpPatternContextDefault
-						}
-						rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-							Key:     cpt.Key,
-							Value:   cpt.Value,
-							Op:      cpt.Op,
-							Context: cpt.Context,
-						})
-					}
-					resp.RuleList = append(resp.RuleList, rdre)
-				}
-			}
-		} else {
-			for _, cdrename := range cdr.RuleListNames {
-				cdre := getDlpRuleFromDefaultSensor(cdrename)
-				if cdre != nil {
 					rdre := &api.RESTDlpRule{
 						Name:    common.GetOrigDlpRuleName(cdre.Name),
 						ID:      cdre.ID,
@@ -1149,35 +1149,21 @@ func (m *CacheMethod) GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlp
 						})
 					}
 					resp.RuleList = append(resp.RuleList, rdre)
-				} else { //try predefined rule
-					cdrelist := getPreDlpRuleFromDefaultSensor(cdrename)
-					for _, cdre := range cdrelist {
-						rdre := &api.RESTDlpRule{
-							Name:    common.GetOrigDlpRuleName(cdre.Name),
-							ID:      cdre.ID,
-							CfgType: cfgTypeMapping[cdre.CfgType],
-						}
-						for _, cpt := range cdre.Patterns {
-							if cpt.Context == "" {
-								cpt.Context = share.DlpPatternContextDefault
-							}
-							rdre.Patterns = append(rdre.Patterns, api.RESTDlpCriteriaEntry{
-								Key:     cpt.Key,
-								Value:   cpt.Value,
-								Op:      cpt.Op,
-								Context: cpt.Context,
-							})
-						}
-						resp.RuleList = append(resp.RuleList, rdre)
-					}
 				}
 			}
 		}
 		sort.Slice(resp.RuleList, func(i, j int) bool {
 			return resp.RuleList[i].Name < resp.RuleList[j].Name
 		})
-		ret = append(ret, &resp)
+		if getLocal && cdr.CfgType != share.FederalCfg {
+			localSensors = append(localSensors, &resp)
+		}
+		if getFed && cdr.CfgType == share.FederalCfg {
+			fedSensors = append(fedSensors, &resp)
+		}
 	}
+	ret = append(ret, fedSensors...)
+	ret = append(ret, localSensors...)
 	return ret
 }
 
@@ -1251,14 +1237,33 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 	return nil, common.ErrObjectNotFound
 }
 
-func (m *CacheMethod) GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGroup {
+func (m *CacheMethod) GetAllDlpGroup(scope string, acc *access.AccessControl) []*api.RESTDlpGroup {
 	log.Debug("")
+	var getLocal, getFed bool
+	if scope == share.ScopeLocal {
+		getLocal = true
+	} else if scope == share.ScopeFed {
+		getFed = true
+	} else if scope == share.ScopeAll {
+		getLocal = true
+		getFed = true
+	} else {
+		return nil
+	}
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
 
+	localDlpGroups := make([]*api.RESTDlpGroup, 0)
+	fedDlpGroups := make([]*api.RESTDlpGroup, 0)
 	ret := make([]*api.RESTDlpGroup, 0)
 	for _, cg := range dlpGroups {
 		if !acc.Authorize(cg, getAccessObjectFuncNoLock) {
+			continue
+		}
+		if getLocal && !getFed && cg.CfgType == share.FederalCfg {
+			continue
+		}
+		if getFed && !getLocal && cg.CfgType != share.FederalCfg {
 			continue
 		}
 		resp := api.RESTDlpGroup{
@@ -1285,8 +1290,15 @@ func (m *CacheMethod) GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGr
 			}
 			resp.Sensors = append(resp.Sensors, rdsa)
 		}
-		ret = append(ret, &resp)
+		if getLocal && cg.CfgType != share.FederalCfg {
+			localDlpGroups = append(localDlpGroups, &resp)
+		}
+		if getFed && cg.CfgType == share.FederalCfg {
+			fedDlpGroups = append(fedDlpGroups, &resp)
+		}
 	}
+	ret = append(ret, fedDlpGroups...)
+	ret = append(ret, localDlpGroups...)
 	return ret
 }
 
@@ -1361,4 +1373,46 @@ func (m CacheMethod) GetDlpRuleNames() *[]string {
 		return &dlprulenames
 	}
 	return nil
+}
+
+// caller owns cacheMutexRLock & has readAll right
+func (m CacheMethod) GetFedDlpGroupSensorCache() ([]*share.CLUSDlpSensor, []*share.CLUSDlpGroup) {
+	feddlpsensors := make([]*share.CLUSDlpSensor, 0)
+	for _, cdr := range dlpSensors {
+		if cdr.CfgType == share.FederalCfg && strings.HasPrefix(cdr.Name, api.FederalGroupPrefix) {
+			feddlpsensors = append(feddlpsensors, cdr)
+		}
+		//we sync (predefined)rules with 'fed.' prefix
+		if cdr.Name == share.CLUSDlpDefaultSensor {
+			fedDefSyncSensor := &share.CLUSDlpSensor{
+				Name:          share.CLUSFedDlpDefSyncSensor,
+				Groups:        make(map[string]string),
+				RuleListNames: make(map[string]string),
+				RuleList:      make(map[string]*share.CLUSDlpRule),
+				PreRuleList:   make(map[string][]*share.CLUSDlpRule),
+				Predefine:     false,
+				CfgType:       share.FederalCfg,
+			}
+			//user created rule
+			for rn, cdre := range cdr.RuleList {
+				if strings.HasPrefix(rn, api.FederalGroupPrefix) {
+					fedDefSyncSensor.RuleList[rn] = cdre
+				}
+			}
+			//predefined rule
+			for rn, cdrelist := range cdr.PreRuleList {
+				if strings.HasPrefix(rn, api.FederalGroupPrefix) {
+					fedDefSyncSensor.PreRuleList[rn] = cdrelist
+				}
+			}
+			feddlpsensors = append(feddlpsensors, fedDefSyncSensor)
+		}
+	}
+	feddlpgrps := make([]*share.CLUSDlpGroup, 0)
+	for _, cg := range dlpGroups {
+		if cg.CfgType == share.FederalCfg && strings.HasPrefix(cg.Name, api.FederalGroupPrefix) {
+			feddlpgrps = append(feddlpgrps, cg)
+		}
+	}
+	return feddlpsensors, feddlpgrps
 }

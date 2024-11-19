@@ -1057,6 +1057,8 @@ func cleanFedRules() {
 	replaceFedResponseRules(resRulesData.Rules, resRulesData.RuleHeads)
 
 	deleteFedGroupPolicy()
+	deleteFedDlpGroupSensors()
+	deleteFedWafGroupSensors()
 
 	txn := cluster.Transact()
 	defer txn.Close()
@@ -1638,6 +1640,7 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 		return membership, status, code, err
 	}
 	kv.CreateDefaultFedGroups()
+	kv.CreateFedDefDlpWafRuleSensor()
 
 	var cfg share.CLUSFedSettings
 	if reqData.DeployRepoScanData != nil {
@@ -2659,7 +2662,7 @@ func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint
 
 	// FedGroupType must be the first to be processed
 	fedRuleTypes := []string{share.FedGroupType, share.FedSystemConfigType, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType,
-		share.FedNetworkRulesType, share.FedResponseRulesType, share.FedFileMonitorProfilesType, share.FedProcessProfilesType}
+		share.FedNetworkRulesType, share.FedResponseRulesType, share.FedFileMonitorProfilesType, share.FedProcessProfilesType, share.FedDlpSensorGrpType, share.FedWafSensorGrpType}
 	for _, fedRuleType := range fedRuleTypes {
 		if fedRev, ok := fedRevs[fedRuleType]; ok {
 			if jointRev, ok := localRevs[fedRuleType]; ok && fedRev != jointRev {
@@ -2689,6 +2692,10 @@ func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint
 					applied = replaceFedProcessProfiles(fedSettings.ProcessProfilesData.Profiles)
 				case share.FedSystemConfigType:
 					applied = replaceFedSystemConfig(fedSettings.SystemConfigData.SystemConfig)
+				case share.FedDlpSensorGrpType:
+					applied = replaceFedDlpSensorGroups(fedSettings.DlpGroupSensorData.DlpSensors, fedSettings.DlpGroupSensorData.DlpGroups)
+				case share.FedWafSensorGrpType:
+					applied = replaceFedWafSensorGroups(fedSettings.WafGroupSensorData.WafSensors, fedSettings.WafGroupSensorData.WafGroups)
 				}
 				if applied {
 					localRevs[fedRuleType] = fedRev

@@ -226,6 +226,7 @@ type ClusterHelper interface {
 	DeleteDlpSensor(name string) error
 	DeleteDlpSensorTxn(txn *cluster.ClusterTransact, name string)
 	GetDlpGroup(group string) *share.CLUSDlpGroup
+	GetAllDlpGroups() []*share.CLUSDlpGroup
 	PutDlpGroup(group *share.CLUSDlpGroup, create bool) error
 	PutDlpGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSDlpGroup) error
 	DeleteDlpGroup(txn *cluster.ClusterTransact, group string) error
@@ -237,6 +238,7 @@ type ClusterHelper interface {
 	DeleteWafSensor(name string) error
 	DeleteWafSensorTxn(txn *cluster.ClusterTransact, name string)
 	GetWafGroup(group string) *share.CLUSWafGroup
+	GetAllWafGroups() []*share.CLUSWafGroup
 	PutWafGroup(group *share.CLUSWafGroup, create bool) error
 	PutWafGroupTxn(txn *cluster.ClusterTransact, group *share.CLUSWafGroup) error
 	DeleteWafGroup(txn *cluster.ClusterTransact, group string) error
@@ -2735,6 +2737,20 @@ func (m clusterHelper) GetDlpGroup(group string) *share.CLUSDlpGroup {
 	return nil
 }
 
+func (m clusterHelper) GetAllDlpGroups() []*share.CLUSDlpGroup {
+	keys, _ := cluster.GetStoreKeys(share.CLUSConfigDlpGroupStore)
+	dlpgrps := make([]*share.CLUSDlpGroup, 0, len(keys))
+	for _, key := range keys {
+		if value, _, _ := m.get(key); value != nil {
+			var dlpgrp share.CLUSDlpGroup
+			_ = nvJsonUnmarshal(key, value, &dlpgrp)
+			dlpgrps = append(dlpgrps, &dlpgrp)
+		}
+	}
+
+	return dlpgrps
+}
+
 func (m clusterHelper) PutDlpGroup(group *share.CLUSDlpGroup, create bool) error {
 	key := share.CLUSDlpGroupConfigKey(group.Name)
 	value, err := json.Marshal(group)
@@ -2835,6 +2851,20 @@ func (m clusterHelper) GetWafGroup(group string) *share.CLUSWafGroup {
 		return &wafgroup
 	}
 	return nil
+}
+
+func (m clusterHelper) GetAllWafGroups() []*share.CLUSWafGroup {
+	keys, _ := cluster.GetStoreKeys(share.CLUSConfigWafGroupStore)
+	wafgrps := make([]*share.CLUSWafGroup, 0, len(keys))
+	for _, key := range keys {
+		if value, _, _ := m.get(key); value != nil {
+			var wafgrp share.CLUSWafGroup
+			_ = nvJsonUnmarshal(key, value, &wafgrp)
+			wafgrps = append(wafgrps, &wafgrp)
+		}
+	}
+
+	return wafgrps
 }
 
 func (m clusterHelper) PutWafGroup(group *share.CLUSWafGroup, create bool) error {

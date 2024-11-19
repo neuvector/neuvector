@@ -209,15 +209,16 @@ type CacheInterface interface {
 
 	// Dlp rule
 	GetDlpSensor(sensor string, acc *access.AccessControl) (*api.RESTDlpSensor, error)
-	GetAllDlpSensors(acc *access.AccessControl) []*api.RESTDlpSensor
+	GetAllDlpSensors(scope string, acc *access.AccessControl) []*api.RESTDlpSensor
 	IsDlpRuleUsedBySensor(rule string, acc *access.AccessControl) bool
 	GetDlpGroup(group string, acc *access.AccessControl) (*api.RESTDlpGroup, error)
-	GetAllDlpGroup(acc *access.AccessControl) []*api.RESTDlpGroup
+	GetAllDlpGroup(scope string, acc *access.AccessControl) []*api.RESTDlpGroup
 	GetDlpRule(rulename string, acc *access.AccessControl) (*api.RESTDlpRuleDetail, error)
 	GetDlpRules(acc *access.AccessControl) ([]*api.RESTDlpRule, error)
 	DoesDlpSensorExist(name string, acc *access.AccessControl) (bool, error)
 	GetDlpRuleNames() *[]string
 	GetDlpRuleSensorGroupById(id uint32) (string, string, *[]string)
+	GetFedDlpGroupSensorCache() ([]*share.CLUSDlpSensor, []*share.CLUSDlpGroup)
 	GetNewServicePolicyMode() (string, string)
 	GetNewServiceProfileBaseline() string
 	GetUnusedGroupAging() uint8
@@ -226,17 +227,18 @@ type CacheInterface interface {
 	GetDisableNetPolicyStatus() bool
 
 	// Waf rule
-	GetAllWafSensors(acc *access.AccessControl) []*api.RESTWafSensor
+	GetAllWafSensors(scope string, acc *access.AccessControl) []*api.RESTWafSensor
 	GetWafSensor(sensor string, acc *access.AccessControl) (*api.RESTWafSensor, error)
 	IsWafRuleUsedBySensor(rule string, acc *access.AccessControl) (bool, share.TCfgType)
 	DoesWafSensorExist(name string, acc *access.AccessControl) (bool, error)
 	WafSensorInGroups(sensor string) bool
-	GetAllWafGroup(acc *access.AccessControl) []*api.RESTWafGroup
+	GetAllWafGroup(scope string, acc *access.AccessControl) []*api.RESTWafGroup
 	GetWafGroup(group string, acc *access.AccessControl) (*api.RESTWafGroup, error)
 	GetWafRules(acc *access.AccessControl) ([]*api.RESTWafRule, error)
 	GetWafRule(rulename string, acc *access.AccessControl) (*api.RESTWafRuleDetail, error)
 	GetWafRuleSensorGroupById(id uint32) (string, string, *[]string)
 	GetWafRuleNames() *[]string
+	GetFedWafGroupSensorCache() ([]*share.CLUSWafSensor, []*share.CLUSWafGroup)
 
 	// Custom role
 	AuthorizeCustomCheck(name string, acc *access.AccessControl) bool

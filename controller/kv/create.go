@@ -27,7 +27,9 @@ const (
 
 const (
 	commentSsnSensor        = "Sensor for SSN detection"
+	commentfedSsnSensor     = "Federal sensor for SSN detection"
 	commentCcSensor         = "Sensor for Credit Card detection, Credit Card includes visa, master, discover, american express, diner and jcb"
+	commentfedCcSensor      = "Federal sensor for Credit Card detection, Credit Card includes visa, master, discover, american express, diner and jcb"
 	commentDefaultSensor    = "Hidden default sensor"
 	commentLog4shSensor     = "Log4Shell - 0Day RCE exploit found in Log4j"
 	commentSpr4shSensor     = "Spring4Shell - 0day RCE Vulnerability found in Java Spring Framework"
@@ -718,6 +720,287 @@ func createDefDlpRuleSensor() {
 	CreatePreDlpSensor(false)
 }
 
+var preFedDlpRuleSsn = []*share.CLUSDlpRule{
+	{
+		Name: share.DlpFedRuleNameSsn,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b(?!\\b(\\d)\\1+-?(\\d)\\1+-?(\\d)\\1+\\b)(?!123-?45-?6789|219-?09-?9999|078-?05-?1120)(?!666|000|9\\d{2})\\d{3}-?(?!00)\\d{2}-?(?!0{4})\\d{4}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcAxp = []*share.CLUSDlpRule{
+	{ //american express
+		Name: share.DlpFedRuleNameCcAxp,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b3[47]\\d{2}([ -]?)(?!(\\d)\\2{5}|123456|234567|345678)\\d{6}\\1(?!(\\d)\\3{4}|12345|56789)\\d{5}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcDiscover = []*share.CLUSDlpRule{
+	{ //discover
+		Name: share.DlpFedRuleNameCcDiscover,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b6(?:011\\d{2}|5\\d{4}|4[4-9]\\d{3}|22(?:1(?:2[6-9]|[3-9]\\d)|[2-8]\\d{2}|9(?:[01]\\d|2[0-5])))\\d{10}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcMaster = []*share.CLUSDlpRule{
+	{ //master
+		Name: share.DlpFedRuleNameCcMaster,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b5([1-5]\\d{2})(?!\\1{3})([ -]?)(?!(\\d)\\3{3})(\\d{4})\\2(?!\\4|(\\d)\\5{3}|1234|2345|3456|5678|7890)(\\d{4})\\2(?!\\6|(\\d)\\7{3}|1234|3456)\\d{4}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcVisa = []*share.CLUSDlpRule{
+	{ //visa
+		Name: share.DlpFedRuleNameCcVisa,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b4(\\d{3})(?!\\1{3})([ -]?)(?!(\\d)\\3{3})(\\d{4})\\2(?!\\4|(\\d)\\5{3}|1234|2345|3456|5678|7890)(\\d{4})\\2(?!\\6|(\\d)\\7{3}|1234|3456)\\d{4}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcDinerV1 = []*share.CLUSDlpRule{
+	{ //diners track1
+		Name: share.DlpFedRuleNameCcDinerV1,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b(36|38)[0-9]{2}(\\s|-)?[0-9]{6}(\\s|-)?[0-9]{4}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcDinerV2 = []*share.CLUSDlpRule{
+	{ //diner track2
+		Name: share.DlpFedRuleNameCcDinerV2,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b30[0-5][0-9](\\s|-)?[0-9]{6}(\\s|-)?[0-9]{4}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var preFedDlpRuleCcJcb = []*share.CLUSDlpRule{
+	{ //jcb
+		Name: share.DlpFedRuleNameCcJcb,
+		Patterns: []share.CLUSDlpCriteriaEntry{
+			{
+				Key:   "pattern",
+				Op:    share.CriteriaOpRegex,
+				Value: "\\b3[0-9]{3}(\\s|-)?[0-9]{4}(\\s|-)?[0-9]{4}(\\s|-)?[0-9]{4}\\b",
+			},
+		},
+		CfgType: share.FederalCfg,
+	},
+}
+
+var FedSsnSensorDlpRule = &share.CLUSDlpSensor{
+	Name:        share.CLUSFedDlpSsnSensor,
+	Groups:      make(map[string]string),
+	RuleList:    make(map[string]*share.CLUSDlpRule),
+	PreRuleList: make(map[string][]*share.CLUSDlpRule),
+	RuleListNames: map[string]string{
+		share.DlpFedRuleNameSsn: share.DlpFedRuleNameSsn,
+	},
+	Comment:   commentfedSsnSensor,
+	Predefine: true,
+	CfgType:   share.FederalCfg,
+}
+
+var FedCreditCardSensorDlpRule = &share.CLUSDlpSensor{
+	Name:        share.CLUSFedDlpCcSensor,
+	Groups:      make(map[string]string),
+	RuleList:    make(map[string]*share.CLUSDlpRule),
+	PreRuleList: make(map[string][]*share.CLUSDlpRule),
+	RuleListNames: map[string]string{
+		share.DlpFedRuleNameCcAxp:      share.DlpFedRuleNameCcAxp,
+		share.DlpFedRuleNameCcDiscover: share.DlpFedRuleNameCcDiscover,
+		share.DlpFedRuleNameCcMaster:   share.DlpFedRuleNameCcMaster,
+		share.DlpFedRuleNameCcVisa:     share.DlpFedRuleNameCcVisa,
+		share.DlpFedRuleNameCcDinerV1:  share.DlpFedRuleNameCcDinerV1,
+		share.DlpFedRuleNameCcDinerV2:  share.DlpFedRuleNameCcDinerV2,
+		share.DlpFedRuleNameCcJcb:      share.DlpFedRuleNameCcJcb,
+	},
+	Comment:   commentfedCcSensor,
+	Predefine: true,
+	CfgType:   share.FederalCfg,
+}
+
+var PreFedDlpSensors = []*share.CLUSDlpSensor{
+	FedSsnSensorDlpRule,
+	FedCreditCardSensorDlpRule,
+}
+
+func createFedPreDlpSensor(withlock bool) {
+	if !withlock {
+		clusterLockWait := time.Duration(time.Second * 4)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	}
+
+	for _, cdr := range PreFedDlpSensors {
+		dlpsensor := clusHelper.GetDlpSensor(cdr.Name)
+		if dlpsensor != nil {
+			for _, rname := range dlpsensor.RuleListNames {
+				if rname != share.DlpRuleNameCreditCard {
+					cdr.RuleListNames[rname] = rname
+				}
+			}
+			_ = clusHelper.PutDlpSensor(cdr, false)
+		} else {
+			_ = clusHelper.PutDlpSensor(cdr, true)
+		}
+	}
+}
+
+var defaultFedSensorAllDlpRule = &share.CLUSDlpSensor{
+	Name:     share.CLUSFedDlpDefaultSensor,
+	Groups:   make(map[string]string),
+	RuleList: make(map[string]*share.CLUSDlpRule),
+	PreRuleList: map[string][]*share.CLUSDlpRule{
+		share.DlpFedRuleNameSsn:        preFedDlpRuleSsn,
+		share.DlpFedRuleNameCcAxp:      preFedDlpRuleCcAxp,
+		share.DlpFedRuleNameCcDiscover: preFedDlpRuleCcDiscover,
+		share.DlpFedRuleNameCcMaster:   preFedDlpRuleCcMaster,
+		share.DlpFedRuleNameCcVisa:     preFedDlpRuleCcVisa,
+		share.DlpFedRuleNameCcDinerV1:  preFedDlpRuleCcDinerV1,
+		share.DlpFedRuleNameCcDinerV2:  preFedDlpRuleCcDinerV2,
+		share.DlpFedRuleNameCcJcb:      preFedDlpRuleCcJcb,
+	},
+	Comment:   commentDefaultSensor,
+	Predefine: true,
+	CfgType:   share.FederalCfg,
+}
+
+func createFedDefDlpRules(withlock bool) {
+	var idx uint32 = 0
+
+	for _, rulearray := range defaultFedSensorAllDlpRule.PreRuleList {
+		for i, rule := range rulearray {
+			if i == 0 {
+				if len(rule.Name) >= api.DlpRuleNameMaxLen {
+					log.WithFields(log.Fields{"name": rule.Name, "name_len": len(rule.Name)}).Debug("Invalid rule name")
+					return
+				}
+			}
+
+			if len(rule.Patterns) == 0 {
+				log.WithFields(log.Fields{"name": rule.Name}).Debug("Failed to creat default rule: dlp rule must have pattern")
+				return
+			}
+			if len(rule.Patterns) > api.DlpRulePatternMaxNum {
+				log.WithFields(log.Fields{"name": rule.Name}).Debug("Failed to creat default rule: dlp rule must have no more than 2 patterns")
+				return
+			}
+			for _, pt := range rule.Patterns {
+				if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
+					if _, err := pcre.Compile(pt.Value, 0); err != nil {
+						log.WithFields(log.Fields{"error": err}).Debug("Failed to creat default rule: invalid regex in pattern criteria")
+						return
+					}
+				}
+			}
+			/*
+			 * assign rule id for predefined dlp rule
+			 * by design predefined rule id start from
+			 * api.MinDlpPredefinedRuleID
+			 */
+			if i == 0 {
+				rule.ID = uint32(api.MinDlpFedPredefinedRuleID) + idx
+				idx++
+			}
+		}
+	}
+
+	if !withlock {
+		clusterLockWait := time.Duration(time.Second * 4)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	}
+	dlpsensor := clusHelper.GetDlpSensor(defaultSensorAllDlpRule.Name)
+
+	if dlpsensor == nil {
+		CreateDefDlpRules(true)
+		CreatePreDlpSensor(true)
+		dlpsensor = clusHelper.GetDlpSensor(defaultSensorAllDlpRule.Name)
+		if dlpsensor == nil {
+			e := "sensor cannot be created in cluster!"
+			log.WithFields(log.Fields{"sensor": dlpsensor.Name}).Error(e)
+			return
+		}
+		log.Debug("Creating predefined dlp sensor!")
+	}
+	if dlpsensor.RuleList == nil {
+		dlpsensor.RuleList = make(map[string]*share.CLUSDlpRule)
+	}
+	if dlpsensor.PreRuleList == nil {
+		dlpsensor.PreRuleList = make(map[string][]*share.CLUSDlpRule)
+	}
+
+	for rname, cdr := range defaultFedSensorAllDlpRule.RuleList {
+		if _, ok := dlpsensor.RuleList[rname]; !ok {
+			dlpsensor.RuleList[rname] = cdr
+		}
+	}
+	for rname, cdr_list := range defaultFedSensorAllDlpRule.PreRuleList {
+		if _, ok := dlpsensor.PreRuleList[rname]; !ok && rname != share.DlpRuleNameCreditCard {
+			dlpsensor.PreRuleList[rname] = cdr_list
+		}
+	}
+	_ = clusHelper.PutDlpSensor(dlpsensor, false)
+}
+
+func createFedDefDlpRuleSensor(withlock bool) {
+	createFedDefDlpRules(withlock)
+	createFedPreDlpSensor(withlock)
+}
+
 var preWafRuleLog4sh = &share.CLUSWafRule{
 	Name: common.GetInternalWafRuleName(share.WafRuleNameLog4sh, share.CLUSWafLog4shSensor),
 	Patterns: []share.CLUSWafCriteriaEntry{
@@ -864,6 +1147,176 @@ func CreateDefWafRules(withlock bool) {
 func createDefWafRuleSensor() {
 	CreateDefWafRules(false)
 	CreatePreWafSensor(false)
+}
+
+var preWafFedRuleLog4sh = &share.CLUSWafRule{
+	Name: common.GetInternalWafRuleName(share.WafRuleNameLog4sh, share.CLUSWafFedLog4shSensor),
+	Patterns: []share.CLUSWafCriteriaEntry{
+		{
+			Key:     "pattern",
+			Op:      share.CriteriaOpRegex,
+			Context: share.DlpPatternContextHEAD,
+			Value:   "\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*",
+		},
+	},
+	CfgType: share.FederalCfg,
+}
+
+var Log4shWafFedSensor = &share.CLUSWafSensor{
+	Name:        share.CLUSWafFedLog4shSensor,
+	Groups:      make(map[string]string),
+	RuleList:    make(map[string]*share.CLUSWafRule),
+	PreRuleList: make(map[string][]*share.CLUSWafRule),
+	RuleListNames: map[string]string{
+		preWafFedRuleLog4sh.Name: preWafFedRuleLog4sh.Name,
+	},
+	Comment:   commentLog4shSensor,
+	Predefine: false,
+	CfgType:   share.FederalCfg,
+}
+
+var preWafFedRuleSpring4sh = &share.CLUSWafRule{
+	Name: common.GetInternalWafRuleName(share.WafRuleNameSpr4sh, share.CLUSWafFedSpr4shSensor),
+	Patterns: []share.CLUSWafCriteriaEntry{
+		{
+			Key:     "pattern",
+			Op:      share.CriteriaOpRegex,
+			Context: share.DlpPatternContextBODY,
+			Value:   "if.*equals.*request\\.getParameter.*pwd.*getRuntime.*exec.*request\\.getParameter.*cmd.*getInputStream.*read.*print.*classLoader",
+		},
+	},
+	CfgType: share.FederalCfg,
+}
+
+var Spring4shWafFedSensor = &share.CLUSWafSensor{
+	Name:        share.CLUSWafFedSpr4shSensor,
+	Groups:      make(map[string]string),
+	RuleList:    make(map[string]*share.CLUSWafRule),
+	PreRuleList: make(map[string][]*share.CLUSWafRule),
+	RuleListNames: map[string]string{
+		preWafFedRuleSpring4sh.Name: preWafFedRuleSpring4sh.Name,
+	},
+	Comment:   commentSpr4shSensor,
+	Predefine: false,
+	CfgType:   share.FederalCfg,
+}
+
+var PreWafFedSensors = []*share.CLUSWafSensor{
+	Log4shWafFedSensor,
+	Spring4shWafFedSensor,
+}
+
+func createFedPreWafSensor(withlock bool) {
+	if !withlock {
+		clusterLockWait := time.Duration(time.Second * 4)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	}
+	for _, cdr := range PreWafFedSensors {
+		wafsensor := clusHelper.GetWafSensor(cdr.Name)
+		if wafsensor == nil {
+			_ = clusHelper.PutWafSensor(cdr, true)
+		}
+	}
+}
+
+var defaultFedSensorAllWafRule = &share.CLUSWafSensor{
+	Name:   share.CLUSWafDefaultFedSensor,
+	Groups: make(map[string]string),
+	RuleList: map[string]*share.CLUSWafRule{
+		preWafFedRuleLog4sh.Name:    preWafFedRuleLog4sh,
+		preWafFedRuleSpring4sh.Name: preWafFedRuleSpring4sh,
+	},
+	PreRuleList: make(map[string][]*share.CLUSWafRule),
+	Comment:     commentDefaultWafSensor,
+	Predefine:   true,
+	CfgType:     share.SystemDefined,
+}
+
+func createFedDefWafRules(withlock bool) {
+	for _, rule := range defaultFedSensorAllWafRule.RuleList {
+		if len(rule.Name) >= api.DlpRuleNameMaxLen {
+			log.WithFields(log.Fields{"name": rule.Name, "name_len": len(rule.Name)}).Debug("Invalid rule name")
+			return
+		}
+
+		if len(rule.Patterns) == 0 {
+			log.WithFields(log.Fields{"name": rule.Name}).Debug("Failed to creat default rule: waf rule must have pattern")
+			return
+		}
+		if len(rule.Patterns) > api.DlpRulePatternMaxNum {
+			log.WithFields(log.Fields{"name": rule.Name}).Debug("Failed to creat default rule: waf rule must have no more than 16 patterns")
+			return
+		}
+		for _, pt := range rule.Patterns {
+			if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
+				if _, err := pcre.Compile(pt.Value, 0); err != nil {
+					log.WithFields(log.Fields{"error": err}).Debug("Failed to creat default waf rule: invalid regex in pattern criteria")
+					return
+				}
+			}
+		}
+	}
+
+	if !withlock {
+		clusterLockWait := time.Duration(time.Second * 4)
+		lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+			return
+		}
+		defer clusHelper.ReleaseLock(lock)
+	}
+	wafsensor := clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+
+	/*
+	* create default waf sensor.
+	 */
+	if wafsensor == nil {
+		CreateDefWafRules(true)
+		CreatePreWafSensor(true)
+		wafsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+		if wafsensor == nil {
+			e := "sensor cannot be created in cluster!"
+			log.WithFields(log.Fields{"sensor": wafsensor.Name}).Error(e)
+			return
+		}
+		log.Debug("Creating default waf sensor!")
+	}
+	if wafsensor.RuleList == nil {
+		wafsensor.RuleList = make(map[string]*share.CLUSWafRule)
+	}
+	if wafsensor.PreRuleList == nil {
+		wafsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
+	}
+
+	for rname, cdr := range defaultFedSensorAllWafRule.RuleList {
+		if _, ok := wafsensor.RuleList[rname]; !ok {
+			wafsensor.RuleList[rname] = cdr
+		}
+	}
+	for _, rule := range wafsensor.RuleList {
+		if rule.ID == 0 {
+			rule.ID = common.GetWafRuleID(wafsensor)
+		}
+	}
+	_ = clusHelper.PutWafSensor(wafsensor, false)
+}
+
+func createFedDefWafRuleSensor(withlock bool) {
+	createFedDefWafRules(withlock)
+	createFedPreWafSensor(withlock)
+}
+
+func CreateFedDefDlpWafRuleSensor() {
+	if fedRole, _ := getFedRole(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
+		createFedDefDlpRuleSensor(true)
+		createFedDefWafRuleSensor(true)
+	}
 }
 
 func CreateDefaultFedGroups() {

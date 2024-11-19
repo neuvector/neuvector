@@ -37,8 +37,9 @@ func handlerWafSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	var resp api.RESTWafSensorsData
 	resp.Sensors = make([]*api.RESTWafSensor, 0)
+	scope := query.pairs[api.QueryScope] // empty string means fed & local groups
 
-	wafsensors := cacher.GetAllWafSensors(acc)
+	wafsensors := cacher.GetAllWafSensors(scope, acc)
 	// Filter
 	if len(wafsensors) <= query.start {
 		restRespSuccess(w, r, &resp, acc, login, nil, "Get waf rule list")
@@ -73,17 +74,25 @@ func handlerWafSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	//always put predefined sensor in front
+	preFedSensors := make([]*api.RESTWafSensor, 0)
+	fedSensors := make([]*api.RESTWafSensor, 0)
 	preSensors := make([]*api.RESTWafSensor, 0)
 	userSensors := make([]*api.RESTWafSensor, 0)
 	for _, sen := range resp.Sensors {
-		if sen.Predefine {
+		if sen.CfgType == api.CfgTypeFederal && sen.Predefine {
+			preFedSensors = append(preFedSensors, sen)
+		} else if sen.CfgType == api.CfgTypeFederal {
+			fedSensors = append(fedSensors, sen)
+		} else if sen.Predefine {
 			preSensors = append(preSensors, sen)
 		} else {
 			userSensors = append(userSensors, sen)
 		}
 	}
+	preFedSensors = append(preFedSensors, fedSensors...)
 	preSensors = append(preSensors, userSensors...)
-	resp.Sensors = preSensors
+	preFedSensors = append(preFedSensors, preSensors...)
+	resp.Sensors = preFedSensors
 
 	log.WithFields(log.Fields{"entries": len(resp.Sensors)}).Debug("Response")
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get all waf sensors")
@@ -158,8 +167,9 @@ func handlerWafGroupList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	var resp api.RESTWafGroupsData
 	resp.WafGroups = make([]*api.RESTWafGroup, 0)
+	scope := query.pairs[api.QueryScope] // empty string means fed & local groups
 
-	wafgroups := cacher.GetAllWafGroup(acc)
+	wafgroups := cacher.GetAllWafGroup(scope, acc)
 	// Filter
 	if len(wafgroups) <= query.start {
 		restRespSuccess(w, r, &resp, acc, login, nil, "Get waf group list")
@@ -425,6 +435,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	conf := rconf.Config
+	tcfgtype := cfgTypeMapping[conf.CfgType]
 
 	//check user permission before creation
 	if !acc.Authorize(&share.CLUSWafSensor{Name: conf.Name}, nil) {
@@ -445,8 +456,20 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
 		return
 	}
-	if conf.Name == share.CLUSWafDefaultSensor || strings.HasPrefix(conf.Name, api.FederalGroupPrefix) {
+	if conf.Name == share.CLUSWafDefaultSensor {
 		e := "Cannot create sensor with reserved name"
+		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
+		return
+	}
+	if tcfgtype == share.UserCreated && strings.HasPrefix(conf.Name, api.FederalGroupPrefix) {
+		e := "Cannot create local scope sensor with federal name"
+		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
+		return
+	}
+	if tcfgtype == share.FederalCfg && !strings.HasPrefix(conf.Name, api.FederalGroupPrefix) {
+		e := "federal scope sensor must start with \"fed.\""
 		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidName, e)
 		return
@@ -454,7 +477,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 
 	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached {
 		e := "waf sensor already exists"
-		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
+		log.WithFields(log.Fields{"name": conf.Name}).Warn(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
 		return
 	} else if err == common.ErrObjectAccessDenied {
@@ -492,11 +515,13 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	if err := createWafSensor(w, conf, share.UserCreated); err != nil {
+	if err := createWafSensor(w, conf, tcfgtype); err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
 		return
 	}
-
+	if tcfgtype == share.FederalCfg {
+		updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
+	}
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Create waf sensor")
 }
 
@@ -507,6 +532,8 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 		return fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
 	} else if reviewType == share.ReviewTypeCRD {
 		cfgType = share.GroundCfg
+	} else if strings.HasPrefix(sensor.Name, api.FederalGroupPrefix) {
+		cfgType = share.FederalCfg
 	}
 
 	modified := false
@@ -807,14 +834,24 @@ func handlerWafSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 			return
 		} else {
 			if err := updateWafSensor(w, conf, 0, sensor); err == nil {
+				if sensor.CfgType == share.FederalCfg {
+					updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
+				}
 				restRespSuccess(w, r, nil, acc, login, &rconf, "Configure waf sensor")
 			}
 		}
 	}
 }
 
-func processGroupSensors(w http.ResponseWriter, cg *share.CLUSWafGroup, sensors []api.RESTWafConfig) error {
+func processGroupWafSensors(w http.ResponseWriter, cg *share.CLUSWafGroup, sensors []api.RESTWafConfig) error {
 	for _, rs := range sensors {
+		if (strings.HasPrefix(cg.Name, api.FederalGroupPrefix) && !strings.HasPrefix(rs.Name, api.FederalGroupPrefix)) ||
+			(!strings.HasPrefix(cg.Name, api.FederalGroupPrefix) && strings.HasPrefix(rs.Name, api.FederalGroupPrefix)) {
+			e := "Federal group must use federal sensor and vice versa!"
+			log.WithFields(log.Fields{"name": rs.Name}).Error(e)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return fmt.Errorf("%s", e)
+		}
 		if rs.Name == share.CLUSWafDefaultSensor {
 			e := "Cannot use default sensor in waf group!"
 			log.WithFields(log.Fields{"name": rs.Name}).Error(e)
@@ -905,7 +942,7 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 		//add replace sensor list to the waf group
 		if len(*conf.RepSensors) > 0 {
-			if err := processGroupSensors(w, cg, *conf.RepSensors); err != nil {
+			if err := processGroupWafSensors(w, cg, *conf.RepSensors); err != nil {
 				return
 			}
 		}
@@ -942,7 +979,7 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 				cg.Sensors = make([]*share.CLUSWafSetting, 0)
 			}
 			if len(*conf.Sensors) > 0 {
-				if err := processGroupSensors(w, cg, *conf.Sensors); err != nil {
+				if err := processGroupWafSensors(w, cg, *conf.Sensors); err != nil {
 					return
 				}
 			}
@@ -954,6 +991,9 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
+	}
+	if cg.CfgType == share.FederalCfg {
+		updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
 	}
 	restRespSuccess(w, r, nil, acc, login, &rconf, "Configure waf group")
 }
@@ -1018,7 +1058,9 @@ func deleteWafSensor(w http.ResponseWriter, name string, reviewType share.TRevie
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
 		return err
 	}
-
+	if wafsensor.CfgType == share.FederalCfg {
+		updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
+	}
 	return nil
 }
 
@@ -1241,4 +1283,434 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_WAF)
 
 	return nil
+}
+
+// caller has been verified for federal admin access right
+func replaceFedWafSensorGroups(WafSensors []*share.CLUSWafSensor, WafGroups []*share.CLUSWafGroup) bool {
+	wafSenMap := make(map[string]*share.CLUSWafSensor, len(WafSensors))
+	for _, wafsen := range WafSensors {
+		if wafsen.CfgType == share.FederalCfg {
+			wafSenMap[wafsen.Name] = wafsen
+		}
+	}
+	wafGrpMap := make(map[string]*share.CLUSWafGroup, len(WafGroups))
+	for _, wafgrp := range WafGroups {
+		if wafgrp.CfgType == share.FederalCfg {
+			wafGrpMap[wafgrp.Name] = wafgrp
+		}
+	}
+
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+		return false
+	}
+	defer clusHelper.ReleaseLock(lock)
+	var defsensor *share.CLUSWafSensor
+	defsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+
+	/*
+	 * create default waf sensor.
+	 */
+	if defsensor == nil {
+		createDefaultWafSensor()
+		defsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+		if defsensor == nil {
+			e := "sensor cannot be created in cluster!"
+			log.Error(e)
+			return false
+		}
+		log.Debug("Creating default waf sensor!")
+	}
+
+	if defsensor.RuleList == nil {
+		defsensor.RuleList = make(map[string]*share.CLUSWafRule)
+	}
+	if defsensor.PreRuleList == nil {
+		defsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
+	}
+
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	existingSensors := clusHelper.GetAllWafSensors()
+	for _, esen := range existingSensors {
+		//delete all existing fed sensor
+		if esen != nil && esen.CfgType == share.FederalCfg {
+			for _, rn := range esen.RuleListNames {
+				delete(defsensor.RuleList, rn)
+			}
+			clusHelper.DeleteWafSensorTxn(txn, esen.Name)
+		}
+	}
+	//replace with synced fed sensor
+	for _, wsen := range wafSenMap {
+		if wsen != nil {
+			if wsen.Name == share.CLUSFedWafDefSyncSensor {
+				for rname, cdr := range wsen.RuleList {
+					cdr.ID = common.GetWafRuleID(defsensor)
+					if cdr.ID == 0 {
+						e := "Waf rule id overflow!"
+						log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
+						return false
+					}
+					defsensor.RuleList[rname] = cdr
+				}
+				continue
+			}
+			if err := clusHelper.PutWafSensorTxn(txn, wsen); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+				return false
+			}
+		}
+	}
+	if err := clusHelper.PutWafSensorTxn(txn, defsensor); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+		return false
+	}
+
+	//delete all existing fed wafgroup
+	existingWafgrps := clusHelper.GetAllWafGroups()
+	for _, ewafgrp := range existingWafgrps {
+		if ewafgrp != nil && ewafgrp.CfgType == share.FederalCfg {
+			if err := clusHelper.DeleteWafGroup(txn, ewafgrp.Name); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteWafGroup")
+				return false
+			}
+		}
+	}
+	//replace with synced fed group
+	for _, wafgrp := range wafGrpMap {
+		if wafgrp != nil {
+			if err := clusHelper.PutWafGroupTxn(txn, wafgrp); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutWafGroupTxn")
+				return false
+			}
+		}
+	}
+
+	if ok, err := txn.Apply(); err != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+		return false
+	}
+
+	return true
+}
+
+func deleteFedWafGroupSensors() { // delete all fed waf groups and sensors(caller must be fedAdmin)
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+	var defsensor *share.CLUSWafSensor
+	defsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+
+	/*
+	 * create default waf sensor.
+	 */
+	if defsensor == nil {
+		createDefaultWafSensor()
+		defsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+		if defsensor == nil {
+			e := "sensor cannot be created in cluster!"
+			log.Error(e)
+			return
+		}
+		log.Debug("Creating default waf sensor!")
+	}
+
+	if defsensor.RuleList == nil {
+		defsensor.RuleList = make(map[string]*share.CLUSWafRule)
+	}
+	if defsensor.PreRuleList == nil {
+		defsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
+	}
+
+	txn := cluster.Transact()
+	defer txn.Close()
+
+	existingWafgrps := clusHelper.GetAllWafGroups()
+	for _, ewafgrp := range existingWafgrps {
+		if ewafgrp != nil && ewafgrp.CfgType == share.FederalCfg {
+			if err := clusHelper.DeleteWafGroup(txn, ewafgrp.Name); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("DeleteWafGroup")
+				return
+			}
+		}
+	}
+	existingSensors := clusHelper.GetAllWafSensors()
+	for _, esen := range existingSensors {
+		if esen != nil && esen.CfgType == share.FederalCfg {
+			for _, rn := range esen.RuleListNames {
+				_, foundInAll := defsensor.RuleList[rn]
+				if foundInAll {
+					delete(defsensor.RuleList, rn)
+				}
+			}
+			clusHelper.DeleteWafSensorTxn(txn, esen.Name)
+		}
+	}
+	if err := clusHelper.PutWafSensorTxn(txn, defsensor); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensorTxn")
+		return
+	}
+
+	if ok, err := txn.Apply(); err != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
+	}
+}
+
+func fedcreateWafSensor(conf *api.RESTWafSensorConfig, cfgType share.TCfgType) error {
+	log.Debug()
+	sensor := &share.CLUSWafSensor{
+		Name:          conf.Name,
+		Groups:        make(map[string]string),
+		RuleListNames: make(map[string]string),
+		RuleList:      make(map[string]*share.CLUSWafRule),
+		PreRuleList:   make(map[string][]*share.CLUSWafRule),
+		Predefine:     false,
+		CfgType:       cfgType,
+	}
+	if conf.Comment != nil {
+		sensor.Comment = *conf.Comment
+	}
+
+	var defsensor *share.CLUSWafSensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+
+	if defsensor == nil {
+		e := "sensor cannot be created in cluster!"
+		log.WithFields(log.Fields{"sensor": sensor.Name}).Error(e)
+		return fmt.Errorf("%s", e)
+	}
+
+	if defsensor.RuleList == nil {
+		defsensor.RuleList = make(map[string]*share.CLUSWafRule)
+	}
+	if defsensor.PreRuleList == nil {
+		defsensor.PreRuleList = make(map[string][]*share.CLUSWafRule)
+	}
+
+	for _, rdr := range *conf.Rules {
+		rdr.Name = common.GetInternalWafRuleName(rdr.Name, sensor.Name)
+		cdr := share.CLUSWafRule{
+			Name:    rdr.Name,
+			CfgType: cfgType,
+		}
+		for _, rpt := range rdr.Patterns {
+			cdr.Patterns = append(cdr.Patterns, share.CLUSWafCriteriaEntry{
+				Key:     rpt.Key,
+				Value:   rpt.Value,
+				Op:      rpt.Op,
+				Context: rpt.Context,
+			})
+		}
+		cdr.ID = common.GetWafRuleID(defsensor)
+		if cdr.ID == 0 {
+			e := "waf rule id overflow!"
+			log.WithFields(log.Fields{"ID": cdr.ID}).Error(e)
+			return fmt.Errorf("%s", e)
+		}
+
+		//save full rule with pattern in default sensor
+		defsensor.RuleList[cdr.Name] = &cdr
+
+		//new sensor use this rule, only save name
+		sensor.RuleListNames[rdr.Name] = rdr.Name
+	}
+	//save full rule with pattern in default sensor
+	if err := clusHelper.PutWafSensor(defsensor, false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensor")
+		return err
+	}
+
+	//create new sensor
+	if err := clusHelper.PutWafSensor(sensor, true); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("PutWafSensor")
+		return err
+	}
+
+	return nil
+}
+
+func processFedGroupWafSensors(cg *share.CLUSWafGroup, sensors []api.RESTWafConfig) error {
+	for _, rs := range sensors {
+		if (strings.HasPrefix(cg.Name, api.FederalGroupPrefix) && !strings.HasPrefix(rs.Name, api.FederalGroupPrefix)) ||
+			(!strings.HasPrefix(cg.Name, api.FederalGroupPrefix) && strings.HasPrefix(rs.Name, api.FederalGroupPrefix)) {
+			e := "Federal group must use federal sensor and vice versa!"
+			log.WithFields(log.Fields{"name": rs.Name}).Error(e)
+			return fmt.Errorf("%s", e)
+		}
+		if rs.Name == share.CLUSWafDefaultSensor {
+			e := "Cannot use default sensor in waf group!"
+			log.WithFields(log.Fields{"name": rs.Name}).Error(e)
+			return fmt.Errorf("%s", e)
+		}
+		if rs.Action != share.DlpRuleActionAllow && rs.Action != share.DlpRuleActionDrop {
+			e := "Action is not supported!"
+			log.WithFields(log.Fields{"sensor": rs}).Error(e)
+			return fmt.Errorf("%s", e)
+		}
+		cs := share.CLUSWafSetting{Name: rs.Name, Action: rs.Action}
+		if ret, ok := common.MergeWafSensors(cg.Sensors, &cs); ok {
+			cg.Sensors = ret
+		}
+	}
+
+	return nil
+}
+
+func fedWafSensorPromote(cs *api.RESTWafSensor, acc *access.AccessControl, login *loginSession) {
+	log.Debug("")
+	fedSenName := fmt.Sprintf("%s%s", api.FederalGroupPrefix, cs.Name)
+	rules := make([]api.RESTWafRule, 0)
+	conf := &api.RESTWafSensorConfig{
+		Name:        fedSenName,
+		RuleChgList: nil,
+		RuleDelList: nil,
+		Rules:       nil,
+		Comment:     &cs.Comment,
+		CfgType:     api.CfgTypeFederal,
+	}
+	for _, rl := range cs.RuleList {
+		rul := api.RESTWafRule{
+			Name:     rl.Name,
+			Patterns: rl.Patterns,
+			CfgType:  api.CfgTypeFederal,
+		}
+		rules = append(rules, rul)
+	}
+	conf.Rules = &rules
+
+	tcfgtype := cfgTypeMapping[conf.CfgType]
+
+	if len(conf.Name) > api.DlpSensorNameMaxLen {
+		e := fmt.Sprintf("Sensor name exceed max %d length!", api.DlpSensorNameMaxLen)
+		log.WithFields(log.Fields{"name": conf.Name, "name_length": len(conf.Name)}).Error(e)
+		return
+	}
+
+	if tcfgtype == share.UserCreated && strings.HasPrefix(conf.Name, api.FederalGroupPrefix) {
+		e := "Cannot create local scope sensor with federal name"
+		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
+		return
+	}
+	if tcfgtype == share.FederalCfg && !strings.HasPrefix(conf.Name, api.FederalGroupPrefix) {
+		e := "federal scope sensor must start with \"fed.\""
+		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
+		return
+	}
+
+	if cached, err := cacher.DoesWafSensorExist(conf.Name, acc); cached {
+		e := "waf sensor already exists"
+		log.WithFields(log.Fields{"name": conf.Name}).Warn(e)
+		return
+	} else if err == common.ErrObjectAccessDenied {
+		e := "access denied"
+		log.WithFields(log.Fields{"name": conf.Name}).Error(e)
+		return
+	}
+
+	if conf.Rules == nil {
+		rules := make([]api.RESTWafRule, 0)
+		conf.Rules = &rules
+	}
+
+	if err := fedcreateWafSensor(conf, tcfgtype); err == nil {
+		if tcfgtype == share.FederalCfg {
+			updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
+		}
+	}
+}
+
+func fedWafGroupConfig(wafgrp *api.RESTWafGroup, acc *access.AccessControl, login *loginSession) {
+	log.Debug("")
+
+	fedGrpName := fmt.Sprintf("%s%s", api.FederalGroupPrefix, wafgrp.Name)
+	rsensors := make([]api.RESTWafConfig, 0)
+	conf := &api.RESTWafGroupConfig{
+		Name:       fedGrpName,
+		Status:     &wafgrp.Status,
+		DelSensors: nil,
+		Sensors:    nil,
+		RepSensors: nil,
+	}
+	for _, rds := range wafgrp.Sensors {
+		rdc := api.RESTWafConfig{
+			Name:    fmt.Sprintf("%s%s", api.FederalGroupPrefix, rds.Name),
+			Action:  rds.Action,
+			Comment: rds.Comment,
+		}
+		rsensors = append(rsensors, rdc)
+	}
+	conf.RepSensors = &rsensors
+
+	// Read from cluster
+	cg := clusHelper.GetWafGroup(wafgrp.Name)
+	if cg == nil {
+		e := "Waf group doesn't exist"
+		log.WithFields(log.Fields{"name": wafgrp.Name}).Error(e)
+		return
+	}
+	cg.Name = fedGrpName
+	cg.CfgType = share.FederalCfg
+	// Apply waf changes
+	if conf.Status != nil {
+		cg.Status = *conf.Status
+	}
+
+	if conf.RepSensors != nil { //used by GUI
+		//delete existing sensor list used by dlp group
+		cg.Sensors = make([]*share.CLUSWafSetting, 0)
+
+		//add replace sensor list to the dlp group
+		if len(*conf.RepSensors) > 0 {
+			if err := processFedGroupWafSensors(cg, *conf.RepSensors); err != nil {
+				return
+			}
+		}
+	}
+	// Write dlp group definition into key-value store
+	if err := clusHelper.PutWafGroup(cg, false); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return
+	}
+	if cg.CfgType == share.FederalCfg {
+		updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
+	}
+}
+
+func promoteFedWafGroup(grpName string, acc *access.AccessControl, login *loginSession) {
+	cg := clusHelper.GetWafGroup(grpName)
+	if cg == nil || len(cg.Sensors) <= 0 {
+		log.WithFields(log.Fields{"group": grpName}).Debug("Local waf group is not set")
+		return
+	}
+	for _, sensor := range cg.Sensors { //local
+		if cs, _ := cacher.GetWafSensor(sensor.Name, acc); cs != nil {
+			fedWafSensorPromote(cs, acc, login)
+		}
+	}
+	fedGrpName := fmt.Sprintf("%s%s", api.FederalGroupPrefix, grpName)
+	fedcg := clusHelper.GetWafGroup(fedGrpName)
+	if fedcg == nil {
+		log.WithFields(log.Fields{"group": fedGrpName}).Debug("Fed waf group does not exist yet, create one")
+		wafgroup := &share.CLUSWafGroup{
+			Name:    fedGrpName,
+			Status:  true,
+			Sensors: make([]*share.CLUSWafSetting, 0),
+			CfgType: share.FederalCfg,
+		}
+		if err := clusHelper.PutWafGroup(wafgroup, true); err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Put waf group fail")
+			return
+		}
+	}
+	if cached, _ := cacher.GetWafGroup(grpName, acc); cached == nil {
+		log.WithFields(log.Fields{"group": grpName}).Debug("Local waf group does not exist.")
+		return
+	} else {
+		fedWafGroupConfig(cached, acc, login)
+	}
 }
