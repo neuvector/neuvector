@@ -2243,6 +2243,8 @@ const (
 	FedFileMonitorProfilesType = "fed_file_profile"
 	FedProcessProfilesType     = "fed_process_profile"
 	FedSystemConfigType        = "fed_system_config"
+	FedDlpSensorGrpType        = "fed_dlp_sensor_grp"
+	FedWafSensorGrpType        = "fed_waf_sensor_grp"
 )
 
 const (
@@ -2306,6 +2308,8 @@ func CLUSEmptyFedRulesRevision() *CLUSFedRulesRevision {
 			FedFileMonitorProfilesType: 0,
 			FedProcessProfilesType:     0,
 			FedSystemConfigType:        0,
+			FedDlpSensorGrpType:        0,
+			FedWafSensorGrpType:        0,
 		},
 		LastUpdateTime: time.Now().UTC(),
 	}
@@ -2478,6 +2482,18 @@ type CLUSFedScanRevisions struct {
 	RestoreAt      time.Time         `json:"restore_at"`
 }
 
+type CLUSFedDlpGroupSensorData struct {
+	Revision   uint64           `json:"revision"`
+	DlpSensors []*CLUSDlpSensor `json:"dlp_sensors"`
+	DlpGroups  []*CLUSDlpGroup  `json:"dlp_groups"`
+}
+
+type CLUSFedWafGroupSensorData struct {
+	Revision   uint64           `json:"revision"`
+	WafSensors []*CLUSWafSensor `json:"waf_sensors"`
+	WafGroups  []*CLUSWafGroup  `json:"waf_groups"`
+}
+
 // dlp rule
 const (
 	DlpRuleKeyPattern string = "pattern"
@@ -2492,26 +2508,42 @@ const (
 )
 
 const (
-	CLUSDlpDefaultSensor = "sensor.dlpdfltnv"
-	CLUSDlpSsnSensor     = "sensor.ssn"
-	CLUSDlpCcSensor      = "sensor.creditcard"
-	CLUSWafDefaultSensor = "sensor.wafdfltnv"
-	CLUSWafLog4shSensor  = "sensor.log4shell"
-	CLUSWafSpr4shSensor  = "sensor.spring4shell"
+	CLUSDlpDefaultSensor    = "sensor.dlpdfltnv"
+	CLUSFedDlpDefaultSensor = "fed.sensor.dlpdfltnv"
+	CLUSFedDlpDefSyncSensor = "fed.sensor.dlpdfltsyncnv"
+	CLUSDlpSsnSensor        = "sensor.ssn"
+	CLUSDlpCcSensor         = "sensor.creditcard"
+	CLUSFedDlpSsnSensor     = "fed.sensor.ssn"
+	CLUSFedDlpCcSensor      = "fed.sensor.creditcard"
+	CLUSWafDefaultSensor    = "sensor.wafdfltnv"
+	CLUSWafLog4shSensor     = "sensor.log4shell"
+	CLUSWafSpr4shSensor     = "sensor.spring4shell"
+	CLUSWafDefaultFedSensor = "fed.sensor.wafdfltnv"
+	CLUSFedWafDefSyncSensor = "fed.sensor.wafdfltsyncnv"
+	CLUSWafFedLog4shSensor  = "fed.sensor.log4shell"
+	CLUSWafFedSpr4shSensor  = "fed.sensor.spring4shell"
 )
 
 const (
-	DlpRuleNameCreditCard string = "rule.creditcard"
-	DlpRuleNameCcAxp      string = "rule.americanexpress"
-	DlpRuleNameCcDiscover string = "rule.discover"
-	DlpRuleNameCcMaster   string = "rule.master"
-	DlpRuleNameCcVisa     string = "rule.visa"
-	DlpRuleNameCcDinerV1  string = "rule.diner1"
-	DlpRuleNameCcDinerV2  string = "rule.diner2"
-	DlpRuleNameCcJcb      string = "rule.jcb"
-	DlpRuleNameSsn        string = "rule.ssn"
-	WafRuleNameLog4sh     string = "rule.log4shell"
-	WafRuleNameSpr4sh     string = "rule.spring4shell"
+	DlpRuleNameCreditCard    string = "rule.creditcard"
+	DlpRuleNameCcAxp         string = "rule.americanexpress"
+	DlpFedRuleNameCcAxp      string = "fed.rule.americanexpress"
+	DlpRuleNameCcMaster      string = "rule.master"
+	DlpFedRuleNameCcMaster   string = "fed.rule.master"
+	DlpRuleNameCcDiscover    string = "rule.discover"
+	DlpFedRuleNameCcDiscover string = "fed.rule.discover"
+	DlpRuleNameCcVisa        string = "rule.visa"
+	DlpFedRuleNameCcVisa     string = "fed.rule.visa"
+	DlpRuleNameCcDinerV1     string = "rule.diner1"
+	DlpFedRuleNameCcDinerV1  string = "fed.rule.diner1"
+	DlpRuleNameCcDinerV2     string = "rule.diner2"
+	DlpFedRuleNameCcDinerV2  string = "fed.rule.diner2"
+	DlpRuleNameCcJcb         string = "rule.jcb"
+	DlpFedRuleNameCcJcb      string = "fed.rule.jcb"
+	DlpRuleNameSsn           string = "rule.ssn"
+	DlpFedRuleNameSsn        string = "fed.rule.ssn"
+	WafRuleNameLog4sh        string = "rule.log4shell"
+	WafRuleNameSpr4sh        string = "rule.spring4shell"
 )
 
 const (
