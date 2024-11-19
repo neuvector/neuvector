@@ -387,8 +387,13 @@ static int dns_parser(dpi_packet_t *p, uint8_t *ptr, uint32_t len)
 
     //limit the question and answer max number in case of wrong dns type
     if ((qd + an) < MAX_RECORD_NUM) {
-        questions = calloc(qd, sizeof(dns_question_t));
-        answers = calloc(an, sizeof(dns_answer_t));
+        if (qd > 0) {
+            questions = calloc(qd, sizeof(dns_question_t));
+        }
+        if (an > 0) {
+            answers = calloc(an, sizeof(dns_answer_t));
+        }
+
         if ((questions == NULL) ^ (answers == NULL)) {
             free(questions);
             free(answers);
