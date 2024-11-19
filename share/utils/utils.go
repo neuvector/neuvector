@@ -1330,7 +1330,7 @@ func FileHashCrc32(path string, size int64) uint32 {
 			if _, err := f.Seek(hashByteRange, io.SeekEnd); err == nil {
 				if n, err := f.Read(buf); err == nil {
 					crc += crc32.ChecksumIEEE(buf[:n])
-				} else {
+				} else if err != io.EOF {
 					log.WithFields(log.Fields{"err": err, "path": path, "size": size}).Error()
 				}
 			}

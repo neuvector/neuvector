@@ -137,6 +137,7 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
+	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 )
 
 require (

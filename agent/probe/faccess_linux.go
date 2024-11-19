@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
+	fanotify "github.com/s3rj1k/go-fanotify/fanotify"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	"github.com/neuvector/neuvector/agent/workerlet"
 	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/utils"
@@ -59,7 +59,7 @@ type FileAccessCtrl struct {
 	bEnabled      bool
 	prober        *Probe
 	ctrlMux       sync.Mutex
-	fanfd         *fsmon.NotifyFD
+	fanfd         *fanotify.NotifyFD
 	roots         map[string]*rootFd // container id, invidual control list
 	lastReportPid int                // filtering reppeated report
 	marks         int                // monitor total aloocated marks
@@ -162,8 +162,11 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 
 	// docker cp (file changes) might change the polling behaviors,
 	// remove the non-block io to controller the polling timeouts
-	flags := fsmon.FAN_CLASS_CONTENT | fsmon.FAN_UNLIMITED_MARKS | fsmon.FAN_UNLIMITED_QUEUE | fsmon.FAN_NONBLOCK
-	fn, err := fsmon.Initialize(flags, unix.O_RDONLY|unix.O_LARGEFILE)
+	flags := unix.FAN_CLASS_CONTENT |
+		unix.FAN_UNLIMITED_MARKS |
+		unix.FAN_UNLIMITED_QUEUE |
+		unix.FAN_NONBLOCK
+	fn, err := fanotify.Initialize(uint(flags), unix.O_RDONLY|unix.O_LARGEFILE)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("FA: Initialize")
 		return nil, false
@@ -178,12 +181,12 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 		fa.bEnabled = false // reset it back
 		return nil, false
 	}
-	fa.cflag = fsmon.FAN_OPEN_PERM
+	fa.cflag = unix.FAN_OPEN_PERM
 
 	// perferable flag
 	if fa.isSupportExecPerm() {
 		log.Info("FA: Use ExecPerm")
-		fa.cflag = fsmon.FAN_OPEN_EXEC_PERM
+		fa.cflag = unix.FAN_OPEN_EXEC_PERM
 	}
 
 	go fa.monitorFilePermissionEvents()
@@ -195,7 +198,7 @@ func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, dir := range dirs {
 		path := ppath + dir
-		err := fa.fanfd.Mark(fsmon.FAN_MARK_ADD, fa.cflag|fsmon.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path)
+		err := fa.fanfd.Mark(unix.FAN_MARK_ADD, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path)
 		if err != nil {
 			log.WithFields(log.Fields{"path": path, "error": err}).Error("FA: ")
 		} else {
@@ -212,7 +215,7 @@ func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, dir := range dirs {
 		path := ppath + dir
-		if dbgError := fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fa.cflag|fsmon.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); dbgError != nil {
+		if dbgError := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); dbgError != nil {
 			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 		}
 	}
@@ -222,8 +225,8 @@ func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 // ///
 func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 	path := fmt.Sprintf(procRootMountPoint, 1)
-	err := fa.fanfd.Mark(fsmon.FAN_MARK_ADD, fsmon.FAN_OPEN_PERM, unix.AT_FDCWD, path)
-	if dbgError := fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fsmon.FAN_OPEN_PERM, unix.AT_FDCWD, path); dbgError != nil {
+	err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path)
+	if dbgError := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); dbgError != nil {
 		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 	}
 	if err != nil {
@@ -235,8 +238,8 @@ func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 
 func (fa *FileAccessCtrl) isSupportExecPerm() bool {
 	path := fmt.Sprintf(procRootMountPoint, 1)
-	err := fa.fanfd.Mark(fsmon.FAN_MARK_ADD, fsmon.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path)
-	if dbgError := fa.fanfd.Mark(fsmon.FAN_MARK_REMOVE, fsmon.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); dbgError != nil {
+	err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path)
+	if dbgError := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); dbgError != nil {
 		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 	}
 	if err != nil {
@@ -249,7 +252,7 @@ func (fa *FileAccessCtrl) isSupportExecPerm() bool {
 // ///
 func (fa *FileAccessCtrl) monitorExit() {
 	if fa.fanfd != nil {
-		fa.fanfd.Close()
+		fa.fanfd.File.Close()
 	}
 
 	if fa.prober != nil {
@@ -707,11 +710,12 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 	return id, profileSetting, svcGroup, res
 }
 
-func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
+func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string) {
+	var ppath, path string
+	var err error
+
 	bPass := true
 	if (ev.Mask & fa.cflag) > 0 {
-		var ppath, path string
-		var err error
 
 		res := rule_allowed // by default
 
@@ -725,7 +729,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 			}
 		}
 
-		if path, err = os.Readlink(fmt.Sprintf(procSelfFd, ev.File.Fd())); err == nil {
+		if path, err = os.Readlink(fmt.Sprintf(procSelfFd, int(ev.Fd))); err == nil {
 			// FA event doesn't provide enough information about the process
 			// The euid is going to be used to get the process' euid and the username.
 			// The parent PID is used to check if it is a root process
@@ -742,7 +746,7 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 
 			name := filepath.Base(path) // estimated child executable
 			if fa.isParentProcessException(ppath, path, name) {
-				return bPass
+				return bPass, path
 			}
 
 			var id, profileSetting, svcGroup, rule_uuid string
@@ -818,17 +822,26 @@ func (fa *FileAccessCtrl) processEvent(ev *fsmon.EventMetadata) bool {
 			log.WithFields(log.Fields{"ppid": ppid, "path": path, "ppath": ppath}).Debug("FA: allowed")
 		}
 	}
-	return bPass
+	return bPass, path
 }
 
-func (fa *FileAccessCtrl) handleEvents() {
-	if events, err := fa.fanfd.GetEvents(); err == nil {
-		for _, ev := range events {
-			if dbgError := fa.fanfd.Response(ev, fa.processEvent(ev)); dbgError != nil {
-				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-			}
-			ev.File.Close()
+func (fa *FileAccessCtrl) handleEvents() error {
+	for {
+		ev, err := fa.fanfd.GetEvent(os.Getpid())
+		if err != nil || ev == nil {
+			return err
 		}
+
+		resp, path := fa.processEvent(ev)
+		if resp {
+			err = fa.fanfd.ResponseAllow(ev)
+		} else {
+			err = fa.fanfd.ResponseDeny(ev)
+		}
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "path": path, "resp": resp}).Error()
+		}
+		ev.Close()
 	}
 }
 
@@ -836,7 +849,7 @@ func (fa *FileAccessCtrl) handleEvents() {
 func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 	waitCnt := 0
 	pfd := make([]unix.PollFd, 1)
-	pfd[0].Fd = fa.fanfd.GetFd()
+	pfd[0].Fd = int32(fa.fanfd.Fd)
 	pfd[0].Events = unix.POLLIN
 	log.Info("FA: start")
 	for {
@@ -857,7 +870,10 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
-			fa.handleEvents()
+			if err := fa.handleEvents(); err != nil && err != unix.EINTR {
+				log.WithFields(log.Fields{"err": err}).Error("FA: handle")
+				break
+			}
 			waitCnt = 0
 		}
 	}
