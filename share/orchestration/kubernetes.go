@@ -229,7 +229,7 @@ func GetK8sVersion(reGetK8sVersion, reGetOcVersion bool) (string, string) {
 				break
 			}
 		}
-		if k8sVer == "" && err != nil {
+		if k8sVer == "" && err != nil && !strings.HasPrefix(err.Error(), "Read File fail") {
 			log.Error(err.Error())
 		}
 		err = nil
@@ -243,7 +243,7 @@ func GetK8sVersion(reGetK8sVersion, reGetOcVersion bool) (string, string) {
 				break
 			}
 		}
-		if ocVer == "" && err != nil {
+		if ocVer == "" && err != nil && !strings.HasPrefix(err.Error(), "Read File fail") {
 			log.Error(err.Error())
 		}
 	}

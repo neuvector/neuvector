@@ -1,6 +1,7 @@
 package fsmon
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -103,8 +104,8 @@ func (fn *FaNotify) checkConfigPerm() bool {
 	}
 
 	err = fn.fa.Mark(faMarkDelFlags, mask, 0, tmpDir)
-	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Debug("delete mark fail")
+	if err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+		log.WithFields(log.Fields{"err": err}).Error("delete mark fail")
 	}
 	return true
 }
@@ -162,8 +163,8 @@ func (fn *FaNotify) RemoveMonitorFile(path string) {
 		if ifd, exist := r.paths[rPath]; exist {
 			// if the file removed, the mark will be removed automaticly
 			err := fn.fa.Mark(faMarkDelFlags, ifd.mask, unix.AT_FDCWD, path)
-			if err != nil {
-				log.WithFields(log.Fields{"path": ifd.path, "err": err}).Debug("file")
+			if err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+				log.WithFields(log.Fields{"path": ifd.path, "err": err}).Error("file")
 			}
 			delete(r.paths, rPath)
 			return
@@ -171,8 +172,8 @@ func (fn *FaNotify) RemoveMonitorFile(path string) {
 
 		if ifd, exist := r.dirs[rPath]; exist {
 			err := fn.fa.Mark(faMarkDelFlags, ifd.mask, unix.AT_FDCWD, path)
-			if err != nil {
-				log.WithFields(log.Fields{"path": ifd.path, "err": err}).Debug("dir")
+			if err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+				log.WithFields(log.Fields{"path": ifd.path, "err": err}).Error("dir")
 			}
 			delete(r.dirs, rPath)
 			return
@@ -199,7 +200,7 @@ func (fn *FaNotify) removeMarks(r *rootFd) {
 	ppath := fmt.Sprintf(procRootMountPoint, r.pid)
 	for dir, mask := range r.dirMonitorMap {
 		path := ppath + dir
-		if err := fn.fa.Mark(unix.FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil {
+		if err := fn.fa.Mark(unix.FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
 			log.WithFields(log.Fields{"err": err, "dir": path}).Error()
 		}
 	}
@@ -209,7 +210,7 @@ func (fn *FaNotify) removeMarks(r *rootFd) {
 		if ifile, ok := r.paths[file]; ok {
 			path := ppath + file
 			mask := ifile.mask
-			if err := fn.fa.Mark(unix.FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil {
+			if err := fn.fa.Mark(unix.FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
 				log.WithFields(log.Fields{"err": err, "path": path}).Error()
 			}
 		}
@@ -373,8 +374,8 @@ func (fn *FaNotify) addSingleFile(r *rootFd, path string, mask uint64) bool {
 		return false
 	}
 
-	if err := fn.fa.Mark(faMarkAddFlags, mask, unix.AT_FDCWD, path); err != nil {
-		log.WithFields(log.Fields{"path": path, "error": err}).Debug("FMON:")
+	if err := fn.fa.Mark(faMarkAddFlags, mask, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+		log.WithFields(log.Fields{"path": path, "error": err}).Error("FMON:")
 		return false
 	}
 
@@ -424,8 +425,8 @@ func (fn *FaNotify) StartMonitor(rootPid int) bool {
 	ppath := fmt.Sprintf(procRootMountPoint, rootPid)
 	for dir, mask := range r.dirMonitorMap {
 		path := ppath + dir
-		if err := fn.fa.Mark(faMarkAddFlags, mask, unix.AT_FDCWD, path); err != nil {
-			log.WithFields(log.Fields{"path": path, "error": err}).Debug("FMON:")
+		if err := fn.fa.Mark(faMarkAddFlags, mask, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+			log.WithFields(log.Fields{"path": path, "error": err}).Error("FMON:")
 		} else {
 			mLog.WithFields(log.Fields{"path": path, "mask": fmt.Sprintf("0x%08x", mask)}).Debug("FMON:")
 		}
@@ -549,7 +550,7 @@ func (fn *FaNotify) MonitorFileEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
-			if err := fn.handleEvents(); err != nil && err != unix.EINTR {
+			if err := fn.handleEvents(); err != nil && !errors.Is(errors.Unwrap(err), unix.EINTR) {
 				log.WithFields(log.Fields{"err": err}).Error("FMON: handle")
 				break
 			}

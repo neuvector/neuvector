@@ -2,6 +2,7 @@ package probe
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -200,7 +201,9 @@ func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 		path := ppath + dir
 		err := fa.fanfd.Mark(unix.FAN_MARK_ADD, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path)
 		if err != nil {
-			log.WithFields(log.Fields{"path": path, "error": err}).Error("FA: ")
+			if !os.IsNotExist(errors.Unwrap(err)) {
+				log.WithFields(log.Fields{"path": path, "error": err}).Error("FA: ")
+			}
 		} else {
 			log.WithFields(log.Fields{"path": path}).Debug("FA: ")
 		}
@@ -215,8 +218,8 @@ func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, dir := range dirs {
 		path := ppath + dir
-		if dbgError := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); dbgError != nil {
-			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+			log.WithFields(log.Fields{"error": err}).Error()
 		}
 	}
 	return len(dirs)
@@ -225,26 +228,26 @@ func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 // ///
 func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 	path := fmt.Sprintf(procRootMountPoint, 1)
-	err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path)
-	if dbgError := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); dbgError != nil {
-		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-	}
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("FA: not supported")
+	if err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); err != nil {
+		log.WithFields(log.Fields{"error": err}).Info("FA: not supported")
 		return false
+	}
+
+	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+		log.WithFields(log.Fields{"error": err}).Error()
 	}
 	return true
 }
 
 func (fa *FileAccessCtrl) isSupportExecPerm() bool {
 	path := fmt.Sprintf(procRootMountPoint, 1)
-	err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path)
-	if dbgError := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); dbgError != nil {
-		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-	}
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Debug("FA: not supported")
+	if err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); err != nil {
+		log.WithFields(log.Fields{"error": err}).Info("FA: not supported")
 		return false
+	}
+
+	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+		log.WithFields(log.Fields{"error": err}).Error()
 	}
 	return true
 }
@@ -870,7 +873,7 @@ func (fa *FileAccessCtrl) monitorFilePermissionEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
-			if err := fa.handleEvents(); err != nil && err != unix.EINTR {
+			if err := fa.handleEvents(); err != nil && !errors.Is(errors.Unwrap(err), unix.EINTR) {
 				log.WithFields(log.Fields{"err": err}).Error("FA: handle")
 				break
 			}
