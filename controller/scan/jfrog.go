@@ -216,7 +216,7 @@ func getSubdomainFromRepo(repo string) (string, string) {
 	return "", ""
 }
 
-// Only be called by in jfrog, since the api is not working for it, create it as a callback function.
+// GetArtifactoryTags is designed to work with a new API endpoint provided by JFrog.
 func (r *jfrog) GetArtifactoryTags(repositoryStr string, rc *scanUtils.RegClient) ([]string, error) {
 	tags := make([]string, 0)
 	key, repository, found := strings.Cut(repositoryStr, "/")
@@ -245,11 +245,14 @@ func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 		repo = subRepo
 	}
 
-	if tags, err := rc.Tags(repo); len(tags) > 0 || err != nil {
+	// GetArtifactoryTags fetches tags fetch tags using the Artifactory API (introduced in JFrog 4.4.3)
+	if tags, err := r.GetArtifactoryTags(repo, rc); len(tags) > 0 || err != nil {
 		return tags, err
 	}
 
-	return r.GetArtifactoryTags(repo, rc)
+	// Fallback to the original `Tags` API if the Artifactory API fails or returns no tags
+	smd.scanLog.WithFields(log.Fields{"repo": repo}).Debug("Falling back to rc.Tags API")
+	return rc.Tags(repo)
 }
 
 func (r *jfrog) GetAllImages() (map[share.CLUSImage][]string, error) {
