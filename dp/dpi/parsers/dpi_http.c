@@ -322,7 +322,7 @@ static int http_parse_request(http_ctx_t *ctx, uint8_t *ptr, int len)
     ctx->data->proto = proto;
 
     // TODO: move to signature
-    if (part[1].end - part[1].start > 12 && memcmp(part[1].start, "/wp-content/", 12) == 0) {
+    if (part[1].end - part[1].start > 12 && part[1].start && memcmp(part[1].start, "/wp-content/", 12) == 0) {
         dpi_ep_set_app(ctx->p, 0, DPI_APP_WORDPRESS);
     }
 

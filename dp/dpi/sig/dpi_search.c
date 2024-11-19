@@ -385,6 +385,10 @@ dpi_sig_user_t* dpi_find_sig_user(struct cds_list_head *sig_user_list, dpi_sig_t
         return NULL;
     }
     new_sig_user_link->sig_user = new_user;
+
+    if (sig_user_list->prev == NULL || sig_user_list->next == NULL) {
+        CDS_INIT_LIST_HEAD(sig_user_list);
+    }
     cds_list_add_tail((struct cds_list_head *)new_sig_user_link, sig_user_list);
 
     return new_user;

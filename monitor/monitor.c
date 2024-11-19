@@ -101,8 +101,8 @@ enum {
 typedef struct proc_info_ {
     char name[32];
     char path[64];
-    int active  : 1,
-        running : 1;
+    int active;
+    int running;
     pid_t pid;
     struct timeval start;
     int exit_count;
@@ -228,8 +228,8 @@ static pid_t fork_exec(int i)
     pid_t pid;
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
-    char *license, *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
-    char *on_demand, *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
+    char *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
+    char *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     char *custom_check_control, *log_level;
     int a;
@@ -298,7 +298,7 @@ static pid_t fork_exec(int i)
             args[a ++] = "--adv_port";
             args[a ++] = adv_port;
         }
-        if (((license = getenv(ENV_SCANNER_LICENSE)) != NULL) || (on_demand = getenv(ENV_SCANNER_ON_DEMAND)) != NULL) {
+        if ((getenv(ENV_SCANNER_LICENSE) != NULL) || (getenv(ENV_SCANNER_ON_DEMAND) != NULL)) {
             args[a ++] = "--license";
             args[a++] = "on_demand";
 
