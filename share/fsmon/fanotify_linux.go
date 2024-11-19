@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	fanotify "github.com/s3rj1k/go-fanotify/fanotify"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
@@ -45,7 +46,7 @@ type FaNotify struct {
 	configPerm bool
 	agentPid   int
 	//	ourRootPid int
-	fa         *NotifyFD
+	fa         *fanotify.NotifyFD
 	roots      map[int]*rootFd
 	mntRoots   map[uint64]*rootFd
 	pidLookup  PidLookupCallback
@@ -55,15 +56,17 @@ type FaNotify struct {
 	bNVProtect bool
 }
 
-const faInitFlags = FAN_CLOEXEC | FAN_CLASS_CONTENT | FAN_UNLIMITED_MARKS
-const faMarkAddFlags = FAN_MARK_ADD
-const faMarkDelFlags = FAN_MARK_REMOVE
-const faMarkMask = FAN_CLOSE_WRITE | FAN_MODIFY
-const faMarkMaskDir = FAN_ONDIR | FAN_EVENT_ON_CHILD
+const faInitFlags = unix.FAN_CLOEXEC |
+	unix.FAN_CLASS_CONTENT |
+	unix.FAN_UNLIMITED_MARKS
+const faMarkAddFlags = unix.FAN_MARK_ADD
+const faMarkDelFlags = unix.FAN_MARK_REMOVE
+const faMarkMask = unix.FAN_CLOSE_WRITE | unix.FAN_MODIFY
+const faMarkMaskDir = unix.FAN_ONDIR | unix.FAN_EVENT_ON_CHILD
 
 func NewFaNotify(endFaChan chan bool, cb PidLookupCallback, nvrpt SendNVrptCallback, sys *system.SystemTools, bNvProtect bool) (*FaNotify, error) {
 	// log.Debug("FMON: ")
-	fa, err := Initialize(faInitFlags, os.O_RDONLY|syscall.O_LARGEFILE)
+	fa, err := fanotify.Initialize(faInitFlags, unix.O_RDONLY|unix.O_LARGEFILE)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +95,7 @@ func (fn *FaNotify) checkConfigPerm() bool {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	mask := uint64(FAN_OPEN_PERM | FAN_ONDIR)
+	mask := uint64(unix.FAN_OPEN_PERM | unix.FAN_ONDIR)
 	err = fn.fa.Mark(faMarkAddFlags, mask, 0, tmpDir)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("FMON: not supported")
@@ -196,7 +199,7 @@ func (fn *FaNotify) removeMarks(r *rootFd) {
 	ppath := fmt.Sprintf(procRootMountPoint, r.pid)
 	for dir, mask := range r.dirMonitorMap {
 		path := ppath + dir
-		if err := fn.fa.Mark(FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil {
+		if err := fn.fa.Mark(unix.FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil {
 			log.WithFields(log.Fields{"err": err, "dir": path}).Error()
 		}
 	}
@@ -206,7 +209,7 @@ func (fn *FaNotify) removeMarks(r *rootFd) {
 		if ifile, ok := r.paths[file]; ok {
 			path := ppath + file
 			mask := ifile.mask
-			if err := fn.fa.Mark(FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil {
+			if err := fn.fa.Mark(unix.FAN_MARK_REMOVE, mask, unix.AT_FDCWD, path); err != nil {
 				log.WithFields(log.Fields{"err": err, "path": path}).Error()
 			}
 		}
@@ -235,7 +238,7 @@ func (fn *FaNotify) ContainerCleanup(rootPid int) {
 // ///
 func (fn *FaNotify) monitorExit() {
 	if fn.fa != nil {
-		fn.fa.Close()
+		fn.fa.File.Close()
 	}
 
 	if fn.endChan != nil {
@@ -457,12 +460,12 @@ func (fn *FaNotify) addFile(path string, filter interface{}, protect, isDir, use
 	if userAdded || protect { // user-defined or protected: including access control
 		if r.permControl { // protect mode
 			if fn.configPerm { // system-wise : access control is available
-				mask |= FAN_OPEN_PERM
+				mask |= unix.FAN_OPEN_PERM
 			} else {
-				mask |= FAN_OPEN
+				mask |= unix.FAN_OPEN
 			}
 		} else {
-			mask |= FAN_OPEN
+			mask |= unix.FAN_OPEN
 		}
 	}
 
@@ -525,7 +528,7 @@ func (fn *FaNotify) addFile(path string, filter interface{}, protect, isDir, use
 func (fn *FaNotify) MonitorFileEvents() {
 	waitCnt := 0
 	pfd := make([]unix.PollFd, 1)
-	pfd[0].Fd = fn.fa.GetFd()
+	pfd[0].Fd = int32(fn.fa.Fd)
 	pfd[0].Events = unix.POLLIN
 	log.Info("FMON: start")
 	for {
@@ -546,7 +549,7 @@ func (fn *FaNotify) MonitorFileEvents() {
 		}
 
 		if (pfd[0].Revents & unix.POLLIN) != 0 {
-			if err := fn.handleEvents(); err != nil {
+			if err := fn.handleEvents(); err != nil && err != unix.EINTR {
 				log.WithFields(log.Fields{"err": err}).Error("FMON: handle")
 				break
 			}
@@ -560,53 +563,62 @@ func (fn *FaNotify) MonitorFileEvents() {
 
 // ////
 func (fn *FaNotify) handleEvents() error {
-	if events, err := fn.fa.GetEvents(); err == nil {
-		for _, ev := range events {
-			// log.WithFields(log.Fields{"pid": pid, "fmask": fmt.Sprintf("0x%08x", fmask), "fd": fd}).Debug("FMON:")
-			pid := int(ev.Pid)
-			fd := int(ev.File.Fd())
-			fmask := uint64(ev.Mask)
-			perm := (fmask & (FAN_OPEN_PERM | FAN_ACCESS_PERM)) > 0
+	for {
+		ev, err := fn.fa.GetEvent(os.Getpid())
+		if err != nil {
+			return err
+		}
+		if ev == nil {
+			return nil
+		}
+		pid := int(ev.Pid)
+		fd := int(ev.Fd)
+		fmask := uint64(ev.Mask)
+		perm := (fmask & (unix.FAN_OPEN_PERM | unix.FAN_ACCESS_PERM)) > 0
 
-			resp, mask, nvPod, ifile, pInfo := fn.calculateResponse(pid, fd, fmask, perm)
-			if perm {
-				if err := fn.fa.Response(ev, resp); err != nil {
-					log.WithFields(log.Fields{"err": err, "pid": pid}).Error()
-				}
+		// log.WithFields(log.Fields{"pid": pid, "fmask": fmt.Sprintf("0x%08x", fmask), "fd": fd}).Debug("FMON:")
+		resp, mask, nvPod, ifile, pInfo := fn.calculateResponse(pid, fd, fmask, perm)
+		if perm {
+			if resp {
+				err = fn.fa.ResponseAllow(ev)
+			} else {
+				err = fn.fa.ResponseDeny(ev)
 			}
-			ev.File.Close()
-
-			if nvPod {
-				if !resp && ifile != nil && pInfo != nil {
-					finfo := ifile.params.(*osutil.FileInfoExt)
-					_, path := fn.sys.ParseContainerFilePath(ifile.path)
-					log.WithFields(log.Fields{"path": path, "caller": pInfo.Path, "pid": pid}).Info("FMON: NV Protect")
-					go fn.sendNVrpt(pInfo.RootPid, pid, finfo.ContainerId, path, pInfo.Path)
-				}
-				continue
-			}
-
-			if ifile == nil {
-				continue // nothing to justify
-			}
-
-			change := (fmask & FAN_CLOSE_WRITE) > 0
-			// log.WithFields(log.Fields{"ifile": ifile, "pInfo": pInfo, "Resp": resp, "Change": change, "Perm": perm}).Debug("FMON:")
-
-			var bReporting bool
-			if ifile.learnt { // discover mode
-				bReporting = ifile.userAdd // learn app for customer-added entry
-			} else { // monitor or protect mode
-				allowRead := resp && !change
-				bReporting = !allowRead // allowed app by block_access
-			}
-
-			if bReporting || change { // report changed file
-				ifile.cb(ifile.path, mask, ifile.params, pInfo)
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "pid": pid, "resp": resp}).Error()
 			}
 		}
+		ev.Close()
+
+		if nvPod {
+			if !resp && ifile != nil && pInfo != nil {
+				finfo := ifile.params.(*osutil.FileInfoExt)
+				_, path := fn.sys.ParseContainerFilePath(ifile.path)
+				log.WithFields(log.Fields{"path": path, "caller": pInfo.Path, "pid": pid}).Info("FMON: NV Protect")
+				go fn.sendNVrpt(pInfo.RootPid, pid, finfo.ContainerId, path, pInfo.Path)
+			}
+			continue
+		}
+
+		if ifile == nil {
+			continue // nothing to justify
+		}
+
+		change := (fmask & unix.FAN_CLOSE_WRITE) > 0
+		// log.WithFields(log.Fields{"ifile": ifile, "pInfo": pInfo, "Resp": resp, "Change": change, "Perm": perm}).Debug("FMON:")
+
+		var bReporting bool
+		if ifile.learnt { // discover mode
+			bReporting = ifile.userAdd // learn app for customer-added entry
+		} else { // monitor or protect mode
+			allowRead := resp && !change
+			bReporting = !allowRead // allowed app by block_access
+		}
+
+		if bReporting || change { // report changed file
+			ifile.cb(ifile.path, mask, ifile.params, pInfo)
+		}
 	}
-	return nil
 }
 
 func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (bool, uint32, bool, *IFile, *ProcInfo) {
@@ -716,10 +728,10 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 		// log.WithFields(log.Fields{"resp": resp}).Debug("FMON:")
 	}
 
-	if (fmask & FAN_MODIFY) > 0 {
+	if (fmask & unix.FAN_MODIFY) > 0 {
 		mask |= syscall.IN_MODIFY
 		log.WithFields(log.Fields{"path": linkPath}).Debug("FMON: modified")
-	} else if (fmask & FAN_CLOSE_WRITE) > 0 {
+	} else if (fmask & unix.FAN_CLOSE_WRITE) > 0 {
 		mask |= syscall.IN_CLOSE_WRITE
 		log.WithFields(log.Fields{"path": linkPath}).Debug("FMON: cls_wr")
 	} else {
