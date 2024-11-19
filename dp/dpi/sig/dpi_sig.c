@@ -7,6 +7,8 @@ uint32_t DlpRuleCount = 0;
 #define MAX_USER_SIG_COUNT (DPI_SIG_MAX_USER_SIG_ID - DPI_SIG_MIN_USER_SIG_ID + 1)
 #define MAX_USER_SIG_LEN 2048
 
+static void dpi_dlp_init_macro_rulelist(dpi_sig_macro_sig_t *macro);
+
 static dpi_sigopt_status_t
 dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
                             dpi_sig_t *rule, void *dlpdetector);
@@ -144,6 +146,7 @@ void dpi_dlp_release_macro_rule (dpi_sig_macro_sig_t *macro)
     if (macro->conf.description) {
        free(macro->conf.description);
     }
+    dpi_dlp_init_macro_rulelist(macro);
     cds_list_for_each_entry_safe(sig_itr, sig_next, &macro->sigs, node) {
         cds_list_del((struct cds_list_head *)sig_itr);
 

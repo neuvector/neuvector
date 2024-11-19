@@ -312,7 +312,7 @@ int dpi_cache_packet(dpi_packet_t *p, dpi_wing_t *w, bool lookup)
 {
     clip_t *clip;
 
-    if (lookup && (clip = asm_lookup(&w->asm_cache, p->raw.seq)) != NULL) {
+    if (lookup && (asm_lookup(&w->asm_cache, p->raw.seq) != NULL)) {
         return -1;
     }
 

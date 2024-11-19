@@ -1,41 +1,44 @@
 [
-    {
-        "arguments": [
-            "cc",
-            "-c",
-            "-Wall",
-            "-Werror",
-            "-o",
-            "nstools",
-            "nsrun.c"
-        ],
-        "directory": "/home/gfeng/go/src/github.com/neuvector/neuvector/tools/nstools",
-        "file": "nsrun.c"
-    },
-    {
-        "arguments": [
-            "cc",
-            "-c",
-            "-Wall",
-            "-Werror",
-            "-o",
-            "nstools",
-            "nstools.c"
-        ],
-        "directory": "/home/gfeng/go/src/github.com/neuvector/neuvector/tools/nstools",
-        "file": "nstools.c"
-    },
-    {
-        "arguments": [
-            "cc",
-            "-c",
-            "-Wall",
-            "-Werror",
-            "-o",
-            "nstools",
-            "nsget.c"
-        ],
-        "directory": "/home/gfeng/go/src/github.com/neuvector/neuvector/tools/nstools",
-        "file": "nsget.c"
-    }
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Werror",
+      "-o",
+      "nstools",
+      "nstools.c"
+    ],
+    "directory": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools",
+    "file": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools/nstools.c",
+    "output": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools/nstools"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Werror",
+      "-o",
+      "nstools",
+      "nsrun.c"
+    ],
+    "directory": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools",
+    "file": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools/nsrun.c",
+    "output": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools/nstools"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Werror",
+      "-o",
+      "nstools",
+      "nsget.c"
+    ],
+    "directory": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools",
+    "file": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools/nsget.c",
+    "output": "/home/neuvector/go/src/github.com/neuvector/neuvector/tools/nstools/nstools"
+  }
 ]
