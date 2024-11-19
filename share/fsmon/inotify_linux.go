@@ -91,14 +91,14 @@ func (n *Inotify) RemoveMonitorFile(path string) {
 	n.mux.Lock()
 	defer n.mux.Unlock()
 	if ifl, ok := n.paths[path]; ok {
-		if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil {
+		if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil && !errors.Is(err, syscall.EINVAL) {
 			log.WithFields(log.Fields{"err": err, "path": path}).Error()
 		}
 		delete(n.wds, ifl.wd)
 		delete(n.paths, path)
 	}
 	if ifl, ok := n.dirs[path]; ok {
-		if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil {
+		if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil && !errors.Is(err, syscall.EINVAL) {
 			log.WithFields(log.Fields{"err": err, "dir": path}).Error()
 		}
 		delete(n.wds, ifl.wd)
@@ -145,7 +145,7 @@ func (n *Inotify) ContainerCleanup(rootPid int) {
 	defer n.mux.Unlock()
 	for path, ifl := range n.paths {
 		if strings.Contains(path, fmt.Sprintf("/proc/%d/root/", rootPid)) {
-			if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil {
+			if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil && !errors.Is(err, syscall.EINVAL) {
 				log.WithFields(log.Fields{"err": err, "path": path}).Error()
 			}
 			delete(n.wds, ifl.wd)
@@ -155,7 +155,7 @@ func (n *Inotify) ContainerCleanup(rootPid int) {
 	}
 	for path, ifl := range n.dirs {
 		if strings.Contains(path, fmt.Sprintf("/proc/%d/root/", rootPid)) {
-			if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil {
+			if _, err := syscall.InotifyRmWatch(n.fd, uint32(ifl.wd)); err != nil && !errors.Is(err, syscall.EINVAL) {
 				log.WithFields(log.Fields{"err": err, "dir": path}).Error()
 			}
 			delete(n.wds, ifl.wd)
@@ -295,7 +295,7 @@ func (n *Inotify) MonitorFileEvents() {
 					} else { // a watched file
 						if (event.Mask & imonitorRemoveMask) > 0 {
 							log.WithFields(log.Fields{"path": ifile.path}).Debug("file: remove")
-							if _, err := syscall.InotifyRmWatch(n.fd, uint32(event.Wd)); err != nil {
+							if _, err := syscall.InotifyRmWatch(n.fd, uint32(event.Wd)); err != nil && !errors.Is(err, syscall.EINVAL) {
 								log.WithFields(log.Fields{"err": err, "path": ifile.path}).Error()
 							}
 							cbFile = ifile
@@ -328,7 +328,7 @@ func (n *Inotify) Close() {
 	n.mux.Lock()
 	defer n.mux.Unlock()
 	for wd := range n.wds {
-		if _, err := syscall.InotifyRmWatch(n.fd, uint32(wd)); err != nil {
+		if _, err := syscall.InotifyRmWatch(n.fd, uint32(wd)); err != nil && !errors.Is(err, syscall.EINVAL) {
 			log.WithFields(log.Fields{"err": err, "wd": uint32(wd)}).Error()
 		}
 	}

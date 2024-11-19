@@ -1382,7 +1382,7 @@ func programPorts(c *containerData, restore bool) ([]*pipe.InterceptPair, error)
 			}
 		}
 		newPairs, err := pipe.InspectContainerPorts(c.pid, c.intcpPairs)
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			log.WithFields(log.Fields{"container": c.id, "error": err}).Error("Failed to inspect port")
 		}
 		return newPairs, err
@@ -2126,9 +2126,9 @@ func taskStopContainer(id string, pid int) {
 	}
 
 	log.WithFields(log.Fields{"container": c.id, "c.pid": c.pid, "pid": pid}).Info("")
-	info, err := global.RT.GetContainer(id)
-	if err != nil {
-		log.WithFields(log.Fields{"id": id, "error": err}).Error("Failed to read container. Use cached info.")
+	info, dbgErr := global.RT.GetContainer(id)
+	if dbgErr != nil {
+		log.WithFields(log.Fields{"id": id, "dbgErr": dbgErr}).Debug("Failed to read container. Use cached info.")
 		info = c.info
 		info.Running = false
 	} else if info.Running {
