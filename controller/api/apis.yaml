@@ -11702,11 +11702,6 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/RESTRolePermission'
-      remote_permissions:
-        description: permissions on managed clusters in fed. only for Rancher SSO
-        type: object
-        items:
-          $ref: '#/definitions/RESTRemoteRolePermits'
       timeout:
         type: integer
         format: uint32
