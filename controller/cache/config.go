@@ -101,7 +101,7 @@ func setControllerDebug(debug []string, debugCPath bool) {
 	if hasConn {
 		cctx.ConnLog.Level = log.DebugLevel
 	} else {
-		cctx.ConnLog.Level = cctx.DefaultLogLevel
+		cctx.ConnLog.Level = log.InfoLevel
 	}
 	if hasScan || debugCPath || hasCPath {
 		cctx.ScanLog.Level = log.DebugLevel
@@ -111,7 +111,7 @@ func setControllerDebug(debug []string, debugCPath bool) {
 	if hasMutex {
 		cctx.MutexLog.Level = log.DebugLevel
 	} else {
-		cctx.MutexLog.Level = cctx.DefaultLogLevel
+		cctx.MutexLog.Level = log.InfoLevel
 	}
 	if hasCluster || debugCPath {
 		cluster.SetLogLevel(log.DebugLevel)
