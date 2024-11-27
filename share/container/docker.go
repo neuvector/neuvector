@@ -55,7 +55,6 @@ func _connect(endpoint string) (*dockerClient.Client, *dockerTypes.Version, *doc
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Connecting to docker")
 	client, err := dockerClient.NewClientWithOpts(
 		dockerClient.WithHost(endpoint),
-		dockerClient.WithTimeout(clientConnectTimeout),
 		dockerClient.WithAPIVersionNegotiation())
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create client")
@@ -76,6 +75,9 @@ func _connect(endpoint string) (*dockerClient.Client, *dockerTypes.Version, *doc
 }
 
 func getContainerSocketPath(client *dockerClient.Client, id, endpoint string) (string, error) {
+	if !IsPidHost() {
+		return "", nil
+	}
 	if strings.HasPrefix(endpoint, "/proc/1/root") {
 		return strings.TrimPrefix(endpoint, "/proc/1/root"), nil
 	}
