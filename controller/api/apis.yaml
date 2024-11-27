@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.4'
+  version: '5.4.2'
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -3679,11 +3679,11 @@ paths:
       responses:
         '200':
           description: Success
-  /v1/system/license:
+  /v1/system/score/metrics:
     get:
       tags:
         - System
-      summary: Show license
+      summary: Get system score metrics data
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -3693,37 +3693,7 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTLicenseShowData'
-    delete:
-      tags:
-        - System
-      summary: Delete license
-      security:
-        - ApiKeyAuth: []
-        - TokenAuth: []
-      responses:
-        '200':
-          description: Success
-  /v1/system/license/update:
-    post:
-      tags:
-        - System
-      summary: License update
-      security:
-        - ApiKeyAuth: []
-        - TokenAuth: []
-      consumes:
-        - application/json
-      parameters:
-        - in: body
-          name: body
-          description: License key
-          required: true
-          schema:
-            $ref: '#/definitions/RESTLicenseKey'
-      responses:
-        '200':
-          description: Success
+            $ref: '#/definitions/RESTScoreMetricsData'
   /v1/user:
     get:
       tags:
@@ -7550,77 +7520,6 @@ definitions:
         type: string
         format: password
         example: password
-  RESTLicenseInfo:
-    type: object
-    required:
-      - name
-      - email
-      - phone
-      - installation_id
-    properties:
-      name:
-        type: string
-        example: name
-      email:
-        type: string
-        format: email
-        example: user@mail.com
-      phone:
-        type: string
-        example: ""
-      id:
-        type: string
-        example: ""
-      id_type:
-        type: string
-        example: ""
-      installation_id:
-        type: string
-        example: ae2049871b8dd5b002fb7980f3a8c59f
-  RESTLicenseKey:
-    type: object
-    properties:
-      license_key:
-        type: string
-        example: ""
-  RESTLicenseRequest:
-    type: object
-    required:
-      - name
-      - email
-      - phone
-    properties:
-      name:
-        type: string
-        example: name
-      email:
-        type: string
-        format: email
-        example: user@mail.com
-      phone:
-        type: string
-        example: ""
-  RESTLicenseRequestData:
-    type: object
-    required:
-      - license_request
-    properties:
-      license_request:
-        $ref: '#/definitions/RESTLicenseRequest'
-  RESTLicenseShow:
-    type: object
-    required:
-      - info
-    properties:
-      info:
-        $ref: '#/definitions/RESTLicenseInfo'
-  RESTLicenseShowData:
-    type: object
-    required:
-      - license
-    properties:
-      license:
-        $ref: '#/definitions/RESTLicenseShow'
   RESTMappableRoles:
     type: object
     required:
@@ -14189,3 +14088,185 @@ definitions:
         items:
           type: string
           example: "<container id>"
+  RESTRiskScoreMetricsWL:
+    type: object
+    properties:
+      running_pods:
+        type: integer
+      privileged_wls:
+        type: integer
+      root_wls:
+        type: integer
+      discover_ext_eps:
+        type: integer
+      monitor_ext_eps:
+        type: integer
+      protect_ext_eps:
+        type: integer
+      threat_ext_eps:
+        type: integer
+      violate_ext_eps:
+        type: integer
+  RESTRiskScoreMetricsGroup:
+    type: object
+    properties:
+      groups:
+        type: integer
+      discover_groups:
+        type: integer
+      monitor_groups:
+        type: integer
+      protect_groups:
+        type: integer
+      profile_discover_groups:
+        type: integer
+      profile_monitor_groups:
+        type: integer
+      profile_protect_groups:
+        type: integer
+      discover_groups_zero_drift:
+        type: integer
+      monitor_groups_zero_drift:
+        type: integer
+      protect_groups_zero_drift:
+        type: integer
+  RESTRiskScoreMetricsCVE:
+    type: object
+    properties:
+      discover_cves:
+        type: integer
+      monitor_cves:
+        type: integer
+      protect_cves:
+        type: integer
+      platform_cves:
+        type: integer
+      host_cves:
+        type: integer
+  RESTRiskScoreMetrics:
+    type: object
+    properties:
+      platform:
+        type: string
+      kube_version:
+        type: string
+      openshift_version:
+        type: string
+      new_service_policy_mode:
+        type: string
+      new_service_profile_mode:
+        type: string
+      deny_adm_ctrl_rules:
+        type: integer
+      hosts:
+        type: integer
+      workloads:
+        $ref: '#/definitions/RESTRiskScoreMetricsWL'
+      groups:
+        $ref: '#/definitions/RESTRiskScoreMetricsGroup'
+      cves:
+        $ref: '#/definitions/RESTRiskScoreMetricsCVE'
+  RESTExposedEndpoint:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      display_name:
+        type: string
+      pod_name:
+        type: string
+      service:
+        type: string
+      severity:
+        type: string
+      critical:
+        type: integer
+      high:
+        type: integer
+      medium:
+        type: integer
+      policy_mode:
+        type: string
+      policy_action:
+        type: string
+      protocols:
+        type: array
+        items:
+          type: string
+      applications:
+        type: array
+        items:
+          type: string
+      ports:
+        type: array
+        items:
+          type: string
+      entries:
+        type: array
+        items:
+          $ref: '#/definitions/RESTConversationReportEntry'
+  RESTConversationReportEntry:
+    type: object
+    properties:
+      bytes:
+        type: integer
+        format: uint64
+      sessions:
+        type: integer
+        format: uint32
+      port:
+        type: string
+      application:
+        type: string
+      policy_action:
+        type: string
+      client_ip:
+        type: string
+      server_ip:
+        type: string
+      fqdn:
+        type: string
+  RESTSecurityScores:
+    type: object
+    properties:
+      new_service_mode_score:
+        type: integer
+      service_mode_score:
+        type: integer
+      service_mode_score_by_100:
+        type: integer
+      exposure_score:
+        type: integer
+      exposure_score_by_100:
+        type: integer
+      privileged_container_score:
+        type: integer
+      run_as_root_score:
+        type: integer
+      admission_rule_score:
+        type: integer
+      vulnerability_score:
+        type: integer
+      vulnerability_score_by_100:
+        type: integer
+      security_risk_score:
+        type: integer
+  RESTScoreMetricsData:
+    type: object
+    properties:
+      metrics:
+        type: array
+        items:
+          $ref: '#/definitions/RESTComplianceProfileConfig'
+      ingress:
+        type: array
+        items:
+          $ref: '#/definitions/RESTExposedEndpoint'
+      egress:
+        type: array
+        items:
+          $ref: '#/definitions/RESTExposedEndpoint'
+      security_scores:
+        $ref: '#/definitions/RESTSecurityScores'

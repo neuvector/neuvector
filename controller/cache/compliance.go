@@ -203,7 +203,7 @@ type podVuls struct {
 	MedVuls      int
 }
 
-func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTInternalSystemData {
+func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTScoreMetricsData {
 	var s api.RESTRiskScoreMetrics
 
 	s.Platform, s.K8sVersion, s.OCVersion = m.GetPlatform()
@@ -513,7 +513,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 	}
 	cacheMutexRUnlock()
 
-	return &api.RESTInternalSystemData{Metrics: &s, Ingress: ins, Egress: outs}
+	return &api.RESTScoreMetricsData{Metrics: &s, Ingress: ins, Egress: outs}
 }
 
 // ---

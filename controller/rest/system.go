@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"mime/multipart"
 	"net"
@@ -217,6 +218,171 @@ func handlerSystemSummary(w http.ResponseWriter, r *http.Request, ps httprouter.
 	resp := api.RESTSystemSummaryData{Summary: summary}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get system summary")
+}
+
+func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	// any user can call this API to get system summary, but only users with global 'config' permission can see non-zero host/controller/agent/scanner counters
+	accSysConfig := acc.BoostPermissions(share.PERM_SYSTEM_CONFIG)
+	isGlobalUser := true
+	if r := login.domainRoles[access.AccessDomainGlobal]; r == "" {
+		if permits := login.extraDomainPermits[access.AccessDomainGlobal]; permits.IsEmpty() {
+			isGlobalUser = false
+		}
+	}
+
+	resp := cacher.GetRiskScoreMetrics(accSysConfig, acc)
+	metrics := resp.Metrics
+
+	const MAX_SERVICE_MODE_SCORE = 26
+	const MAX_NEW_SERVICE_MODE_SCORE = 2
+	const MAX_PRIVILEGED_CONTAINER_SCORE = 4
+	const MAX_RUN_AS_ROOT_CONTAINER_SCORE = 4
+	const MAX_ADMISSION_RULE_SCORE = 4
+	const MAX_PLATFORM_VUL_SCORE = 2
+	const MAX_HOST_VUL_SCORE = 6
+	const MAX_POD_VUL_SCORE = 8
+	const MAX_MODE_EXPOSURE = 10.0
+	const MAX_VIOLATE_EXPOSURE = 12.0
+	const MAX_THREAT_EXPOSURE = 20.0
+	const THRESHOLD_EXPOSURE_100 = 5.0
+	const THRESHOLD_EXPOSURE_1000 = 25.0
+	const THRESHOLD_EXPOSURE_10000 = 62.5
+	const RATIO_DISCOVER_VUL = 1.0 / 15
+	const RATIO_MONITOR_VUL = 1.0 / 60
+	const RATIO_PROTECT_VUL = 1.0 / 120
+	const RATIO_HOST_VUL = 1.0 / 20
+	const RATIO_PROTECT_MONITOR_EXPOSURE = 1
+	const RATIO_DISCOVER_EXPOSURE = 3
+	const RATIO_VIOLATED_EXPOSURE = 4
+	const RATIO_THREATENED_EXPOSURE = 8
+
+	// Formula for security risk score:
+	//	Good: 0 <= Score < 21
+	//	Fair: 21 <= Score < 51
+	//	Poor: 51 <= Score
+
+	// Service connection risk (New service mode score). Max newServiceModeScore: 4
+	newServiceModeScore := 0
+	if metrics.NewServiceMode == share.PolicyModeLearn {
+		newServiceModeScore += MAX_NEW_SERVICE_MODE_SCORE
+	}
+	if metrics.NewProfileMode == share.PolicyModeLearn {
+		newServiceModeScore += MAX_NEW_SERVICE_MODE_SCORE
+	}
+
+	// Service connection risk (Service mode score). Max serviceModeScore: 26
+	var serviceModeScoreBy100 int
+	if metrics.Groups.Groups != 0 {
+		serviceModeScoreBy100 = int(math.Ceil(
+			(float64(metrics.Groups.DiscoverGroups+metrics.Groups.ProfileDiscoverGroups)*0.5 - float64(metrics.Groups.DiscoverGroupsZD)*0.3) /
+				float64(metrics.Groups.Groups) * 100))
+	}
+	serviceModeScore := int(math.Ceil(float64(serviceModeScoreBy100) / 100.0 * MAX_SERVICE_MODE_SCORE))
+
+	// Ingress/Egress exposure risk. Max: 42
+	var exposureScore int
+	totalRunningPods := float64(metrics.WLs.RunningPods)
+	if totalRunningPods > 0 {
+		var exposureDensity float64
+		if totalRunningPods > 10000 {
+			exposureDensity = 1.0 / THRESHOLD_EXPOSURE_10000
+		} else if totalRunningPods > 1000 {
+			exposureDensity = 1.0 / (THRESHOLD_EXPOSURE_1000 + ((THRESHOLD_EXPOSURE_10000 - THRESHOLD_EXPOSURE_1000) * totalRunningPods / 10000.0))
+		} else if totalRunningPods > 100 {
+			exposureDensity = 1.0 / (THRESHOLD_EXPOSURE_100 + ((THRESHOLD_EXPOSURE_1000 - THRESHOLD_EXPOSURE_100) * totalRunningPods / 1000.0))
+		} else {
+			exposureDensity = 1.0 / (1.0 + (THRESHOLD_EXPOSURE_100 * totalRunningPods / 100.0))
+		}
+		modeScore := float64(metrics.WLs.ProtectExtEPs+metrics.WLs.MonitorExtEPs)*exposureDensity*RATIO_PROTECT_MONITOR_EXPOSURE +
+			float64(metrics.WLs.DiscoverExtEPs)*exposureDensity*RATIO_DISCOVER_EXPOSURE
+		violationScore := float64(metrics.WLs.VioExtEPs) * exposureDensity * RATIO_VIOLATED_EXPOSURE
+		threatScore := float64(metrics.WLs.ThrtExtEPs) * exposureDensity * RATIO_THREATENED_EXPOSURE
+		if modeScore > MAX_MODE_EXPOSURE {
+			modeScore = MAX_MODE_EXPOSURE
+		}
+		if violationScore > MAX_VIOLATE_EXPOSURE {
+			violationScore = MAX_VIOLATE_EXPOSURE
+		}
+		if threatScore > MAX_THREAT_EXPOSURE {
+			threatScore = MAX_THREAT_EXPOSURE
+		}
+		exposureScore = int(math.Ceil(modeScore + violationScore + threatScore))
+	}
+	exposureScoreBy100 := int(math.Ceil(float64(exposureScore) * 100 / (MAX_MODE_EXPOSURE + MAX_VIOLATE_EXPOSURE + MAX_THREAT_EXPOSURE)))
+
+	// Max: 4, 4, 4
+	var privilegedContainerScore int
+	var runAsRootScore int
+	var admissionRuleScore int
+	if metrics.WLs.PrivilegedWLs > 0 {
+		privilegedContainerScore = MAX_PRIVILEGED_CONTAINER_SCORE
+	}
+	if metrics.WLs.RootWLs > 0 {
+		runAsRootScore = MAX_RUN_AS_ROOT_CONTAINER_SCORE
+	}
+	if metrics.DenyAdmCtrlRules > 0 {
+		admissionRuleScore = MAX_ADMISSION_RULE_SCORE
+	}
+
+	// Vulnerability exploit risk (Only PodScore). Max: 16
+	var podScore float64
+	if totalRunningPods > 0 {
+		podScore = float64(metrics.CVEs.DiscoverCVEs)/totalRunningPods*RATIO_DISCOVER_VUL +
+			float64(metrics.CVEs.MonitorCVEs)/totalRunningPods*RATIO_MONITOR_VUL +
+			float64(metrics.CVEs.ProtectCVEs)/totalRunningPods*RATIO_PROTECT_VUL
+		if podScore > MAX_POD_VUL_SCORE {
+			podScore = MAX_POD_VUL_SCORE
+		}
+	}
+	var hostScore float64
+	if metrics.Hosts > 0 {
+		hostScore = (float64(metrics.CVEs.HostCVEs) / float64(metrics.Hosts)) * RATIO_HOST_VUL
+		if hostScore > MAX_HOST_VUL_SCORE {
+			hostScore = MAX_HOST_VUL_SCORE
+		}
+	}
+	var platformScore float64
+	if metrics.CVEs.PlatformCVEs > 0 {
+		platformScore = MAX_PLATFORM_VUL_SCORE
+	}
+
+	vulnerabilityScore := int(math.Ceil(podScore + hostScore + platformScore))
+	vulnerabilityScoreBy100 := int(math.Ceil(float64(vulnerabilityScore) * 100 / (MAX_POD_VUL_SCORE + MAX_HOST_VUL_SCORE + MAX_PLATFORM_VUL_SCORE)))
+
+	var securityRiskScore int
+	if isGlobalUser {
+		securityRiskScore = newServiceModeScore + serviceModeScore + exposureScore + privilegedContainerScore +
+			runAsRootScore + admissionRuleScore + vulnerabilityScore
+	} else {
+		_score := float64(serviceModeScore+exposureScore+privilegedContainerScore+runAsRootScore+vulnerabilityScore) /
+			(MAX_MODE_EXPOSURE + MAX_VIOLATE_EXPOSURE + MAX_THREAT_EXPOSURE + MAX_PRIVILEGED_CONTAINER_SCORE +
+				MAX_RUN_AS_ROOT_CONTAINER_SCORE + MAX_POD_VUL_SCORE + MAX_HOST_VUL_SCORE + MAX_PLATFORM_VUL_SCORE)
+		securityRiskScore = int(_score * 100)
+	}
+
+	resp.SecurityScores = &api.RESTSecurityScores{
+		NewServiceModeScore:      newServiceModeScore,
+		ServiceModeScore:         serviceModeScore,
+		ServiceModeScoreBy100:    serviceModeScoreBy100,
+		ExposureScore:            exposureScore,
+		ExposureScoreBy100:       exposureScoreBy100,
+		PrivilegedContainerScore: privilegedContainerScore,
+		RunAsRootScore:           runAsRootScore,
+		AdmissionRuleScore:       admissionRuleScore,
+		VulnerabilityScore:       vulnerabilityScore,
+		VulnerabilityScoreBy100:  vulnerabilityScoreBy100,
+		SecurityRiskScore:        securityRiskScore,
+	}
+
+	restRespSuccess(w, r, resp, acc, login, nil, "Get system internal data")
 }
 
 func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
