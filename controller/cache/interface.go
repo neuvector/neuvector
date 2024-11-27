@@ -13,7 +13,7 @@ import (
 )
 
 type CacheInterface interface {
-	GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTInternalSystemData
+	GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTScoreMetricsData
 
 	GetAllHosts(acc *access.AccessControl) []*api.RESTHost
 	GetAllHostsRisk(acc *access.AccessControl) []*common.WorkloadRisk
