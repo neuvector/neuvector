@@ -1924,7 +1924,8 @@ func scanReport2BenchLog(id string, objType share.ScanObjectType, report *share.
 	return &clog
 }
 
-func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.CLUSScanReport, criticals, highs, meds []string, layerCriticals, layerHighs, layerMeds map[string][]string, regName string) *api.Audit {
+func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.CLUSScanReport, reportedVuls []*share.ScanVulnerability,
+	criticals, highs, meds []string, layerCriticals, layerHighs, layerMeds map[string][]string, regName string) *api.Audit {
 	clog := api.Audit{
 		LogCommon: api.LogCommon{
 			ReportedAt:        api.RESTTimeString(report.ScannedAt),
@@ -1988,11 +1989,11 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 	if systemConfigCache.SingleCVEPerSyslog {
 		// if only reporting one cve per event, we will add the vulnerabile info.
 		// the vul. list will not be included in the log
-		for _, v := range report.Vuls {
+		for _, v := range reportedVuls {
 			scanUtils.FillVul(v)
 		}
 		clog.Vuls = make(map[string]*share.ScanVulnerability)
-		for _, v := range report.Vuls {
+		for _, v := range reportedVuls {
 			clog.Vuls[v.Name] = v
 		}
 	}

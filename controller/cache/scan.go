@@ -519,6 +519,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	}
 	scanMutexUnlock()
 
+	reportedVuls := report.Vuls
 	if ok && dbAssetVul != nil {
 		dbAssetVul.Vuls = report.Vuls
 		dbAssetVul.Modules = report.Modules
@@ -540,7 +541,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 
 	// all controller should call auditUpdate to record the log, the leader will take action
 	if alives != nil {
-		clog := scanReport2ScanLog(id, objType, report, criticals, highs, meds, nil, nil, nil, "")
+		clog := scanReport2ScanLog(id, objType, report, reportedVuls, criticals, highs, meds, nil, nil, nil, "")
 		syncLock(syncCatgAuditIdx)
 		auditUpdate(id, share.EventCVEReport, objType, clog, alives, fixedCriticalsInfo, fixedHighsInfo)
 		syncUnlock(syncCatgAuditIdx)
@@ -983,7 +984,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 				// for any scan report on master/standalone cluster & non-fed scan report on managed cluster
 				if fedRole != api.FedRoleJoint || !strings.HasPrefix(name, api.FederalGroupPrefix) {
 					if alives != nil {
-						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, criticals, highs, meds, layerCriticals, layerHighs, layerMeds, name)
+						clog := scanReport2ScanLog(id, share.ScanObjectType_IMAGE, report, report.Vuls, criticals, highs, meds, layerCriticals, layerHighs, layerMeds, name)
 						syncLock(syncCatgAuditIdx)
 						auditUpdate(id, share.EventCVEReport, share.ScanObjectType_IMAGE, clog, alives, fixedCriticalsInfo, fixedHighsInfo)
 						syncUnlock(syncCatgAuditIdx)
