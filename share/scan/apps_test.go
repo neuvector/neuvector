@@ -278,18 +278,62 @@ Bundle-ActivationPolicy: lazy
 	}
 }
 
-func TestGetDotNetModuleName(t *testing.T) {
+func TestParseDotNetModuleNameVersion(t *testing.T) {
 	tests := []struct {
-		incomingName string
-		expectedName string
+		incomingName    string
+		expectedName    string
+		expectedVersion string
 	}{
-		{"Microsoft.AspNetCore.App.Runtime.linux-musl-x64/6.0.15", "Microsoft.AspNetCore.App.Runtime.linux-musl-x64"},
-		{"Microsoft.NETCore.App.Runtime.linux-musl-x64/6.0.15", "Microsoft.NETCore.App.Runtime.linux-musl-x64"},
-		{"Microsoft.NETCored5", ""},
+		{"Microsoft.AspNetCore.App.Runtime.linux-musl-x64/6.0.15", "Microsoft.AspNetCore.App.Runtime.linux-musl-x64", "6.0.15"},
+		{"Microsoft.NETCore.App.Runtime.linux-musl-x64/6.0.15", "Microsoft.NETCore.App.Runtime.linux-musl-x64", "6.0.15"},
+		{"Microsoft.NETCored5", "", ""},
 	}
 
 	for _, test := range tests {
-		outgoingName := getDotNetModuleName(test.incomingName)
+		outgoingName, outgoingVersion := splitDotNetModuleNameVersion(test.incomingName)
 		assert.Equal(t, test.expectedName, outgoingName, "Wrong module name")
+		assert.Equal(t, test.expectedVersion, outgoingVersion, "Wrong module version")
+	}
+}
+
+func TestParseDotNetPackage(t *testing.T) {
+	filename := "test.deps.json"
+	fullpath := "/home/test.deps.json"
+	data := dotnetPackage{
+		Runtime: dotnetRuntime{
+			Name:      ".NETCoreApp,Version=v2.2",
+			Signature: "c10e7f708ec2454055c233c695ddc3ac682c23df",
+		},
+		Targets: map[string]map[string]dotnetDependency{
+			".NETCoreApp,Version=v2.2": {
+				"Business.ProfileService/1.0.0": dotnetDependency{
+					Deps: map[string]string{
+						"CorrelationId": "2.1.0",
+						"EasyNetQ":      "3.4.0",
+					},
+				},
+				"Elasticsearch.Net/6.0.0": dotnetDependency{
+					Deps: map[string]string{
+						"CorrelationId": "2.1.0",
+						"EasyNetQ":      "3.4.0",
+					},
+				},
+			},
+		},
+	}
+	expectedResults := map[string]string{
+		".NET:Business.ProfileService": "1.0.0",
+		".NET:CorrelationId":           "2.1.0",
+		".NET:EasyNetQ":                "3.4.0",
+		".NET:Elasticsearch.Net":       "6.0.0",
+	}
+	pkgs := parseDotNetJsonData(filename, fullpath, data)
+	assert.Equal(t, len(expectedResults), len(pkgs), "unexpected number of pkgs")
+
+	for _, pkg := range pkgs {
+		assert.Contains(t, expectedResults, pkg.ModuleName, "unexpected pkg name")
+		if version, ok := expectedResults[pkg.ModuleName]; ok {
+			assert.Equal(t, version, pkg.Version, "ModuleVersion does not match expected version")
+		}
 	}
 }
