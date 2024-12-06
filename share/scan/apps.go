@@ -690,15 +690,26 @@ func (s *ScanApps) parseDotNetPackage(filename string, fullpath string) {
 
 	var dotnet dotnetPackage
 
-	if data, err := os.ReadFile(fullpath); err != nil {
+	data, err := os.ReadFile(fullpath)
+
+	if err != nil {
 		log.WithFields(log.Fields{"err": err, "fullpath": fullpath, "filename": filename}).Error("Failed to read file")
 		return
-	} else if err = json.Unmarshal(data, &dotnet); err != nil {
+	}
+
+	if err := json.Unmarshal(data, &dotnet); err != nil {
 		log.WithFields(log.Fields{"err": err, "fullpath": fullpath, "filename": filename}).Error("Failed to unmarshal file")
 		return
 	}
 
-	var coreVersion string
+	pkgs := parseDotNetJsonData(filename, fullpath, dotnet)
+
+	if len(pkgs) > 0 {
+		s.pkgs[filename] = pkgs
+	}
+}
+
+func parseDotNetJsonData(filename string, fullpath string, dotnet dotnetPackage) []AppPackage {
 	dedup := utils.NewSet()
 	pkgs := make([]AppPackage, 0)
 	/*
@@ -719,34 +730,10 @@ func (s *ScanApps) parseDotNetPackage(filename string, fullpath string) {
 		}
 	*/
 
-	// parse filename
-	tokens := strings.Split(filename, "/")
-	for i, token := range tokens {
-		if token == "Microsoft.NETCore.App" || token == "Microsoft.AspNetCore.App" {
-			if i < len(tokens)-1 {
-				coreVersion = tokens[i+1]
-			}
-			break
-		}
-	}
-
 	if targets, ok := dotnet.Targets[dotnet.Runtime.Name]; ok {
 		for target, dep := range targets {
-			// "Microsoft.NETCore.App/3.1.15-servicing.21214.3"
-			// it is possible that there are multiple core versions in different dependencies
-			//    Microsoft.NETCore.App/2.2.8   ==> 2.2.8
-			//    Microsoft.AspNetCore.ApplicationInsights.HostingStartup/2.2.0 ==> 2.2.0 (x)
-			if strings.HasPrefix(target, "Microsoft.NETCore.App/") || strings.HasPrefix(target, "Microsoft.AspNetCore.App/") ||
-				strings.HasPrefix(target, "Microsoft.NETCore.App.Runtime") || strings.HasPrefix(target, "Microsoft.AspNetCore.App.Runtime") {
-				if o := strings.Index(target, "/"); o != -1 {
-					version := target[o+1:]
-					if o = strings.Index(version, "-"); o != -1 {
-						version = version[:o]
-					}
-					coreVersion = version
-				}
-			}
 
+			//Get dependencies of individual targets
 			for app, v := range dep.Deps {
 				key := fmt.Sprintf("%s-%s", ".NET:"+app, v)
 				if !dedup.Contains(key) {
@@ -761,19 +748,20 @@ func (s *ScanApps) parseDotNetPackage(filename string, fullpath string) {
 				}
 			}
 
-			if coreVersion != "" {
-				name := getDotNetModuleName(target)
-				if name == "" {
-					log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename}).Error("Failed to determine .Net ModuleName")
-					continue
-				}
-				key := fmt.Sprintf(".NET:%s-%s", name, coreVersion)
+			name, version := splitDotNetModuleNameVersion(target)
+			if name == "" || version == "" {
+				log.WithFields(log.Fields{"fullpath": fullpath, "filename": filename, "target": target}).Error("Failed to determine .Net ModuleName")
+				continue
+			}
+			//Add module for the target itself.
+			if version != "" {
+				key := fmt.Sprintf(".NET:%s-%s", name, version)
 				if !dedup.Contains(key) {
 					dedup.Add(key)
 					pkg := AppPackage{
 						AppName:    ".NET",
 						ModuleName: ".NET:" + name,
-						Version:    coreVersion,
+						Version:    version,
 						FileName:   filename,
 					}
 					pkgs = append(pkgs, pkg)
@@ -781,20 +769,15 @@ func (s *ScanApps) parseDotNetPackage(filename string, fullpath string) {
 			}
 		}
 	}
-
-	if len(pkgs) > 0 {
-		s.pkgs[filename] = pkgs
-	}
+	return pkgs
 }
 
-func getDotNetModuleName(input string) string {
+func splitDotNetModuleNameVersion(input string) (name string, version string) {
 	splits := strings.Split(input, "/")
-	for _, split := range splits {
-		if strings.HasPrefix(split, "Microsoft.NETCore.") || strings.HasPrefix(split, "Microsoft.AspNetCore.") && !strings.HasSuffix(split, ".json") {
-			return split
-		}
+	if len(splits) == 2 {
+		return splits[0], splits[1]
 	}
-	return ""
+	return "", ""
 }
 
 func (s *ScanApps) parseRLangPackage(filename, fullpath string) {
