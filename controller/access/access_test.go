@@ -1345,6 +1345,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/license",
 			"v1/system/summary",
 			"v1/internal/system",
+			"v1/system/score/metrics",
 		},
 		CONST_API_FED: {
 			"v1/fed/member",
