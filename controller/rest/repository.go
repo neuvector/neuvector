@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,13 +23,33 @@ import (
 
 const (
 	repositoryDefaultTag      = "latest"
-	maxRepoScanTasks          = 32
 	repoScanTimeout           = time.Minute * 20
 	repoScanLingeringDuration = time.Second * 30
 	repoScanLongPollTimeout   = time.Second * 30
 )
 
-var repoScanMgr *longpollOnceMgr
+var RepoScanMgr *longpollOnceMgr
+var scanJobQueueCapacity, scanJobFailRetryMax, maxConcurrentRepoScanTasks int
+var staleScanJobCleanupIntervalHour time.Duration
+
+// SetMaxConcurrentRepoScanTasks sets the maximum number of concurrent scan workers
+// for repository scans. This limit helps balance performance and resource utilization.
+// The default value is 16.
+func SetMaxConcurrentRepoScanTasks(limit int) {
+	maxConcurrentRepoScanTasks = limit
+}
+
+func SetScanJobQueueCapacity(capacity int) {
+	scanJobQueueCapacity = capacity
+}
+
+func SetScanJobFailRetryMax(retryMax int) {
+	scanJobFailRetryMax = retryMax
+}
+
+func SetStaleScanJobCleanupIntervalHour(intervalHour int) {
+	staleScanJobCleanupIntervalHour = time.Duration(intervalHour) * time.Hour
+}
 
 type repoScanKey struct {
 	api.RESTScanRepoReq
@@ -45,15 +66,56 @@ func getImageName(req *api.RESTScanRepoReq) string {
 	return fmt.Sprintf("%s:%s", req.Repository, req.Tag)
 }
 
+// newRepoScanMgr initializes the repository scan manager with the specified parameters.
+// - repoScanLongPollTimeout: The timeout duration for long polling operations.
+// - maxConcurrentRepoScanTasks: The maximum number of concurrent repository scan tasks allowed.
+// - scanJobQueueCapacity: The capacity of the job queue for managing repository scan tasks.
+// - scanJobFailRetryMax: The maximum number of retry attempts for failed jobs.
+// - staleScanJobCleanupIntervalHour: The interval for cleaning up stale jobs.
 func newRepoScanMgr() {
-	repoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, repoScanLingeringDuration, maxRepoScanTasks)
+	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax, staleScanJobCleanupIntervalHour)
 }
 
 type repoScanTask struct {
 }
 
-func (r *repoScanTask) Run(arg interface{}) interface{} {
-	req := arg.(*api.RESTScanRepoReq)
+// The ShouldRetry method determines whether a repository scan task should be retried based on the error encountered.
+// - Retry is allowed for specific error codes related to timeouts, registry API issues, file system errors, network problems, and container API errors.
+// - If the error code indicates that the image was not found, it logs this information and returns false, as retrying would be futile.
+// - For any other error codes not explicitly handled, the method defaults to returning false, indicating no retry.
+func (t *repoScanTask) ShouldRetry(arg interface{}) bool {
+	jobErr, ok := arg.(*JobError)
+	if !ok {
+		log.Error("ShouldRetry: arg is not of type *share.ScanResult")
+		return false
+	}
+
+	// Check error codes that allow retries
+	switch jobErr.Detail {
+	case share.ScanErrorCode_ScanErrTimeout,
+		share.ScanErrorCode_ScanErrRegistryAPI,
+		share.ScanErrorCode_ScanErrFileSystem,
+		share.ScanErrorCode_ScanErrNetwork,
+		share.ScanErrorCode_ScanErrContainerAPI:
+		return true
+
+	case share.ScanErrorCode_ScanErrImageNotFound:
+		log.Error("ShouldRetry: image not found, no retry needed")
+		return false
+
+	default:
+		return false
+	}
+}
+
+// Run executes the repository scan task and returns the result along with any error encountered.
+func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
+	req, ok := arg.(*api.RESTScanRepoReq)
+	if !ok || req == nil {
+		log.Error("Invalid argument passed to Run")
+		return nil, NewJobError(api.RESTErrInvalidRequest, errors.New("Invalid argument passed to Run"), nil)
+	}
+	var scanErr *JobError
 
 	log.WithFields(log.Fields{
 		"registry": req.Registry, "image": getImageName(req),
@@ -64,12 +126,12 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 	var proxy string
 	var err error
 
-	// if local image, no need proxy
+	// Determine if a proxy is needed based on the registry
 	if req.Registry != "" {
 		proxy = scan.GetProxy(req.Registry)
 	}
 
-	// default: always scan secrets
+	// Default behavior: always scan for secrets
 	scanSecrets := true
 
 	ctx, cancel := context.WithTimeout(context.Background(), repoScanTimeout)
@@ -91,20 +153,17 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 		rsr.errCode = api.RESTErrFailReadCluster
 		rsr.errMsg = fmt.Sprintf("could not retrieve sigstore roots of trust: %s", err.Error())
 	}
+
 	result, err := rpc.ScanImage("", ctx, scanReq)
 
 	if result == nil {
-		// rpc request not made
-		rsr.errCode = api.RESTErrClusterRPCError
-		rsr.errMsg = err.Error()
-
+		// RPC request failed
+		scanErr = NewJobError(api.RESTErrClusterRPCError, err, nil)
 		log.WithFields(log.Fields{
 			"registry": req.Registry, "image": getImageName(req), "error": rsr.errMsg,
 		}).Error("RPC request fail")
 	} else if result.Error != share.ScanErrorCode_ScanErrNone {
-		rsr.errCode = api.RESTErrFailRepoScan
-		rsr.errMsg = scanUtils.ScanErrorToStr(result.Error)
-
+		scanErr = NewJobError(api.RESTErrFailRepoScan, err, result.Error)
 		log.WithFields(log.Fields{
 			"registry": req.Registry, "image": getImageName(req), "error": rsr.errMsg,
 		}).Error("Failed to scan repository")
@@ -113,13 +172,13 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 			"registry": req.Registry, "image": getImageName(req),
 		}).Info("Scan repository finish")
 
-		// store the scan result so it can be used by admission control
+		// Store the scan result for use in admission control
 		scan.FixRegRepoForAdmCtrl(result)
 		if err := scanner.StoreRepoScanResult(result); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("StoreRepoScanResult")
 		}
 
-		// build image compliance list and filter the list
+		// Build and filter the image compliance list
 		cpf := &complianceProfileFilter{filter: make(map[string][]string)}
 		if cp, filter, err := cacher.GetComplianceProfile(share.DefaultComplianceProfileName, access.NewReaderAccessControl()); err != nil {
 			log.WithFields(log.Fields{"profile": share.DefaultComplianceProfileName}).Error("Compliance profile not found")
@@ -138,7 +197,7 @@ func (r *repoScanTask) Run(arg interface{}) interface{} {
 		rsr.report = rpt
 	}
 
-	return &rsr
+	return &rsr, scanErr
 }
 
 func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -194,43 +253,51 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	// If request is from a different login session, a new scan is triggered even for the same image.
-	var task repoScanTask
+	task := &repoScanTask{}
 	key := repoScanKey{
 		RESTScanRepoReq: *req,
-		token:           login.getToken(),
+		token:           login.getToken(), // Keep it for backward compatibility
 	}
 
-	job, err := repoScanMgr.NewJob(key, &task, req)
+	// Create a new job for the repository scan
+	_, err = RepoScanMgr.NewJob(key, task, req)
 	switch err {
 	case errTooManyJobs:
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFailRepoScan,
-			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", maxRepoScanTasks))
+		restRespErrorMessage(w, http.StatusTooManyRequests, api.RESTErrFailRepoScan,
+			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", scanJobQueueCapacity))
 		return
-	case errDuplicateJob:
-		// If a request is already polling the scan, reject the new request from the same session.
+	case errMaxRetryReached:
+		// maximum job retry attempts reached
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFailRepoScan,
-			"Duplicated repository scan request.")
+			fmt.Sprintf("Maximum job retry attempts (%v) reached.", scanJobFailRetryMax))
 		return
 	}
 
-	result, _ := job.Poll()
+	// The Poll method returns an error only if the job has failed.
+	// For jobs that are retrying or pending, it returns nil for both result and error.
+	// If the job is complete, it returns the result and nil for the error.
+	result, scanErr := RepoScanMgr.Poll(key)
+
+	if scanErr != nil {
+		data.Request.Password = ""
+		if scanErr.Code != 0 && scanErr.Code != api.RESTErrClusterRPCError {
+			restRespErrorMessage(w, http.StatusInternalServerError, scanErr.Code, scanErr.Message)
+		} else {
+			restRespError(w, http.StatusInternalServerError, scanErr.Code)
+		}
+	}
+
 	if result == nil {
 		log.WithFields(log.Fields{
 			"registry": req.Registry, "image": getImageName(req),
-		}).Debug("Keep waiting ...")
+		}).Debug("Scan is still in progress, waiting for completion...")
 		w.WriteHeader(http.StatusNotModified)
 	} else {
 		ret := result.(*repoScanResult)
 		// Clear password field for registry data
 		data.Request.Password = ""
-		if ret.errCode == api.RESTErrClusterRPCError {
-			restRespError(w, http.StatusInternalServerError, ret.errCode)
-		} else if ret.errCode != 0 {
-			restRespErrorMessage(w, http.StatusInternalServerError, ret.errCode, ret.errMsg)
-		} else {
-			resp := &api.RESTScanRepoReportData{Report: ret.report}
-			restRespSuccess(w, r, resp, acc, login, &data, "Request repository scan")
-		}
+		resp := &api.RESTScanRepoReportData{Report: ret.report}
+		restRespSuccess(w, r, resp, acc, login, &data, "Repository scan request completed successfully")
 	}
 }
 
