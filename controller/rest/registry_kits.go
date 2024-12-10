@@ -350,8 +350,8 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	job, err := regTestMgr.NewJob(tid, task, task.config)
 	switch err {
 	case errTooManyJobs:
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFailRepoScan,
-			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", maxRepoScanTasks))
+		restRespErrorMessage(w, http.StatusTooManyRequests, api.RESTErrFailRepoScan,
+			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", maxConcurrentRepoScanTasks))
 		return
 	case errDuplicateJob:
 		// If a request is already polling the scan, reject the new request from the same session.

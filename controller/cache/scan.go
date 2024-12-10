@@ -1102,7 +1102,7 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 				cacheMutexUnlock()
 
 				if !s.BuiltIn {
-					rpc.AddScanner(&s)
+					rpc.ScannerMgr.AddScanner(&s)
 					if err := scan.AddScanner(s.ID); err != nil {
 						log.WithError(err).Warn("failed to add scanner to reg scheduler")
 					}
@@ -1110,7 +1110,7 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 						log.WithError(err).Warn("failed to add scanner to scheduler")
 					}
 				} else if s.ID == localDev.Ctrler.ID {
-					rpc.AddScanner(&s)
+					rpc.ScannerMgr.AddScanner(&s)
 					if err := scan.AddScanner(s.ID); err != nil {
 						log.WithError(err).Warn("failed to add scanner to reg scheduler")
 					}
@@ -1131,7 +1131,7 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 			delete(scannerCacheMap, id)
 			cacheMutexUnlock()
 
-			rpc.RemoveScanner(id)
+			rpc.ScannerMgr.RemoveScanner(id)
 			if err := scan.RemoveScanner(id); err != nil {
 				log.WithError(err).Warn("failed to remove scanner from reg scheduler")
 			}
