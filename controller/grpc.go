@@ -35,6 +35,10 @@ import (
 
 // const scanImageDataTimeout = time.Second * 45
 const repoScanTimeout = time.Minute * 20
+const (
+	dbSlotsBase = 256
+	dbSlotsMax  = 512
+)
 
 type ScanService struct {
 }
@@ -66,7 +70,7 @@ func (ss *ScanService) preprocessDB(data *share.ScannerRegisterData) map[string]
 
 func (ss *ScanService) prepareDBSlots(data *share.ScannerRegisterData, cvedb map[string]*share.ScanVulnerability) ([][]byte, error) {
 	// As of now, Feb. 2019, the compressed db size is 3M, while max kv value size is 512K.
-	for slots := 128; slots <= 256; slots *= 2 {
+	for slots := dbSlotsBase; slots <= dbSlotsMax; slots *= 2 {
 		log.WithFields(log.Fields{"slots": slots}).Debug()
 
 		enlarge := false
