@@ -140,6 +140,7 @@ func createConfigFile(cc *ClusterConfig) error {
 		Server   uint `json:"server"`
 		Serf_lan uint `json:"serf_lan"`
 		Serf_wan int  `json:"serf_wan"`
+		GrpcTls  int  `json:"grpc_tls"`
 	}
 
 	type tConsulConfigPerformance struct {
@@ -201,6 +202,7 @@ func createConfigFile(cc *ClusterConfig) error {
 			Server:   rpcPort,
 			Serf_lan: lanPort,
 			Serf_wan: -1,
+			GrpcTls:  -1,
 		},
 		Tls_cipher_suites: "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
 		Performance: tConsulConfigPerformance{
