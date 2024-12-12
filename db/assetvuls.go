@@ -603,7 +603,7 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 }
 
 func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error) {
-	columns := []interface{}{"assetid", "name", "policy_mode"}
+	columns := []interface{}{"assetid", "name", "policy_mode", "I_repository_url"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -627,11 +627,13 @@ func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error)
 		defer rows.Close()
 
 		for rows.Next() {
+			var registry string
 			as := &api.RESTImageAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode, &registry)
 			if err != nil {
 				return nil, err
 			}
+			as.DisplayName = registry + as.DisplayName
 			records[as.ID] = as
 		}
 		break
