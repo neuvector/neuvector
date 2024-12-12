@@ -69,7 +69,10 @@ func (ss *ScanService) preprocessDB(data *share.ScannerRegisterData) map[string]
 }
 
 func (ss *ScanService) prepareDBSlots(data *share.ScannerRegisterData, cvedb map[string]*share.ScanVulnerability) ([][]byte, error) {
-	// As of now, Feb. 2019, the compressed db size is 3M, while max kv value size is 512K.
+	// Splits the compressed CVE database into multiple slots to fit within the key-value store's size limitations (512KB).
+	// Using 128 slots as the base was found to be insufficient, so 256 is now used as the starting base (dbSlotsBase).
+	// The function attempts to double the number of slots with each iteration (up to dbSlotsMax) to ensure that
+	// the size of each slot stays within the permissible limit.
 	for slots := dbSlotsBase; slots <= dbSlotsMax; slots *= 2 {
 		log.WithFields(log.Fields{"slots": slots}).Debug()
 
