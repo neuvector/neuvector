@@ -53,7 +53,7 @@ require (
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/net v0.23.0
 	golang.org/x/oauth2 v0.16.0
-	golang.org/x/sys v0.18.0
+	golang.org/x/sys v0.28.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/grpc/security/advancedtls v0.0.0-20240408170116-ec257b4e1cec
 	gopkg.in/ldap.v2 v2.5.1
@@ -115,9 +115,9 @@ require (
 	go.opentelemetry.io/otel v1.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/otel/trace v1.19.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80 // indirect
@@ -184,7 +184,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 	k8s.io/cli-runtime v0.29.3 // indirect
