@@ -476,7 +476,7 @@ func FillAssets(vul *api.RESTVulnerabilityAssetV2, assetMaps *AssetMaps) {
 }
 
 func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, error) {
-	columns := []interface{}{"assetid", "name", "w_domain", "policy_mode", "w_service_group", "w_image"}
+	columns := []interface{}{"assetid", "name", "w_domain", "w_service_group", "w_image"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -501,7 +501,7 @@ func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, 
 
 		for rows.Next() {
 			as := &api.RESTWorkloadAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &as.Domain, &as.PolicyMode, &as.Service, &as.Image)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.Domain, &as.Service, &as.Image)
 
 			if err != nil {
 				return nil, err
@@ -519,7 +519,7 @@ func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, 
 }
 
 func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
-	columns := []interface{}{"assetid", "name", "policy_mode"}
+	columns := []interface{}{"assetid", "name"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -544,7 +544,7 @@ func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
 
 		for rows.Next() {
 			as := &api.RESTHostAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName)
 			if err != nil {
 				return nil, err
 			}
@@ -561,7 +561,7 @@ func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
 }
 
 func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, error) {
-	columns := []interface{}{"assetid", "name", "policy_mode"}
+	columns := []interface{}{"assetid", "name"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -586,7 +586,7 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 
 		for rows.Next() {
 			as := &api.RESTPlatformAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName)
 			if err != nil {
 				return nil, err
 			}
@@ -603,7 +603,7 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 }
 
 func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error) {
-	columns := []interface{}{"assetid", "name", "policy_mode"}
+	columns := []interface{}{"assetid", "name"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
@@ -628,7 +628,7 @@ func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error)
 
 		for rows.Next() {
 			as := &api.RESTImageAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName, &as.PolicyMode)
+			err = rows.Scan(&as.ID, &as.DisplayName)
 			if err != nil {
 				return nil, err
 			}

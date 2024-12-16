@@ -13,6 +13,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/db"
+	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -243,6 +244,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		for _, vul := range resp.Vuls {
 			db.FillAssets(vul, assetMaps)
 		}
+		fillPolicyMode(resp.Vuls, acc)
 
 		elapsed := time.Since(start)
 		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("4/4, get asset meta, took=%v", elapsed))
@@ -513,6 +515,8 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
 		return
 	}
+	fillPolicyMode(resp.Vuls, acc)
+
 	elapsed = time.Since(start)
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("2/2, get assets from db, poolSize=%v, took=%v", queryFilter.ThreadCount, elapsed))
 
@@ -693,4 +697,41 @@ func getAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "invalid asset type")
+}
+
+func fillPolicyMode(Vuls []*api.RESTVulnerabilityAssetV2, acc *access.AccessControl) {
+	img2mode := make(map[string]string)
+
+	for _, vul := range Vuls {
+		for _, asset := range vul.Workloads {
+			brief, err := cacher.GetWorkloadBrief(asset.ID, api.QueryValueViewPod, acc)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "id": asset.ID}).Debug("GetWorkloadBrief")
+				asset.PolicyMode = share.PolicyModeLearn
+				continue
+			}
+			asset.PolicyMode = brief.PolicyMode
+			img2mode[brief.ImageID] = brief.PolicyMode
+		}
+
+		for _, asset := range vul.Nodes {
+			host, err := cacher.GetHost(asset.ID, acc)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "id": asset.ID}).Debug("GetHost")
+				asset.PolicyMode = share.PolicyModeLearn
+				continue
+			}
+			asset.PolicyMode = host.PolicyMode
+		}
+
+		for _, asset := range vul.Images {
+			if policy, ok := img2mode[asset.ID]; ok {
+				asset.PolicyMode = policy
+			}
+		}
+
+		for _, asset := range vul.Platforms {
+			asset.PolicyMode = share.PolicyModeLearn
+		}
+	}
 }
