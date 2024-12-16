@@ -62,6 +62,7 @@ type DbVulAsset struct {
 	MeetSearch   bool // for static data which needs all data even not within search result
 	DBKey        string
 	ImpactWeight int
+	FeedRating   string
 }
 
 type DbCVESource struct {
@@ -315,7 +316,8 @@ func getVulassetSchema() []string {
 		"nodes TEXT", "images TEXT", "platforms TEXT",
 		"cve_sources TEXT",
 		"f_withFix INTEGER", "f_profile INTEGER", "debuglog TEXT",
-		"score_str TEXT", "scorev3_str TEXT", "impact_weight INTEGER"}
+		"score_str TEXT", "scorev3_str TEXT", "impact_weight INTEGER",
+		"feed_rating TEXT"}
 	return schema
 }
 
