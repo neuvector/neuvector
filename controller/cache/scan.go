@@ -1497,7 +1497,6 @@ func getWorkloadDbAssetVul(c *workloadCache, criticals, highs, meds, lows []stri
 		d.W_applications = string(b)
 	}
 
-	d.Policy_mode, _ = getWorkloadPerGroupPolicyMode(c)
 	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
 	return d
 }
@@ -1518,7 +1517,6 @@ func getHostDbAssetVul(c *hostCache, criticals, highs, meds, lows []string, last
 		N_containers: c.workloads.Cardinality(),
 	}
 
-	d.Policy_mode, _ = getHostPolicyMode(c)
 	d.Scanned_at = api.RESTTimeString(lastScanTime.UTC())
 	return d
 }
