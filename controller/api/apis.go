@@ -2442,6 +2442,7 @@ type RESTVulnerabilityAssetV2 struct {
 	VectorsV3   string                              `json:"vectors_v3"`
 	PublishedTS int64                               `json:"published_timestamp"`
 	LastModTS   int64                               `json:"last_modified_timestamp"`
+	FeedRating  string                              `json:"feed_rating"`
 
 	Workloads   []*RESTWorkloadAsset `json:"workloads,omitempty"`
 	WorkloadIDs []string             `json:"-"`
