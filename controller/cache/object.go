@@ -420,7 +420,7 @@ func getWorkloadDisplayName(wl *share.CLUSWorkload, parent string) (string, stri
 // With cachMutex held
 func addrHostAdd(id string, param interface{}) {
 	host := param.(*hostCache).host
-
+	hostchg := false
 	// Update Host_ip-to-Host map
 	for _, addrs := range host.Ifaces {
 		for _, addr := range addrs {
@@ -433,6 +433,7 @@ func addrHostAdd(id string, param interface{}) {
 						hp.hostID = host.ID
 						hp.ipnet = addr.IPNet
 						hp.managed = true
+						hostchg = true
 					} else {
 						ipHostMap[key] = &hostDigest{hostID: host.ID, ipnet: addr.IPNet, managed: true}
 					}
@@ -462,6 +463,9 @@ func addrHostAdd(id string, param interface{}) {
 			// node IP endpoint.
 			updateInternalIPNet(&ipnet, share.CLUSIPAddrScopeGlobal, false)
 		}
+	}
+	if hostchg {
+		scheduleIPPolicyCalculation(true)
 	}
 }
 
@@ -1397,10 +1401,11 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 			oldSvc := wlCache.workload.Service
 
 			if !reflect.DeepEqual(wlCache.workload.Ifaces, wl.Ifaces) ||
-				!reflect.DeepEqual(wlCache.workload.Ports, wl.Ports) {
+				!reflect.DeepEqual(wlCache.workload.Ports, wl.Ports) ||
+				wlCache.workload.HostID != wl.HostID {
 				log.WithFields(log.Fields{
 					"workload": container.ShortContainerId(wl.ID),
-				}).Debug("intf/ports changed")
+				}).Debug("intf/ports/host changed")
 				defer scheduleIPPolicyCalculation(true)
 			}
 
