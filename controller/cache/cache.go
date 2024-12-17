@@ -697,28 +697,38 @@ func (m CacheMethod) GetFakeWorkloadBrief(id string) *api.RESTWorkloadBrief {
 func (m CacheMethod) GetWorkloadDetail(id string, view string, acc *access.AccessControl) (*api.RESTWorkloadDetail, error) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
-	if cache, ok := wlCacheMap[id]; ok {
-		if !acc.Authorize(cache.workload, nil) {
-			return nil, common.ErrObjectAccessDenied
-		}
 
-		wl := workload2DetailREST(cache)
-		switch view {
-		case api.QueryValueViewPod:
-			for child := range cache.children.Iter() {
-				if childCache, ok := wlCacheMap[child.(string)]; ok {
-					wl.Children = append(wl.Children, workload2DetailREST(childCache))
-				}
-			}
-			sort.Slice(wl.Children, func(i, j int) bool {
-				return wl.Children[i].DisplayName < wl.Children[j].DisplayName
-			})
-		case api.QueryValueViewPodOnly:
-		}
+	var cache *workloadCache
+	var ok bool
 
-		return wl, nil
+	if cache, ok = wlCacheMap[id]; !ok {
+		cache, ok = nvwlCacheMap[id]
 	}
-	return nil, common.ErrObjectNotFound
+
+	if !ok {
+		return nil, common.ErrObjectNotFound
+	}
+
+	if !acc.Authorize(cache.workload, nil) {
+		return nil, common.ErrObjectAccessDenied
+	}
+
+	wl := workload2DetailREST(cache)
+
+	switch view {
+	case api.QueryValueViewPod:
+		for child := range cache.children.Iter() {
+			if childCache, ok := wlCacheMap[child.(string)]; ok {
+				wl.Children = append(wl.Children, workload2DetailREST(childCache))
+			}
+		}
+		sort.Slice(wl.Children, func(i, j int) bool {
+			return wl.Children[i].DisplayName < wl.Children[j].DisplayName
+		})
+	case api.QueryValueViewPodOnly:
+	}
+
+	return wl, nil
 }
 
 func getWorkloadNameForLogging(id string) *workloadNames {

@@ -298,15 +298,19 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 
 // cacheMutexRLock is already called by caller
 func workload2DetailREST(cache *workloadCache) *api.RESTWorkloadDetail {
-	wl := &api.RESTWorkloadDetail{
-		RESTWorkload: *workload2REST(cache),
-		Groups:       make([]string, cache.groups.Cardinality()),
+	var groups []string
+	if cache.groups != nil {
+		groups = make([]string, cache.groups.Cardinality())
+		i := 0
+		for name := range cache.groups.Iter() {
+			groups[i] = name.(string)
+			i++
+		}
 	}
 
-	i := 0
-	for name := range cache.groups.Iter() {
-		wl.Groups[i] = name.(string)
-		i++
+	wl := &api.RESTWorkloadDetail{
+		RESTWorkload: *workload2REST(cache),
+		Groups:       groups,
 	}
 
 	wl.AppPorts = getAppPorts(cache.workload)
