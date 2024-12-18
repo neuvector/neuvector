@@ -71,6 +71,7 @@ ARG COMMIT
 WORKDIR /
 COPY --from=base /chroot/ /
 COPY --from=builder /src/stage /
+COPY EULA.pdf /licenses/
 
 
 LABEL "name"="controller" \

@@ -76,6 +76,7 @@ ARG VERSION
 WORKDIR /
 COPY --from=base /chroot/ /
 COPY --from=builder /src/stage /
+COPY EULA.pdf /licenses/
 
 RUN ln -s /usr/lib64/libpcap.so /usr/lib64/libpcap.so.0.8
 
