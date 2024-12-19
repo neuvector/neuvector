@@ -51,7 +51,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vishvananda/netns v0.0.4
-	golang.org/x/net v0.23.0
+	golang.org/x/net v0.33.0
 	golang.org/x/oauth2 v0.16.0
 	golang.org/x/sys v0.28.0
 	google.golang.org/grpc v1.62.1
