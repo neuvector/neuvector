@@ -1,165 +1,39 @@
-// Copyright 2015 clair authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package utils
 
 import (
 	"archive/tar"
 	"archive/zip"
-	"bufio"
 	"bytes"
-	"compress/bzip2"
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/coreos/clair/pkg/tarutil"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	// ErrCouldNotExtract occurs when an extraction fails.
-	ErrCouldNotExtract = errors.New("could not extract the archive")
-	ErrRequestCanceled = errors.New("request conceled")
-
-	// ErrExtractedFileTooBig occurs when a file to extract is too big.
-	ErrExtractedFileTooBig = errors.New("could not extract one or more files from the archive: file too big")
-
+	ErrRequestCanceled     = errors.New("request conceled")
 	ErrCouldNotWriteToDisk = errors.New("could not write to disk")
-
-	readLen = 6 // max bytes to sniff
-
-	gzipHeader  = []byte{0x1f, 0x8b}
-	bzip2Header = []byte{0x42, 0x5a, 0x68}
-	xzHeader    = []byte{0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00}
 )
-
-// XzReader is an io.ReadCloser which decompresses xz compressed data.
-type XzReader struct {
-	io.ReadCloser
-	cmd     *exec.Cmd
-	closech chan error
-}
-
-type TarFileInfo struct {
-	Name string
-	Body []byte
-}
-
-// NewXzReader shells out to a command line xz executable (if
-// available) to decompress the given io.Reader using the xz
-// compression format and returns an *XzReader.
-// It is the caller's responsibility to call Close on the XzReader when done.
-func NewXzReader(r io.Reader) (*XzReader, error) {
-	rpipe, wpipe := io.Pipe()
-	ex, err := exec.LookPath("xz")
-	if err != nil {
-		return nil, err
-	}
-	cmd := exec.Command(ex, "--decompress", "--stdout")
-
-	closech := make(chan error)
-
-	cmd.Stdin = r
-	cmd.Stdout = wpipe
-
-	go func() {
-		err := cmd.Run()
-		wpipe.CloseWithError(err)
-		closech <- err
-	}()
-
-	return &XzReader{rpipe, cmd, closech}, nil
-}
-
-func (r *XzReader) Close() error {
-	r.ReadCloser.Close()
-	if err := r.cmd.Process.Kill(); err != nil {
-		var path string
-		if r.cmd != nil {
-			path = r.cmd.Path
-		}
-		log.WithFields(log.Fields{"err": err, "path": path}).Error()
-	}
-	return <-r.closech
-}
-
-// TarReadCloser embeds a *tar.Reader and the related io.Closer
-// It is the caller's responsibility to call Close on TarReadCloser when
-// done.
-type TarReadCloser struct {
-	*tar.Reader
-	io.Closer
-}
-
-func (r *TarReadCloser) Close() error {
-	return r.Closer.Close()
-}
 
 // SelectivelyExtractArchive extracts the specified files and folders
 // from targz data read from the given reader and store them in a map indexed by file paths
-func SelectivelyExtractArchive(r io.Reader, selected func(string) bool, maxFileSize int64) (map[string][]byte, error) {
+func SelectivelyExtractArchive(r io.Reader, selected func(string) bool) (map[string][]byte, error) {
 	data := make(map[string][]byte)
 
 	extract := func(filename string, size int64, reader io.ReadCloser) error {
 		// File size limit
-		if maxFileSize > 0 && size > maxFileSize {
-			// for some big jar file, just skip it
+		if size > tarutil.MaxExtractableFileSize {
 			log.WithFields(log.Fields{"size": size, "filename": filename}).Error("file too big")
-			return nil
+			return tarutil.ErrExtractedFileTooBig
 		}
 		d, _ := io.ReadAll(reader)
 		data[filename] = d
-		return nil
-	}
-
-	err := extractTarFile(r, selected, extract)
-	if err != nil {
-		return data, err
-	}
-
-	return data, nil
-}
-
-func SelectivelyExtractToFiles(r io.Reader, dir string, selected func(string) bool, maxFileSize int64) (map[string]string, error) {
-	data := make(map[string]string)
-
-	extract := func(filename string, size int64, reader io.ReadCloser) error {
-		// File size limit
-		if maxFileSize > 0 && size > maxFileSize {
-			// for some big jar file, just skip it
-			log.WithFields(log.Fields{"size": size, "filename": filename}).Error("file too big")
-			return nil
-		}
-		tmpfile, err := os.CreateTemp(dir, "extract")
-		if err != nil {
-			log.WithFields(log.Fields{"err": err, "filename": filename}).Error("write to temp file fail")
-			return nil
-		}
-		if nb, err := io.Copy(tmpfile, reader); err != nil || nb == 0 {
-			if err != nil {
-				log.WithFields(log.Fields{"err": err, "filename": filename}).Error("copy file fail")
-			}
-			return nil
-		}
-		tmpfile.Close()
-		data[filename] = tmpfile.Name()
 		return nil
 	}
 
@@ -180,10 +54,10 @@ func EnsureBaseDir(fpath string) error {
 	return os.MkdirAll(baseDir, 0755)
 }
 
-func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encryptKey []byte) error {
-	tr, err := getTarReader(r)
+func ExtractAllArchiveToFiles(path string, r io.Reader, encryptKey []byte) error {
+	tr, err := tarutil.NewTarReadCloser(r)
 	if err != nil {
-		return ErrCouldNotExtract
+		return tarutil.ErrCouldNotExtract
 	}
 	defer tr.Close()
 
@@ -194,7 +68,7 @@ func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encry
 			break
 		}
 		if err != nil {
-			return ErrCouldNotExtract
+			return tarutil.ErrCouldNotExtract
 		}
 
 		// Get element filename
@@ -202,8 +76,8 @@ func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encry
 		filename = strings.TrimPrefix(filename, "./")
 
 		// File size limit
-		if maxFileSize > 0 && hdr.Size > maxFileSize {
-			return ErrExtractedFileTooBig
+		if hdr.Size > tarutil.MaxExtractableFileSize {
+			return tarutil.ErrExtractedFileTooBig
 		}
 
 		// Extract the element
@@ -224,10 +98,10 @@ func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encry
 	return nil
 }
 
-func ExtractAllArchive(dst string, r io.Reader, maxFileSize int64) (int64, error) {
+func ExtractAllArchive(dst string, r io.Reader) (int64, error) {
 	var untarSize int64
 
-	tr, err := getTarReader(r)
+	tr, err := tarutil.NewTarReadCloser(r)
 	if err != nil {
 		return untarSize, err
 	}
@@ -264,8 +138,8 @@ func ExtractAllArchive(dst string, r io.Reader, maxFileSize int64) (int64, error
 		// a benefit of using one vs. the other.
 		// fi := header.FileInfo()
 		// File size limit
-		if maxFileSize > 0 && header.Size > maxFileSize {
-			return untarSize, ErrExtractedFileTooBig
+		if header.Size > tarutil.MaxExtractableFileSize {
+			return untarSize, tarutil.ErrExtractedFileTooBig
 		}
 		untarSize += header.Size
 
@@ -317,101 +191,25 @@ func ExtractAllArchive(dst string, r io.Reader, maxFileSize int64) (int64, error
 	}
 }
 
-// getTarReader returns a TarReaderCloser associated with the specified io.Reader.
-//
-// Gzip/Bzip2/XZ detection is done by using the magic numbers:
-// Gzip: the first two bytes should be 0x1f and 0x8b. Defined in the RFC1952.
-// Bzip2: the first three bytes should be 0x42, 0x5a and 0x68. No RFC.
-// XZ: the first three bytes should be 0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00. No RFC.
-func getTarReader(r io.Reader) (*TarReadCloser, error) {
-	br := bufio.NewReader(r)
-	header, err := br.Peek(readLen)
-	if err == nil {
-		switch {
-		case bytes.HasPrefix(header, gzipHeader):
-			gr, err := gzip.NewReader(br)
-			if err != nil {
-				return nil, err
-			}
-			return &TarReadCloser{tar.NewReader(gr), gr}, nil
-		case bytes.HasPrefix(header, bzip2Header):
-			bzip2r := io.NopCloser(bzip2.NewReader(br))
-			return &TarReadCloser{tar.NewReader(bzip2r), bzip2r}, nil
-		case bytes.HasPrefix(header, xzHeader):
-			xzr, err := NewXzReader(br)
-			if err != nil {
-				return nil, err
-			}
-			return &TarReadCloser{tar.NewReader(xzr), xzr}, nil
-		}
-	}
-
-	dr := io.NopCloser(br)
-	return &TarReadCloser{tar.NewReader(dr), dr}, nil
-}
-
-func MakeTar(files []TarFileInfo) (*bytes.Buffer, error) {
+func MakeTar(files tarutil.FilesMap) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
 	defer tw.Close()
-	for _, file := range files {
+	for name, body := range files {
 		hdr := &tar.Header{
-			Name:     file.Name,
+			Name:     name,
 			Mode:     0655,
-			Typeflag: '0',
-			Size:     int64(len(file.Body)),
+			Typeflag: tar.TypeReg,
+			Size:     int64(len(body)),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			return nil, err
 		}
-		if _, err := tw.Write([]byte(file.Body)); err != nil {
+		if _, err := tw.Write([]byte(body)); err != nil {
 			return nil, err
 		}
 	}
 	return buf, nil
-}
-
-func SelectivelyExtractModules(r io.Reader, lastfix string, maxFileSize int64) (map[string][]byte, error) {
-	data := make(map[string][]byte)
-
-	// Create a tar or tar/tar-gzip/tar-bzip2/tar-xz reader
-	tr, err := getTarReader(r)
-	if err != nil {
-		return data, ErrCouldNotExtract
-	}
-	defer tr.Close()
-
-	// For each element in the archive
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return data, ErrCouldNotExtract
-		}
-
-		// Get element filename
-		filename := hdr.Name
-		filename = strings.TrimPrefix(filename, "./")
-
-		// Determine if we should extract the element
-		if !strings.HasSuffix(filename, lastfix) {
-			continue
-		}
-		// File size limit
-		if maxFileSize > 0 && hdr.Size > maxFileSize {
-			return data, ErrExtractedFileTooBig
-		}
-
-		// Extract the element
-		if hdr.Typeflag == tar.TypeReg {
-			d, _ := io.ReadAll(tr)
-			data[filename] = d
-		}
-	}
-
-	return data, nil
 }
 
 // func SelectivelyExtractToFile(r io.Reader, prefix string, toExtract []string, dir string) (map[string]string, error) {
@@ -445,13 +243,13 @@ func extractTarFile(r io.Reader, selected func(string) bool, extract func(string
 	// canceled context only reports when reading the response.
 
 	// Create a tar or tar/tar-gzip/tar-bzip2/tar-xz reader
-	tr, err := getTarReader(r)
+	tr, err := tarutil.NewTarReadCloser(r)
 	if err == context.Canceled {
 		log.Info("Request canceled")
 		return ErrRequestCanceled
 	} else if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
-		return ErrCouldNotExtract
+		return tarutil.ErrCouldNotExtract
 	}
 	defer tr.Close()
 
@@ -466,7 +264,7 @@ func extractTarFile(r io.Reader, selected func(string) bool, extract func(string
 			return ErrRequestCanceled
 		} else if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error()
-			return ErrCouldNotExtract
+			return tarutil.ErrCouldNotExtract
 		}
 
 		// Get element filename
