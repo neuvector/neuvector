@@ -72,7 +72,6 @@
 #define ENV_SCANNER_BASE_IMAGE  "SCANNER_BASE_IMAGE"
 #define ENV_SCANNER_CTRL_USER   "SCANNER_CTRL_API_USERNAME"
 #define ENV_SCANNER_CTRL_PASS   "SCANNER_CTRL_API_PASSWORD"
-#define ENV_SCANNER_PROXY_URL   "SCANNER_PROXY_URL"
 
 #define ENV_THRT_SSL_TLS_1DOT0  "THRT_SSL_TLS_1DOT0"
 #define ENV_THRT_SSL_TLS_1DOT1  "THRT_SSL_TLS_1DOT1"
@@ -229,7 +228,7 @@ static pid_t fork_exec(int i)
     pid_t pid;
     char *args[PROC_ARGS_MAX], *join, *adv, *bind, *url, *iface, *subnets, *cnet_type;
     char *lan_port, *rpc_port, *grpc_port, *fed_port, *server_port, *join_port, *adv_port, *adm_port;
-    char *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable, *proxy_url;
+    char *registry, *repository, *tag, *user, *pass, *base, *api_user, *api_pass, *enable;
     char *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     char *custom_check_control, *log_level;
@@ -341,10 +340,6 @@ static pid_t fork_exec(int i)
         if ((api_pass = getenv(ENV_SCANNER_CTRL_PASS)) != NULL) {
             args[a ++] = "--ctrl_password";
             args[a ++] = api_pass;
-        }
-        if ((proxy_url = getenv(ENV_SCANNER_PROXY_URL)) != NULL) {
-            args[a ++] = "--proxy_url";
-            args[a ++] = proxy_url;
         }
         args[a] = NULL;
         break;
