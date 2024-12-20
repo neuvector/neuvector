@@ -3,6 +3,7 @@ package scan
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -191,10 +192,9 @@ type base struct {
 	ignoreProxy bool
 }
 
-func (r *base) url(pathTemplate string, args ...interface{}) string {
+func (r *base) url(pathTemplate string, args ...interface{}) (string, error) {
 	pathSuffix := fmt.Sprintf(pathTemplate, args...)
-	url := fmt.Sprintf("%s%s", r.regURL, pathSuffix)
-	return url
+	return url.JoinPath(r.regURL, pathSuffix)
 }
 
 func (r *base) newRegClient(url, username, password string) error {

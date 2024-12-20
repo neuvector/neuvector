@@ -46,7 +46,11 @@ func (r dockerhub) GetRepoList(org, name string, limit int) ([]*share.CLUSImage,
 		}
 	}
 
-	u := r.url("v2/repositories/%s/?page_size=%d", org, limit)
+	u, err := r.url("v2/repositories/%s/?page_size=%d", org, limit)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := r.rc.Client.Get(u)
 	if err != nil {
 		return nil, err
