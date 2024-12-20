@@ -758,6 +758,9 @@ func (rs *Registry) getScanImages(sctx *scanContext, drv registryDriver, dryrun 
 
 	// not all driver support this
 	allImages, err := drv.GetAllImages()
+	if err != nil {
+		smd.scanLog.WithFields(log.Fields{"error": err}).Debug("Failed to get all images")
+	}
 
 	if sctx.ctx != nil {
 		select {
