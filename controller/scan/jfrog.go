@@ -224,7 +224,10 @@ func (r *jfrog) GetArtifactoryTags(repositoryStr string, rc *scanUtils.RegClient
 		return tags, fmt.Errorf("invalid repository format: %v", repositoryStr)
 	}
 
-	url := r.url("/artifactory/api/docker/%s/v2/%s/tags/list", key, repository)
+	url, err := r.url("/artifactory/api/docker/%s/v2/%s/tags/list", key, repository)
+	if err != nil {
+		return nil, err
+	}
 	return rc.FetchTagsPaginated(url, repositoryStr)
 }
 
@@ -264,7 +267,11 @@ func (r *jfrog) GetAllImages() (map[share.CLUSImage][]string, error) {
 
 	r.isSubdomain = true
 
-	aqlUrl := r.url("artifactory/api/search/aql")
+	aqlUrl, err := r.url("artifactory/api/search/aql")
+	if err != nil {
+		return nil, err
+	}
+
 	aql := `items.find({"repo":{"$match":"*"},"type":"folder"}).include("repo","path","name").sort({"$desc":["repo","path","name"]})`
 
 	var resp *http.Response
@@ -395,7 +402,10 @@ func (r *jfrog) ScanImage(scanner string, ctx context.Context, id, digest, repo,
 }
 
 func (r *jfrog) getJFrogDirUrl() ([]jfrogDir, error) {
-	repoUrl := r.url("artifactory/api/repositories")
+	repoUrl, err := r.url("artifactory/api/repositories")
+	if err != nil {
+		return nil, err
+	}
 	smd.scanLog.WithFields(log.Fields{"url": repoUrl}).Debug()
 
 	resp, err := r.rc.Client.Get(repoUrl)
