@@ -52,9 +52,11 @@ RUN mkdir -p /chroot/etc/neuvector/certs/internal/
 
 COPY package/deps /deps/
 
-ARG CONSUL_VERSION=1.20.1
-RUN curl -fL https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_${TARGETOS}_${TARGETARCH}.zip -o consul.zip \
-    && cat /deps/${TARGETOS}_${TARGETARCH}/consul.checksum | sha256sum --check --status && unzip consul.zip -d /chroot/usr/local/bin/
+RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
+    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/repodata/repomd.xml.key && \
+    zypper -n refresh && \
+    zypper --installroot /chroot install -y consul
+RUN mv /chroot/usr/bin/consul /chroot/usr/local/bin/consul
 
 ARG OPA_VERSION=v0.69.0
 RUN curl -fL https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_${TARGETOS}_${TARGETARCH}_static -o opa \
