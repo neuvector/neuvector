@@ -50,7 +50,9 @@ RUN zypper refresh && zypper --installroot /chroot -n in --no-recommends \
 RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
     rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/repodata/repomd.xml.key && \
     zypper -n refresh && \
-    zypper --installroot /chroot install -y yq libhs5-vectorscan5 vectorscan-devel
+    zypper --installroot /chroot install -y yq libhs5-vectorscan5 vectorscan-devel consul
+
+RUN mv /chroot/usr/bin/consul /chroot/usr/local/bin/consul
 
 RUN zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/log/
@@ -58,10 +60,6 @@ RUN zypper --installroot /chroot clean -a && \
 RUN touch /chroot/usr/local/bin/.nvcontainer && mkdir -p /chroot/etc/neuvector/certs/internal/
 
 COPY package/deps /deps/
-
-ARG CONSUL_VERSION=1.20.1
-RUN curl -fL https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_${TARGETARCH}.zip -o consul.zip \
-    && cat /deps/${TARGETOS}_${TARGETARCH}/consul.checksum | sha256sum --check --status && unzip consul.zip -d /chroot/usr/local/bin/
 
 RUN cd /usr/bin/ && rm -rf basename chcon chgrp chmod chown chroot cksum dd df dircolors dirname du install install-info join locale localedef mkdir mkfifo mknod mktemp paste pathchk readlink realpath sync smidiff smidump smilink smiquery smistrip smixlate tee tiemout tload top truncate unlink watch
 
