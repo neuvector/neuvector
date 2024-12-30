@@ -220,26 +220,14 @@ func handlerSystemSummary(w http.ResponseWriter, r *http.Request, ps httprouter.
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get system summary")
 }
 
-func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
-	defer r.Body.Close()
+func calcSecurityScore(metrics *api.RESTRiskScoreMetrics, login *loginSession) api.RESTSecurityScores {
 
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	}
-
-	// any user can call this API to get system summary, but only users with global 'config' permission can see non-zero host/controller/agent/scanner counters
-	accSysConfig := acc.BoostPermissions(share.PERM_SYSTEM_CONFIG)
 	isGlobalUser := true
 	if r := login.domainRoles[access.AccessDomainGlobal]; r == "" {
 		if permits := login.extraDomainPermits[access.AccessDomainGlobal]; permits.IsEmpty() {
 			isGlobalUser = false
 		}
 	}
-
-	resp := cacher.GetRiskScoreMetrics(accSysConfig, acc)
-	metrics := resp.Metrics
 
 	const MAX_SERVICE_MODE_SCORE = 26
 	const MAX_NEW_SERVICE_MODE_SCORE = 2
@@ -368,7 +356,7 @@ func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps htt
 		securityRiskScore = int(_score * 100)
 	}
 
-	resp.SecurityScores = &api.RESTSecurityScores{
+	return api.RESTSecurityScores{
 		NewServiceModeScore:      newServiceModeScore,
 		ServiceModeScore:         serviceModeScore,
 		ServiceModeScoreBy100:    serviceModeScoreBy100,
@@ -381,8 +369,53 @@ func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps htt
 		VulnerabilityScoreBy100:  vulnerabilityScoreBy100,
 		SecurityRiskScore:        securityRiskScore,
 	}
+}
 
-	restRespSuccess(w, r, resp, acc, login, nil, "Get system internal data")
+func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	// any user can call this API to get system summary, but only users with global 'config' permission can see non-zero host/controller/agent/scanner counters
+	accSysConfig := acc.BoostPermissions(share.PERM_SYSTEM_CONFIG)
+
+	resp := cacher.GetRiskScoreMetrics(accSysConfig, acc)
+	scores := calcSecurityScore(resp.Metrics, login)
+	resp.SecurityScores = &scores
+
+	restRespSuccess(w, r, resp, acc, login, nil, "Get system score metrics data")
+}
+
+func handlerPredictSystemScore(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	body, _ := io.ReadAll(r.Body)
+
+	var data api.RESTPredictScoreData
+	err := json.Unmarshal(body, &data)
+	if err != nil || data.Metrics == nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	scores := calcSecurityScore(data.Metrics, login)
+	resp := api.RESTScoreMetricsData{
+		Metrics:        data.Metrics,
+		SecurityScores: &scores,
+	}
+
+	restRespSuccess(w, r, &resp, acc, login, nil, "Predict system score improvement")
 }
 
 func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

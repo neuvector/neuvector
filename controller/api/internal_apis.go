@@ -209,3 +209,7 @@ type RESTCheckUpgradeInfo struct {
 	MinUpgradeVersion *RESTUpgradeInfo `json:"min_upgrade_version"`
 	MaxUpgradeVersion *RESTUpgradeInfo `json:"max_upgrade_version"`
 }
+
+type RESTPredictScoreData struct {
+	Metrics *RESTRiskScoreMetrics `json:"metrics"`
+}
