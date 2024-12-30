@@ -1655,6 +1655,7 @@ func StartRESTServer(isNewCluster bool, isLead bool) {
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
 	r.GET("/v1/system/alerts", handlerSystemGetAlerts)
 	r.GET("/v1/system/score/metrics", handlerGetSystemScoreMetrics)
+	r.POST("/v1/system/score/metrics", handlerPredictSystemScore) // skip API document
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.PATCH("/v2/system/config", handlerSystemConfigV2)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
