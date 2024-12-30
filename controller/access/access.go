@@ -1015,6 +1015,7 @@ func CompileUriPermitsMapping() {
 				"v1/system/license/update",
 				"v1/system/config/webhook",
 				"v1/system/config/remote_repository",
+				"v1/system/score/metrics",
 			},
 			CONST_API_IBMSA: {
 				"v1/partner/ibm_sa/*/setup/*",
