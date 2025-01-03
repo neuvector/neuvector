@@ -13,8 +13,6 @@ fi
 
 echo "==> Making monitor"
 make -C monitor
-echo "==> Making nstools"
-make -C tools/nstools/
 if [ "$machine" == "x86_64" ]; then
 	CONTROLLER_FILE="controller/controller-amd64"
 else
@@ -38,7 +36,6 @@ mkdir -p ${STAGE_DIR}/licenses
 cp monitor/monitor ${STAGE_DIR}/usr/local/bin/
 cp controller/controller ${STAGE_DIR}/usr/local/bin/
 cp upgrader/upgrader ${STAGE_DIR}/usr/local/bin/
-cp tools/nstools/nstools ${STAGE_DIR}/usr/local/bin/
 #
 cp scripts/sysctl.conf ${STAGE_DIR}/etc/
 cp scripts/teardown.sh ${STAGE_DIR}/usr/local/bin/scripts/
