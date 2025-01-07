@@ -2592,6 +2592,8 @@ func (p *Probe) sendProcessIncident(bDenied bool, id, uuid, group, derivedGroup 
 		s = p.makeProcessReport(id, proc, "Process profile violation, not from an image file", nil, false, group, uuid)
 	case share.CLUSReservedUuidShieldMode: // zero-drift incident
 		s = p.makeProcessReport(id, proc, "Process profile violation, not from its root process", nil, false, group, uuid)
+	case share.CLUSReservedUuidShieldNotListMode:
+		s = p.makeProcessReport(id, proc, "Process profile violation, not a listed family process", nil, false, group, uuid)
 	default: // rules-based incident
 		s = p.makeProcessReport(id, proc, "Process profile violation", nil, false, derivedGroup, uuid)
 	}
@@ -3173,6 +3175,11 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					break
 				}
 
+				if mode == share.PolicyModeEvaluate {
+					// report as incidents
+					ppe.Uuid = share.CLUSReservedUuidShieldNotListMode
+					break
+				}
 			}
 
 			bPass = true
@@ -3195,7 +3202,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					ppe.Action = share.PolicyActionAllow
 				}
 			} else {
-				ppe.Uuid = share.CLUSReservedUuidNotAlllowed
+				ppe.Uuid = share.CLUSReservedUuidShieldNotListMode
 			}
 		}
 	} else {
