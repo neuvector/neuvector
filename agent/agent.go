@@ -281,7 +281,8 @@ func main() {
 	disable_kv_congest_ctl := flag.Bool("no_kvc", false, "disable kv congestion control")
 	disable_scan_secrets := flag.Bool("no_scrt", false, "disable secret scans")
 	disable_auto_benchmark := flag.Bool("no_auto_benchmark", false, "disable auto benchmark")
-	disable_system_protection := flag.Bool("no_sys_protect", false, "disable system protections")
+	disable_system_protection := flag.Bool("no_sys_protect", false, "disable process and file protections")
+	disable_file_protection := flag.Bool("no_fs_protect", false, "disable file protections")
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
@@ -336,9 +337,16 @@ func main() {
 	}
 
 	agentEnv.systemProfiles = true
+	agentEnv.fileProfile = true
 	if *disable_system_protection {
-		log.Info("System protection is disabled (process/file profiles)")
+		log.Info("System protections are disabled (process/file profiles)")
 		agentEnv.systemProfiles = false
+		agentEnv.fileProfile = false
+	}
+
+	if *disable_file_protection {
+		log.Info("File system protection is disabled (file profiles)")
+		agentEnv.fileProfile = false
 	}
 
 	agentEnv.netPolicyPuller = *policy_puller
@@ -693,7 +701,7 @@ func main() {
 
 	// File monitor
 	fmonConfig := fsmon.FileMonitorConfig{
-		ProfileEnable:  agentEnv.systemProfiles,
+		ProfileEnable:  agentEnv.fileProfile,
 		IsAufs:         global.RT.GetStorageDriver() == "aufs",
 		EnableTrace:    *show_monitor_trace,
 		EndChan:        fsmonEndChan,

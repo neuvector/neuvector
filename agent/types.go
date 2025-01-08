@@ -20,6 +20,7 @@ type AgentEnvInfo struct {
 	scanSecrets          bool
 	autoBenchmark        bool
 	systemProfiles       bool
+	fileProfile          bool
 	customBenchmark      bool
 	netPolicyPuller      int
 	autoProfieCapture    uint64
