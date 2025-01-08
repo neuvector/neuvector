@@ -782,6 +782,8 @@ func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string
 							msg = "Process profile violation, not from an image file: execution denied"
 						case share.CLUSReservedUuidShieldMode:
 							msg = "Process profile violation, not from its root process: execution denied"
+						case share.CLUSReservedUuidShieldNotListMode:
+							msg = "Process profile violation, from its root process but not in the list: execution denied"
 						default:
 							msg = "Process profile violation: execution denied"
 						}
