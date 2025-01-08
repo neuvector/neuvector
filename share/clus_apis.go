@@ -2675,13 +2675,14 @@ type CLUSCrdEventQueueInfo struct {
 const CLUSReservedUuidPrefix string = "00000000-0000-0000-0000-0000000000" // reserved the last 2 digits
 
 // ////
-const CLUSReservedUuidNotAlllowed string = "00000000-0000-0000-0000-000000000000"    // processes beyond white list
-const CLUSReservedUuidRiskyApp string = "00000000-0000-0000-0000-000000000001"       // riskApp
-const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"     // tunnel
-const CLUSReservedUuidRootEscalation string = "00000000-0000-0000-0000-000000000003" // root privilege escallation
-const CLUSReservedUuidDockerCp string = "00000000-0000-0000-0000-000000000004"       // docker cp
-const CLUSReservedUuidAnchorMode string = "00000000-0000-0000-0000-000000000005"     // rejected by anchor mode
-const CLUSReservedUuidShieldMode string = "00000000-0000-0000-0000-000000000006"     // rejected by non-family process
+const CLUSReservedUuidNotAlllowed string = "00000000-0000-0000-0000-000000000000"       // processes beyond white list
+const CLUSReservedUuidRiskyApp string = "00000000-0000-0000-0000-000000000001"          // riskApp
+const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"        // tunnel
+const CLUSReservedUuidRootEscalation string = "00000000-0000-0000-0000-000000000003"    // root privilege escallation
+const CLUSReservedUuidDockerCp string = "00000000-0000-0000-0000-000000000004"          // docker cp
+const CLUSReservedUuidAnchorMode string = "00000000-0000-0000-0000-000000000005"        // rejected by anchor mode
+const CLUSReservedUuidShieldMode string = "00000000-0000-0000-0000-000000000006"        // rejected by non-family process
+const CLUSReservedUuidShieldNotListMode string = "00000000-0000-0000-0000-000000000007" // rejected by Monitor mode for not-listed family process
 
 type ProcRule struct {
 	Active int                     `json:"active"`
