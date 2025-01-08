@@ -47,6 +47,7 @@
 #define ENV_NO_SCAN_SECRETS    "ENF_NO_SECRET_SCANS"
 #define ENV_NO_AUTO_BENCHMARK  "ENF_NO_AUTO_BENCHMARK"
 #define ENV_NO_SYSTEM_PROTECT  "ENF_NO_SYSTEM_PROFILES"
+#define ENV_NO_FILE_PROTECT    "ENF_NO_FILE_PROFILE"
 #define ENV_POLICY_PULLER      "ENF_NETPOLICY_PULL_INTERVAL"
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
@@ -542,6 +543,9 @@ static pid_t fork_exec(int i)
         }
         if (getenv(ENV_NO_SYSTEM_PROTECT)) {
             args[a ++] = "-no_sys_protect";
+        }
+        if (getenv(ENV_NO_FILE_PROTECT)) {
+            args[a ++] = "-no_fs_protect";
         }
         if ((policy_pull_period = getenv(ENV_POLICY_PULLER)) != NULL) {
             args[a ++] = "-policy_puller";
