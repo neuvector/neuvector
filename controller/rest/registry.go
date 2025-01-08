@@ -60,6 +60,7 @@ var registryTypeList []string = []string{
 	share.RegistryTypeSonatypeNexus,
 	share.RegistryTypeGitlab,
 	share.RegistryTypeIBMCloud,
+	share.RegistryTypeHarbor,
 }
 var registryTypeSet utils.Set = utils.NewSetFromSliceKind(registryTypeList)
 
