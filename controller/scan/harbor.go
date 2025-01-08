@@ -10,10 +10,13 @@ import (
 	"strings"
 
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/httpclient"
+	log "github.com/sirupsen/logrus"
 )
 
 type harbor struct {
 	base
+	client http.Client
 }
 
 type HarborApiProject struct {
@@ -28,6 +31,24 @@ func (proj *HarborApiProject) IsProxyCacheProject() bool {
 type HarborApiRepository struct {
 	FullName  string `json:"name"`
 	ProjectId int    `json:"project_id"`
+}
+
+func newHarbor(baseDriver base) *harbor {
+	client := &http.Client{
+		Timeout: gitTimeout,
+	}
+
+	t, err := httpclient.GetTransport(baseDriver.proxy)
+	if err != nil {
+		log.WithError(err).Warn("failed to get transport")
+	} else {
+		client.Transport = t
+	}
+
+	return &harbor{
+		base:   baseDriver,
+		client: *client,
+	}
 }
 
 // TODO: the splits in projectName() and repoName() are duplicated, perform only once

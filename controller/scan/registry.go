@@ -695,7 +695,7 @@ func newRegistryDriver(cfg *share.CLUSRegistryConfig, public bool, tracer httptr
 	} else if cfg.Type == share.RegistryTypeIBMCloud {
 		return &ibmcloud{base: baseDriver}
 	} else if cfg.Type == share.RegistryTypeHarbor {
-		return &harbor{base: baseDriver}
+		return newHarbor(baseDriver)
 	} else {
 		return &baseDriver
 	}
