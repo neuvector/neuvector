@@ -9,13 +9,11 @@ import (
 	"strings"
 
 	"github.com/neuvector/neuvector/share"
-	"github.com/neuvector/neuvector/share/httpclient"
 	log "github.com/sirupsen/logrus"
 )
 
 type harbor struct {
 	base
-	client http.Client
 }
 
 type HarborApiProject struct {
@@ -30,24 +28,6 @@ func (proj *HarborApiProject) IsProxyCacheProject() bool {
 type HarborApiRepository struct {
 	FullName  string `json:"name"`
 	ProjectId int    `json:"project_id"`
-}
-
-func newHarbor(baseDriver base) *harbor {
-	client := &http.Client{
-		Timeout: gitTimeout,
-	}
-
-	t, err := httpclient.GetTransport(baseDriver.proxy)
-	if err != nil {
-		log.WithError(err).Warn("failed to get transport")
-	} else {
-		client.Transport = t
-	}
-
-	return &harbor{
-		base:   baseDriver,
-		client: *client,
-	}
 }
 
 // TODO: the splits in projectName() and repoName() are duplicated, perform only once
@@ -96,14 +76,17 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 
 // TODO: deal with large registries, implement pagination/chunked responses?
 func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2.0/repositories", h.base.regURL), nil)
+	reqUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/repositories")
+	if err != nil {
+		return nil, fmt.Errorf("could not generate repository request url: %w", err)
+	}
+	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not make request object: %w", err)
 	}
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
-	client := http.DefaultClient
-	resp, err := client.Do(req)
+	resp, err := h.rc.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not do request to get all repositories: %w", err)
 	}
@@ -145,15 +128,18 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	// the harbor api requires the repo name (which tends to contain a slash) to be url encoded twice
 	// example: a/b -> a%2Fb -> a%252Fb
 	encodedRepoName := url.PathEscape(url.PathEscape(repository.repoName()))
-	artifactEndpoint := fmt.Sprintf("api/v2.0/projects/%s/repositories/%s/artifacts?with_tag=true", projectName, encodedRepoName)
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", h.base.regURL, artifactEndpoint), nil)
+	reqUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/projects", projectName, "repositories", encodedRepoName, "artifacts")
+	if err != nil {
+		return nil, fmt.Errorf("could not generate artifact request url: %w", err)
+	}
+	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not make request object: %w", err)
 	}
+	req.URL.RawQuery = "with_tag=true" // required to include image tags in response
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
-	client := http.DefaultClient
-	resp, err := client.Do(req)
+	resp, err := h.rc.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not do request to get all artifacts for repo %s: %w", repository.FullName, err)
 	}
