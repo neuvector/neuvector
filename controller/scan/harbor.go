@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -101,9 +100,7 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not make request object: %s", err.Error())
 	}
-	basicEncoding := base64.StdEncoding
-	basicAuthToken := basicEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", h.base.username, h.base.password)))
-	req.Header.Add("authorization", fmt.Sprintf("Basic %s", basicAuthToken))
+	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
 	client := http.DefaultClient
 	resp, err := client.Do(req)
@@ -149,10 +146,7 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	if err != nil {
 		return nil, fmt.Errorf("could not make request object: %s", err.Error())
 	}
-
-	basicEncoding := base64.StdEncoding
-	basicAuthToken := basicEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", h.base.username, h.base.password)))
-	req.Header.Add("authorization", fmt.Sprintf("Basic %s", basicAuthToken))
+	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
 	client := http.DefaultClient
 	resp, err := client.Do(req)
