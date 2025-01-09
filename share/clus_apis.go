@@ -1835,39 +1835,34 @@ type CLUSGCRKey struct {
 }
 
 type CLUSRegistryConfig struct {
-	Registry           string                   `json:"registry"`
-	Name               string                   `json:"name"`
-	Type               string                   `json:"type"`
-	Username           string                   `json:"username"`
-	Password           string                   `json:"password,cloak"`
-	AuthToken          string                   `json:"auth_token,cloak"`
-	AuthWithToken      bool                     `json:"auth_with_token"`
-	Domains            []string                 `json:"domains"`
-	CreaterDomains     []string                 `json:"creater_domains"`
-	Filters            []string                 `json:"filters"`
-	ParsedFilters      []*CLUSRegistryFilter    `json:"parsed_filters"`
-	RescanImage        bool                     `json:"rescan_image"`
-	ScanLayers         bool                     `json:"scan_layers"`
-	DisableFiles       bool                     `json:"disable_files"`
-	RepoLimit          int                      `json:"repo_limit"`
-	TagLimit           int                      `json:"tag_limit"`
-	Schedule           string                   `json:"schedule"`
-	PollPeriod         int                      `json:"poll_period"`
-	AwsKey             *CLUSAWSAccountKey       `json:"aws_key"`
-	GcrKey             *CLUSGCRKey              `json:"gcr_key"`
-	JfrogMode          string                   `json:"jfrog_mode"`
-	JfrogAQL           bool                     `json:"jfrog_aql"`
-	GitlabApiUrl       string                   `json:"gitlab_api_url"`
-	GitlabPrivateToken string                   `json:"gitlab_private_token,cloak"`
-	IBMCloudAccount    string                   `json:"ibmcloud_account"`
-	IBMCloudTokenURL   string                   `json:"ibmcloud_token_url"`
-	CfgType            TCfgType                 `json:"cfg_type"`
-	IgnoreProxy        bool                     `json:"ignore_proxy"`
-	HarborConfig       CLUSHarborRegistryConfig `json:"harbor_config"`
-}
-
-type CLUSHarborRegistryConfig struct {
-	ScanProxyCacheProjects bool
+	Registry           string                `json:"registry"`
+	Name               string                `json:"name"`
+	Type               string                `json:"type"`
+	Username           string                `json:"username"`
+	Password           string                `json:"password,cloak"`
+	AuthToken          string                `json:"auth_token,cloak"`
+	AuthWithToken      bool                  `json:"auth_with_token"`
+	Domains            []string              `json:"domains"`
+	CreaterDomains     []string              `json:"creater_domains"`
+	Filters            []string              `json:"filters"`
+	ParsedFilters      []*CLUSRegistryFilter `json:"parsed_filters"`
+	RescanImage        bool                  `json:"rescan_image"`
+	ScanLayers         bool                  `json:"scan_layers"`
+	DisableFiles       bool                  `json:"disable_files"`
+	RepoLimit          int                   `json:"repo_limit"`
+	TagLimit           int                   `json:"tag_limit"`
+	Schedule           string                `json:"schedule"`
+	PollPeriod         int                   `json:"poll_period"`
+	AwsKey             *CLUSAWSAccountKey    `json:"aws_key"`
+	GcrKey             *CLUSGCRKey           `json:"gcr_key"`
+	JfrogMode          string                `json:"jfrog_mode"`
+	JfrogAQL           bool                  `json:"jfrog_aql"`
+	GitlabApiUrl       string                `json:"gitlab_api_url"`
+	GitlabPrivateToken string                `json:"gitlab_private_token,cloak"`
+	IBMCloudAccount    string                `json:"ibmcloud_account"`
+	IBMCloudTokenURL   string                `json:"ibmcloud_token_url"`
+	CfgType            TCfgType              `json:"cfg_type"`
+	IgnoreProxy        bool                  `json:"ignore_proxy"`
 }
 
 type CLUSImage struct {

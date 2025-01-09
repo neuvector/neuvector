@@ -51,32 +51,32 @@ func newHarbor(baseDriver base) *harbor {
 }
 
 // TODO: the splits in projectName() and repoName() are duplicated, perform only once
-func (harborRepo *HarborApiRepository) projectName() string {
-	splitRepoName := strings.Split(harborRepo.FullName, "/")
-	if len(splitRepoName) < 2 {
+func (harborRepo *HarborApiRepository) projectName() (string, error) {
+	splitName := strings.Split(harborRepo.FullName, "/")
+	if len(splitName) < 2 {
 		// a harbor repo should always have the project name
 		// prefixed which means this should never happen
 		// but handling for the sake of robustness
-		return ""
+		return "", fmt.Errorf("could not parse project name for project repository \"%s\"", harborRepo.FullName)
 	}
 	// A Harbor project is not allowed to have forward-slash
 	// characters, so the first one we run into in a repository
 	// name delimits the harbor project name that repo belongs to
-	return splitRepoName[0]
+	return splitName[0], nil
 }
 
 func (harborRepo *HarborApiRepository) repoName() string {
-	splitRepoName := strings.Split(harborRepo.FullName, "/")
-	if len(splitRepoName) < 2 {
+	splitName := strings.Split(harborRepo.FullName, "/")
+	if len(splitName) < 2 {
 		return harborRepo.FullName
 	}
-	return strings.Join(splitRepoName[1:], "/")
+	return strings.Join(splitName[1:], "/")
 }
 
 func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 	repositories, err := h.getAllRepositories()
 	if err != nil {
-		return nil, fmt.Errorf("could not get repositories from harbor api: %s", err.Error())
+		return nil, fmt.Errorf("could not get repositories from harbor api: %w", err)
 	}
 
 	images := map[share.CLUSImage][]string{}
@@ -86,7 +86,7 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 		}
 		tags, err := h.getTagsForRepository(repository)
 		if err != nil {
-			return nil, fmt.Errorf("could not get tags for repository %s from harbor api: %s", repository.FullName, err.Error())
+			return nil, fmt.Errorf("could not get tags for repository %s from harbor api: %w", repository.FullName, err)
 		}
 		images[image] = tags
 	}
@@ -98,15 +98,16 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2.0/repositories", h.base.regURL), nil)
 	if err != nil {
-		return nil, fmt.Errorf("could not make request object: %s", err.Error())
+		return nil, fmt.Errorf("could not make request object: %w", err)
 	}
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
 	client := http.DefaultClient
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("could not do request to get all repositories: %s", err.Error())
+		return nil, fmt.Errorf("could not do request to get all repositories: %w", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
 	}
@@ -114,11 +115,11 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 	// TODO: more efficiently deal with large responses, instead of reading all into a byte slice
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("could not read response body: %s", err.Error())
+		return nil, fmt.Errorf("could not read response body: %w", err)
 	}
 	err = json.Unmarshal(respBytes, &harborRepositories)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshall response body json: %s", err.Error())
+		return nil, fmt.Errorf("could not unmarshall response body json: %w", err)
 	}
 	return harborRepositories, nil
 }
@@ -132,8 +133,11 @@ type HarborApiTag struct {
 }
 
 func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string, error) {
-	fmt.Printf("getting tags for repository: %s\n", repository.FullName)
-	projectName := repository.projectName()
+	log.WithField("repository", repository.FullName).Debug("getting tags for repository")
+	projectName, err := repository.projectName()
+	if err != nil {
+		return nil, fmt.Errorf("could not get project name: %w", err)
+	}
 	if projectName == "" {
 		return nil, fmt.Errorf("cannot parse project name for project/repository: %s", repository.FullName)
 	}
@@ -141,18 +145,19 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	// the harbor api requires the repo name (which tends to contain a slash) to be url encoded twice
 	// example: a/b -> a%2Fb -> a%252Fb
 	encodedRepoName := url.PathEscape(url.PathEscape(repository.repoName()))
-	artifactEndpoint := fmt.Sprintf("api/v2.0/projects/%s/repositories/%s/artifacts?with_tag=true", repository.projectName(), encodedRepoName)
+	artifactEndpoint := fmt.Sprintf("api/v2.0/projects/%s/repositories/%s/artifacts?with_tag=true", projectName, encodedRepoName)
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", h.base.regURL, artifactEndpoint), nil)
 	if err != nil {
-		return nil, fmt.Errorf("could not make request object: %s", err.Error())
+		return nil, fmt.Errorf("could not make request object: %w", err)
 	}
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
 	client := http.DefaultClient
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("could not do request to get all artifacts for repo %s: %s", repository.FullName, err.Error())
+		return nil, fmt.Errorf("could not do request to get all artifacts for repo %s: %w", repository.FullName, err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
 	}
@@ -161,12 +166,11 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	// TODO: more efficiently deal with large responses, instead of reading all into a byte slice
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("could not read response body: %s", err.Error())
+		return nil, fmt.Errorf("could not read response body: %w", err)
 	}
-	fmt.Println(string(respBytes))
 	err = json.Unmarshal(respBytes, &harborArtifacts)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshall response body json: %s", err.Error())
+		return nil, fmt.Errorf("could not unmarshall response body json: %w", err)
 	}
 
 	tagsForRepo := []string{}
