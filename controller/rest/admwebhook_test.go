@@ -86,6 +86,34 @@ func TestParseReqImageName(t *testing.T) {
 	postTest()
 }
 
+func TestScanEnvVarSecrets(t *testing.T) {
+	preTest()
+
+	vars := map[string]string{
+		"env1": "AIDA11ABLZS4A3QDU576",
+		"env2": "neuvector-svc-controller.neuvector",
+		"env3": "password:abcdefghijklmnop",
+		"env4": "api_token:12345abcdefghijklmnop",
+	}
+	expectedText := map[string]interface{}{
+		"env1=AIDA11ABLZS4A3QDU...":            nil,
+		"env3=password:abcdefghijklm...":       nil,
+		"env4=api_token:12345abcdefghijklm...": nil,
+	}
+	scanSecretLog := scanEnvVarSecrets(vars)
+	if len(scanSecretLog) != 3 {
+		t.Errorf("Expect 3 but only %d environment variables containing secret are found", len(scanSecretLog))
+	} else {
+		for _, log := range scanSecretLog {
+			if _, ok := expectedText[log.Text]; !ok {
+				t.Errorf("Unexpected text for diaplying an environment variable that contains secret: %s", log.Text)
+			}
+		}
+	}
+
+	postTest()
+}
+
 /* we don't skip any UPDATE request anymore in case some critical properties are changed in yaml file that should not be allowed by admission control rules
 func TestWalkThruContainersForSkipUpdateLog(t *testing.T) {
 	preTest()

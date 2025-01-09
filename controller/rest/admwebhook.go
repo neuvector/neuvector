@@ -1687,8 +1687,9 @@ func scanEnvVarSecrets(vars map[string]string) []share.ScanSecretLog {
 	}
 
 	var envVars string
+	delim := " = "
 	for k, v := range vars {
-		pair := fmt.Sprintf("%v = %v\n", k, v)
+		pair := fmt.Sprintf("%v%s%v\n", k, delim, v)
 		envVars = envVars + pair
 		//	log.WithFields(log.Fields{"pair": pair}).Debug()
 	}
@@ -1713,6 +1714,18 @@ func scanEnvVarSecrets(vars map[string]string) []share.ScanSecretLog {
 			subject = l.Text[:secretLength-3]
 		}
 		subject += "..."
+
+		if idx := strings.Index(l.Line, delim); idx >= 0 {
+			if k := l.Line[0:idx]; k != "" {
+				if _, ok := vars[k]; ok {
+					if strings.HasPrefix(subject, delim) {
+						subject = fmt.Sprintf("%s=%s", k, subject[len(delim):])
+					} else {
+						subject = fmt.Sprintf("%s=%s", k, subject)
+					}
+				}
+			}
+		}
 
 		slogs[i] = share.ScanSecretLog{
 			Type:       l.Type,
