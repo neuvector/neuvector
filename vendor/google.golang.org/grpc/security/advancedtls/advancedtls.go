@@ -16,9 +16,15 @@
  *
  */
 
-// Package advancedtls is a utility library containing functions to construct
-// credentials.TransportCredentials that can perform credential reloading and
-// custom verification check.
+// Package advancedtls provides gRPC transport credentials that allow easy
+// configuration of advanced TLS features. The APIs here give the user more
+// customizable control to fit their security landscape, thus the "advanced"
+// moniker. This package provides both interfaces and generally useful
+// implementations of those interfaces, for example periodic credential
+// reloading, support for certificate revocation lists, and customizable
+// certificate verification behaviors. If the provided implementations do not
+// fit a given use case, a custom implementation of the interface can be
+// injected.
 package advancedtls
 
 import (
@@ -27,16 +33,20 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
-	"syscall"
+	"reflect"
 	"time"
 
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/tls/certprovider"
+	credinternal "google.golang.org/grpc/internal/credentials"
 )
 
-// VerificationFuncParams contains parameters available to users when
-// implementing CustomVerificationFunc.
+type CertificateChains [][]*x509.Certificate
+
+// HandshakeVerificationInfo contains information about a handshake needed for
+// verification for use when implementing the `PostHandshakeVerificationFunc`
 // The fields in this struct are read-only.
-type VerificationFuncParams struct {
+type HandshakeVerificationInfo struct {
 	// The target server name that the client connects to when establishing the
 	// connection. This field is only meaningful for client side. On server side,
 	// this field would be an empty string.
@@ -45,52 +55,105 @@ type VerificationFuncParams struct {
 	RawCerts [][]byte
 	// The verification chain obtained by checking peer RawCerts against the
 	// trust certificate bundle(s), if applicable.
-	VerifiedChains [][]*x509.Certificate
+	VerifiedChains CertificateChains
 	// The leaf certificate sent from peer, if choosing to verify the peer
 	// certificate(s) and that verification passed. This field would be nil if
 	// either user chose not to verify or the verification failed.
 	Leaf *x509.Certificate
 }
 
-// VerificationResults contains the information about results of
-// CustomVerificationFunc.
-// VerificationResults is an empty struct for now. It may be extended in the
+// PostHandshakeVerificationResults contains the information about results of
+// PostHandshakeVerificationFunc.
+// PostHandshakeVerificationResults is an empty struct for now. It may be extended in the
 // future to include more information.
-type VerificationResults struct{}
+type PostHandshakeVerificationResults struct{}
 
-// CustomVerificationFunc is the function defined by users to perform custom
-// verification check.
-// CustomVerificationFunc returns nil if the authorization fails; otherwise
-// returns an empty struct.
-type CustomVerificationFunc func(params *VerificationFuncParams) (*VerificationResults, error)
+// PostHandshakeVerificationFunc is the function defined by users to perform
+// custom verification checks after chain building and regular handshake
+// verification has been completed.
+// PostHandshakeVerificationFunc should return (nil, error) if the authorization
+// should fail, with the error containing information on why it failed.
+type PostHandshakeVerificationFunc func(params *HandshakeVerificationInfo) (*PostHandshakeVerificationResults, error)
 
-// GetRootCAsParams contains the parameters available to users when
-// implementing GetRootCAs.
-type GetRootCAsParams struct {
-	RawConn  net.Conn
+// ConnectionInfo contains the parameters available to users when
+// implementing GetRootCertificates.
+type ConnectionInfo struct {
+	// RawConn is the raw net.Conn representing a connection.
+	RawConn net.Conn
+	// RawCerts is the byte representation of the presented peer cert chain.
 	RawCerts [][]byte
 }
 
-// GetRootCAsResults contains the results of GetRootCAs.
+// RootCertificates is the result of GetRootCertificates.
 // If users want to reload the root trust certificate, it is required to return
 // the proper TrustCerts in GetRootCAs.
-type GetRootCAsResults struct {
+type RootCertificates struct {
+	// TrustCerts is the pool of trusted certificates.
 	TrustCerts *x509.CertPool
 }
 
-// RootCertificateOptions contains a field and a function for obtaining root
-// trust certificates.
-// It is used by both ClientOptions and ServerOptions.
+// RootCertificateOptions contains options to obtain root trust certificates
+// for both the client and the server.
+// At most one field should be set. If none of them are set, we use the system
+// default trust certificates. Setting more than one field will result in
+// undefined behavior.
 type RootCertificateOptions struct {
-	// If field RootCACerts is set, field GetRootCAs will be ignored. RootCACerts
-	// will be used every time when verifying the peer certificates, without
-	// performing root certificate reloading.
-	RootCACerts *x509.CertPool
-	// If GetRootCAs is set and RootCACerts is nil, GetRootCAs will be invoked
-	// every time asked to check certificates sent from the server when a new
-	// connection is established.
-	// This is known as root CA certificate reloading.
-	GetRootCAs func(params *GetRootCAsParams) (*GetRootCAsResults, error)
+	// If RootCertificates is set, it will be used every time when verifying
+	// the peer certificates, without performing root certificate reloading.
+	RootCertificates *x509.CertPool
+	// If GetRootCertificates is set, it will be invoked to obtain root certs for
+	// every new connection.
+	GetRootCertificates func(params *ConnectionInfo) (*RootCertificates, error)
+	// If RootProvider is set, we will use the root certs from the Provider's
+	// KeyMaterial() call in the new connections. The Provider must have initial
+	// credentials if specified. Otherwise, KeyMaterial() will block forever.
+	RootProvider certprovider.Provider
+}
+
+// nonNilFieldCount returns the number of set fields in RootCertificateOptions.
+func (o RootCertificateOptions) nonNilFieldCount() int {
+	cnt := 0
+	rv := reflect.ValueOf(o)
+	for i := 0; i < rv.NumField(); i++ {
+		if !rv.Field(i).IsNil() {
+			cnt++
+		}
+	}
+	return cnt
+}
+
+// IdentityCertificateOptions contains options to obtain identity certificates
+// for both the client and the server.
+// At most one field should be set. Setting more than one field will result in undefined behavior.
+type IdentityCertificateOptions struct {
+	// If Certificates is set, it will be used every time when needed to present
+	// identity certificates, without performing identity certificate reloading.
+	Certificates []tls.Certificate
+	// If GetIdentityCertificatesForClient is set, it will be invoked to obtain
+	// identity certs for every new connection.
+	// This field is only relevant when set on the client side.
+	GetIdentityCertificatesForClient func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
+	// If GetIdentityCertificatesForServer is set, it will be invoked to obtain
+	// identity certs for every new connection.
+	// This field is only relevant when set on the server side.
+	GetIdentityCertificatesForServer func(*tls.ClientHelloInfo) ([]*tls.Certificate, error)
+	// If IdentityProvider is set, we will use the identity certs from the
+	// Provider's KeyMaterial() call in the new connections. The Provider must
+	// have initial credentials if specified. Otherwise, KeyMaterial() will block
+	// forever.
+	IdentityProvider certprovider.Provider
+}
+
+// nonNilFieldCount returns the number of set fields in IdentityCertificateOptions.
+func (o IdentityCertificateOptions) nonNilFieldCount() int {
+	cnt := 0
+	rv := reflect.ValueOf(o)
+	for i := 0; i < rv.NumField(); i++ {
+		if !rv.Field(i).IsNil() {
+			cnt++
+		}
+	}
+	return cnt
 }
 
 // VerificationType is the enum type that represents different levels of
@@ -112,131 +175,157 @@ const (
 	SkipVerification
 )
 
-// ClientOptions contains all the fields and functions needed to be filled by
-// the client.
-// General rules for certificate setting on client side:
-// Certificates or GetClientCertificate indicates the certificates sent from
-// the client to the server to prove client's identities. The rules for setting
-// these two fields are:
-// If requiring mutual authentication on server side:
-//
-//	Either Certificates or GetClientCertificate must be set; the other will
-//	be ignored.
-//
-// Otherwise:
-//
-//	Nothing needed(the two fields will be ignored).
-type ClientOptions struct {
-	// If field Certificates is set, field GetClientCertificate will be ignored.
-	// The client will use Certificates every time when asked for a certificate,
-	// without performing certificate reloading.
-	Certificates []tls.Certificate
-	// If GetClientCertificate is set and Certificates is nil, the client will
-	// invoke this function every time asked to present certificates to the
-	// server when a new connection is established. This is known as peer
-	// certificate reloading.
-	GetClientCertificate func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
-	// VerifyPeer is a custom verification check after certificate signature
+// Options contains the fields a user can configure when setting up TLS clients
+// and servers
+type Options struct {
+	// IdentityOptions is OPTIONAL on client side. This field only needs to be
+	// set if mutual authentication is required on server side.
+	// IdentityOptions is REQUIRED on server side.
+	IdentityOptions IdentityCertificateOptions
+	// AdditionalPeerVerification is a custom verification check after certificate signature
 	// check.
 	// If this is set, we will perform this customized check after doing the
-	// normal check(s) indicated by setting VType.
-	VerifyPeer CustomVerificationFunc
-	// ServerNameOverride is for testing only. If set to a non-empty string,
-	// it will override the virtual host name of authority (e.g. :authority
-	// header field) in requests.
-	ServerNameOverride string
-	// RootCertificateOptions is REQUIRED to be correctly set on client side.
-	RootCertificateOptions
-	// VType is the verification type on the client side.
-	VType VerificationType
-	// MinVersion contains the minimum TLS version that is acceptable.
-	// By default, TLS 1.2 is currently used as the minimum when acting as a
-	// client, and TLS 1.0 when acting as a server. TLS 1.0 is the minimum
-	// supported by this package, both as a client and as a server.
-	MinVersion uint16
-	// MaxVersion contains the maximum TLS version that is acceptable.
-	// By default, the maximum version supported by this package is used,
-	// which is currently TLS 1.3.
-	MaxVersion uint16
-
-	CipherSuites []uint16
-}
-
-// ServerOptions contains all the fields and functions needed to be filled by
-// the client.
-// General rules for certificate setting on server side:
-// Certificates or GetClientCertificate indicates the certificates sent from
-// the server to the client to prove server's identities. The rules for setting
-// these two fields are:
-// Either Certificates or GetCertificate must be set; the other will be ignored.
-type ServerOptions struct {
-	// If field Certificates is set, field GetClientCertificate will be ignored.
-	// The server will use Certificates every time when asked for a certificate,
-	// without performing certificate reloading.
-	Certificates []tls.Certificate
-	// If GetClientCertificate is set and Certificates is nil, the server will
-	// invoke this function every time asked to present certificates to the
-	// client when a new connection is established. This is known as peer
-	// certificate reloading.
-	GetCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
-	// VerifyPeer is a custom verification check after certificate signature
-	// check.
-	// If this is set, we will perform this customized check after doing the
-	// normal check(s) indicated by setting VType.
-	VerifyPeer CustomVerificationFunc
-	// RootCertificateOptions is only required when mutual TLS is
-	// enabled(RequireClientCert is true).
-	RootCertificateOptions
-	// If the server want the client to send certificates.
+	// normal check(s) indicated by setting VerificationType.
+	AdditionalPeerVerification PostHandshakeVerificationFunc
+	// RootOptions is OPTIONAL on server side. This field only needs to be set if
+	// mutual authentication is required(RequireClientCert is true).
+	RootOptions RootCertificateOptions
+	// If the server requires the client to send certificates. This value is only
+	// relevant when configuring options for the server. Is not used for
+	// client-side configuration.
 	RequireClientCert bool
-	// VType is the verification type on the server side.
-	VType VerificationType
-	// MinVersion contains the minimum TLS version that is acceptable.
+	// VerificationType defines what type of peer verification is done. See
+	// the `VerificationType` enum for the different options.
+	// Default: CertAndHostVerification
+	VerificationType VerificationType
+	// RevocationOptions is the configurations for certificate revocation checks.
+	// It could be nil if such checks are not needed.
+	RevocationOptions *RevocationOptions
+	// MinTLSVersion contains the minimum TLS version that is acceptable.
+	// The value should be set using tls.VersionTLSxx from https://pkg.go.dev/crypto/tls
 	// By default, TLS 1.2 is currently used as the minimum when acting as a
 	// client, and TLS 1.0 when acting as a server. TLS 1.0 is the minimum
-	// supported by this package, both as a client and as a server.
-	MinVersion uint16
-	// MaxVersion contains the maximum TLS version that is acceptable.
+	// supported by this package, both as a client and as a server.  This
+	// default may be changed over time affecting backwards compatibility.
+	MinTLSVersion uint16
+	// MaxTLSVersion contains the maximum TLS version that is acceptable.
+	// The value should be set using tls.VersionTLSxx from https://pkg.go.dev/crypto/tls
 	// By default, the maximum version supported by this package is used,
-	// which is currently TLS 1.3.
-	MaxVersion uint16
-
+	// which is currently TLS 1.3.  This default may be changed over time
+	// affecting backwards compatibility.
+	MaxTLSVersion uint16
+	// CipherSuites is an unordered list of supported TLS 1.0–1.2
+	// ciphersuites. TLS 1.3 ciphersuites are not configurable. If nil, a
+	// safe default list is used.
 	CipherSuites []uint16
+	// serverNameOverride is for testing only and only relevant on the client
+	// side. If set to a non-empty string, it will override the virtual host
+	// name of authority (e.g. :authority header field) in requests and the
+	// target hostname used during server cert verification.
+	serverNameOverride string
 }
 
-func (o *ClientOptions) config() (*tls.Config, error) {
-	if o.VType == SkipVerification && o.VerifyPeer == nil {
-		return nil, fmt.Errorf(
-			"client needs to provide custom verification mechanism if choose to skip default verification")
+func (o *Options) clientConfig() (*tls.Config, error) {
+	if o.VerificationType == SkipVerification && o.AdditionalPeerVerification == nil {
+		return nil, fmt.Errorf("client needs to provide custom verification mechanism if choose to skip default verification")
 	}
-	if o.MinVersion > o.MaxVersion {
+	// Make sure users didn't specify more than one fields in
+	// RootCertificateOptions and IdentityCertificateOptions.
+	if num := o.RootOptions.nonNilFieldCount(); num > 1 {
+		return nil, fmt.Errorf("at most one field in RootCertificateOptions could be specified")
+	}
+	if num := o.IdentityOptions.nonNilFieldCount(); num > 1 {
+		return nil, fmt.Errorf("at most one field in IdentityCertificateOptions could be specified")
+	}
+	if o.IdentityOptions.GetIdentityCertificatesForServer != nil {
+		return nil, fmt.Errorf("GetIdentityCertificatesForServer cannot be specified on the client side")
+	}
+	if o.MinTLSVersion > o.MaxTLSVersion {
 		return nil, fmt.Errorf("the minimum TLS version is larger than the maximum TLS version")
 	}
-	// We have to set InsecureSkipVerify to true to skip the default checks and
-	// use the verification function we built from buildVerifyFunc.
+	// If the MinTLSVersion isn't set, default to 1.2
+	if o.MinTLSVersion == 0 {
+		o.MinTLSVersion = tls.VersionTLS12
+	}
+	// If the MaxTLSVersion isn't set, default to 1.3
+	if o.MaxTLSVersion == 0 {
+		o.MaxTLSVersion = tls.VersionTLS13
+	}
 	config := &tls.Config{
-		ServerName:               o.ServerNameOverride,
-		Certificates:             o.Certificates,
-		GetClientCertificate:     o.GetClientCertificate,
-		RootCAs:                  o.RootCACerts,
-		InsecureSkipVerify:       true,
-		MinVersion:               o.MinVersion,
-		MaxVersion:               o.MaxVersion,
-		CipherSuites:             o.CipherSuites,
-		PreferServerCipherSuites: true,
+		ServerName: o.serverNameOverride,
+		// We have to set InsecureSkipVerify to true to skip the default checks and
+		// use the verification function we built from buildVerifyFunc.
+		InsecureSkipVerify: true,
+		MinVersion:         o.MinTLSVersion,
+		MaxVersion:         o.MaxTLSVersion,
+		CipherSuites:       o.CipherSuites,
+	}
+	// Propagate root-certificate-related fields in tls.Config.
+	switch {
+	case o.RootOptions.RootCertificates != nil:
+		config.RootCAs = o.RootOptions.RootCertificates
+	case o.RootOptions.GetRootCertificates != nil:
+		// In cases when users provide GetRootCertificates callback, since this
+		// callback is not contained in tls.Config, we have nothing to set here.
+		// We will invoke the callback in ClientHandshake.
+	case o.RootOptions.RootProvider != nil:
+		o.RootOptions.GetRootCertificates = func(*ConnectionInfo) (*RootCertificates, error) {
+			km, err := o.RootOptions.RootProvider.KeyMaterial(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			return &RootCertificates{TrustCerts: km.Roots}, nil
+		}
+	default:
+		// No root certificate options specified by user. Use the certificates
+		// stored in system default path as the last resort.
+		if o.VerificationType != SkipVerification {
+			systemRootCAs, err := x509.SystemCertPool()
+			if err != nil {
+				return nil, err
+			}
+			config.RootCAs = systemRootCAs
+		}
+	}
+	// Propagate identity-certificate-related fields in tls.Config.
+	switch {
+	case o.IdentityOptions.Certificates != nil:
+		config.Certificates = o.IdentityOptions.Certificates
+	case o.IdentityOptions.GetIdentityCertificatesForClient != nil:
+		config.GetClientCertificate = o.IdentityOptions.GetIdentityCertificatesForClient
+	case o.IdentityOptions.IdentityProvider != nil:
+		config.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			km, err := o.IdentityOptions.IdentityProvider.KeyMaterial(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			if len(km.Certs) != 1 {
+				return nil, fmt.Errorf("there should always be only one identity cert chain on the client side in IdentityProvider")
+			}
+			return &km.Certs[0], nil
+		}
+	default:
+		// It's fine for users to not specify identity certificate options here.
 	}
 	return config, nil
 }
 
-func (o *ServerOptions) config() (*tls.Config, error) {
-	if o.Certificates == nil && o.GetCertificate == nil {
-		return nil, fmt.Errorf("either Certificates or GetCertificate must be specified")
+func (o *Options) serverConfig() (*tls.Config, error) {
+	if o.RequireClientCert && o.VerificationType == SkipVerification && o.AdditionalPeerVerification == nil {
+		return nil, fmt.Errorf("server needs to provide custom verification mechanism if choose to skip default verification, but require client certificate(s)")
 	}
-	if o.RequireClientCert && o.VType == SkipVerification && o.VerifyPeer == nil {
-		return nil, fmt.Errorf(
-			"server needs to provide custom verification mechanism if choose to skip default verification, but require client certificate(s)")
+	// Make sure users didn't specify more than one fields in
+	// RootCertificateOptions and IdentityCertificateOptions.
+	if num := o.RootOptions.nonNilFieldCount(); num > 1 {
+		return nil, fmt.Errorf("at most one field in RootCertificateOptions could be specified")
 	}
-	if o.MinVersion > o.MaxVersion {
+	if num := o.IdentityOptions.nonNilFieldCount(); num > 1 {
+		return nil, fmt.Errorf("at most one field in IdentityCertificateOptions could be specified")
+	}
+	if o.IdentityOptions.GetIdentityCertificatesForClient != nil {
+		return nil, fmt.Errorf("GetIdentityCertificatesForClient cannot be specified on the server side")
+	}
+	if o.MinTLSVersion > o.MaxTLSVersion {
 		return nil, fmt.Errorf("the minimum TLS version is larger than the maximum TLS version")
 	}
 	clientAuth := tls.NoClientCert
@@ -246,17 +335,72 @@ func (o *ServerOptions) config() (*tls.Config, error) {
 		// buildVerifyFunc.
 		clientAuth = tls.RequireAnyClientCert
 	}
-	config := &tls.Config{
-		ClientAuth:               clientAuth,
-		Certificates:             o.Certificates,
-		GetCertificate:           o.GetCertificate,
-		MinVersion:               o.MinVersion,
-		MaxVersion:               o.MaxVersion,
-		CipherSuites:             o.CipherSuites,
-		PreferServerCipherSuites: true,
+	// If the MinTLSVersion isn't set, default to 1.2
+	if o.MinTLSVersion == 0 {
+		o.MinTLSVersion = tls.VersionTLS12
 	}
-	if o.RootCACerts != nil {
-		config.ClientCAs = o.RootCACerts
+	// If the MaxTLSVersion isn't set, default to 1.3
+	if o.MaxTLSVersion == 0 {
+		o.MaxTLSVersion = tls.VersionTLS13
+	}
+	config := &tls.Config{
+		ClientAuth:   clientAuth,
+		MinVersion:   o.MinTLSVersion,
+		MaxVersion:   o.MaxTLSVersion,
+		CipherSuites: o.CipherSuites,
+	}
+	// Propagate root-certificate-related fields in tls.Config.
+	switch {
+	case o.RootOptions.RootCertificates != nil:
+		config.ClientCAs = o.RootOptions.RootCertificates
+	case o.RootOptions.GetRootCertificates != nil:
+		// In cases when users provide GetRootCertificates callback, since this
+		// callback is not contained in tls.Config, we have nothing to set here.
+		// We will invoke the callback in ServerHandshake.
+	case o.RootOptions.RootProvider != nil:
+		o.RootOptions.GetRootCertificates = func(*ConnectionInfo) (*RootCertificates, error) {
+			km, err := o.RootOptions.RootProvider.KeyMaterial(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			return &RootCertificates{TrustCerts: km.Roots}, nil
+		}
+	default:
+		// No root certificate options specified by user. Use the certificates
+		// stored in system default path as the last resort.
+		if o.VerificationType != SkipVerification && o.RequireClientCert {
+			systemRootCAs, err := x509.SystemCertPool()
+			if err != nil {
+				return nil, err
+			}
+			config.ClientCAs = systemRootCAs
+		}
+	}
+	// Propagate identity-certificate-related fields in tls.Config.
+	switch {
+	case o.IdentityOptions.Certificates != nil:
+		config.Certificates = o.IdentityOptions.Certificates
+	case o.IdentityOptions.GetIdentityCertificatesForServer != nil:
+		config.GetCertificate = func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			return buildGetCertificates(clientHello, o)
+		}
+	case o.IdentityOptions.IdentityProvider != nil:
+		o.IdentityOptions.GetIdentityCertificatesForServer = func(*tls.ClientHelloInfo) ([]*tls.Certificate, error) {
+			km, err := o.IdentityOptions.IdentityProvider.KeyMaterial(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			var certChains []*tls.Certificate
+			for i := 0; i < len(km.Certs); i++ {
+				certChains = append(certChains, &km.Certs[i])
+			}
+			return certChains, nil
+		}
+		config.GetCertificate = func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			return buildGetCertificates(clientHello, o)
+		}
+	default:
+		return nil, fmt.Errorf("needs to specify at least one field in IdentityCertificateOptions")
 	}
 	return config, nil
 }
@@ -264,11 +408,12 @@ func (o *ServerOptions) config() (*tls.Config, error) {
 // advancedTLSCreds is the credentials required for authenticating a connection
 // using TLS.
 type advancedTLSCreds struct {
-	config     *tls.Config
-	verifyFunc CustomVerificationFunc
-	getRootCAs func(params *GetRootCAsParams) (*GetRootCAsResults, error)
-	isClient   bool
-	vType      VerificationType
+	config              *tls.Config
+	verifyFunc          PostHandshakeVerificationFunc
+	getRootCertificates func(params *ConnectionInfo) (*RootCertificates, error)
+	isClient            bool
+	revocationOptions   *RevocationOptions
+	verificationType    VerificationType
 }
 
 func (c advancedTLSCreds) Info() credentials.ProtocolInfo {
@@ -281,13 +426,14 @@ func (c advancedTLSCreds) Info() credentials.ProtocolInfo {
 
 func (c *advancedTLSCreds) ClientHandshake(ctx context.Context, authority string, rawConn net.Conn) (net.Conn, credentials.AuthInfo, error) {
 	// Use local cfg to avoid clobbering ServerName if using multiple endpoints.
-	cfg := cloneTLSConfig(c.config)
+	cfg := credinternal.CloneTLSConfig(c.config)
 	// We return the full authority name to users if ServerName is empty without
 	// stripping the trailing port.
 	if cfg.ServerName == "" {
 		cfg.ServerName = authority
 	}
-	cfg.VerifyPeerCertificate = buildVerifyFunc(c, cfg.ServerName, rawConn)
+	peerVerifiedChains := CertificateChains{}
+	cfg.VerifyPeerCertificate = buildVerifyFunc(c, cfg.ServerName, rawConn, &peerVerifiedChains)
 	conn := tls.Client(rawConn, cfg)
 	errChannel := make(chan error, 1)
 	go func() {
@@ -310,12 +456,15 @@ func (c *advancedTLSCreds) ClientHandshake(ctx context.Context, authority string
 			SecurityLevel: credentials.PrivacyAndIntegrity,
 		},
 	}
-	return WrapSyscallConn(rawConn, conn), info, nil
+	info.SPIFFEID = credinternal.SPIFFEIDFromState(conn.ConnectionState())
+	info.State.VerifiedChains = peerVerifiedChains
+	return credinternal.WrapSyscallConn(rawConn, conn), info, nil
 }
 
 func (c *advancedTLSCreds) ServerHandshake(rawConn net.Conn) (net.Conn, credentials.AuthInfo, error) {
-	cfg := cloneTLSConfig(c.config)
-	cfg.VerifyPeerCertificate = buildVerifyFunc(c, "", rawConn)
+	cfg := credinternal.CloneTLSConfig(c.config)
+	peerVerifiedChains := CertificateChains{}
+	cfg.VerifyPeerCertificate = buildVerifyFunc(c, "", rawConn, &peerVerifiedChains)
 	conn := tls.Server(rawConn, cfg)
 	if err := conn.Handshake(); err != nil {
 		conn.Close()
@@ -327,15 +476,17 @@ func (c *advancedTLSCreds) ServerHandshake(rawConn net.Conn) (net.Conn, credenti
 			SecurityLevel: credentials.PrivacyAndIntegrity,
 		},
 	}
-	return WrapSyscallConn(rawConn, conn), info, nil
+	info.SPIFFEID = credinternal.SPIFFEIDFromState(conn.ConnectionState())
+	info.State.VerifiedChains = peerVerifiedChains
+	return credinternal.WrapSyscallConn(rawConn, conn), info, nil
 }
 
 func (c *advancedTLSCreds) Clone() credentials.TransportCredentials {
 	return &advancedTLSCreds{
-		config:     cloneTLSConfig(c.config),
-		verifyFunc: c.verifyFunc,
-		getRootCAs: c.getRootCAs,
-		isClient:   c.isClient,
+		config:              credinternal.CloneTLSConfig(c.config),
+		verifyFunc:          c.verifyFunc,
+		getRootCertificates: c.getRootCertificates,
+		isClient:            c.isClient,
 	}
 }
 
@@ -351,21 +502,35 @@ func (c *advancedTLSCreds) OverrideServerName(serverNameOverride string) error {
 //  1. does not have a good support on root cert reloading.
 //  2. will ignore basic certificate check when setting InsecureSkipVerify
 //     to true.
+//
+// peerVerifiedChains(output param): verified chain of certs from leaf to the
+// trust cert that the peer trusts.
+//  1. For server it is, client certs + Root ca that the server trusts
+//  2. For client it is, server certs + Root ca that the client trusts
 func buildVerifyFunc(c *advancedTLSCreds,
 	serverName string,
-	rawConn net.Conn) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	rawConn net.Conn,
+	peerVerifiedChains *CertificateChains) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		chains := verifiedChains
 		var leafCert *x509.Certificate
-		if c.vType == CertAndHostVerification || c.vType == CertVerification {
+		rawCertList := make([]*x509.Certificate, len(rawCerts))
+		for i, asn1Data := range rawCerts {
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				return err
+			}
+			rawCertList[i] = cert
+		}
+		if c.verificationType == CertAndHostVerification || c.verificationType == CertVerification {
 			// perform possible trust credential reloading and certificate check
 			rootCAs := c.config.RootCAs
 			if !c.isClient {
 				rootCAs = c.config.ClientCAs
 			}
 			// Reload root CA certs.
-			if rootCAs == nil && c.getRootCAs != nil {
-				results, err := c.getRootCAs(&GetRootCAsParams{
+			if rootCAs == nil && c.getRootCertificates != nil {
+				results, err := c.getRootCertificates(&ConnectionInfo{
 					RawConn:  rawConn,
 					RawCerts: rawCerts,
 				})
@@ -375,14 +540,6 @@ func buildVerifyFunc(c *advancedTLSCreds,
 				rootCAs = results.TrustCerts
 			}
 			// Verify peers' certificates against RootCAs and get verifiedChains.
-			certs := make([]*x509.Certificate, len(rawCerts))
-			for i, asn1Data := range rawCerts {
-				cert, err := x509.ParseCertificate(asn1Data)
-				if err != nil {
-					return err
-				}
-				certs[i] = cert
-			}
 			keyUsages := []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 			if !c.isClient {
 				keyUsages = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
@@ -393,125 +550,87 @@ func buildVerifyFunc(c *advancedTLSCreds,
 				Intermediates: x509.NewCertPool(),
 				KeyUsages:     keyUsages,
 			}
-			for _, cert := range certs[1:] {
+			for _, cert := range rawCertList[1:] {
 				opts.Intermediates.AddCert(cert)
 			}
 			// Perform default hostname check if specified.
-			if c.isClient && c.vType == CertAndHostVerification && serverName != "" {
-				opts.DNSName = serverName
+			if c.isClient && c.verificationType == CertAndHostVerification && serverName != "" {
+				parsedName, _, err := net.SplitHostPort(serverName)
+				if err != nil {
+					// If the serverName had no host port or if the serverName cannot be
+					// parsed, use it as-is.
+					parsedName = serverName
+				}
+				opts.DNSName = parsedName
 			}
 			var err error
-			chains, err = certs[0].Verify(opts)
+			chains, err = rawCertList[0].Verify(opts)
 			if err != nil {
 				return err
 			}
-			leafCert = certs[0]
+			leafCert = rawCertList[0]
+		}
+		// Perform certificate revocation check if specified.
+		if c.revocationOptions != nil {
+			verifiedChains := chains
+			if verifiedChains == nil {
+				verifiedChains = CertificateChains{rawCertList}
+			}
+			if err := checkChainRevocation(verifiedChains, *c.revocationOptions); err != nil {
+				return err
+			}
 		}
 		// Perform custom verification check if specified.
 		if c.verifyFunc != nil {
-			_, err := c.verifyFunc(&VerificationFuncParams{
+			_, err := c.verifyFunc(&HandshakeVerificationInfo{
 				ServerName:     serverName,
 				RawCerts:       rawCerts,
 				VerifiedChains: chains,
 				Leaf:           leafCert,
 			})
-			return err
+			if err != nil {
+				return err
+			}
 		}
+		*peerVerifiedChains = chains
 		return nil
 	}
 }
 
 // NewClientCreds uses ClientOptions to construct a TransportCredentials based
 // on TLS.
-func NewClientCreds(o *ClientOptions) (credentials.TransportCredentials, error) {
-	conf, err := o.config()
+func NewClientCreds(o *Options) (credentials.TransportCredentials, error) {
+	conf, err := o.clientConfig()
 	if err != nil {
 		return nil, err
 	}
 	tc := &advancedTLSCreds{
-		config:     conf,
-		isClient:   true,
-		getRootCAs: o.GetRootCAs,
-		verifyFunc: o.VerifyPeer,
-		vType:      o.VType,
+		config:              conf,
+		isClient:            true,
+		getRootCertificates: o.RootOptions.GetRootCertificates,
+		verifyFunc:          o.AdditionalPeerVerification,
+		revocationOptions:   o.RevocationOptions,
+		verificationType:    o.VerificationType,
 	}
-	tc.config.NextProtos = appendH2ToNextProtos(tc.config.NextProtos)
+	tc.config.NextProtos = credinternal.AppendH2ToNextProtos(tc.config.NextProtos)
 	return tc, nil
 }
 
 // NewServerCreds uses ServerOptions to construct a TransportCredentials based
 // on TLS.
-func NewServerCreds(o *ServerOptions) (credentials.TransportCredentials, error) {
-	conf, err := o.config()
+func NewServerCreds(o *Options) (credentials.TransportCredentials, error) {
+	conf, err := o.serverConfig()
 	if err != nil {
 		return nil, err
 	}
 	tc := &advancedTLSCreds{
-		config:     conf,
-		isClient:   false,
-		getRootCAs: o.GetRootCAs,
-		verifyFunc: o.VerifyPeer,
-		vType:      o.VType,
+		config:              conf,
+		isClient:            false,
+		getRootCertificates: o.RootOptions.GetRootCertificates,
+		verifyFunc:          o.AdditionalPeerVerification,
+		revocationOptions:   o.RevocationOptions,
+		verificationType:    o.VerificationType,
 	}
-	tc.config.NextProtos = appendH2ToNextProtos(tc.config.NextProtos)
+	tc.config.NextProtos = credinternal.AppendH2ToNextProtos(tc.config.NextProtos)
 	return tc, nil
-}
-
-// TODO(ZhenLian): The code below are duplicates with gRPC-Go under
-//
-//	credentials/internal. Consider refactoring in the future.
-const alpnProtoStrH2 = "h2"
-
-func appendH2ToNextProtos(ps []string) []string {
-	for _, p := range ps {
-		if p == alpnProtoStrH2 {
-			return ps
-		}
-	}
-	ret := make([]string, 0, len(ps)+1)
-	ret = append(ret, ps...)
-	return append(ret, alpnProtoStrH2)
-}
-
-// We give syscall.Conn a new name here since syscall.Conn and net.Conn used
-// below have the same names.
-type sysConn = syscall.Conn
-
-// syscallConn keeps reference of rawConn to support syscall.Conn for channelz.
-// SyscallConn() (the method in interface syscall.Conn) is explicitly
-// implemented on this type,
-//
-// Interface syscall.Conn is implemented by most net.Conn implementations (e.g.
-// TCPConn, UnixConn), but is not part of net.Conn interface. So wrapper conns
-// that embed net.Conn don't implement syscall.Conn. (Side note: tls.Conn
-// doesn't embed net.Conn, so even if syscall.Conn is part of net.Conn, it won't
-// help here).
-type syscallConn struct {
-	net.Conn
-	// sysConn is a type alias of syscall.Conn. It's necessary because the name
-	// `Conn` collides with `net.Conn`.
-	sysConn
-}
-
-// WrapSyscallConn tries to wrap rawConn and newConn into a net.Conn that
-// implements syscall.Conn. rawConn will be used to support syscall, and newConn
-// will be used for read/write.
-//
-// This function returns newConn if rawConn doesn't implement syscall.Conn.
-func WrapSyscallConn(rawConn, newConn net.Conn) net.Conn {
-	sysConn, ok := rawConn.(syscall.Conn)
-	if !ok {
-		return newConn
-	}
-	return &syscallConn{
-		Conn:    newConn,
-		sysConn: sysConn,
-	}
-}
-
-func cloneTLSConfig(cfg *tls.Config) *tls.Config {
-	if cfg == nil {
-		return &tls.Config{}
-	}
-	return cfg.Clone()
 }
