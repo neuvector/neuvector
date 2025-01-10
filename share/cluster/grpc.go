@@ -51,24 +51,26 @@ type GRPCServer struct {
 }
 
 func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
-	options := &advancedtls.ServerOptions{
-		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-			log.Debug("Server getting certificates")
-			_, cert, _ := GetInternalCert()
+	options := &advancedtls.Options{
+		IdentityOptions: advancedtls.IdentityCertificateOptions{
+			GetIdentityCertificatesForServer: func(*tls.ClientHelloInfo) ([]*tls.Certificate, error) {
+				log.Debug("Server getting certificates")
+				_, cert, _ := GetInternalCert()
 
-			return cert, nil
+				return []*tls.Certificate{cert}, nil
+			},
 		},
-		RootCertificateOptions: advancedtls.RootCertificateOptions{
-			GetRootCAs: func(params *advancedtls.GetRootCAsParams) (*advancedtls.GetRootCAsResults, error) {
+		RootOptions: advancedtls.RootCertificateOptions{
+			GetRootCertificates: func(params *advancedtls.ConnectionInfo) (*advancedtls.RootCertificates, error) {
 				log.Debug("Server getting root CAs")
 				caCertPool, _, _ := GetInternalCert()
 
-				return &advancedtls.GetRootCAsResults{
+				return &advancedtls.RootCertificates{
 					TrustCerts: caCertPool,
 				}, nil
 			},
 		},
-		VerifyPeer: func(params *advancedtls.VerificationFuncParams) (*advancedtls.VerificationResults, error) {
+		AdditionalPeerVerification: func(params *advancedtls.HandshakeVerificationInfo) (*advancedtls.PostHandshakeVerificationResults, error) {
 			log.Debug("Server checking CN")
 			_, _, cn := GetInternalCert()
 			if params.Leaf == nil || len(params.Leaf.DNSNames) == 0 {
@@ -79,12 +81,12 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 				log.Warnf("server name is invalid: %s", params.Leaf.DNSNames[0])
 				return nil, fmt.Errorf("server name is invalid: %s", params.Leaf.DNSNames[0])
 			}
-			return &advancedtls.VerificationResults{}, nil
+			return &advancedtls.PostHandshakeVerificationResults{}, nil
 		},
 		RequireClientCert: true,
-		VType:             advancedtls.CertVerification,
-		MinVersion:        tls.VersionTLS11,
-		MaxVersion:        tls.VersionTLS13,
+		VerificationType:  advancedtls.CertVerification,
+		MinTLSVersion:     tls.VersionTLS11,
+		MaxTLSVersion:     tls.VersionTLS13,
 		CipherSuites:      utils.GetSupportedTLSCipherSuites(),
 	}
 
@@ -270,24 +272,26 @@ func (c *GRPCClient) monitorGRPCConnectivity(ctx context.Context) {
 
 // For backward compatibility.  Use internal certs.
 func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback, compress bool) (*GRPCClient, error) {
-	options := &advancedtls.ClientOptions{
-		GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			log.Debug("Client getting certificates")
-			_, cert, _ := GetInternalCert()
+	options := &advancedtls.Options{
+		IdentityOptions: advancedtls.IdentityCertificateOptions{
+			GetIdentityCertificatesForClient: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				log.Debug("Client getting certificates")
+				_, cert, _ := GetInternalCert()
 
-			return cert, nil
+				return cert, nil
+			},
 		},
-		RootCertificateOptions: advancedtls.RootCertificateOptions{
-			GetRootCAs: func(params *advancedtls.GetRootCAsParams) (*advancedtls.GetRootCAsResults, error) {
+		RootOptions: advancedtls.RootCertificateOptions{
+			GetRootCertificates: func(params *advancedtls.ConnectionInfo) (*advancedtls.RootCertificates, error) {
 				log.Debug("Client getting root CAs")
 				caCertPool, _, _ := GetInternalCert()
 
-				return &advancedtls.GetRootCAsResults{
+				return &advancedtls.RootCertificates{
 					TrustCerts: caCertPool,
 				}, nil
 			},
 		},
-		VerifyPeer: func(params *advancedtls.VerificationFuncParams) (*advancedtls.VerificationResults, error) {
+		AdditionalPeerVerification: func(params *advancedtls.HandshakeVerificationInfo) (*advancedtls.PostHandshakeVerificationResults, error) {
 			log.Debug("Client checking CN")
 			_, _, cn := GetInternalCert()
 			if params.Leaf == nil || len(params.Leaf.DNSNames) == 0 {
@@ -295,14 +299,14 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 			}
 			if params.Leaf.DNSNames[0] != cn {
 				log.Warnf("server name is invalid: %s", params.Leaf.DNSNames[0])
-				return &advancedtls.VerificationResults{}, fmt.Errorf("server name is invalid: %s", params.Leaf.DNSNames[0])
+				return &advancedtls.PostHandshakeVerificationResults{}, fmt.Errorf("server name is invalid: %s", params.Leaf.DNSNames[0])
 			}
 			return nil, nil
 		},
-		VType:        advancedtls.CertVerification, // Custom check is performed in VerifyPeer().
-		MinVersion:   tls.VersionTLS11,
-		MaxVersion:   tls.VersionTLS13,
-		CipherSuites: utils.GetSupportedTLSCipherSuites(),
+		VerificationType: advancedtls.CertVerification, // Custom check is performed in VerifyPeer().
+		MinTLSVersion:    tls.VersionTLS11,
+		MaxTLSVersion:    tls.VersionTLS13,
+		CipherSuites:     utils.GetSupportedTLSCipherSuites(),
 	}
 
 	ct, err := advancedtls.NewClientCreds(options)
