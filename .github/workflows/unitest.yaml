@@ -12,6 +12,9 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version: '1.22.9'
+    - name: Install dependencies
+      run: |
+        sudo apt update && sudo apt install -y libpcre3-dev
     - run: |
         ./unitest.sh
     - uses: actions/setup-node@v4
