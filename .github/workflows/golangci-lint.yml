@@ -17,6 +17,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: Install dependencies
+        run: |
+          sudo apt update && sudo apt install -y libpcre3-dev
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
