@@ -1314,6 +1314,8 @@ type RESTPolicyRule struct {
 	LastModTS    int64    `json:"last_modified_timestamp"`
 	CfgType      string   `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	Priority     uint32   `json:"priority"`
+	MatchCntr    uint64   `json:"match_counter"`
+	LastMatchTS  int64    `json:"last_match_timestamp"`
 }
 
 type RESTPolicyRuleData struct {

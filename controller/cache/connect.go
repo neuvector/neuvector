@@ -720,6 +720,45 @@ func CalculateGroupMetric(conn *share.CLUSConnection) {
 	}
 }
 
+func UpdatePolicyMetric() {
+	cacheMutexLock()
+	defer cacheMutexUnlock()
+	for polId, polMet := range policyMetricMap {
+		if exist, ok := policyCache.ruleMap[polId]; ok {
+			exist.MatchCntr = polMet.MatchCntr
+			exist.LastMatchAt = time.Unix(int64(polMet.LastMatchAt), 0).UTC()
+		} else {
+			delete(policyMetricMap, polId)
+		}
+	}
+}
+
+func calNetPolicyMet(conn *share.CLUSConnection) {
+	if conn.PolicyId > 0 && (conn.PolicyAction == C.DP_POLICY_ACTION_ALLOW ||
+		conn.PolicyAction == C.DP_POLICY_ACTION_VIOLATE || conn.PolicyAction == C.DP_POLICY_ACTION_DENY) {
+		cacheMutexLock()
+		defer cacheMutexUnlock()
+
+		polId := conn.PolicyId
+		if policyMetricMap == nil {
+			policyMetricMap = make(map[uint32]*share.CLUSNetPolicyMetric)
+		}
+		if polMet, ok := policyMetricMap[polId]; ok {
+			polMet.MatchCntr = polMet.MatchCntr + 1
+			if polMet.LastMatchAt <= conn.LastSeenAt {
+				polMet.LastMatchAt = conn.LastSeenAt
+			}
+		} else {
+			polMetric := &share.CLUSNetPolicyMetric{
+				ID:          polId,
+				MatchCntr:   1,
+				LastMatchAt: conn.LastSeenAt,
+			}
+			policyMetricMap[polId] = polMetric
+		}
+	}
+}
+
 func UpdateConnections(conns []*share.CLUSConnection) {
 	//syncLock(syncCatgGraphIdx)
 	// use graph lock instead of sync lock for simplicity
@@ -731,6 +770,8 @@ func UpdateConnections(conns []*share.CLUSConnection) {
 		if !preQualifyConnect(conn) {
 			continue
 		}
+
+		calNetPolicyMet(conn)
 		if conn.Ingress {
 			CalculateGroupMetric(conn)
 		}

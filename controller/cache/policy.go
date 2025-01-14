@@ -85,6 +85,11 @@ func policyRule2REST(rule *share.CLUSPolicyRule) *api.RESTPolicyRule {
 		CreatedTS:    rule.CreatedAt.Unix(),
 		LastModTS:    rule.LastModAt.Unix(),
 		Priority:     rule.Priority,
+		MatchCntr:    rule.MatchCntr,
+		LastMatchTS:  rule.LastMatchAt.Unix(),
+	}
+	if r.MatchCntr == 0 {
+		r.LastMatchTS = 0
 	}
 	r.CfgType = cfgTypeMapping[rule.CfgType]
 
@@ -142,6 +147,8 @@ func ruleContains(r1, r2 *share.CLUSPolicyRule) bool {
 	}
 	return true
 }
+
+var policyMetricMap map[uint32]*share.CLUSNetPolicyMetric = make(map[uint32]*share.CLUSNetPolicyMetric)
 
 func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	var del *share.CLUSPolicyRule
@@ -226,6 +233,7 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 					g.usedByPolicy.Remove(exist.ID)
 				}
 				delete(policyCache.ruleMap, id)
+				delete(policyMetricMap, id)
 				del = exist
 			}
 			cacheMutexUnlock()
