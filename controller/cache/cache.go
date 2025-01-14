@@ -1643,6 +1643,7 @@ const pruneKVPeriod = time.Duration(time.Minute * 30)
 const pruneGroupPeriod = time.Duration(time.Minute * 1)
 const rmEmptyGroupPeriod = time.Duration(time.Minute * 1)
 const groupMetricCheckPeriod = time.Duration(time.Minute * 1)
+const policyMetricCheckPeriod = time.Duration(time.Second * 20)
 
 var unManagedWlTimer *time.Timer
 
@@ -1657,6 +1658,7 @@ func startWorkerThread(ctx *Context) {
 		pruneTicker.Stop()
 	}
 	groupMetricCheckTicker := time.NewTicker(groupMetricCheckPeriod)
+	policyMetricCheckTicker := time.NewTicker(policyMetricCheckPeriod)
 
 	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
@@ -1687,6 +1689,8 @@ func startWorkerThread(ctx *Context) {
 				if isLeader() {
 					CheckGroupMetric()
 				}
+			case <-policyMetricCheckTicker.C:
+				UpdatePolicyMetric()
 			case <-teleReportTicker.C:
 				if isLeader() {
 					if !noTelemetry {
