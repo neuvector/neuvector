@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -718,8 +719,8 @@ func reportLearnedProcess() {
 		learnedProcessMtx.Unlock()
 		return
 	}
-	tmp := learnedProcess
-	learnedProcess = nil
+	tmp := slices.Clone(learnedProcess)
+	learnedProcess = learnedProcess[:0]
 	learnedProcessMtx.Unlock()
 
 	cnt := len(tmp)
