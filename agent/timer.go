@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -252,8 +253,8 @@ func updateContainerStats(cpuSystem uint64) {
 
 func putFqdnIps() {
 	fqdnIpMutex.Lock()
-	fqdnips := fqdnIpCache
-	fqdnIpCache = nil
+	fqdnips := slices.Clone(fqdnIpCache)
+	fqdnIpCache = fqdnIpCache[:0]
 	fqdnIpMutex.Unlock()
 
 	for _, fqdnip := range fqdnips {
@@ -271,8 +272,8 @@ func putFqdnIps() {
 
 func putThreatLogs() {
 	threatMutex.Lock()
-	tmp := threatLogCache
-	threatLogCache = nil
+	tmp := slices.Clone(threatLogCache)
+	threatLogCache = threatLogCache[:0]
 	threatMutex.Unlock()
 
 	tlogs := make([]*share.CLUSThreatLog, 0)
@@ -307,8 +308,8 @@ func putThreatLogs() {
 // -- incidents
 func putIncidentLogs() {
 	incidentMutex.Lock()
-	tmp := incidentLogCache
-	incidentLogCache = nil
+	tmp := slices.Clone(incidentLogCache)
+	incidentLogCache = incidentLogCache[:0]
 	incidentMutex.Unlock()
 
 	if len(tmp) > 0 {
@@ -325,8 +326,8 @@ func putIncidentLogs() {
 // -- audit
 func putAuditLogs() {
 	auditMutex.Lock()
-	tmp := auditLogCache
-	auditLogCache = nil
+	tmp := slices.Clone(auditLogCache)
+	auditLogCache = auditLogCache[:0]
 	auditMutex.Unlock()
 
 	if len(tmp) > 0 {
@@ -356,8 +357,8 @@ func keyOtherConnection(conn *dp.Connection) string {
 
 func updateConnection() {
 	connsCacheMutex.Lock()
-	conns := connsCache
-	connsCache = nil
+	conns := slices.Clone(connsCache)
+	connsCache = connsCache[:0]
 	connsCacheMutex.Unlock()
 
 	for _, data := range conns {
