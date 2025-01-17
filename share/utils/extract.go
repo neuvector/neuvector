@@ -21,10 +21,14 @@ var (
 	ErrCouldNotWriteToDisk = errors.New("could not write to disk")
 )
 
-// SelectivelyExtractArchive extracts the specified files and folders
+// ExtractAllArchiveData extracts all files and folders
 // from targz data read from the given reader and store them in a map indexed by file paths
-func SelectivelyExtractArchive(r io.Reader, selected func(string) bool) (map[string][]byte, error) {
+func ExtractAllArchiveData(r io.Reader) (map[string][]byte, error) {
 	data := make(map[string][]byte)
+
+	selected := func(filename string) bool {
+		return true
+	}
 
 	extract := func(filename string, size int64, reader io.ReadCloser) error {
 		// File size limit
