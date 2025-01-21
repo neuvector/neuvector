@@ -232,6 +232,9 @@ github.com/containerd/typeurl
 # github.com/containerd/typeurl/v2 v2.1.1
 ## explicit; go 1.13
 github.com/containerd/typeurl/v2
+# github.com/coreos/clair v2.1.0+incompatible
+## explicit
+github.com/coreos/clair/pkg/tarutil
 # github.com/cpuguy83/go-md2man/v2 v2.0.2
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
