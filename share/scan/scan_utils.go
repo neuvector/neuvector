@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"archive/tar"
 	"archive/zip"
 	"bufio"
 	"bytes"
@@ -200,7 +199,7 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 		log.WithFields(log.Fields{"id": id}).Debug("Empty libary files")
 		return nil, share.ScanErrorCode_ScanErrNotSupport
 	}
-	buf, err := MakeTar(files)
+	buf, err := utils.MakeTar(files)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("make TAR error")
 		return nil, share.ScanErrorCode_ScanErrFileSystem
@@ -222,7 +221,7 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 	pkgs := apps.marshal()
 	files := make(tarutil.FilesMap)
 	files[AppFileName] = pkgs
-	buf, _ := MakeTar(files)
+	buf, _ := utils.MakeTar(files)
 	appPkgs := apps.Data()[path]
 	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone
 }
@@ -625,25 +624,4 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 		}
 	}
 	return appPkg, nil
-}
-
-func MakeTar(files tarutil.FilesMap) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	tw := tar.NewWriter(buf)
-	defer tw.Close()
-	for name, body := range files {
-		hdr := &tar.Header{
-			Name:     name,
-			Mode:     0655,
-			Typeflag: tar.TypeReg,
-			Size:     int64(len(body)),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return nil, err
-		}
-		if _, err := tw.Write([]byte(body)); err != nil {
-			return nil, err
-		}
-	}
-	return buf, nil
 }
