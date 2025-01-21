@@ -1557,6 +1557,12 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 
 			if rc.AuthByPlatform != nil {
 				if cconf.AuthByPlatform && !*rc.AuthByPlatform {
+					if strings.HasPrefix(login.server, share.FlavorRancher) {
+						e := "User authenticated by RBAC is not allowed to disable \"Authenticate using RBAC\""
+						log.Error(e)
+						restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+						return kick, errors.New(e)
+					}
 					kick = true
 				}
 				cconf.AuthByPlatform = *rc.AuthByPlatform
