@@ -1241,7 +1241,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
-	crdHandler.Init(share.CLUSLockPolicyKey)
+	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
 	if crdHandler.AcquireLock(clusterLockWait) {
 		defer crdHandler.ReleaseLock()
 

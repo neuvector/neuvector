@@ -398,3 +398,272 @@ func TestGroupDelete(t *testing.T) {
 
 	postTest()
 }
+
+func TestParseGroupYamlFile(t *testing.T) {
+	preTest()
+
+	importData := []byte(`apiVersion: v1
+items:
+- apiVersion: neuvector.com/v1
+  kind: NvGroupDefinition
+  metadata:
+    name: g-1
+    namespace: neuvector
+  spec:
+    selector:
+      comment: ""
+      criteria:
+      - key: container
+        op: =
+        value: myServer12
+      name: g-1
+- apiVersion: neuvector.com/v1
+  kind: NvGroupDefinition
+  metadata:
+    name: g-2
+    namespace: neuvector
+  spec:
+    selector:
+      comment: ""
+      criteria:
+      - key: container
+        op: =
+        value: myServer2
+      name: g-2
+- apiVersion: neuvector.com/v1
+  kind: NvGroupDefinition
+  metadata:
+    name: g-3
+    namespace: neuvector
+  spec:
+    selector:
+      comment: ""
+      criteria:
+      - key: container
+        op: =
+        value: myServer3
+      name: g-3
+kind: List
+metadata: {}
+
+---
+
+apiVersion: neuvector.com/v1
+kind: NvGroupDefinition
+metadata:
+  creationTimestamp: null
+  name: nv.iperfserver.demo4
+  namespace: neuvector
+spec:
+  selector:
+    comment: ""
+    criteria:
+    - key: service
+      op: =
+      value: iperfserver.demo4
+    - key: domain
+      op: =
+      value: demo4
+    name: nv.iperfserver.demo4
+
+---
+
+apiVersion: v1
+items:
+- apiVersion: neuvector.com/v1
+  kind: NvSecurityRule
+  metadata:
+    creationTimestamp: null
+    name: nv.ip.kubernetes.default
+    namespace: default
+  spec:
+    egress: []
+    file: []
+    ingress:
+    - action: deny
+      applications:
+      - any
+      name: nv.ip.kubernetes.default-ingress-0
+      ports: any
+      priority: 0
+      selector:
+        comment: ""
+        criteria:
+        - key: container
+          op: =
+          value: myServer
+        name: g-1
+        original_name: ""
+    - action: deny
+      applications:
+      - any
+      name: nv.ip.kubernetes.default-ingress-1
+      ports: any
+      priority: 0
+      selector:
+        comment: ""
+        criteria:
+        - key: container
+          op: =
+          value: myServer2
+        name: g-1-192398063-2
+        original_name: ""
+    - action: deny
+      applications:
+      - any
+      name: nv.ip.kubernetes.default-ingress-2
+      ports: any
+      priority: 0
+      selector:
+        comment: ""
+        criteria:
+        - key: container
+          op: =
+          value: myServer
+        name: g-1
+        original_name: ""
+    process: []
+    target:
+      policymode: N/A
+      selector:
+        comment: ""
+        criteria:
+        - key: address
+          op: =
+          value: 10.43.0.1
+        - key: domain
+          op: =
+          value: default
+        name: nv.ip.kubernetes.default
+        original_name: ""
+- apiVersion: neuvector.com/v1
+  kind: NvClusterSecurityRule
+  metadata:
+    name: g-1
+  spec:
+    dlp:
+      settings: []
+      status: true
+    egress: []
+    file: []
+    ingress: []
+    process: []
+    target:
+      policymode: N/A
+      selector:
+        comment: ""
+        criteria:
+        - key: container
+          op: =
+          value: myServer2
+        name: g-1
+        original_name: ""
+    waf:
+      settings: []
+      status: true
+kind: List
+metadata: {}
+
+---
+
+apiVersion: neuvector.com/v1
+kind: NvSecurityRule
+metadata:
+  name: nv.iperfserver.demo4
+  namespace: demo4
+spec:
+  dlp:
+    settings: []
+    status: true
+  egress:
+  - action: deny
+    applications:
+    - MySQL
+    name: containers-egress-0
+    ports: any
+    priority: 0
+    selector:
+      comment: ""
+      name: containers
+      original_name: ""
+  - action: deny
+    applications:
+    - ZooKeeper
+    name: nodes-egress-1
+    ports: any
+    priority: 0
+    selector:
+      comment: ""
+      name: nodes
+      original_name: ""
+  file: []
+  ingress:
+  - action: deny
+    applications:
+    - Radius
+    name: nv.iperfserver.demo4-ingress-0
+    ports: any
+    priority: 0
+    selector:
+      comment: ""
+      name: g-1
+      name_referral: true
+      original_name: ""
+  - action: deny
+    applications:
+    - ZooKeeper
+    name: nv.iperfserver.demo4-ingress-1
+    ports: any
+    priority: 0
+    selector:
+      comment: ""
+      name: nodes
+      original_name: ""
+  process: []
+  process_profile:
+    baseline: zero-drift
+    mode: Discover
+  target:
+    policymode: Discover
+    selector:
+      comment: ""
+      name: nv.iperfserver.demo4
+      name_referral: true
+      original_name: ""
+  waf:
+    settings: []
+    status: true
+`)
+
+	if secRules, nvGrpDefs, err := parseGroupYamlFile(importData); err != nil {
+		t.Errorf("parseGroupYamlFile failed: %s. Expect success", err)
+	} else {
+		if len(nvGrpDefs) != 4 {
+			t.Errorf("parseGroupYamlFile: Incorrect number of valid NvGroupDefinition items parsed.")
+			t.Logf("  Expect 4 group definitions\n")
+			t.Logf("  Actual %d group definitions\n", len(nvGrpDefs))
+		}
+
+		nvSecurityRules := 0
+		nvClusterSecurityRules := 0
+		for _, r := range secRules {
+			if r.Kind == "NvSecurityRule" {
+				nvSecurityRules++
+			} else if r.Kind == "NvClusterSecurityRule" {
+				nvClusterSecurityRules++
+			}
+		}
+		if nvSecurityRules != 2 {
+			t.Errorf("parseGroupYamlFile: Incorrect number of valid NvSecurityRule items parsed.")
+			t.Logf("  Expect 2 items\n")
+			t.Logf("  Actual %d items\n", nvSecurityRules)
+		}
+		if nvClusterSecurityRules != 1 {
+			t.Errorf("parseGroupYamlFile: Incorrect number of valid NvClusterSecurityRule items parsed.")
+			t.Logf("  Expect 1 items\n")
+			t.Logf("  Actual %d items\n", nvClusterSecurityRules)
+		}
+	}
+
+	postTest()
+}

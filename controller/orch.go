@@ -205,6 +205,7 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 	rscTypes = []string{
 		resource.RscTypeCrdSecurityRule,
 		resource.RscTypeCrdClusterSecurityRule,
+		resource.RscTypeCrdGroupDefinition,
 		resource.RscTypeCrdAdmCtrlSecurityRule,
 		resource.RscTypeCrdDlpSecurityRule,
 		resource.RscTypeCrdWafSecurityRule,

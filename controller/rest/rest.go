@@ -2258,10 +2258,17 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	return err
 }
 
-func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{}, w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteExportOptions, resp interface{},
+	w http.ResponseWriter, r *http.Request, acc *access.AccessControl, login *loginSession) {
+
 	var data []byte
-	json_data, _ := json.MarshalIndent(resp, "", "  ")
-	data, _ = yaml.JSONToYAML(json_data)
+	var isRespByteSlice bool
+
+	data, isRespByteSlice = resp.([]byte)
+	if !isRespByteSlice {
+		json_data, _ := json.MarshalIndent(resp, "", "  ")
+		data, _ = yaml.JSONToYAML(json_data)
+	}
 
 	if remoteExportOptions != nil {
 		remoteExport := remote_repository.Export{

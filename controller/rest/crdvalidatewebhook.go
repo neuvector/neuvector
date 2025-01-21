@@ -276,7 +276,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			} else {
 				lockKey = share.CLUSLockPolicyKey
 			}
-			crdHandler.Init(lockKey)
+			crdHandler.Init(lockKey, importCallerK8s)
 			retryCount := 0
 			req := record.Request // *admissionv1beta1.AdmissionRequest
 			crdEventsCount = len(crdEventQueue.CrdEventRecord)
@@ -330,7 +330,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 						}
 					}
 				} else {
-					err = fmt.Errorf("unsupported Kubernetese resource type (%s)", err.Error())
+					err = fmt.Errorf("unsupported Kubernetes resource type (%s)", err.Error())
 				}
 				if err != nil {
 					errCount = 1
@@ -342,7 +342,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 								if crdHandler.crUid != string(o.GetUID()) {
 									// cr in k8s & crd request's uid are different!
 									errCount = 1
-									errMsg = fmt.Sprintf("UID in Kubernetes is %s but UID in request is %s", string(o.GetUID()), string(o.GetUID()))
+									errMsg = fmt.Sprintf("UID in Kubernetes is %s but UID in request is %s", string(o.GetUID()), crdHandler.crUid)
 								}
 							}
 						}
@@ -354,7 +354,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			if errCount == 0 {
 				if !crdHandler.AcquireLock(2 * clusterLockWait) {
 					if retryCount > 3 {
-						log.Printf("Crd dequeu proc Plicy lock FAILED")
+						log.WithFields(log.Fields{"retryCount": retryCount}).Error("Crd dequeu proc Plicy lock FAILED")
 						// push req back to kv queue
 						if _, err := q.crdProcEnqueue(record); err != nil { // record is *admissionv1beta1.AdmissionReview
 							log.WithFields(log.Fields{"error": err}).Error("crdProcEnqueue")
@@ -363,7 +363,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 						continue
 					} else {
 						retryCount++
-						log.Printf("Policy lock retry on proc crd %d", retryCount)
+						log.WithFields(log.Fields{"retryCount": retryCount}).Error("Policy lock retry on proc crd")
 						goto RETRY_POLICY_LOCK
 					}
 				}
@@ -536,18 +536,23 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		}
 
 		if !skip {
-			// Return the rest call early to prevent webhookvalidating timeout
-			if !crdReqMgr.scheduleKvEnqueue(&ar) {
-				allowed = false
-				resultMsg = fmt.Sprintf(" %s denied: too many requests received", reqOp)
+			if ar.Request.Kind.Kind == resource.NvGroupDefKind {
+				// realtime handling only for nvgroupdefinitions CR requests
+				resultMsg, allowed = whsvr.crdServeNvGroupDef(&ar)
 			} else {
-				ctx := r.Context()
-				select {
-				case <-ctx.Done():
-					// if the request is cancelled(ex: press Ctrl+C when using kubectl), log it
-					//=> what to do?
-					log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name, "error": ctx.Err()}).Info("request cancelled")
-				default:
+				// Return the rest call early to prevent webhookvalidating timeout
+				if !crdReqMgr.scheduleKvEnqueue(&ar) {
+					allowed = false
+					resultMsg = fmt.Sprintf(" %s denied: too many requests received", reqOp)
+				} else {
+					ctx := r.Context()
+					select {
+					case <-ctx.Done():
+						// if the request is cancelled(ex: press Ctrl+C when using kubectl), log it
+						//=> what to do?
+						log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name, "error": ctx.Err()}).Info("request cancelled")
+					default:
+					}
 				}
 			}
 		}
@@ -574,6 +579,48 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			}
 		}
 	}
+}
+
+func (whsvr *WebhookServer) crdServeNvGroupDef(ar *admissionv1beta1.AdmissionReview) (string, bool) {
+	var allowed bool
+	var errMsg string
+
+	req := ar.Request
+	reqOp := req.Operation
+	if req.Namespace != resource.NvAdmSvcNamespace {
+		errMsg = fmt.Sprintf("nvgroupdefinitions custom resource is only supported in %s namespace", resource.NvAdmSvcNamespace)
+	} else if reqOp == admissionv1beta1.Create || reqOp == admissionv1beta1.Update {
+		var crdHandler nvCrdHandler
+
+		kind := req.Kind.Kind
+		crdHandler.Init("", importCallerK8s)
+		crdHandler.mdName = req.Name
+		if crdSecRule, err := resource.CreateNvCrdObject(req.Resource.Resource); crdSecRule != nil {
+			if err = json.Unmarshal(req.Object.Raw, crdSecRule); err == nil {
+				if grpDef, ok := crdSecRule.(*resource.NvGroupDefinition); ok {
+					if isReservedNvGroupDefName(grpDef.GetName()) {
+						errMsg = fmt.Sprintf("group %s cannot be defined by cr", grpDef.GetName())
+					} else {
+						_, _, errMsg, _, _, _ = crdHandler.crdSecRuleHandler(req, kind, "", crdSecRule, nil)
+					}
+				}
+			} else {
+				errMsg = fmt.Sprintf("json unmarshal failed(%s)", err.Error())
+			}
+		} else {
+			errMsg = fmt.Sprintf("unsupported Kubernetes resource type (%v)", err)
+		}
+	} else if reqOp == admissionv1beta1.Delete {
+		log.WithFields(log.Fields{"op": ar.Request.Name, "reqOp": reqOp}).Info()
+	}
+	if errMsg != "" {
+		log.WithFields(log.Fields{"op": reqOp, "name": req.Name}).Error(errMsg)
+		errMsg = fmt.Sprintf("Error: %s", errMsg)
+	} else {
+		allowed = true
+	}
+
+	return errMsg, allowed
 }
 
 // Serve method for Admission Control webhook server

@@ -2811,6 +2811,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		}
 
 		lines := 0
+		var body []byte
 		if importType == share.IMPORT_TYPE_CONFIG {
 			if strings.HasPrefix(mediaType, "multipart/") {
 				lines, err = multipartImportRead(r, params, tmpfile)
@@ -2818,16 +2819,18 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				lines, err = rawImportRead(r, tmpfile)
 			}
 		} else {
-			body, _ := io.ReadAll(r.Body)
-			body = _preprocessImportBody(body)
-			var json_data []byte
-			json_data, err = yaml.YAMLToJSON(body)
-			if err != nil {
-				log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Request error")
-				restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-				return
+			if body, err = io.ReadAll(r.Body); err == nil {
+				body = _preprocessImportBody(body)
+				if importType != share.IMPORT_TYPE_GROUP_POLICY {
+					body, err = yaml.YAMLToJSON(body)
+					if err != nil {
+						log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Request error")
+						restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+						return
+					}
+				}
+				_, err = tmpfile.Write(body)
 			}
-			_, err = tmpfile.Write(json_data)
 		}
 		if err == nil {
 			var tempToken string

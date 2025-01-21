@@ -14,8 +14,10 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -453,6 +455,23 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 				value = string(data)
 				if u.Fullname == common.DefaultAdminUser && u.Server == "" {
 					importInfo.defAdminRestored = true
+				}
+			}
+		} else if ep.name == share.CFGEndpointGroup && orchPlatform == share.PlatformKubernetes {
+			var g share.CLUSGroup
+			if nvJsonUnmarshal(key, []byte(value), &g) == nil {
+				if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, g.Name); err == nil {
+					// check whether there is an nvgroupdefinitions CR with different criteria/comment in k8s
+					if o, ok := obj.(*resource.NvGroupDefinition); ok {
+						rc := make([]api.RESTCriteriaEntry, 0, len(g.Criteria))
+						for _, c := range g.Criteria {
+							rc = append(rc, api.RESTCriteriaEntry{Key: c.Key, Value: c.Value, Op: c.Op})
+						}
+						if !common.SameGroupCriteria(o.Spec.Selector.Criteria, rc, false) || o.Spec.Selector.Comment != g.Comment {
+							msg := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", g.Name)
+							log.WithFields(log.Fields{"restored": rc, "cr": o.Spec.Selector.Criteria}).Warn(msg)
+						}
+					}
 				}
 			}
 		}
