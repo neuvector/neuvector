@@ -94,6 +94,8 @@ const (
 	nvCrdRoleBinding            = nvCrdRole
 	nvCrdSecRuleRole            = "neuvector-binding-nvsecurityrules"
 	nvCrdSecRoleBinding         = nvCrdSecRuleRole
+	nvCrdGrpDefRole             = "neuvector-binding-nvgroupdefinitions"
+	nvCrdGrpDefRoleBinding      = nvCrdGrpDefRole
 	nvCrdAdmCtrlRole            = "neuvector-binding-nvadmissioncontrolsecurityrules"
 	nvCrdAdmCtrlRoleBinding     = nvCrdAdmCtrlRole
 	nvCrdDlpRole                = "neuvector-binding-nvdlpsecurityrules"
@@ -287,7 +289,7 @@ var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 }
 
 var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule,
-	RscTypeCrdWafSecurityRule, RscTypeCrdVulnProfile, RscTypeCrdCompProfile)
+	RscTypeCrdWafSecurityRule, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeCrdGroupDefinition)
 var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
 	{
 		ApiGroups:  allApiGroups,
@@ -577,6 +579,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() metav1.Object { return new(NvClusterSecurityRule) },
 				func() metav1.ListInterface { return new(NvClusterSecurityRuleList) },
 				xlateCrdNvClusterSecurityRule,
+				nil,
+			},
+		},
+	},
+	RscTypeCrdGroupDefinition: {
+		apiGroup: constApiGroupNV,
+		makers: []*resourceMaker{
+			{
+				"v1",
+				func() metav1.Object { return new(NvGroupDefinition) },
+				func() metav1.ListInterface { return new(NvGroupDefinitionList) },
+				xlateCrdNvGroupDefinition,
 				nil,
 			},
 		},
@@ -1091,6 +1105,14 @@ func xlateCrdNvClusterSecurityRule(obj metav1.Object) (string, interface{}) {
 	return "", nil
 }
 
+func xlateCrdNvGroupDefinition(obj metav1.Object) (string, interface{}) {
+	if o, ok := obj.(*NvGroupDefinition); ok {
+		return string(obj.GetUID()), o
+	}
+
+	return "", nil
+}
+
 func xlateCrdAdmCtrlRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvAdmCtrlSecurityRule); ok {
 		return string(obj.GetUID()), o
@@ -1295,6 +1317,9 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		case RscTypeCrdClusterSecurityRule:
 			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRule{})
 			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRuleList{})
+		case RscTypeCrdGroupDefinition:
+			k8s.Register("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinition{})
+			k8s.RegisterList("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinitionList{})
 		case RscTypeCrdAdmCtrlSecurityRule:
 			k8s.Register("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRule{})
 			k8s.RegisterList("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRuleList{})
@@ -1627,7 +1652,8 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
 		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
-		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret, RscTypePersistentVolumeClaim:
+		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret, RscTypePersistentVolumeClaim,
+		RscTypeCrdGroupDefinition:
 		return d.getResource(rt, namespace, name)
 	case RscTypePod, RscTypeNode, RscTypeCronJob, RscTypeDaemonSet:
 		if r, err := d.getResource(rt, namespace, name); err == nil {
@@ -1757,7 +1783,7 @@ func (d *kubernetes) DeleteResource(rt string, res interface{}) error {
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule,
 		RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule, RscTypeCrdNvCspUsage,
-		RscTypeCrdVulnProfile, RscTypeCrdCompProfile:
+		RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeCrdGroupDefinition:
 		return d.deleteResource(rt, res)
 	}
 	return ErrResourceNotSupported

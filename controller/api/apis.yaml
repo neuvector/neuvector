@@ -7246,6 +7246,10 @@ definitions:
     required:
       - groups
     properties:
+      use_name_referral:
+        type: boolean
+        example: false
+        description: Do not export groups' criteria. Instead, refer to NvGroupDefinition CRs for all groups involved in the export.
       groups:
         type: array
         items:

@@ -410,6 +410,23 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 		cacheMutexLock()
 		exist, ok := groupCacheMap[group.Name]
 		if ok {
+			if nType == cluster.ClusterNotifyModify {
+				if group.Comment != exist.group.Comment || group.CfgType != exist.group.CfgType {
+					newComment := group.Comment
+					newCfgType := group.CfgType
+					group.Comment = exist.group.Comment
+					group.CfgType = exist.group.CfgType
+					if reflect.DeepEqual(group, *exist.group) {
+						// the group configuration is not changed except for group comment/cfgType. no need to reprocess the group update
+						exist.group.Comment = newComment
+						exist.group.CfgType = newCfgType
+						cacheMutexUnlock()
+						return
+					}
+					group.Comment = newComment
+					group.CfgType = newCfgType
+				}
+			}
 			cache.usedByPolicy = exist.usedByPolicy
 			cache.usedByResponseRules = exist.usedByResponseRules
 			cache.ingressDMZ = exist.ingressDMZ

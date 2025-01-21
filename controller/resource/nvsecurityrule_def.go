@@ -25,6 +25,13 @@ const NvClusterSecurityRuleKind = "NvClusterSecurityRule"
 const NvClusterSecurityRuleListKind = "NvClusterSecurityRuleList"
 const NvClusterSecurityRuleSingular = "nvclustersecurityrule"
 
+const NvGroupDefName = "nvgroupdefinitions.neuvector.com"
+const NvGroupDefVersion = "v1"
+const NvGroupDefPlural = "nvgroupdefinitions"
+const NvGroupDefKind = "NvGroupDefinition"
+const NvGroupDefListKind = "NvGroupDefinitionList"
+const NvGroupDefSingular = "nvgroupdefinition"
+
 const NvAdmCtrlSecurityRuleName = "nvadmissioncontrolsecurityrules.neuvector.com"
 const NvAdmCtrlSecurityRuleVersion = "v1"
 const NvAdmCtrlSecurityRulePlural = "nvadmissioncontrolsecurityrules"
@@ -193,6 +200,42 @@ type NvClusterSecurityRuleList struct {
 	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items            []NvClusterSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
 	XXX_unrecognized []byte                  `json:"-"`
+}
+
+type NvGroupDefCfg struct {
+	Name     string                  `json:"name"`
+	Comment  string                  `json:"comment"`
+	Criteria []api.RESTCriteriaEntry `json:"criteria,omitempty"`
+}
+
+type NvGroupDefinitionSpec struct {
+	Selector NvGroupDefCfg `json:"selector"`
+}
+
+type NvGroupDefinition struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvGroupDefinitionSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+type NvGroupDefinitionList struct {
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvGroupDefinition `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte              `json:"-"`
+}
+
+type NvCr struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	XXX_unrecognized  []byte `json:"-"`
+}
+
+type NvCrList struct {
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvCr `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte `json:"-"`
 }
 
 /*

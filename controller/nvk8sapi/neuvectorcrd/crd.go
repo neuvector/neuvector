@@ -90,9 +90,6 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema(owner string) apie
 			"name": {
 				Type: b.schemaTypeString,
 			},
-			"original_name": {
-				Type: b.schemaTypeString,
-			},
 			"comment": {
 				Type: b.schemaTypeString,
 			},
@@ -118,6 +115,14 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1Schema(owner string) apie
 			},
 		},
 	}
+	if owner != "groupdef" {
+		schema.Properties["original_name"] = apiextv1.JSONSchemaProps{
+			Type: b.schemaTypeString,
+		}
+		schema.Properties["name_referral"] = apiextv1.JSONSchemaProps{
+			Type: b.schemaTypeBoolean,
+		}
+	}
 	if owner == "target" {
 		schema.Properties["mon_metric"] = apiextv1.JSONSchemaProps{
 			Type: b.schemaTypeBoolean,
@@ -139,9 +144,6 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema(owner string) ap
 		Required: []string{"name"},
 		Properties: map[string]apiextv1b1.JSONSchemaProps{
 			"name": {
-				Type: b.schemaTypeString,
-			},
-			"original_name": {
 				Type: b.schemaTypeString,
 			},
 			"comment": {
@@ -168,6 +170,14 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdSelectorV1B1Schema(owner string) ap
 				},
 			},
 		},
+	}
+	if owner != "groupdef" {
+		schema.Properties["original_name"] = apiextv1b1.JSONSchemaProps{
+			Type: b.schemaTypeString,
+		}
+		schema.Properties["name_referral"] = apiextv1b1.JSONSchemaProps{
+			Type: b.schemaTypeBoolean,
+		}
 	}
 	if owner == "target" {
 		schema.Properties["mon_metric"] = apiextv1b1.JSONSchemaProps{
@@ -430,6 +440,23 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 	return &schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvCrdGroupDefinitionV1Schema() *apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": {
+				Type:     b.schemaTypeObject,
+				Required: []string{"selector"},
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"selector": b.buildNvSeurityCrdSelectorV1Schema("groupdef"),
+				},
+			},
+		},
+	}
+
+	return &schema
+}
+
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JSONSchemaProps {
 	schema := apiextv1b1.JSONSchemaProps{
 		Type: b.schemaTypeObject,
@@ -532,6 +559,23 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 					},
 					"dlp": b.buildNvSeurityCrdDlpWafV1B1Schema(),
 					"waf": b.buildNvSeurityCrdDlpWafV1B1Schema(),
+				},
+			},
+		},
+	}
+
+	return &schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvCrdGroupDefinitionV1B1Schema() *apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": {
+				Type:     b.schemaTypeObject,
+				Required: []string{"selector"},
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"selector": b.buildNvSeurityCrdSelectorV1B1Schema("groupdef"),
 				},
 			},
 		},
@@ -1318,6 +1362,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 	switch nvCrdMetaName {
 	case resource.NvSecurityRuleName, resource.NvClusterSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSeurityCrdNwPolicyV1Schema()
+	case resource.NvGroupDefName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvCrdGroupDefinitionV1Schema()
 	case resource.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
@@ -1343,6 +1389,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 	switch nvCrdMetaName {
 	case resource.NvSecurityRuleName, resource.NvClusterSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSeurityCrdNwPolicyV1B1Schema()
+	case resource.NvGroupDefName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvCrdGroupDefinitionV1B1Schema()
 	case resource.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1B1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:

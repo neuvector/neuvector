@@ -608,7 +608,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
-	crdHandler.Init(share.CLUSLockCompKey)
+	crdHandler.Init(share.CLUSLockCompKey, importCallerRest)
 	if crdHandler.AcquireLock(clusterLockWait) {
 		defer crdHandler.ReleaseLock()
 

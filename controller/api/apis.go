@@ -534,6 +534,7 @@ type RESTListData struct {
 // NV future: 	     process profile mode value priority is "profile_mode" -> "policy_mode"
 // NV future:           file profile mode value priority is "file_profile_mode" -> "profile_mode" -> "policy_mode"
 type RESTGroupExport struct {
+	UseNameReferral     bool                     `json:"use_name_referral"` // whether to use referranl for exported groups
 	Groups              []string                 `json:"groups"`
 	PolicyMode          string                   `json:"policy_mode,omitempty"`
 	ProfileMode         string                   `json:"profile_mode,omitempty"` // for both process/file profiles(if specified) since 5.4.1
@@ -1261,14 +1262,15 @@ type RESTGroupConfig struct {
 }
 
 type RESTCrdGroupConfig struct {
-	OriginalName string               `json:"original_name"`
-	Name         string               `json:"name"`
-	Comment      string               `json:"comment"`
-	Criteria     *[]RESTCriteriaEntry `json:"criteria,omitempty"`
-	MonMetric    *bool                `json:"mon_metric,omitempty"`
-	GrpSessCur   *uint32              `json:"grp_sess_cur,omitempty"`
-	GrpSessRate  *uint32              `json:"grp_sess_rate,omitempty"`
-	GrpBandWidth *uint32              `json:"grp_band_width,omitempty"`
+	OriginalName string              `json:"original_name"`
+	Name         string              `json:"name"`
+	Comment      string              `json:"comment"`
+	NameReferral bool                `json:"name_referral,omitempty"`
+	Criteria     []RESTCriteriaEntry `json:"criteria,omitempty"`
+	MonMetric    *bool               `json:"mon_metric,omitempty"`
+	GrpSessCur   *uint32             `json:"grp_sess_cur,omitempty"`
+	GrpSessRate  *uint32             `json:"grp_sess_rate,omitempty"`
+	GrpBandWidth *uint32             `json:"grp_band_width,omitempty"`
 }
 
 type RESTGroupsData struct {

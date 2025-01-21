@@ -968,3 +968,32 @@ func GetMappedCspType(pCspType *string, ptCspType *share.TCspType) (share.TCspTy
 
 	return share.CSP_NONE, "none"
 }
+
+func SameGroupCriteria(src, dst []api.RESTCriteriaEntry, selfComp bool) bool {
+	var dupFind bool
+	if len(src) != len(dst) {
+		return false
+	}
+OUTER:
+	for _, srcC := range src {
+		dupFind = false
+		for i, dstC := range dst {
+			if reflect.DeepEqual(srcC, dstC) {
+				if !selfComp {
+					dst = append(dst[:i], dst[i+1:]...)
+					continue OUTER
+				} else {
+					if dupFind {
+						return false
+					} else {
+						dupFind = true
+					}
+				}
+			}
+		}
+		if !selfComp {
+			return false
+		}
+	}
+	return true
+}

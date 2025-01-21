@@ -1558,7 +1558,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 
 	var err error
 	var crdHandler nvCrdHandler
-	crdHandler.Init(share.CLUSLockAdmCtrlKey)
+	crdHandler.Init(share.CLUSLockAdmCtrlKey, importCallerRest)
 	if crdHandler.AcquireLock(clusterLockWait) {
 		defer crdHandler.ReleaseLock()
 

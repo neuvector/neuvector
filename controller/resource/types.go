@@ -34,6 +34,7 @@ const (
 	RscTypeValidatingWebhookConfiguration = "validatingwebhookconfiguration" // case sensitive!
 	RscTypeCrdSecurityRule                = "nvsecurityrules"
 	RscTypeCrdClusterSecurityRule         = "nvclustersecurityrules"
+	RscTypeCrdGroupDefinition             = "nvgroupdefinitions"
 	RscTypeCrdAdmCtrlSecurityRule         = "nvadmissioncontrolsecurityrules"
 	RscTypeCrdDlpSecurityRule             = "nvdlpsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"

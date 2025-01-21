@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -24,6 +26,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -306,7 +309,25 @@ func isReservedGroupName(name string) bool {
 		strings.HasPrefix(name, api.LearnedHostPrefix) ||
 		strings.HasPrefix(name, api.LearnedWorkloadPrefix) ||
 		strings.HasPrefix(name, api.FederalGroupPrefix) ||
-		name == api.LearnedExternal || name == api.AllHostGroup || name == api.AllContainerGroup
+		isDefaultGroup(name)
+}
+
+func isDefaultGroup(name string) bool {
+	return name == api.LearnedExternal || name == api.AllHostGroup || name == api.AllContainerGroup
+}
+
+func isReservedNvGroupDefName(name string) bool {
+	if isDefaultGroup(name) || name == api.WorkloadTunnelIF {
+		return true
+	} else {
+		prefix := []string{api.LearnedHostPrefix, api.LearnedWorkloadPrefix, api.FederalGroupPrefix}
+		for _, p := range prefix {
+			if strings.HasPrefix(name, p) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func validateServiceConfig(rg *api.RESTServiceConfig) (int, string) {
@@ -643,6 +664,21 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		cg.GrpBandWidth = *rg.GrpBandWidth
 	}
 
+	if k8sPlatform && cg.CfgType != share.FederalCfg {
+		if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, rg.Name); err == nil {
+			if o, ok := obj.(*resource.NvGroupDefinition); ok {
+				if !common.SameGroupCriteria(*rg.Criteria, o.Spec.Selector.Criteria, false) {
+					e := fmt.Sprintf("NvGroupDefinition CR %s with different criteria exists in k8s", rg.Name)
+					log.WithFields(log.Fields{"criteria": *rg.Criteria, "cr": o.Spec.Selector}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return
+				} else if cg.Comment != o.Spec.Selector.Comment {
+					cg.Comment = o.Spec.Selector.Comment
+				}
+			}
+		}
+	}
+
 	// Write group definition into key-value store. Make sure group doesn't exist.
 	if err := clusHelper.PutGroup(&cg, true); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
@@ -787,6 +823,19 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	if !acc.Authorize(cg, nil) {
 		restRespAccessDenied(w, login)
 		return
+	}
+
+	if k8sPlatform && cg.CfgType != share.FederalCfg {
+		if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, rg.Name); err == nil {
+			if o, ok := obj.(*resource.NvGroupDefinition); ok {
+				if !common.SameGroupCriteria(*rg.Criteria, o.Spec.Selector.Criteria, false) || cg.Comment != o.Spec.Selector.Comment {
+					e := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", rg.Name)
+					log.WithFields(log.Fields{"criteria": *rg.Criteria, "comment": cg.Comment, "cr": o.Spec.Selector}).Error(e)
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+					return
+				}
+			}
+		}
 	}
 
 	// Write group definition into key-value store
@@ -1780,42 +1829,140 @@ func handlerGetGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprou
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get import status")
 }
 
+func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resource.NvGroupDefinition, error) {
+
+	importDataStr := string(importData)
+	yamlParts := strings.Split(importDataStr, "\n---\n")
+
+	// check whether it's Windows format
+	if len(yamlParts) == 1 && strings.Contains(importDataStr, "\r\n") {
+		yamlParts = strings.Split(importDataStr, "\r\n---\r\n")
+	}
+
+	var err error
+	var nvGrpDefs []resource.NvGroupDefinition
+	var nvSecRules []resource.NvSecurityRule
+
+	for i, yamlPart := range yamlParts {
+		var sb strings.Builder
+		scanner := bufio.NewScanner(strings.NewReader(yamlPart))
+		for scanner.Scan() {
+			line := scanner.Text()
+			lineTrimmed := strings.TrimSpace(line)
+			if len(lineTrimmed) == 0 || lineTrimmed[0] == byte('#') {
+				continue
+			} else {
+				sb.WriteString(line)
+				sb.WriteString("\n")
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return nil, nil, fmt.Errorf("error reading YAML part %d: %s", i, err)
+		}
+		yamlPart = sb.String()
+		sb.Reset()
+		if len(yamlPart) == 0 {
+			continue
+		}
+
+		var jsonData []byte
+		if jsonData, err = yaml.YAMLToJSON([]byte(yamlPart)); err == nil {
+			var nvCrList resource.NvCrList
+			if err = json.Unmarshal(jsonData, &nvCrList); err == nil {
+				if nvCrList.Kind == "List" {
+					if len(nvCrList.Items) > 0 {
+						nvCr := nvCrList.Items[0]
+						if nvCr.Kind == resource.NvGroupDefKind {
+							var nvGrpDefList resource.NvGroupDefinitionList
+							if err = json.Unmarshal(jsonData, &nvGrpDefList); err == nil {
+								nvGrpDefs = append(nvGrpDefs, nvGrpDefList.Items...)
+							}
+						} else if nvCr.Kind == resource.NvClusterSecurityRuleKind || nvCr.Kind == resource.NvSecurityRuleKind {
+							var nvSecRuleList resource.NvSecurityRuleList
+							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
+								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
+							}
+						} else {
+							err = fmt.Errorf("kind: %s", nvCr.Kind)
+						}
+					}
+				} else {
+					if nvCrList.Kind == resource.NvGroupDefKind {
+						var nvGrpDef resource.NvGroupDefinition
+						if err = json.Unmarshal(jsonData, &nvGrpDef); err == nil {
+							nvGrpDefs = append(nvGrpDefs, nvGrpDef)
+						}
+					} else if nvCrList.Kind == resource.NvClusterSecurityRuleKind || nvCrList.Kind == resource.NvSecurityRuleKind {
+						var nvSecRule resource.NvSecurityRule
+						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
+							nvSecRules = append(nvSecRules, nvSecRule)
+						}
+					} else {
+						err = fmt.Errorf("kind: %s", nvCrList.Kind)
+					}
+				}
+			}
+		}
+		if err != nil {
+			err = fmt.Errorf("Invalid yaml(%d): %s", i, err.Error())
+			break
+		}
+	}
+
+	if err == nil {
+		for _, r := range nvGrpDefs {
+			if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvGroupDefKind {
+				err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
+				break
+			}
+		}
+		if err == nil {
+			for _, r := range nvSecRules {
+				if r.APIVersion != "neuvector.com/v1" ||
+					(r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
+					err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
+					break
+				}
+			}
+		}
+	}
+
+	if err != nil {
+		nvGrpDefs = nil
+		nvSecRules = nil
+	}
+
+	return nvSecRules, nvGrpDefs, err
+}
+
 // if there are multiple yaml documents(separated by "---" line) in the yaml file, only the first document is parsed for import
 func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
-	var secRuleList resource.NvSecurityRuleList
-	var secRule resource.NvSecurityRule
 	var secRules []resource.NvSecurityRule
-	var invalidCrdKind bool
-	var err error
-	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
-		if err = json.Unmarshal(json_data, &secRule); err == nil {
-			secRules = append(secRules, secRule)
-		}
-	} else {
-		secRules = secRuleList.Items
+	var nvGrpDefs []resource.NvGroupDefinition
+	importData, err := os.ReadFile(importTask.TempFilename)
+	if err == nil {
+		secRules, nvGrpDefs, err = parseGroupYamlFile(importData)
 	}
-	for _, r := range secRules {
-		if r.APIVersion != "neuvector.com/v1" || (r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
-			invalidCrdKind = true
-			break
-		}
-	}
-	if invalidCrdKind || len(secRules) == 0 {
-		msg := "Invalid security rule(s)"
+	if err != nil {
+		msg := "Failed to read/parse the imported file"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
 		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
+		return nil
+	} else if len(secRules) == 0 {
+		log.Info("no security rule in yaml")
+		postImportOp(nil, importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
 		return nil
 	}
 
 	var inc float32
 	var progress float32 // progress percentage
 
-	inc = 90.0 / float32(2+2*len(secRules))
+	inc = 90.0 / float32(3+2*len(secRules))
 	parsedGrpCfg := make([]*resource.NvSecurityParse, 0, len(secRules))
+	parsedGrpDefs := make(map[string]*resource.NvSecurityParse, len(nvGrpDefs))
 	progress = 6
 
 	importTask.Percentage = int(progress)
@@ -1823,9 +1970,28 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 	var crdHandler nvCrdHandler
-	crdHandler.Init(share.CLUSLockPolicyKey)
+	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
 	if crdHandler.AcquireLock(clusterLockWait) {
 		defer crdHandler.ReleaseLock()
+
+		for _, nvGrpDef := range nvGrpDefs {
+			if grpDefRet, errCount, errMsg := crdHandler.parseCurCrdGrpDefContent(&nvGrpDef, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
+				err = fmt.Errorf("%s", errMsg)
+				break
+			} else if grpDefRet != nil && !isReservedNvGroupDefName(grpDefRet.TargetName) {
+				log.WithFields(log.Fields{"group": grpDefRet.TargetName}).Debug()
+				parsedGrpDefs[grpDefRet.TargetName] = grpDefRet
+			}
+		}
+		if err != nil {
+			postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
+			return nil
+		}
+		crdHandler.grpDefsInSameYaml = parsedGrpDefs
+
+		progress += inc
+		importTask.Percentage = int(progress)
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 		// The following code does the same job as crdGFwRuleProcessRecord(grpCfgRet, resource.NvSecurityRuleKind, namebase)
 		// It processes the group and network rule list parsed from the import payload yaml
@@ -1862,7 +2028,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 					targetGroupDlpWAF[grpCfgRet.TargetName] = hasDlpWafSetting
 					if updatedGroups.Contains(grpCfgRet.TargetName) {
 						targetGroups = append(targetGroups, grpCfgRet.TargetName)
-					} else if grpCfgRet.TargetName == api.LearnedExternal || grpCfgRet.TargetName == api.AllHostGroup || grpCfgRet.TargetName == api.AllContainerGroup {
+					} else if isDefaultGroup(grpCfgRet.TargetName) {
 						targetGroups = append(targetGroups, grpCfgRet.TargetName)
 					}
 				} else {
@@ -1960,16 +2126,16 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 
 	reservedPrefix := []string{api.LearnedHostPrefix, api.LearnedWorkloadPrefix} // see isExportSkipGroupName()
 	for _, group := range groups {
-		if group.Name == api.LearnedExternal || group.Name == api.AllHostGroup || group.Name == api.AllContainerGroup {
+		if isDefaultGroup(group.Name) {
 			continue
 		}
 		groupCriteria := []api.RESTCriteriaEntry{}
 		isNvIpGroup := strings.HasPrefix(group.Name, api.LearnedSvcGroupPrefix)
 		// keep processing imported nv.ip.xxx group that has empty criteria when the group is not learned yet on docker swarm
-		if (group.Criteria == nil || len(*group.Criteria) == 0) && !isNvIpGroup {
+		if len(group.Criteria) == 0 && !isNvIpGroup {
 			continue
 		} else if group.Criteria != nil {
-			groupCriteria = *group.Criteria
+			groupCriteria = group.Criteria
 		}
 
 		reserved := false
