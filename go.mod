@@ -130,6 +130,7 @@ require (
 
 require (
 	github.com/alitto/pond v1.8.3
+	github.com/coreos/clair v2.1.0+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a

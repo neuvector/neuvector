@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bufio"
 	"bytes"
@@ -19,6 +20,7 @@ import (
 	rpmdb "github.com/neuvector/go-rpmdb/pkg"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/coreos/clair/pkg/tarutil"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
@@ -111,8 +113,8 @@ func NewScanUtil(sys *system.SystemTools) *ScanUtil {
 	return s
 }
 
-func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string, pidHost bool) ([]utils.TarFileInfo, bool) {
-	var files []utils.TarFileInfo
+func (s *ScanUtil) readRunningPackages(pid int, prefix, kernel string, pidHost bool) (tarutil.FilesMap, bool) {
+	files := make(tarutil.FilesMap)
 	var hasPackage bool
 	for itr := range OSPkgFiles.Iter() {
 		var data []byte
@@ -140,7 +142,7 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 					continue
 				}
 				name := fmt.Sprintf("%s%s", DpkgStatusDir, file.Name())
-				files = append(files, utils.TarFileInfo{Name: name, Body: filedata})
+				files[name] = filedata
 			}
 			hasPackage = true
 			continue
@@ -170,17 +172,17 @@ func (s *ScanUtil) readRunningPackages(id string, pid int, prefix, kernel string
 			}
 		}
 
-		files = append(files, utils.TarFileInfo{Name: lib, Body: data})
+		files[lib] = data
 	}
 	return files, hasPackage
 }
 
 func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, pid int, kernel string, pidHost bool) ([]byte, share.ScanErrorCode) {
-	files, hasPkgMgr := s.readRunningPackages(id, pid, "/", kernel, pidHost)
+	files, hasPkgMgr := s.readRunningPackages(pid, "/", kernel, pidHost)
 	if len(files) == 0 && !hasPkgMgr && objType == share.ScanObjectType_HOST {
 		// In RancherOS, host os-release file is at /host/proc/1/root/usr/etc/os-release
 		// but sometimes this file is not accessible.
-		files, _ /*hasPkgMgr*/ = s.readRunningPackages(id, pid, "/usr/", kernel, pidHost)
+		files, _ /*hasPkgMgr*/ = s.readRunningPackages(pid, "/usr/", kernel, pidHost)
 	}
 
 	if objType == share.ScanObjectType_CONTAINER {
@@ -190,7 +192,7 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 			log.WithFields(log.Fields{"data": len(data), "error": err}).Error("Error when getting container app packages")
 		}
 		if len(data) > 0 {
-			files = append(files, utils.TarFileInfo{Name: AppFileName, Body: data})
+			files[AppFileName] = data
 		}
 	}
 
@@ -198,7 +200,7 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 		log.WithFields(log.Fields{"id": id}).Debug("Empty libary files")
 		return nil, share.ScanErrorCode_ScanErrNotSupport
 	}
-	buf, err := utils.MakeTar(files)
+	buf, err := MakeTar(files)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("make TAR error")
 		return nil, share.ScanErrorCode_ScanErrFileSystem
@@ -218,8 +220,9 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 	apps := NewScanApps(true)
 	apps.ExtractAppPkg(path, path)
 	pkgs := apps.marshal()
-	files := []utils.TarFileInfo{{Name: AppFileName, Body: pkgs}}
-	buf, _ := utils.MakeTar(files)
+	files := make(tarutil.FilesMap)
+	files[AppFileName] = pkgs
+	buf, _ := MakeTar(files)
 	appPkgs := apps.Data()[path]
 	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone
 }
@@ -427,7 +430,7 @@ func ParseRegistryURI(ur string) (string, error) {
 		return "", err
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return "", fmt.Errorf("Unsupport registry schema")
+		return "", fmt.Errorf("unsupport registry schema")
 	}
 	uf := u.String()
 	if !strings.HasSuffix(uf, "/") {
@@ -452,7 +455,7 @@ func ParseImageName(image string) (string, string, string, error) {
 				return image, "", "", err
 			}
 		} else {
-			return image, "", "", errors.New("Invalid base image name")
+			return image, "", "", errors.New("invalid base image name")
 		}
 	} else if strings.HasPrefix(image, "http://") {
 		if slash := strings.Index(image[7:], "/"); slash != -1 {
@@ -464,7 +467,7 @@ func ParseImageName(image string) (string, string, string, error) {
 				return image, "", "", err
 			}
 		} else {
-			return image, "", "", errors.New("Invalid base image name")
+			return image, "", "", errors.New("invalid base image name")
 		}
 	}
 
@@ -622,4 +625,25 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 		}
 	}
 	return appPkg, nil
+}
+
+func MakeTar(files tarutil.FilesMap) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	tw := tar.NewWriter(buf)
+	defer tw.Close()
+	for name, body := range files {
+		hdr := &tar.Header{
+			Name:     name,
+			Mode:     0655,
+			Typeflag: tar.TypeReg,
+			Size:     int64(len(body)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return nil, err
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			return nil, err
+		}
+	}
+	return buf, nil
 }
