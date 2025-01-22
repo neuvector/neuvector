@@ -23,7 +23,7 @@ var (
 
 // ExtractAllArchiveData extracts all files and folders
 // from targz data read from the given reader and store them in a map indexed by file paths
-func ExtractAllArchiveData(r io.Reader) (map[string][]byte, error) {
+func ExtractAllArchiveData(r io.Reader, maxFileSize int64) (map[string][]byte, error) {
 	data := make(map[string][]byte)
 
 	selected := func(filename string) bool {
@@ -32,7 +32,7 @@ func ExtractAllArchiveData(r io.Reader) (map[string][]byte, error) {
 
 	extract := func(filename string, size int64, reader io.ReadCloser) error {
 		// File size limit
-		if size > tarutil.MaxExtractableFileSize {
+		if maxFileSize > 0 && size > maxFileSize {
 			log.WithFields(log.Fields{"size": size, "filename": filename}).Error("file too big")
 			return tarutil.ErrExtractedFileTooBig
 		}
@@ -58,7 +58,7 @@ func EnsureBaseDir(fpath string) error {
 	return os.MkdirAll(baseDir, 0755)
 }
 
-func ExtractAllArchiveToFiles(path string, r io.Reader, encryptKey []byte) error {
+func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encryptKey []byte) error {
 	tr, err := tarutil.NewTarReadCloser(r)
 	if err != nil {
 		return tarutil.ErrCouldNotExtract
@@ -80,7 +80,7 @@ func ExtractAllArchiveToFiles(path string, r io.Reader, encryptKey []byte) error
 		filename = strings.TrimPrefix(filename, "./")
 
 		// File size limit
-		if hdr.Size > tarutil.MaxExtractableFileSize {
+		if maxFileSize > 0 && hdr.Size > maxFileSize {
 			return tarutil.ErrExtractedFileTooBig
 		}
 
@@ -102,7 +102,7 @@ func ExtractAllArchiveToFiles(path string, r io.Reader, encryptKey []byte) error
 	return nil
 }
 
-func ExtractAllArchive(dst string, r io.Reader) (int64, error) {
+func ExtractAllArchive(dst string, r io.Reader, maxFileSize int64) (int64, error) {
 	var untarSize int64
 
 	tr, err := tarutil.NewTarReadCloser(r)
@@ -142,7 +142,7 @@ func ExtractAllArchive(dst string, r io.Reader) (int64, error) {
 		// a benefit of using one vs. the other.
 		// fi := header.FileInfo()
 		// File size limit
-		if header.Size > tarutil.MaxExtractableFileSize {
+		if maxFileSize > 0 && header.Size > maxFileSize {
 			return untarSize, tarutil.ErrExtractedFileTooBig
 		}
 		untarSize += header.Size
