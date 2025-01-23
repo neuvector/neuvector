@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -208,6 +209,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 
 	s.Platform, s.K8sVersion, s.OCVersion = m.GetPlatform()
 	s.NewServiceMode, s.NewProfileMode = getNewServicePolicyMode()
+	s.TimeStamp = time.Now().UTC().Unix()
 
 	// Check if count system container/group
 	var disableSystem bool

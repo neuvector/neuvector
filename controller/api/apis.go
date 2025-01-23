@@ -1758,6 +1758,7 @@ type RESTRiskScoreMetrics struct {
 	WLs              RESTRiskScoreMetricsWL    `json:"workloads"`
 	Groups           RESTRiskScoreMetricsGroup `json:"groups"`
 	CVEs             RESTRiskScoreMetricsCVE   `json:"cves"`
+	TimeStamp        int64                     `json:"timestamp"`
 }
 
 type RESTExposedEndpoint struct {
