@@ -79,14 +79,13 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 }
 
 func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
-	allRepos := []HarborApiRepository{}
 	pageNum := 1
 	pageWhereTotalCountChanged := -1
-	repositoryPages := map[int][]HarborApiRepository{}
+	fetchedRepositories := []HarborApiRepository{}
 	totalReposInRegistry := -1
-	totalFetchedRepositories := 0
 	for {
 		if pageNum == pageWhereTotalCountChanged {
+			// we've already appended the repos for this page in a previous iteration
 			continue
 		}
 		repositories, totalCount, err := h.getPageOfRepositories(pageNum)
@@ -97,26 +96,21 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 			totalReposInRegistry = totalCount
 		} else if totalReposInRegistry != totalCount {
 			// number of repos changed while we were querying registry
-			// rerun query for all previous pages
+			// rerun query for all previous pages as well
 			pageWhereTotalCountChanged = pageNum
 			pageNum = 0
-			repositoryPages = map[int][]HarborApiRepository{}
+			fetchedRepositories = []HarborApiRepository{}
 			totalReposInRegistry = totalCount
-			totalFetchedRepositories = 0
 		}
 
-		repositoryPages[pageNum] = repositories
-		totalFetchedRepositories += len(repositories)
-		if totalFetchedRepositories >= totalReposInRegistry {
-			for _, reposForPage := range repositoryPages {
-				allRepos = append(allRepos, reposForPage...)
-			}
+		fetchedRepositories = append(fetchedRepositories, repositories...)
+		if len(fetchedRepositories) >= totalReposInRegistry {
 			break
 		}
 		pageNum++
 	}
 
-	return allRepos, nil
+	return fetchedRepositories, nil
 }
 
 func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int, error) {
