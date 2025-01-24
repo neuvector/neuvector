@@ -14180,9 +14180,6 @@ definitions:
         $ref: '#/definitions/RESTRiskScoreMetricsGroup'
       cves:
         $ref: '#/definitions/RESTRiskScoreMetricsCVE'
-      timestamp:
-        type: integer
-        format: int64
   RESTExposedEndpoint:
     type: object
     properties:
@@ -14245,6 +14242,9 @@ definitions:
         type: string
       fqdn:
         type: string
+      last_seen_at:
+        type: integer
+        format: int64
   RESTSecurityScores:
     type: object
     properties:
