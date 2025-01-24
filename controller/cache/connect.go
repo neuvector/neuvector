@@ -1724,6 +1724,7 @@ func graphAttr2REST(attr *graphAttr) *api.RESTConversationReport {
 			CIP:          utils.Int2IPv4(key.cip).String(),
 			SIP:          utils.Int2IPv4(key.sip).String(),
 			FQDN:         ge.fqdn,
+			LastSeenAt:   int64(ge.last),
 		}
 		protos.Add(key.ipproto)
 		if key.application == 0 || key.application == C.DPI_APP_NOT_CHECKED {
