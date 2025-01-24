@@ -6,11 +6,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/neuvector/neuvector/share"
 	log "github.com/sirupsen/logrus"
 )
+
+const totalCounterHeaderCanonicalForm string = "X-Total-Count"
+const defaultRepositoryPageSize int = 10
 
 type harbor struct {
 	base
@@ -74,37 +78,93 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 	return images, nil
 }
 
-// TODO: deal with large registries, implement pagination/chunked responses?
 func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
-	reqUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/repositories")
-	if err != nil {
-		return nil, fmt.Errorf("could not generate repository request url: %w", err)
+	allRepos := []HarborApiRepository{}
+	pageNum := 1
+	pageWhereTotalCountChanged := -1
+	repositoryPages := map[int][]HarborApiRepository{}
+	totalReposInRegistry := -1
+	totalFetchedRepositories := 0
+	for {
+		if pageNum == pageWhereTotalCountChanged {
+			continue
+		}
+		repositories, totalCount, err := h.getPageOfRepositories(pageNum)
+		if err != nil {
+			return nil, fmt.Errorf("could not get page %d of harbor repositories: %w", pageNum, err)
+		}
+		if totalReposInRegistry == -1 {
+			totalReposInRegistry = totalCount
+		} else if totalReposInRegistry != totalCount {
+			// number of repos changed while we were querying registry
+			// rerun query for all previous pages
+			pageWhereTotalCountChanged = pageNum
+			pageNum = 0
+			repositoryPages = map[int][]HarborApiRepository{}
+			totalReposInRegistry = totalCount
+			totalFetchedRepositories = 0
+		}
+
+		repositoryPages[pageNum] = repositories
+		totalFetchedRepositories += len(repositories)
+		if totalFetchedRepositories >= totalReposInRegistry {
+			for _, reposForPage := range repositoryPages {
+				allRepos = append(allRepos, reposForPage...)
+			}
+			break
+		}
+		pageNum++
 	}
-	req, err := http.NewRequest("GET", reqUrl, nil)
+
+	return allRepos, nil
+}
+
+func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int, error) {
+	rawUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/repositories")
 	if err != nil {
-		return nil, fmt.Errorf("could not make request object: %w", err)
+		return nil, 0, fmt.Errorf("could not join repository request url: %w", err)
+	}
+	reqUrl, err := url.Parse(rawUrl)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not parse repository request url: %w", err)
+	}
+	v := url.Values{}
+	v.Set("page", strconv.Itoa(pageNum))
+	v.Set("page_size", strconv.Itoa(defaultRepositoryPageSize))
+	reqUrl.RawQuery = v.Encode()
+	req, err := http.NewRequest("GET", reqUrl.String(), nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not make request object: %w", err)
 	}
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
 	resp, err := h.rc.Client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("could not do request to get all repositories: %w", err)
+		return nil, 0, fmt.Errorf("could not do request to get all repositories: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
+		return nil, 0, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
 	}
 	harborRepositories := []HarborApiRepository{}
 	// TODO: more efficiently deal with large responses, instead of reading all into a byte slice
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("could not read response body: %w", err)
+		return nil, 0, fmt.Errorf("could not read response body: %w", err)
 	}
 	err = json.Unmarshal(respBytes, &harborRepositories)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshall response body json: %w", err)
+		return nil, 0, fmt.Errorf("could not unmarshall response body json: %w", err)
 	}
-	return harborRepositories, nil
+	totalCountHeader := resp.Header.Get(totalCounterHeaderCanonicalForm)
+	if totalCountHeader == "" {
+		return nil, 0, fmt.Errorf("could not retrieve total count header from response")
+	}
+	totalCount, err := strconv.Atoi(totalCountHeader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not parse total count header \"%s\" to int: %w", totalCountHeader, err)
+	}
+	return harborRepositories, totalCount, nil
 }
 
 type HarborApiArtifact struct {
