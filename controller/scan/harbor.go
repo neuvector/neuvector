@@ -86,6 +86,7 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 	for {
 		if pageNum == pageWhereTotalCountChanged {
 			// we've already appended the repos for this page in a previous iteration
+			pageNum++
 			continue
 		}
 		repositories, totalCount, err := h.getPageOfRepositories(pageNum)
@@ -106,6 +107,8 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 		fetchedRepositories = append(fetchedRepositories, repositories...)
 		if len(fetchedRepositories) >= totalReposInRegistry {
 			break
+		} else if len(fetchedRepositories) == 0 {
+			return nil, fmt.Errorf("received unexpected empty response from harbor registry for repositories page %d", pageNum)
 		}
 		pageNum++
 	}
