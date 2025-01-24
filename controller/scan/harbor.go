@@ -81,7 +81,7 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 	pageNum := 1
 	pageWhereTotalCountChanged := -1
-	fetchedRepositories := []HarborApiRepository{}
+	allFetchedRepositories := []HarborApiRepository{}
 	totalReposInRegistry := -1
 	for {
 		if pageNum == pageWhereTotalCountChanged {
@@ -89,7 +89,7 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 			pageNum++
 			continue
 		}
-		repositories, totalCount, err := h.getPageOfRepositories(pageNum)
+		repositoriesForPage, totalCount, err := h.getPageOfRepositories(pageNum)
 		if err != nil {
 			return nil, fmt.Errorf("could not get page %d of harbor repositories: %w", pageNum, err)
 		}
@@ -100,20 +100,20 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 			// rerun query for all previous pages as well
 			pageWhereTotalCountChanged = pageNum
 			pageNum = 0
-			fetchedRepositories = []HarborApiRepository{}
+			allFetchedRepositories = []HarborApiRepository{}
 			totalReposInRegistry = totalCount
 		}
 
-		fetchedRepositories = append(fetchedRepositories, repositories...)
-		if len(fetchedRepositories) >= totalReposInRegistry {
+		allFetchedRepositories = append(allFetchedRepositories, repositoriesForPage...)
+		if len(allFetchedRepositories) >= totalReposInRegistry {
 			break
-		} else if len(fetchedRepositories) == 0 {
+		} else if len(repositoriesForPage) == 0 {
 			return nil, fmt.Errorf("received unexpected empty response from harbor registry for repositories page %d", pageNum)
 		}
 		pageNum++
 	}
 
-	return fetchedRepositories, nil
+	return allFetchedRepositories, nil
 }
 
 func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int, error) {
