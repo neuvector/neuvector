@@ -519,7 +519,7 @@ func (p *Probe) addProcessControl(id, setting, svcGroup string, pid int, ppe_lis
 			return
 		}
 
-		if !p.fAccessCtl.AddContainerControlByPolicyOrder(id, setting, svcGroup, pid, ppe_list) {
+		if !p.fAccessCtl.AddContainerControlByPolicyOrder(id, setting, svcGroup, "", pid, ppe_list) {
 			log.WithFields(log.Fields{"id": id, "pid": pid}).Debug("PROC: failed")
 		}
 	} else {

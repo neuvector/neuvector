@@ -163,7 +163,7 @@ func fillSystemResevedProcessRule(uuid string) *api.RESTProcessUuidEntry {
 	}
 
 	switch uuid {
-	case share.CLUSReservedUuidNotAlllowed:
+	case share.CLUSReservedUuidNotAllowed:
 		name = "<not_in_profile>" // beyond white-list
 	case share.CLUSReservedUuidTunnelProc:
 		name = "<tunnel_proc>" // tunnel

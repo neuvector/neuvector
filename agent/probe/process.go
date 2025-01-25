@@ -56,6 +56,7 @@ type procContainer struct {
 	fInfo            map[string]*fileInfo
 	bPrivileged      bool
 	healthCheck      []string
+	nvRole           string
 }
 
 type procInternal struct {
@@ -502,14 +503,7 @@ func (p *Probe) addContainerProcess(c *procContainer, pid int) {
 				c1.children.Remove(pid) // nodes has one pool
 			}
 		}
-
-		if c.id == p.selfID {
-			if proc, ok := p.pidProcMap[pid]; ok && isFamilyProcess(c.children, proc) {
-				c.children.Add(pid) // make an early decision
-			}
-		} else {
-			c.outsider.Add(pid) // temporary: c.children
-		}
+		c.outsider.Add(pid) // temporary until shield process evaluation
 	} else {
 		c.children.Add(pid) // nodes only has a pool
 	}
@@ -602,62 +596,6 @@ func unexpectedAgentProcess(name string) bool {
 	return false
 }
 
-func (p *Probe) isEnforcerChildren(proc *procInternal, id string) bool {
-	if id == p.selfID { // might be too early to get the empty id
-		if c, ok := p.containerMap[id]; ok {
-			if isFamilyProcess(c.children, proc) {
-				return true
-			}
-
-			// log.WithFields(log.Fields{"children": c.children.String(), "rootPid": c.rootPid, "oursider": c.outsider.String()}).Debug("PROC:")
-			if p.isAgentChild(proc) {
-				c.children.Add(proc.pid)
-				return true
-			}
-		}
-	}
-	return false
-}
-
-/* removed by golint
-func (p *Probe) evaluateRuncTrigger(id string, proc *procInternal) {
-	if id == "" {
-		if strings.HasSuffix(proc.path, "/runc") {
-			trigger := false
-			// runc [global options] command [command options] [arguments...]
-			for i, param := range proc.cmds {
-				if i == 0 {
-					if !strings.Contains(param, "runc") {
-						break
-					}
-					continue
-				}
-
-				if strings.HasPrefix(param, "--") { // skip name and global option
-					continue
-				}
-
-				if param == "start" || param == "kill" {
-					trigger = true
-				}
-				break
-			}
-
-			////
-			if trigger {
-				log.WithFields(log.Fields{
-					"parent": proc.pname,
-					"ppath":  proc.ppath,
-					"name":   proc.name,
-					"path":   proc.path,
-					"cmd":    proc.cmds,
-				}).Debug("PROC: runc trigger")
-			}
-		}
-	}
-}
-*/
-
 func (p *Probe) evaluateRuntimeCmd(proc *procInternal) bool {
 	if global.RT.IsRuntimeProcess(filepath.Base(proc.ppath), nil) {
 		if global.RT.IsRuntimeProcess(filepath.Base(proc.path), nil) {
@@ -695,8 +633,7 @@ func (p *Probe) printProcReport(id string, proc *procInternal) {
 	var s string
 	if id == "" {
 		s = "[host]"
-		// return
-	} else if p.isEnforcerChildren(proc, id) {
+	} else if id == p.selfID {
 		// s = "[self]"
 		return // hide all information
 	} else {
@@ -1826,12 +1763,6 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		return
 	}
 
-	// only allowing the NS op from the agent's root session
-	if p.isEnforcerChildren(proc, id) {
-		// log.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: ignored")
-		return
-	}
-
 	if id != "" && p.evaluateRuntimeCmd(proc) {
 		return
 	}
@@ -2491,7 +2422,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 					// consider it as an intruder processes unless users whitelist it
 					mLog.WithFields(log.Fields{"proc": proc, "id": id}).Debug("PROC: Risky session")
 					pp.Action = negativeResByMode(mode)
-					pp.Uuid = share.CLUSReservedUuidNotAlllowed
+					pp.Uuid = share.CLUSReservedUuidNotAllowed
 				}
 			} else {
 				// user has not opened the door
@@ -2844,6 +2775,19 @@ func (p *Probe) applyProcessBlockingPolicy(id string, pid int, pg *share.CLUSPro
 	return true
 }
 
+func (p *Probe) HandleNvProtectControl(bBlocking bool, id, role, group string, pid int) bool {
+	var res bool
+	if p.fAccessCtl != nil {
+		if bBlocking {
+			res = p.fAccessCtl.AddContainerControlByPolicyOrder(id, share.ProfileZeroDrift, group, role, pid, nil)
+		} else {
+			res = p.fAccessCtl.RemoveContainerControl(id)
+		}
+	}
+	log.WithFields(log.Fields{"bBlocking": bBlocking, "id": id, "role": role, "pid": pid, "res": res}).Info("PROC")
+	return res
+}
+
 // ////
 func (p *Probe) HandleProcessPolicyChange(id string, pid int, pg *share.CLUSProcessProfile, bAddContainer, bBlocking bool) {
 	if p.bProfileEnable {
@@ -2964,6 +2908,103 @@ func (p *Probe) PatchContainerProcess(pid int, bEval bool) bool {
 	return false
 }
 
+func isControllerType(role string) bool {
+	return role == "controller" || role == "controller+enforcer+manager" || role == "allinone"
+}
+
+func isManagerType(role string) bool {
+	return role == "manager" || role == "controller+enforcer+manager" || role == "allinone"
+}
+
+// protected by lock
+func (p *Probe) isNVChildProcess(c *procContainer, proc *procInternal) bool {
+	var err error
+	nvRole := c.nvRole
+	if nvRole == "" {
+		return false
+	}
+
+	ppath := proc.ppath
+	path := proc.path
+	pid := proc.pid
+	ppid := proc.ppid
+	bRuncInit := p.isAllowRuncInitCommand("runc", proc.cmds)
+	if ppath == "" {
+		if ppath, err = global.SYS.GetFilePath(ppid); err != nil {
+			log.WithFields(log.Fields{"err": err, "nvRole": nvRole, "ppid": ppid}).Debug()
+		}
+	}
+
+	if path == "" && pid > 0 {
+		if path, err = global.SYS.GetFilePath(pid); err != nil {
+			log.WithFields(log.Fields{"err": err, "nvRole": nvRole, "pid": pid}).Debug()
+		}
+	}
+
+	mLog.WithFields(log.Fields{"path": path, "ppath": ppath, "nvRole": nvRole, "ppid": ppid}).Debug()
+	if isManagerType(nvRole) && ppath == "/usr/bin/bash" {
+		if path == "/usr/bin/python3.12" {
+			if len(proc.cmds) == 3 && proc.cmds[1] == "/usr/local/bin/cli" {
+				c.outsider.Remove(pid)
+				c.children.Add(pid)
+				return true
+			}
+		}
+		return path == ppath /// only for cli case
+	}
+
+	// backup lookup if we did not catch its parents
+	for i := 0; i < 8; i++ { // lookup for 8 callers
+		if global.RT.IsRuntimeProcess(filepath.Base(ppath), nil) || bRuncInit {
+			mLog.WithFields(log.Fields{"path": path, "ppath": ppath, "nvRole": nvRole, "k8s": p.bKubePlatform, "bRuncInit": bRuncInit}).Debug()
+			switch path {
+			case "/usr/bin/cat": // k8s readiness probe
+				if p.bKubePlatform && isControllerType(nvRole) {
+					if bRuncInit {
+						return true
+					} else if len(proc.cmds) == 3 {
+						return proc.cmds[0] == "cat" && proc.cmds[1] == "/tmp/ready"
+					}
+				}
+				return false
+			case "/usr/bin/bash": // cli checks
+				return isManagerType(nvRole)
+			}
+			break
+		}
+
+		if filepath.Dir(ppath) == "/usr/local/bin" {
+			log.WithFields(log.Fields{"caller": ppath}).Debug()
+			return true
+		}
+
+		if isManagerType(nvRole) {
+			switch ppath {
+			case "/usr/lib64/jvm/java-17-openjdk-17/bin/java",
+				"/usr/lib64/jvm/java-17-openjdk-17/lib/jspawnhelper",
+				"/usr/bin/python3.12": // stty
+				log.WithFields(log.Fields{"caller": ppath}).Debug()
+				return true
+			}
+		}
+
+		// find its parent
+		if proc, ok := p.pidProcMap[ppid]; ok {
+			ppid = proc.ppid
+		} else {
+			if _, ppid, err = global.SYS.GetProcessName(ppid); err != nil || ppid == 0 {
+				return false
+			}
+		}
+		if ppath, err = global.SYS.GetFilePath(ppid); err != nil {
+			return false
+		}
+		mLog.WithFields(log.Fields{"caller": ppath, "ppid": ppid, "i": i}).Debug()
+	}
+	return false
+}
+
+// protected by lock
 func isFamilyProcess(family utils.Set, proc *procInternal) bool {
 	return family.Contains(proc.pid) || family.Contains(proc.ppid) || family.Contains(proc.pgid) || family.Contains(proc.sid)
 }
@@ -3010,67 +3051,69 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 
 	bNotImageButNewlyAdded := false
 	bImageFile = true
-	if yes, mounted := global.SYS.IsNotContainerFile(c.rootPid, ppe.Path); yes || mounted {
-		// We will not monitor files under the mounted folder
-		// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
-		if c.bPrivileged {
-			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
-		} else if mounted {
-			mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: mounted")
-		} else { // yes: not a container file
-			bFromPrivilegedPod := false
-			ppid := 0
-			cID := ""
-			// The process (like "setns") is from a privileged pod (like enforcer)
-			if proc.ppid == p.agentPid {
-				ppid = p.agentPid
-				cID = p.selfID
-			} else if pContainer, ok := p.pidContainerMap[proc.ppid]; ok && pContainer.id != "" && pContainer.bPrivileged {
-				ppid = pContainer.rootPid
-				cID = pContainer.id
-			}
+	if bFromPmon {
+		if yes, mounted := global.SYS.IsNotContainerFile(c.rootPid, ppe.Path); yes || mounted {
+			// We will not monitor files under the mounted folder
+			// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
+			if c.bPrivileged {
+				mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
+			} else if mounted {
+				mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: mounted")
+			} else { // yes: not a container file
+				bFromPrivilegedPod := false
+				ppid := 0
+				cID := ""
+				// The process (like "setns") is from a privileged pod (like enforcer)
+				if proc.ppid == p.agentPid {
+					ppid = p.agentPid
+					cID = p.selfID
+				} else if pContainer, ok := p.pidContainerMap[proc.ppid]; ok && pContainer.id != "" && pContainer.bPrivileged {
+					ppid = pContainer.rootPid
+					cID = pContainer.id
+				}
 
-			// need to validate it from the calling pod
-			if ppid != 0 {
-				if yes, _ = global.SYS.IsNotContainerFile(ppid, ppe.Path); yes {
-					bFromPrivilegedPod = true
-					log.WithFields(log.Fields{"file": ppe.Path, "id": cID, "ppid": ppid}).Debug("SHD: calling from a priviiged pod")
+				// need to validate it from the calling pod
+				if ppid != 0 {
+					if yes, _ = global.SYS.IsNotContainerFile(ppid, ppe.Path); yes {
+						bFromPrivilegedPod = true
+						log.WithFields(log.Fields{"file": ppe.Path, "id": cID, "ppid": ppid}).Debug("SHD: calling from a priviiged pod")
+					}
+				}
+
+				if !bFromPrivilegedPod {
+					// this file is not existed
+					bImageFile = false
+					mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
 				}
 			}
 
-			if !bFromPrivilegedPod {
-				// this file is not existed
+			// from docker run, v20.10.7
+			bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
+			if bRtProcP && p.isAllowRuncInitCommand(proc.path, proc.cmds) {
+				// mlog.WithFields(log.Fields{"id": id}).Debug("SHD: runc init")
+				return true
+			}
+		} else {
+			if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec && finfo.length > 0 {
 				bImageFile = false
-				mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
-			}
-		}
-
-		// from docker run, v20.10.7
-		bRtProcP := global.RT.IsRuntimeProcess(proc.pname, nil)
-		if bRtProcP && p.isAllowRuncInitCommand(proc.path, proc.cmds) {
-			// mlog.WithFields(log.Fields{"id": id}).Debug("SHD: runc init")
-			return true
-		}
-	} else {
-		if finfo, ok := p.fsnCtr.GetUpperFileInfo(id, ppe.Path); ok && finfo.bExec && finfo.length > 0 {
-			bImageFile = false
-			if fi, ok := c.fInfo[ppe.Path]; ok {
-				bModified = (fi.length != finfo.length) || (fi.hashValue != finfo.hashValue)
-				if ppe.Action == share.PolicyActionAllow && fi.fileType == file_not_exist { // not from image
-					bNotImageButNewlyAdded = true
-					c.fInfo[ppe.Path] = finfo // updated
+				if fi, ok := c.fInfo[ppe.Path]; ok {
+					bModified = (fi.length != finfo.length) || (fi.hashValue != finfo.hashValue)
+					if ppe.Action == share.PolicyActionAllow && fi.fileType == file_not_exist { // not from image
+						bNotImageButNewlyAdded = true
+						c.fInfo[ppe.Path] = finfo // updated
+					}
+					mLog.WithFields(log.Fields{"file": ppe.Path, "fi": fi, "finfo": finfo}).Debug("SHD:")
+				} else {
+					mLog.WithFields(log.Fields{"file": ppe.Path, "finfo": finfo}).Debug("SHD: new file")
+					bModified = true
 				}
-				mLog.WithFields(log.Fields{"file": ppe.Path, "fi": fi, "finfo": finfo}).Debug("SHD:")
-			} else {
-				mLog.WithFields(log.Fields{"file": ppe.Path, "finfo": finfo}).Debug("SHD: new file")
-				bModified = true
 			}
 		}
-	}
+	} // bFromPmon
 
 	bCanBeLearned := true
 	bRuncChild := false
-	if ppe.Action != share.PolicyActionViolate && (p.bK8sGroupWithProbe(svcGroup) || len(c.healthCheck) > 0) {
+	if ppe.Action != share.PolicyActionViolate && (p.bK8sGroupWithProbe(svcGroup) || len(c.healthCheck) > 0) && c.nvRole == "" {
 		// allowing "kubctl exec ...", adpot the binary path to resolve the name
 		bRuncChild = global.RT.IsRuntimeProcess(proc.pname, nil)
 		if !bRuncChild {
@@ -3119,34 +3162,13 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				}
 			}
 		}
-
-		//if bRuncChild {
-		//	bCanBeLearned = false
-		//}
-
-		//  TODO: meet the qualifications
-		// if ppe.Name == proc.name && len(ppe.ProbeCmds) > 0 {
-		//	if bRuncChild {
-		//	norm := strings.TrimSuffix(strings.Join(proc.cmds, ","), ",")
-		//	for _, cmd := range ppe.ProbeCmds {
-		//		if strings.Contains(norm, cmd) {
-		//			// matched up to its grandparent process
-		//          bCanBeLearned = false
-		//			c.outsider.Remove(proc.pid)
-		//			c.children.Add(proc.pid)
-		//			mLog.WithFields(log.Fields{"id": id, "pid": proc.pid}).Debug()
-		//			break
-		//		}
-		//	}
-		//	}
-		//}
 	}
-
-	mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "id": id}).Debug("SHD:")
+	mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "proc": proc, "id": id}).Debug("SHD:")
 	// ZeroDrift: allow a family member of the root process
-	if isFamilyProcess(c.children, proc) || bRuncChild {
+	bFamily := isFamilyProcess(c.children, proc)
+	if bFamily || bRuncChild || p.isNVChildProcess(c, proc) {
 		// a family member
-		if bFromPmon {
+		if bFromPmon && bFamily {
 			c.outsider.Remove(proc.pid)
 			c.children.Add(proc.pid)
 		}
@@ -3165,7 +3187,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			}
 		case share.PolicyActionAllow, share.PolicyActionViolate:
 			if ppe.Action == share.PolicyActionViolate {
-				if ppe.Uuid != share.CLUSReservedUuidNotAlllowed {
+				if ppe.Uuid != share.CLUSReservedUuidNotAllowed {
 					// a real deny rule
 					break
 				}
@@ -3224,6 +3246,8 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 					ppe.Uuid = share.CLUSReservedUuidAnchorMode
 				}
 			}
+		case share.PolicyActionDeny:
+			ppe.Uuid = share.CLUSReservedUuidShieldMode
 		}
 	}
 	mLog.WithFields(log.Fields{"bModified": bModified, "bImageFile": bImageFile, "bNotImageButNewlyAdded": bNotImageButNewlyAdded}).Debug("SHD:")
@@ -3231,7 +3255,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 	return bPass
 }
 
-func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bPrivileged bool, healthCheck []string) {
+func (p *Probe) BuildProcessFamilyGroups(id, nvRole string, rootPid int, bSandboxPod, bPrivileged bool, healthCheck []string) {
 	//log.WithFields(log.Fields{"id": id, "pid": rootPid}).Debug("SHD:")
 	if !p.bProfileEnable {
 		return
@@ -3254,6 +3278,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 				portsMap: make(map[osutil.SocketInfo]*procApp),
 				fInfo:    make(map[string]*fileInfo),
 				startAt:  time.Now(),
+				nvRole:   nvRole,
 			}
 			p.containerMap[id] = c
 		} else {
@@ -3266,6 +3291,7 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 
 	c.rootPid = rootPid
 	c.bPrivileged = bPrivileged
+	c.nvRole = nvRole
 	if healthCheck != nil {
 		c.healthCheck = healthCheck // no override
 	}
@@ -3300,7 +3326,6 @@ func (p *Probe) BuildProcessFamilyGroups(id string, rootPid int, bSandboxPod, bP
 	// (3) rebuild two sets
 	c.children.Add(rootPid) // from the beginning
 	for _, pid := range pids {
-
 		if proc, ok := p.pidProcMap[int(pid)]; ok {
 			if isFamilyProcess(c.children, proc) {
 				c.children.Add(int(pid))
@@ -3351,10 +3376,8 @@ func (p *Probe) HandleAnchorModeChange(bAdd bool, id, cPath string, rootPid int)
 func (p *Probe) HandleAnchorNvProtectChange(bAdd bool, id, cPath, role string, rootPid int) {
 	// log.WithFields(log.Fields{"bAdd": bAdd,"id": id, "cPath": cPath, "rootPid": rootPid}).Debug()
 	if bAdd {
-		if rootPid != 0 {
-			if ok, _ := p.fsnCtr.AddContainer(id, cPath, role, rootPid); !ok {
-				log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
-			}
+		if ok, _ := p.fsnCtr.AddContainer(id, cPath, role, rootPid); !ok {
+			log.WithFields(log.Fields{"id": id, "cPath": cPath}).Debug("AN: add failed")
 		}
 	} else { // Removed
 		if ok := p.fsnCtr.RemoveContainer(id, cPath); !ok {

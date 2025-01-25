@@ -2715,7 +2715,7 @@ type CLUSCrdEventQueueInfo struct {
 const CLUSReservedUuidPrefix string = "00000000-0000-0000-0000-0000000000" // reserved the last 2 digits
 
 // ////
-const CLUSReservedUuidNotAlllowed string = "00000000-0000-0000-0000-000000000000"       // processes beyond white list
+const CLUSReservedUuidNotAllowed string = "00000000-0000-0000-0000-000000000000"        // processes beyond white list
 const CLUSReservedUuidRiskyApp string = "00000000-0000-0000-0000-000000000001"          // riskApp
 const CLUSReservedUuidTunnelProc string = "00000000-0000-0000-0000-000000000002"        // tunnel
 const CLUSReservedUuidRootEscalation string = "00000000-0000-0000-0000-000000000003"    // root privilege escallation

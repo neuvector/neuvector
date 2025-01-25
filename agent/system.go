@@ -648,7 +648,7 @@ func processPolicyLookup(id, riskType, pname, ppath string, pid, pgid, shellCmd 
 	mode, setting, group, err := pe.ProcessPolicyLookup(svcGroup, id, ppe, pid)
 	if err == nil {
 		// log.WithFields(log.Fields{"mode": mode, "group": group, "proc": proc, "pid": pid, "shellCmd": shellCmd}).Debug("PROC: ")
-		bNotInWhitelist := (ppe.Uuid == share.CLUSReservedUuidNotAlllowed)
+		bNotInWhitelist := (ppe.Uuid == share.CLUSReservedUuidNotAllowed)
 		// not in the whitelist, not a risk app, and shell script name
 		if bNotInWhitelist && riskType == "" && shellCmd == 1 {
 			ppe.Action = share.PolicyActionAllow // not recording
@@ -680,7 +680,7 @@ func processPolicyLookup(id, riskType, pname, ppath string, pid, pgid, shellCmd 
 			if bNeuvector {
 				group = share.GroupNVProtect // updated
 				svcGroup = group
-				log.WithFields(log.Fields{"id": id, "name": ppe.Name, "path": ppe.Path}).Info("GRP: NV Protect")
+				// log.WithFields(log.Fields{"id": id, "name": ppe.Name, "path": ppe.Path}).Info("GRP: NV Protect")
 			} else if pe.IsAllowedByParentApp(svcGroup, id, ppe.Name, pname, ppath, pgid) {
 				ppe.Action = share.PolicyActionAllow
 				bAllowSuspicious = true
