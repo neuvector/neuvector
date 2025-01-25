@@ -636,7 +636,6 @@ func (s *SystemTools) ContainerFilePath(pid int, path string) string {
 func (s *SystemTools) IsNotContainerFile(pid int, path string) (bool, bool) {
 	rpath := s.ContainerFilePath(pid, path)
 	_, err := os.Stat(rpath)
-	os.IsNotExist(err)
 	return os.IsNotExist(err), utils.IsMountPoint(filepath.Dir(rpath))
 }
 

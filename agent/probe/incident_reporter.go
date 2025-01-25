@@ -402,6 +402,6 @@ func (p *Probe) sendFsmonNVProtectProbeReport(fmsg *fsmon.MonitorMessage) {
 		path:  fmsg.ProcPath,
 	}
 
-	p.sendProcessIncident(true, fmsg.ID, share.CLUSReservedUuidNotAlllowed, fmsg.Group, share.GroupNVProtect, proc)
+	p.sendProcessIncident(true, fmsg.ID, share.CLUSReservedUuidNotAllowed, fmsg.Group, share.GroupNVProtect, proc)
 	log.WithFields(log.Fields{"proc": proc, "fmsg": fmsg}).Debug("PROC:")
 }

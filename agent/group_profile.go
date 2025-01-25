@@ -1004,7 +1004,7 @@ func cbEstimateDeniedProcessdByGroup(id, name, path string) (string, string) {
 	svcGroup, ok, _ := cbGetLearnedGroupName(id)
 	if !ok {
 		log.WithFields(log.Fields{"id": id}).Error("GRP: no svc")
-		return "", share.CLUSReservedUuidNotAlllowed // TODO: if possible
+		return "", share.CLUSReservedUuidNotAllowed // TODO: if possible
 	}
 
 	if profile, ok := ObtainGroupProcessPolicy(id); ok && profile != nil {
@@ -1024,16 +1024,16 @@ func cbEstimateDeniedProcessdByGroup(id, name, path string) (string, string) {
 		}
 
 		// by default, it from service (include beyond its white list)
-		return svcGroup, share.CLUSReservedUuidNotAlllowed
+		return svcGroup, share.CLUSReservedUuidNotAllowed
 	}
 
 	if _, ok := isNeuvectorContainerById(id); ok { // NeuVector
 		log.WithFields(log.Fields{"id": id, "name": name, "path": path}).Info("GRP: NV Protect")
-		return share.GroupNVProtect, share.CLUSReservedUuidNotAlllowed
+		return share.GroupNVProtect, share.CLUSReservedUuidNotAllowed
 	}
 
 	log.WithFields(log.Fields{"id": id}).Error("GRP: no profile")
-	return "", share.CLUSReservedUuidNotAlllowed
+	return "", share.CLUSReservedUuidNotAllowed
 }
 
 // /// Estimate the rule from group name or service
@@ -1113,7 +1113,7 @@ func updateContainerFamilyTrees(name string) {
 			if c.info != nil {
 				bPrivileged = c.info.Privileged
 			}
-			prober.BuildProcessFamilyGroups(c.id, c.pid, false, bPrivileged, c.healthCheck)
+			prober.BuildProcessFamilyGroups(c.id, c.nvRole, c.pid, false, bPrivileged, c.healthCheck)
 		}
 	}
 }

@@ -659,69 +659,6 @@ func (fn *FaNotify) calculateResponse(pid, fd int, fmask uint64, perm bool) (boo
 		return true, mask, false, nil, pInfo
 	}
 
-	if r.bNeuVectorSvc {
-		if !fn.bNVProtect {
-			return true, 0, true, ifile, pInfo
-		}
-
-		ppid := pInfo.Pid
-		path := pInfo.Path
-
-		log.WithFields(log.Fields{"linkPath": linkPath}).Debug("FMON:")
-
-		if linkPath == "/etc/neuvector/certs" || linkPath == "/etc/neuvector/certs/internal" {
-			if info, err := os.Stat(fmt.Sprintf("/proc/%d/root%s", ppid, linkPath)); err == nil && info.IsDir() {
-				return true, 0, true, ifile, pInfo
-			}
-		}
-
-		switch filepath.Base(linkPath) { // allowed external calling cmd
-		case "ps", "cat":
-			return true, 0, true, ifile, pInfo
-		case "bash": // default shell
-			return true, 0, true, ifile, pInfo
-		case "python3.12", "python": // cli and support: manager and allinone only
-			if _, err := os.Stat(fmt.Sprintf("/proc/%d/root/usr/local/bin/cli", ppid)); os.IsNotExist(err) {
-				break
-			}
-			return true, 0, true, ifile, pInfo
-		}
-
-		// a shortcut for agent
-		gid := osutil.GetProcessGroupId(pid)
-		if _, pgid, err := fn.sys.GetProcessName(gid); err == nil {
-			if pgid == fn.agentPid {
-				return true, 0, true, ifile, pInfo
-			}
-		}
-
-		pid := ppid
-		for i := 0; i < 8; i++ { // lookup for 8 callers
-			switch filepath.Base(path) {
-			case "agent", "monitor", "controller", "nstools", "pathWalker", "dp", "upgrader", "opa", "yq", "scanner", "scannerTask", "sigstore-interface", "adapter":
-				if filepath.Dir(path) == "/usr/local/bin" {
-					// log.WithFields(log.Fields{"caller": path, "i": i}).Debug("FMON:")
-					return true, 0, true, ifile, pInfo
-				}
-			case "java": // manager and allinone only
-				if _, err := os.Stat(fmt.Sprintf("/proc/%d/root/usr/local/bin/cli", ppid)); os.IsNotExist(err) {
-					break
-				}
-				// log.WithFields(log.Fields{"caller": path, "i": i}).Debug("FMON:")
-				return true, 0, true, ifile, pInfo
-			}
-
-			// find the parent
-			if _, pid, err = fn.sys.GetProcessName(pid); err != nil || pid == 0 {
-				break
-			}
-			path, _ = fn.sys.GetFilePath(pid)
-		}
-		return false, mask, true, ifile, pInfo
-	}
-
-	// log.WithFields(log.Fields{"protect": ifile.protect, "perm": perm, "path": linkPath, "ifile": ifile, "evMask": fmt.Sprintf("0x%08x", fmask)}).Debug("FMON:")
-
 	// permition decision
 	resp := true
 	if ifile.protect { // always verify app for block-access

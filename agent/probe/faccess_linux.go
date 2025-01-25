@@ -44,15 +44,17 @@ type regWhiteRule struct {
 
 // whitelist per container
 type rootFd struct {
-	pid            int
-	id             string
-	setting        string
-	group          string
-	whlst          map[string]int // not set: -1, deny: 0, allow: 1, ....
-	reglst         []regWhiteRule // wild card list, like whlist
-	dirMonitorList []string
-	allowProcList  []faProcGrpRef        // allowed process group
-	permitProcGrps map[int]*faProcGrpRef // permitted pgid and ppid
+	pid             int
+	id              string
+	setting         string
+	group           string
+	nvRole          string         // enforcer, controller, manager, allinone and so on
+	whlst           map[string]int // not set: -1, deny: 0, allow: 1, ....
+	reglst          []regWhiteRule // wild card list, like whlist
+	dirMonitorList  []string
+	fileMonitorList []string
+	allowProcList   []faProcGrpRef        // allowed process group
+	permitProcGrps  map[int]*faProcGrpRef // permitted pgid and ppid
 }
 
 // global control data
@@ -205,7 +207,7 @@ func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 				log.WithFields(log.Fields{"path": path, "error": err}).Error("FA: ")
 			}
 		} else {
-			log.WithFields(log.Fields{"path": path}).Debug("FA: ")
+			mLog.WithFields(log.Fields{"path": path}).Debug("FA: ")
 		}
 	}
 	return true, len(dirs)
@@ -223,6 +225,37 @@ func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 		}
 	}
 	return len(dirs)
+}
+
+func (fa *FileAccessCtrl) addFileMarks(pid int, files []string) (bool, int) {
+	ppath := fmt.Sprintf(procRootMountPoint, pid)
+	for _, file := range files {
+		path := filepath.Join(ppath, file)
+		err := fa.fanfd.Mark(unix.FAN_MARK_ADD, fa.cflag, unix.AT_FDCWD, path)
+		if err != nil {
+			if !os.IsNotExist(errors.Unwrap(err)) {
+				log.WithFields(log.Fields{"path": path, "error": err}).Error()
+				return false, 0
+			}
+		} else {
+			mLog.WithFields(log.Fields{"path": path}).Debug("FA: ")
+		}
+	}
+	return true, len(files)
+}
+
+func (fa *FileAccessCtrl) removeFileMarks(pid int, files []string) int {
+	ppath := fmt.Sprintf(procRootMountPoint, pid)
+	for _, file := range files {
+		path := filepath.Join(ppath, file)
+		if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+			if !os.IsNotExist(errors.Unwrap(err)) {
+				log.WithFields(log.Fields{"path": path, "error": err}).Error()
+				return 0
+			}
+		}
+	}
+	return len(files)
 }
 
 // ///
@@ -275,7 +308,9 @@ func (fa *FileAccessCtrl) Close() {
 	defer fa.unlockMux()
 	for _, cRoot := range fa.roots {
 		fa.removeDirMarks(cRoot.pid, cRoot.dirMonitorList)
+		fa.removeFileMarks(cRoot.pid, cRoot.fileMonitorList)
 		cRoot.dirMonitorList = nil
+		cRoot.fileMonitorList = nil
 		cRoot.allowProcList = nil
 		cRoot.permitProcGrps = make(map[int]*faProcGrpRef, 0)
 	}
@@ -285,7 +320,7 @@ func (fa *FileAccessCtrl) Close() {
 	go func() {
 		time.Sleep(5 * time.Second)
 		fa.monitorExit()
-		log.Info("FMON: exit2")
+		log.Info("exit2")
 	}()
 }
 
@@ -417,7 +452,7 @@ func (fa *FileAccessCtrl) mergeMonitorRuleList(root *rootFd, list []string, bAll
 }
 
 // ///
-func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup string, rootpid int, ppe_list []*share.CLUSProcessProfileEntry) bool {
+func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup, nvRole string, rootpid int, ppe_list []*share.CLUSProcessProfileEntry) bool {
 	if !fa.bEnabled {
 		log.Debug("FA: not supported")
 		return false
@@ -431,7 +466,9 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup
 	//// existing entry, remove its marks at first
 	if cRoot, ok := fa.roots[id]; ok {
 		cnt := fa.removeDirMarks(cRoot.pid, cRoot.dirMonitorList)
+		cnt += fa.removeFileMarks(cRoot.pid, cRoot.fileMonitorList)
 		cRoot.dirMonitorList = nil
+		cRoot.fileMonitorList = nil
 		cRoot.allowProcList = nil
 		cRoot.permitProcGrps = nil
 		fa.marks -= cnt
@@ -444,6 +481,7 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup
 		id:             id,
 		setting:        setting,
 		group:          svcGroup,
+		nvRole:         nvRole,
 		whlst:          execs,
 		dirMonitorList: dirs,
 		allowProcList:  make([]faProcGrpRef, 0),
@@ -492,12 +530,47 @@ func (fa *FileAccessCtrl) AddContainerControlByPolicyOrder(id, setting, svcGroup
 	}
 
 	////
+	switch nvRole {
+	case "enforcer", "controller+enforcer+manager", "allinone":
+		var dirs, files []string
+		skipfiles := utils.NewSet(
+			"/bin/ps", // pipe operations
+			"/usr/bin/bash", "/usr/bin/cut", "/usr/bin/echo", "/usr/bin/gawk",
+			"/usr/bin/grep", "/usr/bin/lsof", "/usr/bin/sed",
+			"/usr/sbin/ethtool", "/usr/sbin/ip", "/usr/sbin/lsmod", "/usr/sbin/tc",
+		)
+
+		// selective
+		for exec := range execs {
+			switch filepath.Dir(exec) {
+			case "/usr/sbin", "/usr/bin", "/bin":
+				if ok := skipfiles.Contains(exec); !ok {
+					files = append(files, exec)
+				}
+			}
+		}
+
+		for _, dir := range root.dirMonitorList {
+			switch dir {
+			case "/usr/sbin", "/usr/bin", "/usr/local/bin", "/bin":
+			default:
+				dirs = append(dirs, dir)
+			}
+		}
+		root.dirMonitorList = dirs
+		root.fileMonitorList = files
+	}
+
 	ok, cnt := fa.addDirMarks(root.pid, root.dirMonitorList)
 	if !ok {
-		log.Debug("FA: failed")
+		log.Debug("FA: dir failed")
 		return false
 	}
 
+	if ok, _ := fa.addFileMarks(root.pid, root.fileMonitorList); !ok {
+		log.Debug("FA: file files")
+		return false
+	}
 	fa.marks += cnt
 	fa.roots[id] = root // put the entry
 	log.WithFields(log.Fields{"marks": cnt, "total_marks": fa.marks, "exec_cnt": len(execs)}).Debug("FA: add marks")
@@ -517,7 +590,9 @@ func (fa *FileAccessCtrl) RemoveContainerControl(id string) bool {
 
 	if cRoot, ok := fa.roots[id]; ok {
 		cnt := fa.removeDirMarks(cRoot.pid, cRoot.dirMonitorList)
+		cnt += fa.removeFileMarks(cRoot.pid, cRoot.fileMonitorList)
 		cRoot.dirMonitorList = nil
+		cRoot.fileMonitorList = nil
 		cRoot.allowProcList = nil
 		cRoot.permitProcGrps = make(map[int]*faProcGrpRef, 0)
 		fa.marks -= cnt
@@ -530,56 +605,6 @@ func (fa *FileAccessCtrl) RemoveContainerControl(id string) bool {
 	}
 	return true
 }
-
-/* removed by golint
-func (fa *FileAccessCtrl) AddBlackListOnTheFly(id string, list []string) bool {
-	if !fa.bEnabled {
-		log.Debug("FA: not supported")
-		return false
-	}
-
-	////
-	fa.lockMux()
-	defer fa.unlockMux()
-
-	/////
-	cRoot, ok := fa.roots[id]
-	if !ok {
-		// log.WithFields(log.Fields{"id": id}).Debug("FA: not found")
-		return false
-	}
-
-	//// Do not access files after lock, it could cause deadlocks among file accesses and  Fanotify
-	cur := len(cRoot.dirMonitorList) // reference
-	for _, path := range list {
-		// check it whether is an allowed rule
-		if res, ok := cRoot.whlst[path]; ok && res > rule_denied {
-			// res=1: allowed
-			// res=3: allowed with updateAlert
-			// log.WithFields(log.Fields{"path": path}).Debug("FA: allowed")
-			fa.addToMonitorList(cRoot, path, true, (res == rule_allowed_updateAlert))
-			continue
-		}
-		// log.WithFields(log.Fields{"path": path}).Debug("FA: denied")
-		fa.addToMonitorList(cRoot, path, false, false)
-	}
-
-	if cur == len(cRoot.dirMonitorList) { // not adding new marks
-		log.WithFields(log.Fields{"total_marks": fa.marks}).Debug("FA:")
-		return true
-	}
-
-	ok, cnt := fa.addDirMarks(cRoot.pid, cRoot.dirMonitorList[cur:])
-	if !ok {
-		log.Debug("FA: failed")
-		return false
-	}
-
-	fa.marks += cnt
-	log.WithFields(log.Fields{"marks": cnt, "total_marks": fa.marks}).Debug("FA:")
-	return true
-}
-*/
 
 func (fa *FileAccessCtrl) isAllowedByParentApp(cRoot *rootFd, pid int) (bool, string, string, int) {
 	if len(cRoot.allowProcList) == 0 {
@@ -645,7 +670,7 @@ func (fa *FileAccessCtrl) isAllowedByParentApp(cRoot *rootFd, pid int) (bool, st
 	return allowed, name, path, pgid
 }
 
-func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, path, svcGroup string, pid, res int) string {
+func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, ppath, path, svcGroup string, pid, res int) string {
 	if fa.prober == nil {
 		return ""
 	}
@@ -653,7 +678,7 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, path, svcGroup str
 	sid, pgid := osutil.GetSessionId(pid), osutil.GetProcessGroupId(pid)
 	ppid, _, _, _, _ := osutil.GetProcessPIDs(pid)
 	cmds, _ := global.SYS.ReadCmdLine(pid)
-	proc := &procInternal{pid: pid, name: name, path: path, cmds: cmds, ppid: ppid, sid: sid, pgid: pgid}
+	proc := &procInternal{pid: pid, name: name, path: path, cmds: cmds, ppid: ppid, ppath: ppath, sid: sid, pgid: pgid}
 	ppe := &share.CLUSProcessProfileEntry{Name: name, Path: path, Action: share.PolicyActionAllow, DerivedGroup: svcGroup}
 
 	if res == rule_not_defined {
@@ -672,26 +697,26 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, path, svcGroup str
 	return ppe.Uuid // cause
 }
 
-func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, string, int) {
-	var svcGroup string
+func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, string, string, int) {
+	var svcGroup, nvRole string
 	res := rule_allowed // allow
 	profileSetting := share.ProfileBasic
 	// check if the /proc/xxx/cgroup exists
 	id, _, _, found := global.SYS.GetContainerIDByPID(pid)
-	if id == fa.prober.selfID || !found || !fa.bEnabled {
-		// log.WithFields(log.Fields{"id": id}).Debug("FA: bypass")
-		return id, profileSetting, svcGroup, res // allow agent operations
+	if !found || !fa.bEnabled {
+		log.WithFields(log.Fields{"id": id}).Debug("FA: bypass")
+		return id, profileSetting, svcGroup, nvRole, res // allow agent operations
 	}
 
 	fa.lockMux()
 	defer fa.unlockMux()
-	// log.WithFields(log.Fields{"id": id, "found": found, "path": path}).Debug("FA: ")
 	if cRoot, ok := fa.roots[id]; ok {
 		profileSetting = cRoot.setting
 		svcGroup = cRoot.group
+		nvRole = cRoot.nvRole
 		if ok, pname, ppath, pgid := fa.isAllowedByParentApp(cRoot, pid); ok {
 			log.WithFields(log.Fields{"pname": pname, "ppath": ppath, "pid": pid, "pgid": pgid}).Debug("FA: allowed by parent")
-			return id, profileSetting, svcGroup, res
+			return id, profileSetting, svcGroup, nvRole, res
 		}
 
 		if rres, ok := cRoot.whlst[path]; ok {
@@ -700,21 +725,20 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 				for _, regRule := range cRoot.reglst {
 					if index := strings.Index(regRule.path, "/*/"); index > -1 {
 						if strings.HasPrefix(path, regRule.path[:index]) && (filepath.Base(path) == filepath.Base(regRule.path)) {
-							return id, profileSetting, svcGroup, regRule.decision
+							return id, profileSetting, svcGroup, nvRole, regRule.decision
 						}
 					}
 				}
 			}
-			return id, profileSetting, svcGroup, rres
-		} /*else {
-			log.Debug("FA: not in the whtlst")
-		} */
+			return id, profileSetting, svcGroup, nvRole, rres
+		}
 	}
-	return id, profileSetting, svcGroup, res
+	// not in the whtlst
+	return id, profileSetting, svcGroup, nvRole, res
 }
 
 func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string) {
-	var ppath, path string
+	var ppath, path, id string
 	var err error
 
 	bPass := true
@@ -752,14 +776,14 @@ func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string
 				return bPass, path
 			}
 
-			var id, profileSetting, svcGroup, rule_uuid string
-			id, profileSetting, svcGroup, res = fa.whiteListCheck(path, ppid)
-			// mLog.WithFields(log.Fields{"path": path, "ppid": ppid, "id": id, "profileSetting": profileSetting, "res": res}).Debug("FA:")
+			var profileSetting, svcGroup, rule_uuid, nvRole string
+			id, profileSetting, svcGroup, nvRole, res = fa.whiteListCheck(path, ppid)
+			// mLog.WithFields(log.Fields{"path": path, "ppid": ppid, "ppath": ppath, "id": id, "nvRole": nvRole, "profileSetting": profileSetting, "res": res}).Debug("FA:")
 			if profileSetting == share.ProfileZeroDrift {
 				switch res {
 				case rule_denied, rule_allowed: // matched a rule or bypass
 				default:
-					if rule_uuid = fa.checkAllowedShieldProcess(id, name, path, svcGroup, ppid, res); rule_uuid == "" {
+					if rule_uuid = fa.checkAllowedShieldProcess(id, name, ppath, path, svcGroup, ppid, res); rule_uuid == "" {
 						res = rule_allowed_zdrift
 						log.WithFields(log.Fields{"id": id, "rule_uuid": rule_uuid}).Debug("SHD: allowed")
 					} else {
@@ -768,6 +792,17 @@ func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string
 				}
 			} else { // basic
 				if res >= rule_allowed {
+					res = rule_allowed
+				}
+			}
+
+			if nvRole != "" && res < rule_allowed {
+				if fa.prober != nil && fa.prober.disableNvProtect {
+					res = rule_allowed
+				}
+
+				if rule_uuid == share.CLUSReservedUuidNotAllowed {
+					log.WithFields(log.Fields{"path": path, "res": res, "ppath": ppath, "rule_uuid": rule_uuid}).Debug("FA:")
 					res = rule_allowed
 				}
 			}
@@ -823,8 +858,6 @@ func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string
 		bPass = res > rule_denied
 		if !bPass {
 			log.WithFields(log.Fields{"path": path, "ppid": ppid, "ppath": ppath}).Debug("FA: denied")
-		} else {
-			log.WithFields(log.Fields{"ppid": ppid, "path": path, "ppath": ppath}).Debug("FA: allowed")
 		}
 	}
 	return bPass, path
@@ -902,8 +935,9 @@ func (fa *FileAccessCtrl) GetProbeData() *FileAccessProbeData {
 	probeData.nRoots = len(fa.roots)
 	probeData.nMarks = fa.marks
 	for _, cRoot := range fa.roots {
-		probeData.nEntryCnt += len(cRoot.whlst)           // include black and white entries
-		probeData.nDirMonCnt += len(cRoot.dirMonitorList) // the number should match marks
+		probeData.nEntryCnt += len(cRoot.whlst)            // include black and white entries
+		probeData.nDirMonCnt += len(cRoot.dirMonitorList)  // the number should match marks
+		probeData.nDirMonCnt += len(cRoot.fileMonitorList) // the number should match marks
 	}
 
 	return &probeData

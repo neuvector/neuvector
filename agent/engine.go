@@ -1715,54 +1715,39 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 
 	// process monitor : protect mode, process profiles for all neuvector containers
 	if agentEnv.containerShieldMode {
-		prober.BuildProcessFamilyGroups(c.id, c.pid, false, info.Privileged, nil)
-		// process killer per policy: removed by evaluating other same-kind instances
-		// since the same policy might be shared by several same-kind instances in a node
+		prober.BuildProcessFamilyGroups(c.id, c.nvRole, c.pid, false, info.Privileged, nil)
 		pe.InsertNeuvectorProcessProfilePolicy(group, role)
-
-		// process blocker per container: can be removed by its container id
-		// applyProcessProfilePolicy(c, group)
 		c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
-		prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, role, c.pid)
 		// file monitors : protect mode, core-definitions, only modification alerts
-		fileWatcher.ContainerCleanup(info.Pid, false)
+		fileWatcher.ContainerCleanup(c.pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
-
-		switch role {
-		case "enforcer", "controller+enforcer+manager", "controller+enforcer", "allinone", "controller", "manager":
+		switch c.nvRole {
+		case "enforcer", "controller+enforcer+manager", "allinone", "controller":
 			var filters []share.CLUSFileMonitorFilter
 			for _, fltr := range conf.Profile.Filters {
 				switch fltr.Path {
-				case "/bin", "/sbin", "/usr/bin", "/usr/sbin": // apply blocking controls
-				/*
-					filters = append(filters, share.CLUSFileMonitorFilter{
-						Behavior:    share.FileAccessBehaviorBlock,
-						Path:        fltr.Path,
-						Regex:       ".*",
-						Recursive:   false,
-						CustomerAdd: true,
-					})
-				*/
+				case "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin": // not apply controls
 				default:
 					filters = append(filters, fltr)
 				}
 			}
-
-			if role != "manager" {
-				filters = append(filters, share.CLUSFileMonitorFilter{
-					Behavior: share.FileAccessBehaviorBlock, Path: "/usr/local/bin/scripts", Regex: ".*", Recursive: true, CustomerAdd: true,
-				})
-			}
-			conf.Profile.Filters = filters // customized
+			filters = append(filters, share.CLUSFileMonitorFilter{
+				Behavior:    share.FileAccessBehaviorMonitor,
+				Path:        "/usr/local/bin/scripts",
+				Regex:       ".*",
+				Recursive:   true,
+				CustomerAdd: true,
+			})
+			conf.Profile.Filters = filters
+			conf.Profile.Mode = share.PolicyModeEvaluate //share.PolicyModeEnforce
+		default:
+			conf.Profile.Mode = share.PolicyModeEvaluate
 		}
-
-		conf.Profile.Filters = append(conf.Profile.Filters, share.CLUSFileMonitorFilter{
-			Behavior: share.FileAccessBehaviorMonitor, Path: "/etc/neuvector/certs", Regex: ".*", Recursive: true, CustomerAdd: true,
-		})
-		conf.Profile.Mode = share.PolicyModeEnforce
 		conf.Profile.Group = group
 		if info.Pid != 0 {
-			go fileWatcher.StartWatch(id, info.Pid, conf, true, true)
+			prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, role, c.pid)
+			go prober.HandleNvProtectControl(true, c.id, role, share.GroupNVProtect, c.pid)
+			go fileWatcher.StartWatch(id, c.pid, conf, true, true)
 		}
 	}
 
@@ -1823,6 +1808,7 @@ func stopNeuVectorMonitor(c *containerData) {
 	}
 
 	prober.HandleAnchorNvProtectChange(false, c.id, c.upperDir, "", c.pid)
+	prober.HandleNvProtectControl(false, c.id, "", "", c.pid)
 	log.WithFields(log.Fields{"id": c.id, "pid": c.pid}).Debug("FMON:")
 	fileWatcher.ContainerCleanup(c.pid, true)
 
@@ -1906,7 +1892,7 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 
 	hostMode := isContainerNetHostMode(info, parent)
 	fillContainerProperties(c, parent, info, hostMode)
-	prober.BuildProcessFamilyGroups(c.id, c.pid, parent == nil, info.Privileged, c.healthCheck)
+	prober.BuildProcessFamilyGroups(c.id, c.nvRole, c.pid, parent == nil, info.Privileged, c.healthCheck)
 	prober.HandleAnchorModeChange(true, c.id, c.upperDir, c.pid)
 
 	if parent == nil {
