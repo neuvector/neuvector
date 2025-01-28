@@ -279,14 +279,14 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		// Calculate sum of vulnerabilities for containers in each pod
 		// Do not re-sum existing pod vulnerabilities
 		if wl.ShareNetNS != "" {
-			pv, ok := podVulsMap[cache.podName]
+			pv, ok := podVulsMap[cache.podName+cache.serviceName]
 			if !ok {
 				pv = podVuls{}
 			}
 			pv.CriticalVuls += cache.scanBrief.CriticalVuls
 			pv.HighVuls += cache.scanBrief.HighVuls
 			pv.MedVuls += cache.scanBrief.MedVuls
-			podVulsMap[cache.podName] = pv
+			podVulsMap[cache.podName+cache.serviceName] = pv
 		}
 	}
 
@@ -320,7 +320,7 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 		// Assign containers' sum of vulnerabilities to pod cache
 		if wl.ShareNetNS == "" {
 			epMap[cache.workload.ID] = &wlMini{mode: mode}
-			if podVuls, ok := podVulsMap[cache.podName]; ok {
+			if podVuls, ok := podVulsMap[cache.podName+cache.serviceName]; ok {
 				if cache.scanBrief == nil {
 					cache.scanBrief = &api.RESTScanBrief{}
 				}
