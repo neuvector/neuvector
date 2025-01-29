@@ -173,6 +173,7 @@ var restErrMessage = []string{
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
 	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
 	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
+	api.RESTErrPollJobNotFoundError:  "Job not found in the Job Queue",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
