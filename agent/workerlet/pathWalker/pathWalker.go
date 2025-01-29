@@ -179,7 +179,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 		Files: make([]*workerlet.FileData, 0),
 	}
 
-	log.WithFields(log.Fields{"req": req}).Debug()
+	//log.WithFields(log.Fields{"req": req}).Debug()
 	rootPath := filepath.Join(fmt.Sprintf(procRootMountPoint, req.Pid), req.Path)
 	rootPathLen := len(rootPath)
 	rootPath += "/"
@@ -220,6 +220,18 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 			if path != rootPath {
 				if utils.IsMountPoint(path) {
 					log.WithFields(log.Fields{"path": path}).Debug("skip dir")
+					return filepath.SkipDir
+				}
+
+				bSkip := true
+				ldir := path[rootPathLen:]
+				for _, rdir := range req.Dirs {
+					if strings.HasPrefix(ldir, rdir) {
+						bSkip = false
+						break
+					}
+				}
+				if bSkip {
 					return filepath.SkipDir
 				}
 			}
