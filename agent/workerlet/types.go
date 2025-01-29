@@ -18,6 +18,7 @@ type WalkPathRequest struct {
 	Path     string        `json:"path"`
 	ExecOnly bool          `json:"ExecOnly"`
 	Timeout  time.Duration `json:"Timeout"`
+	Dirs     []string      `json:"Directories"`
 }
 
 type WalkGetPackageRequest struct {

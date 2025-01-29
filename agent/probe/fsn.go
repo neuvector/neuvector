@@ -295,7 +295,9 @@ func (fsn *FileNotificationCtr) updateFileInfo(index string, file, path string) 
 
 	// reporting events
 	// log.WithFields(log.Fields{"id": root.id, "file": file, "finfo": finfo}).Debug("FSN:")
-	go fsn.prober.ProcessFsnEvent(root.id, []string{file}, *finfo)
+	if bExec || bJavaPkg {
+		go fsn.prober.ProcessFsnEvent(root.id, []string{file}, *finfo)
+	}
 }
 
 // already locked
@@ -461,7 +463,7 @@ func (fsn *FileNotificationCtr) skipPathByRole(role, path string) bool {
 			return true
 		}
 		fallthrough
-	case "enforcer", "scanner":
+	case "enforcer", "scanner", "controller", "manager":
 		if strings.HasPrefix(path+"/", "/tmp/") {
 			return true
 		}

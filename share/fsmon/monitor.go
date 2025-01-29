@@ -1,6 +1,7 @@
 package fsmon
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,29 +20,13 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/utils"
+	"golang.org/x/sync/semaphore"
 )
 
 var mLog *log.Logger = log.New()
 
-/*
-const inodeChangeMask = syscall.IN_CLOSE_WRITE |
-
-	syscall.IN_DELETE |
-	syscall.IN_DELETE_SELF |
-	syscall.IN_MOVE |
-	syscall.IN_MOVE_SELF |
-	syscall.IN_MOVED_TO
-*/
 const inodeMovedMask = syscall.IN_MOVE | syscall.IN_MOVE_SELF | syscall.IN_MOVED_TO
 
-/*
-var packageFile utils.Set = utils.NewSet(
-
-	"/var/lib/dpkg/status",
-	"/var/lib/rpm/Packages",
-	"/var/lib/rpm/Packages.db",
-	"/lib/apk/db/installed")
-*/
 type SendAggregateReportCallback func(fsmsg *MonitorMessage) bool
 
 var ImportantFiles []share.CLUSFileMonitorFilter = []share.CLUSFileMonitorFilter{
@@ -72,11 +57,10 @@ var DefaultContainerConf share.CLUSFileMonitorProfile = share.CLUSFileMonitorPro
 	Filters: ImportantFiles,
 }
 
-/*
 const (
-	imonitorFileDelay = 10
+	rootIterTimeout = time.Second * 16
+	walkerMaxCount  = 2
 )
-*/
 
 const (
 	fileEventAttr uint32 = (1 << iota)
@@ -140,18 +124,19 @@ type groupInfo struct {
 }
 
 type FileWatch struct {
-	mux        sync.Mutex
-	bEnable    bool // profile function is enabled, default: true
-	aufs       bool
-	bNVProtect bool
-	fanotifier *FaNotify
-	inotifier  *Inotify
-	fileEvents map[string]*fileMod
-	groups     map[int]*groupInfo
-	sendrpt    SendAggregateReportCallback
-	sendRule   SendFileAccessRuleCallback
-	estRuleSrc EstimateRuleSrcCallback
-	walkerTask *workerlet.Tasker
+	mux           sync.Mutex
+	bEnable       bool // profile function is enabled, default: true
+	aufs          bool
+	bNVProtect    bool
+	fanotifier    *FaNotify
+	inotifier     *Inotify
+	fileEvents    map[string]*fileMod
+	groups        map[int]*groupInfo
+	sendrpt       SendAggregateReportCallback
+	sendRule      SendFileAccessRuleCallback
+	estRuleSrc    EstimateRuleSrcCallback
+	walkerTask    *workerlet.Tasker
+	walkerLimiter *semaphore.Weighted
 }
 
 type MonitorMessage struct {
@@ -239,15 +224,16 @@ func NewFileWatcher(config *FileMonitorConfig, logLevel string) (*FileWatch, err
 	}
 
 	fw := &FileWatch{
-		bEnable:    config.ProfileEnable,
-		aufs:       config.IsAufs,
-		fileEvents: make(map[string]*fileMod),
-		groups:     make(map[int]*groupInfo),
-		sendrpt:    config.SendReport,
-		sendRule:   config.SendAccessRule,
-		estRuleSrc: config.EstRule,
-		walkerTask: config.WalkerTask,
-		bNVProtect: config.NVProtect,
+		bEnable:       config.ProfileEnable,
+		aufs:          config.IsAufs,
+		fileEvents:    make(map[string]*fileMod),
+		groups:        make(map[int]*groupInfo),
+		sendrpt:       config.SendReport,
+		sendRule:      config.SendAccessRule,
+		estRuleSrc:    config.EstRule,
+		bNVProtect:    config.NVProtect,
+		walkerTask:    config.WalkerTask,
+		walkerLimiter: semaphore.NewWeighted(walkerMaxCount),
 	}
 
 	if !fw.bEnable {
@@ -457,6 +443,7 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, even
 	// it depends on the init conditions by runtime engine
 	if isRunTimeAddedFile(filepath.Join("/root", path)) {
 		if event == fileEventAccessed || time.Since(grp.startAt) < time.Duration(time.Second*60) {
+			log.WithFields(log.Fields{"rootPid": rootPid, "path": path}).Debug("FMON: skip")
 			return
 		}
 	}
@@ -588,9 +575,62 @@ func (w *FileWatch) addDir(bIncInotify bool, finfo *osutil.FileInfoExt, files ma
 	}
 }
 
-func (w *FileWatch) getDirAndFileList(pid int, path, regx, cid string, filter *filterRegex, recur, protect, userAdded bool,
-	dirList map[string]*osutil.FileInfoExt) []*osutil.FileInfoExt {
-	dirs, singles := w.getDirFileList(pid, path, regx, cid, filter, recur, protect, userAdded)
+func getBaseDirPrefix(filter share.CLUSFileMonitorFilter) string {
+	dir := strings.Replace(filter.Path, "\\.", ".", -1)
+	if index := strings.Index(dir, ".*"); index > 0 {
+		dir = dir[:(index - 1)]
+	}
+	if filter.Regex == "" {
+		dir = filepath.Dir(dir)
+	}
+	return dir
+}
+
+func (w *FileWatch) getRootFs(pid int, cid string, profile *share.CLUSFileMonitorProfile) *workerlet.WalkPathResult {
+	var dirs []string
+	if profile != nil {
+		dirSet := utils.NewSet()
+		for _, filter := range profile.Filters {
+			dirSet.Add(getBaseDirPrefix(filter))
+		}
+		for _, filter := range profile.FiltersCRD {
+			dirSet.Add(getBaseDirPrefix(filter))
+		}
+		dirs = dirSet.ToStringSlice()
+		if pid > 1 {
+			log.WithFields(log.Fields{"dirs": dirs}).Debug("JW:")
+		}
+	}
+
+	res := workerlet.WalkPathResult{
+		Dirs:  make([]*workerlet.DirData, 0),
+		Files: make([]*workerlet.FileData, 0),
+	}
+
+	req := workerlet.WalkPathRequest{
+		Pid:     pid,
+		Path:    "/",
+		Timeout: rootIterTimeout,
+		Dirs:    dirs,
+	}
+
+	var err error
+	if err = w.walkerLimiter.Acquire(context.Background(), 1); err == nil {
+		var bytesValue []byte
+
+		defer w.walkerLimiter.Release(1)
+		if bytesValue, _, err = w.walkerTask.RunWithTimeout(req, cid, req.Timeout); err == nil {
+			if err = json.Unmarshal(bytesValue, &res); err == nil {
+				return &res
+			}
+		}
+	}
+	log.WithFields(log.Fields{"req": req, "error": err}).Error()
+	return nil
+}
+
+func (w *FileWatch) getDirAndFileList(pid int, res *workerlet.WalkPathResult, filter share.CLUSFileMonitorFilter, dirList map[string]*osutil.FileInfoExt) []*osutil.FileInfoExt {
+	dirs, singles := w.getDirFileList(pid, res, filter)
 	for _, di := range dirs {
 		if diExist, ok := dirList[di.Path]; ok {
 			diExist.Children = append(diExist.Children, di.Children...)
@@ -605,38 +645,16 @@ func (w *FileWatch) getCoreFile(cid string, pid int, profile *share.CLUSFileMoni
 	dirList := make(map[string]*osutil.FileInfoExt)
 	singleFiles := make([]*osutil.FileInfoExt, 0)
 
-	// get files and dirs from all filters
-	for _, filter := range profile.Filters {
-		flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
-		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
-		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
-		bUserAdded := filter.CustomerAdd
-		if strings.Contains(filter.Path, "*") {
-			subDirs := w.getSubDirList(pid, filter.Path, cid)
-			for _, sub := range subDirs {
-				singles := w.getDirAndFileList(pid, sub, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
-				singleFiles = append(singleFiles, singles...)
-			}
-		} else {
-			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
+	if res := w.getRootFs(pid, cid, profile); res != nil {
+		// Normal
+		for _, filter := range profile.Filters {
+			singles := w.getDirAndFileList(pid, res, filter, dirList)
 			singleFiles = append(singleFiles, singles...)
 		}
-	}
 
-	// get files and dirs from all filters
-	for _, filter := range profile.FiltersCRD {
-		flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
-		flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
-		bBlockAccess := filter.Behavior == share.FileAccessBehaviorBlock
-		bUserAdded := filter.CustomerAdd
-		if strings.Contains(filter.Path, "*") {
-			subDirs := w.getSubDirList(pid, filter.Path, cid)
-			for _, sub := range subDirs {
-				singles := w.getDirAndFileList(pid, sub, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
-				singleFiles = append(singleFiles, singles...)
-			}
-		} else {
-			singles := w.getDirAndFileList(pid, filter.Path, filter.Regex, cid, flt, filter.Recursive, bBlockAccess, bUserAdded, dirList)
+		// CRD
+		for _, filter := range profile.FiltersCRD {
+			singles := w.getDirAndFileList(pid, res, filter, dirList)
 			singleFiles = append(singleFiles, singles...)
 		}
 	}
@@ -849,7 +867,9 @@ func (w *FileWatch) handleDirEvents(fmod fileMod, info os.FileInfo, fullPath, pa
 			if !bIsDir {
 				if hash, err := osutil.GetFileHash(fullPath); err == nil {
 					if hash != fmod.finfo.Hash {
-						event = fileEventModified
+						if !osutil.HashZero(fmod.finfo.Hash) {
+							event = fileEventModified
+						}
 						fmod.finfo.Hash = hash
 					}
 				} else if (fmod.mask & syscall.IN_MODIFY) > 0 {
@@ -883,7 +903,7 @@ func (w *FileWatch) handleDirEvents(fmod fileMod, info os.FileInfo, fullPath, pa
 func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath string, pid int) uint32 {
 	var event uint32
 	if info != nil {
-		log.WithFields(log.Fields{"fullPath": fullPath, "fmod": fmod, "finfo": fmod.finfo}).Debug()
+		log.WithFields(log.Fields{"fullPath": fullPath, "finfo": fmod.finfo}).Debug()
 		if (fmod.mask & inodeMovedMask) > 0 {
 			log.WithFields(log.Fields{"fullPath": fullPath, "finfo": fmod.finfo}).Debug()
 			event = fileEventMovedTo
@@ -897,7 +917,9 @@ func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath st
 			event = fileEventAccessed
 			if hash, err := osutil.GetFileHash(fullPath); err == nil {
 				if hash != fmod.finfo.Hash {
-					event = fileEventModified
+					if !osutil.HashZero(fmod.finfo.Hash) {
+						event = fileEventModified
+					}
 					fmod.finfo.Hash = hash
 				}
 			} else if (fmod.mask & syscall.IN_MODIFY) > 0 {
@@ -990,187 +1012,74 @@ func (w *FileWatch) SetMonitorTrace(bEnable bool, logLevel string) {
 	}
 }
 
-// ////////////////////
-const (
-	dirIterTimeout  = time.Second * 8
-	rootIterTimeout = time.Second * 16
-)
-
-// generic get a directory file list
-func (w *FileWatch) getDirFileList(pid int, base, regexStr, cid string, flt interface{}, recur, protect, userAdded bool) (map[string]*osutil.FileInfoExt, []*osutil.FileInfoExt) {
-	if !w.bEnable {
-		return nil, nil
-	}
-
+// collect a directory file list
+func (w *FileWatch) getDirFileList(pid int, res *workerlet.WalkPathResult, filter share.CLUSFileMonitorFilter) (map[string]*osutil.FileInfoExt, []*osutil.FileInfoExt) {
 	dirList := make(map[string]*osutil.FileInfoExt)
 	singleFiles := make([]*osutil.FileInfoExt, 0)
 
-	tmOut := dirIterTimeout
-	if base == "" {
-		base += "/"
-		tmOut = rootIterTimeout
-	}
-	base = strings.Replace(base, "\\.", ".", -1)
-	dirs := utils.NewSet(base)
+	base := strings.Replace(filter.Path, "\\.", ".", -1)
+	baseD := base + "/"
+	flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
+	flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
 
-	// for recursive directory
-	for dirs.Cardinality() > 0 {
-		any := dirs.Any()
-		absPath := any.(string)
-		realPath := global.SYS.ContainerFilePath(pid, absPath)
-		finfo, err := os.Stat(realPath)
-		if err != nil {
-			dirs.Remove(any)
+	var fpath string
+	for _, d := range res.Dirs {
+		if d.Dir != base && !strings.HasPrefix(d.Dir, baseD) {
 			continue
 		}
 
-		// the path in the filter is single file
-		if !finfo.IsDir() {
-			if files := osutil.GetFileInfoExtFromPath(pid, realPath, flt, protect, userAdded); files != nil {
-				// file and it's possible link
-				singleFiles = append(singleFiles, files...)
+		if !filter.Recursive {
+			if len(d.Dir) > len(base) { // sub-directory
+				continue
 			}
-			dirs.Remove(any)
-			continue
 		}
 
-		// directory and its files
-		dirInfo := &osutil.FileInfoExt{
-			FileMode:  finfo.Mode(),
-			Path:      realPath,
+		fpath = global.SYS.ContainerFilePath(pid, d.Dir)
+		dinfo := &osutil.FileInfoExt{
+			FileMode:  d.Info.Mode,
+			Path:      fpath,
 			Filter:    flt,
-			Protect:   protect,
-			UserAdded: userAdded,
+			Protect:   filter.Behavior == share.FileAccessBehaviorBlock,
+			UserAdded: filter.CustomerAdd,
 		}
-		dirList[realPath] = dirInfo
+		dirList[fpath] = dinfo
+	}
 
-		// log.WithFields(log.Fields{"realPath": realPath, "absPath": absPath}).Debug()
-		res := workerlet.WalkPathResult{
-			Dirs:  make([]*workerlet.DirData, 0),
-			Files: make([]*workerlet.FileData, 0),
-		}
-
-		req := workerlet.WalkPathRequest{
-			Pid:     pid,
-			Path:    absPath,
-			Timeout: tmOut,
-		}
-
-		bytesValue, _, err := w.walkerTask.RunWithTimeout(req, cid, req.Timeout)
-		if err == nil {
-			err = json.Unmarshal(bytesValue, &res)
-		}
-
-		if err != nil {
-			log.WithFields(log.Fields{"req": req, "error": err, "regexStr": regexStr, "any": any}).Error()
-			dirs.Remove(any)
-			continue
-		}
-
-		for _, d := range res.Dirs {
-			path := filepath.Join(realPath, d.Dir)
-			if realPath != path && regexStr == ".*" {
-				// log.WithFields(log.Fields{"dir": path}).Debug()
-				dinfo := &osutil.FileInfoExt{
-					FileMode:  finfo.Mode(), // ??
-					Path:      path,
-					Filter:    flt,
-					Protect:   protect,
-					UserAdded: userAdded,
-				}
-				dirList[path] = dinfo
-			}
-		}
-
-		for _, f := range res.Files {
-			path := filepath.Join(realPath, f.File)
-			if !recur && realPath != filepath.Dir(path) {
+	for _, f := range res.Files {
+		if f.File != base {
+			if !strings.HasPrefix(f.File, baseD) {
 				continue
 			}
 
-			fstr := fmt.Sprintf("%s/%s", filepath.Dir(path), regexStr)
-			regx, err := regexp.Compile(fmt.Sprintf("^%s$", fstr))
-			if err != nil {
-				log.WithFields(log.Fields{"error": err, "str": fstr}).Debug("regexp parse fail")
-				continue
-			}
-
-			if regx.MatchString(path) {
-				// log.WithFields(log.Fields{"path": path, "fstr": fstr}).Debug()
-				if files := osutil.GetFileInfoExtFromPath(pid, path, flt, protect, userAdded); files != nil {
-					// check whether the files are in the directory, some file link to other position
-					for _, file := range files {
-						singleFiles = append(singleFiles, file)
-						dirPath := filepath.Dir(file.Path)
-						if di, ok := dirList[dirPath]; ok {
-							di.Children = append(di.Children, file)
-						} else {
-							singleFiles = append(singleFiles, file)
-						}
-					}
+			fstr := fmt.Sprintf("%s/%s", filepath.Dir(f.File), filter.Regex)
+			if rgx, err := regexp.Compile(fmt.Sprintf("^%s$", fstr)); err == nil {
+				if !rgx.MatchString(f.File) {
+					continue
 				}
 			}
-		}
-		dirs.Remove(any)
 
-		if !recur { // only 1st layer of directory
-			break
+			if !filter.Recursive && filepath.Dir(f.File) != base {
+				continue
+			}
 		}
+
+		fpath = global.SYS.ContainerFilePath(pid, f.File)
+		file := &osutil.FileInfoExt{
+			FileMode:  f.Info.Mode,
+			Path:      fpath,
+			Filter:    flt,
+			Protect:   filter.Behavior == share.FileAccessBehaviorBlock,
+			UserAdded: filter.CustomerAdd,
+		}
+
+		if di, ok := dirList[filepath.Dir(fpath)]; ok {
+			di.Children = append(di.Children, file)
+		} else {
+			singleFiles = append(singleFiles, file)
+		}
+
 	}
 	return dirList, singleFiles
-}
-
-func (w *FileWatch) getSubDirList(pid int, base, cid string) []string {
-	dirList := make([]string, 0)
-	fstr := global.SYS.ContainerFilePath(pid, base)
-	regxDir, err := regexp.Compile(fstr)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err, "str": fstr}).Debug("directory regexp parse fail")
-		return dirList
-	}
-	baseStr := strings.Split(base, "/")
-	var startDir string
-	for i, dd := range baseStr {
-		if strings.Contains(dd, "*") {
-			break
-		}
-		if i > 0 {
-			startDir += "/" + dd
-		}
-	}
-	basePath := global.SYS.ContainerFilePath(pid, "")
-	realPath := global.SYS.ContainerFilePath(pid, startDir)
-
-	// log.WithFields(log.Fields{"startDir": startDir, "realPath": realPath, "basePath": basePath}).Debug()
-	res := workerlet.WalkPathResult{
-		Dirs:  make([]*workerlet.DirData, 0),
-		Files: make([]*workerlet.FileData, 0),
-	}
-
-	req := workerlet.WalkPathRequest{
-		Pid:     pid,
-		Path:    startDir,
-		Timeout: dirIterTimeout,
-	}
-
-	bytesValue, _, err := w.walkerTask.RunWithTimeout(req, cid, req.Timeout)
-	if err == nil {
-		err = json.Unmarshal(bytesValue, &res)
-	}
-
-	if err != nil {
-		log.WithFields(log.Fields{"path": startDir, "error": err}).Error()
-	}
-
-	for _, d := range res.Dirs {
-		path := filepath.Join(realPath, d.Dir)
-		if regxDir.MatchString(path) {
-			absPath := path[len(basePath):]
-			// log.WithFields(log.Fields{"absPath": absPath, "path": path}).Debug()
-			dirList = append(dirList, absPath)
-		}
-	}
-	return dirList
 }
 
 // //////////

@@ -196,15 +196,6 @@ func IsPackageLib(path string) bool {
 	return packageFiles.Contains(path)
 }
 
-func GetFileInfoExtFromPid(root, pid int) []*FileInfoExt {
-	if path, err := GetExePathFromLink(pid); err == nil {
-		filePath := global.SYS.ContainerFilePath(root, path)
-		return GetFileInfoExtFromPath(root, filePath, "", false, true) // TODO: user-added?
-	} else {
-		return nil
-	}
-}
-
 // get the file information, if the file is a symlink, return both the symlink and the real file
 func GetFileInfoExtFromPath(root int, path string, flt interface{}, protect, userAdded bool) []*FileInfoExt {
 	files := make([]*FileInfoExt, 0)
