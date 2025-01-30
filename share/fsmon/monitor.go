@@ -597,9 +597,6 @@ func (w *FileWatch) getRootFs(pid int, cid string, profile *share.CLUSFileMonito
 			dirSet.Add(getBaseDirPrefix(filter))
 		}
 		dirs = dirSet.ToStringSlice()
-		if pid > 1 {
-			log.WithFields(log.Fields{"dirs": dirs}).Debug("JW:")
-		}
 	}
 
 	res := workerlet.WalkPathResult{

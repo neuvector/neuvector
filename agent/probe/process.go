@@ -2962,8 +2962,16 @@ func (p *Probe) isNVChildProcess(c *procContainer, proc *procInternal) bool {
 				if p.bKubePlatform && isControllerType(nvRole) {
 					if bRuncInit {
 						return true
-					} else if len(proc.cmds) == 3 {
-						return proc.cmds[0] == "cat" && proc.cmds[1] == "/tmp/ready"
+					} else {
+						switch len(proc.cmds) {
+						case 2, 3:
+							if proc.cmds[1] != "/tmp/ready" {
+								return false
+							}
+							fallthrough
+						case 1: // cmdline: polymorphic behavior
+							return proc.cmds[0] == "cat"
+						}
 					}
 				}
 				return false
