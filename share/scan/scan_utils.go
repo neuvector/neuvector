@@ -19,10 +19,10 @@ import (
 	rpmdb "github.com/neuvector/go-rpmdb/pkg"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/coreos/clair/pkg/tarutil"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/quay/clair/v2/pkg/tarutil"
 )
 
 var RPMPkgFiles utils.Set = utils.NewSet(
