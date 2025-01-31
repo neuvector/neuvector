@@ -130,10 +130,10 @@ require (
 
 require (
 	github.com/alitto/pond v1.8.3
-	github.com/coreos/clair v2.1.0+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
+	github.com/quay/clair/v2 v2.1.8
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 )
 

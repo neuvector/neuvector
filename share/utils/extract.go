@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/coreos/clair/pkg/tarutil"
+	"github.com/quay/clair/v2/pkg/tarutil"
 	log "github.com/sirupsen/logrus"
 )
 
