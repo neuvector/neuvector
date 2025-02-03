@@ -1,4 +1,6 @@
 * @holyspectral @BinX-Suse @yasker 
+/*
+/vendor/
 /CODEOWNERS @holyspectral @BinX-Suse @yasker
 /.github/ @neuvector/build @yasker  
 /build/ @neuvector/build @yasker 
