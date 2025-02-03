@@ -55,9 +55,10 @@ github.com/alitto/pond
 # github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
 ## explicit
 github.com/armon/go-metrics
-# github.com/aws/aws-sdk-go v1.42.22
-## explicit; go 1.11
+# github.com/aws/aws-sdk-go v1.55.6
+## explicit; go 1.19
 github.com/aws/aws-sdk-go/aws
+github.com/aws/aws-sdk-go/aws/auth/bearer
 github.com/aws/aws-sdk-go/aws/awserr
 github.com/aws/aws-sdk-go/aws/awsutil
 github.com/aws/aws-sdk-go/aws/client
@@ -96,6 +97,7 @@ github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
 github.com/aws/aws-sdk-go/service/ecr
 github.com/aws/aws-sdk-go/service/sso
 github.com/aws/aws-sdk-go/service/sso/ssoiface
+github.com/aws/aws-sdk-go/service/ssooidc
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beevik/etree v1.2.0
