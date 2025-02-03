@@ -9,7 +9,7 @@ replace (
 
 require (
 	github.com/Microsoft/hcsshim v0.12.0-rc.1 // indirect
-	github.com/aws/aws-sdk-go v1.42.22
+	github.com/aws/aws-sdk-go v1.55.6
 	github.com/beevik/etree v1.2.0
 	github.com/cenkalti/rpc2 v0.0.0-20210604223624-c1acbc6ec984
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
