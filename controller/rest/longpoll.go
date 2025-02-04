@@ -44,22 +44,24 @@ type longpollOnceJob struct {
 }
 
 type JobError struct {
-	Message string
-	Code    int
-	Detail  interface{}
+	Err    error
+	Code   int
+	Detail interface{}
 }
 
 func NewJobError(code int, err error, detail interface{}) *JobError {
-	var message string
-	if err != nil {
-		message = err.Error()
-	}
-
 	return &JobError{
-		Code:    code,
-		Message: message,
-		Detail:  detail,
+		Code:   code,
+		Err:    err,
+		Detail: detail,
 	}
+}
+
+func (e *JobError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("JobError Code: %d, Error: %v", e.Code, e.Err)
+	}
+	return fmt.Sprintf("JobError Code: %d", e.Code)
 }
 
 func newLongPollOnceJob(key interface{}, timeout time.Duration) *longpollOnceJob {
@@ -80,15 +82,15 @@ type PollWorkItem struct {
 }
 
 type longpollOnceMgr struct {
-	mux                     sync.RWMutex
-	poolSize                int
-	timeout                 time.Duration
-	jobs                    map[interface{}]*longpollOnceJob // use as a queue
-	jobQueue                chan PollWorkItem
-	shutdownCh              chan struct{}
-	jobFailRetryMax         int           // Maximum retry attempts
-	staleJobCleanupInterval time.Duration // Interval for cleaning up stale jobs
-	workerWG                sync.WaitGroup
+	mux                        sync.RWMutex
+	timeout                    time.Duration
+	jobs                       map[interface{}]*longpollOnceJob // use as a queue
+	jobQueue                   chan PollWorkItem
+	shutdownCh                 chan struct{}
+	jobFailRetryMax            int // Maximum retry attempts
+	maxConcurrentRepoScanTasks int
+	staleJobCleanupInterval    time.Duration // Interval for cleaning up stale jobs
+	workerWG                   sync.WaitGroup
 }
 
 // Poll waits for the job to complete or timeout.
@@ -170,19 +172,25 @@ func (m *longpollOnceMgr) updateJobStatus(jobKey interface{}, jobStatus JobStatu
 	}
 }
 
-func NewLongPollOnceMgr(timeout time.Duration, poolSize int, queueCapacity int, retryMax int, cleanupInterval time.Duration) *longpollOnceMgr {
+// NewLongPollOnceMgr initializes the repository scan manager with the specified parameters.
+// - repoScanLongPollTimeout: The timeout duration for long polling operations.
+// - staleScanJobCleanupIntervalHour: The interval for cleaning up stale jobs.
+// - maxConcurrentRepoScanWorkers: The maximum number of concurrent repository scan tasks allowed.
+// - scanJobQueueCapacity: The capacity of the job queue for managing repository scan tasks.
+// - scanJobFailRetryMax: The maximum number of retry attempts for failed jobs.
+func NewLongPollOnceMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour time.Duration, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax int) *longpollOnceMgr {
 	mgr := &longpollOnceMgr{
-		poolSize:                poolSize,
-		timeout:                 timeout,
-		jobs:                    make(map[interface{}]*longpollOnceJob),
-		shutdownCh:              make(chan struct{}),                            // Ensure the running is close
-		jobQueue:                make(chan PollWorkItem, max(0, queueCapacity)), // Ensure the jobQueue size does not become negative.
-		jobFailRetryMax:         retryMax,
-		staleJobCleanupInterval: cleanupInterval,
+		maxConcurrentRepoScanTasks: maxConcurrentRepoScanTasks,
+		timeout:                    repoScanLongPollTimeout,
+		jobs:                       make(map[interface{}]*longpollOnceJob),
+		shutdownCh:                 make(chan struct{}),                                   // Ensure the running is close
+		jobQueue:                   make(chan PollWorkItem, max(0, scanJobQueueCapacity)), // Ensure the jobQueue size does not become negative.
+		jobFailRetryMax:            scanJobFailRetryMax,
+		staleJobCleanupInterval:    staleScanJobCleanupIntervalHour,
 	}
 
 	// Run a work pool to maintain the speed for process the jobs in jobs Map
-	for i := 0; i < poolSize; i++ {
+	for i := 0; i < mgr.maxConcurrentRepoScanTasks; i++ {
 		mgr.workerWG.Add(1)
 		go func() {
 			defer mgr.workerWG.Done()
@@ -357,19 +365,21 @@ func (j *longpollManyJob) Poll() (interface{}, bool, time.Duration) {
 }
 
 type longpollManyMgr struct {
-	mux     sync.Mutex
-	max     int
-	timeout time.Duration
-	linger  time.Duration
-	jobs    map[interface{}]*longpollManyJob
+	mux                        sync.Mutex
+	max                        int
+	maxConcurrentRepoScanTasks int
+	timeout                    time.Duration
+	linger                     time.Duration
+	jobs                       map[interface{}]*longpollManyJob
 }
 
-func NewLongPollManyMgr(timeout, linger time.Duration, max int) *longpollManyMgr {
+func NewLongPollManyMgr(timeout, linger time.Duration, max, maxConcurrentRepoScanTasks int) *longpollManyMgr {
 	return &longpollManyMgr{
-		max:     max,
-		timeout: timeout,
-		linger:  linger,
-		jobs:    make(map[interface{}]*longpollManyJob),
+		max:                        max,
+		timeout:                    timeout,
+		linger:                     linger,
+		maxConcurrentRepoScanTasks: maxConcurrentRepoScanTasks,
+		jobs:                       make(map[interface{}]*longpollManyJob),
 	}
 }
 

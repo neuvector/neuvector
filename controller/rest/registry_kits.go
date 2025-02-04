@@ -111,8 +111,8 @@ var regTestMgr *longpollManyMgr
 var regTestMap map[string]*regTestTask
 var regTestLock sync.RWMutex
 
-func newRegTestMgr() {
-	regTestMgr = NewLongPollManyMgr(regTestLongPollTimeout, regTestLingeringDuration, maxRegTestTasks)
+func newRegTestMgr(maxConcurrentRepoScanTasks int) {
+	regTestMgr = NewLongPollManyMgr(regTestLongPollTimeout, regTestLingeringDuration, maxRegTestTasks, maxConcurrentRepoScanTasks)
 	regTestMap = make(map[string]*regTestTask)
 }
 
@@ -351,7 +351,7 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	switch err {
 	case errTooManyJobs:
 		restRespErrorMessage(w, http.StatusTooManyRequests, api.RESTErrFailRepoScan,
-			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", maxConcurrentRepoScanTasks))
+			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", regTestMgr.maxConcurrentRepoScanTasks))
 		return
 	case errDuplicateJob:
 		// If a request is already polling the scan, reject the new request from the same session.
