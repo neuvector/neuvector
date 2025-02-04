@@ -1585,10 +1585,11 @@ func InitContext(ctx *Context) {
 	initHttpClients()
 }
 
-func StartRESTServer(isNewCluster bool, isLead bool) {
+func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax int, repoScanLongPollTimeout, staleScanJobCleanupIntervalHour time.Duration) {
 	initDefaultRegistries()
-	newRepoScanMgr()
-	newRegTestMgr()
+	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax)
+	newRegTestMgr(maxConcurrentRepoScanTasks)
+	defer RepoScanMgr.Shutdown() // RepoScanMgr is initialized in StartRESTServer; ensure it is closed to prevent goroutine leaks.
 
 	if localDev.Host.Platform == share.PlatformKubernetes {
 		k8sPlatform = true

@@ -75,9 +75,10 @@
 #define ENV_SCANNER_CTRL_PASS   "SCANNER_CTRL_API_PASSWORD"
 
 #define ENV_MAX_SCANNER_TASKS                 "MAX_SCANNER_TASKS"
-#define ENV_MAX_CONCURRENT_REPO_SCAN_WORKERS  "MAX_CONCURRENT_REPO_SCAN_WORKERS"
+#define ENV_MAX_CONCURRENT_REPO_SCAN_TASKS  "MAX_CONCURRENT_REPO_SCAN_TASKS"
 #define ENV_SCAN_JOB_QUEUE_CAPACITY           "SCAN_JOB_QUEUE_CAPACITY"
 #define ENV_SCAN_JOB_FAIL_RETRY_MAX           "SCAN_JOB_FAIL_RETRY_MAX"
+#define ENV_REPO_SCAN_LONG_POLL_TIMEOUT        "REPO_SCAN_LONG_POLL_TIMEOUT"
 #define ENV_STALE_SCAN_JOB_CLEANUP_INTERVAL_HOUR   "STALE_SCAN_JOB_CLEANUP_INTERVAL_HOUR"
 
 #define ENV_THRT_SSL_TLS_1DOT0  "THRT_SSL_TLS_1DOT0"
@@ -240,7 +241,7 @@ static pid_t fork_exec(int i)
     char *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     char *custom_check_control, *log_level;
-    char *max_scanner_tasks, *max_concurrent_repo_scan_workers, *scan_job_queue_capacity, *scan_job_fail_retry_max, *stale_scan_job_cleanup_interval_hour;
+    char *max_scanner_tasks, *max_concurrent_repo_scan_tasks, *scan_job_queue_capacity, *scan_job_fail_retry_max, *repo_scan_long_poll_timeout, *stale_scan_job_cleanup_interval_hour;
     int a;
 
     switch (i) {
@@ -481,9 +482,9 @@ static pid_t fork_exec(int i)
             args[a++] = "-max_scanner_tasks";
             args[a++] = max_scanner_tasks;
         }
-        if ((max_concurrent_repo_scan_workers = getenv(ENV_MAX_CONCURRENT_REPO_SCAN_WORKERS)) != NULL) {
-            args[a++] = "-max_concurrent_repo_scan_workers";
-            args[a++] = max_concurrent_repo_scan_workers;
+        if ((max_concurrent_repo_scan_tasks = getenv(ENV_MAX_CONCURRENT_REPO_SCAN_TASKS)) != NULL) {
+            args[a++] = "-max_concurrent_repo_scan_tasks";
+            args[a++] = max_concurrent_repo_scan_tasks;
         }
         if ((scan_job_queue_capacity = getenv(ENV_SCAN_JOB_QUEUE_CAPACITY)) != NULL) {
             args[a++] = "-scan_job_queue_capacity";
@@ -497,7 +498,11 @@ static pid_t fork_exec(int i)
             args[a++] = "-stale_scan_job_cleanup_interval_hour";
             args[a++] = stale_scan_job_cleanup_interval_hour;
         }        
-        debug("args: stale_scan_job_cleanup_interval_hour: %s \n",args[4]);
+        if ((repo_scan_long_poll_timeout = getenv(ENV_REPO_SCAN_LONG_POLL_TIMEOUT)) != NULL) {
+            args[a++] = "-repo_scan_long_poll_timeout";
+            args[a++] = repo_scan_long_poll_timeout;
+        }    
+        
         //  debug("Start %s, pid=%d\n", g_procs[i].name, g_procs[i].pid);
         args[a] = NULL;
         break;

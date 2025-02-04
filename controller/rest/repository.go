@@ -25,31 +25,12 @@ const (
 	repositoryDefaultTag      = "latest"
 	repoScanTimeout           = time.Minute * 20
 	repoScanLingeringDuration = time.Second * 30
-	repoScanLongPollTimeout   = time.Second * 30
 )
 
 var RepoScanMgr *longpollOnceMgr
-var scanJobQueueCapacity, scanJobFailRetryMax, maxConcurrentRepoScanTasks int
-var staleScanJobCleanupIntervalHour time.Duration
 
-// SetMaxConcurrentRepoScanTasks sets the maximum number of concurrent scan workers
-// for repository scans. This limit helps balance performance and resource utilization.
-// The default value is 16.
-func SetMaxConcurrentRepoScanTasks(limit int) {
-	maxConcurrentRepoScanTasks = limit
-}
-
-func SetScanJobQueueCapacity(capacity int) {
-	scanJobQueueCapacity = capacity
-}
-
-func SetScanJobFailRetryMax(retryMax int) {
-	scanJobFailRetryMax = retryMax
-}
-
-func SetStaleScanJobCleanupIntervalHour(intervalHour int) {
-	staleScanJobCleanupIntervalHour = time.Duration(intervalHour) * time.Hour
-}
+// var scanJobQueueCapacity, scanJobFailRetryMax, maxConcurrentRepoScanTasks int
+// var staleScanJobCleanupIntervalHour time.Duration
 
 type repoScanKey struct {
 	api.RESTScanRepoReq
@@ -66,15 +47,15 @@ func getImageName(req *api.RESTScanRepoReq) string {
 	return fmt.Sprintf("%s:%s", req.Repository, req.Tag)
 }
 
-// newRepoScanMgr initializes the repository scan manager with the specified parameters.
-// - repoScanLongPollTimeout: The timeout duration for long polling operations.
-// - maxConcurrentRepoScanTasks: The maximum number of concurrent repository scan tasks allowed.
-// - scanJobQueueCapacity: The capacity of the job queue for managing repository scan tasks.
-// - scanJobFailRetryMax: The maximum number of retry attempts for failed jobs.
-// - staleScanJobCleanupIntervalHour: The interval for cleaning up stale jobs.
-func newRepoScanMgr() {
-	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax, staleScanJobCleanupIntervalHour)
-}
+// // newRepoScanMgr initializes the repository scan manager with the specified parameters.
+// // - repoScanLongPollTimeout: The timeout duration for long polling operations.
+// // - staleScanJobCleanupIntervalHour: The interval for cleaning up stale jobs.
+// // - maxConcurrentRepoScanTasks: The maximum number of concurrent repository scan tasks allowed.
+// // - scanJobQueueCapacity: The capacity of the job queue for managing repository scan tasks.
+// // - scanJobFailRetryMax: The maximum number of retry attempts for failed jobs.
+// func newRepoScanMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour time.Duration, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax int) {
+// 	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax)
+// }
 
 type repoScanTask struct {
 }
@@ -86,7 +67,7 @@ type repoScanTask struct {
 func (t *repoScanTask) ShouldRetry(arg interface{}) bool {
 	jobErr, ok := arg.(*JobError)
 	if !ok {
-		log.Error("ShouldRetry: arg is not of type *share.ScanResult")
+		log.Error("ShouldRetry: arg is not of type *JobError")
 		return false
 	}
 
@@ -113,7 +94,7 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 	req, ok := arg.(*api.RESTScanRepoReq)
 	if !ok || req == nil {
 		log.Error("Invalid argument passed to Run")
-		return nil, NewJobError(api.RESTErrInvalidRequest, errors.New("Invalid argument passed to Run"), nil)
+		return nil, NewJobError(api.RESTErrInvalidRequest, errors.New("invalid argument passed to Run"), nil)
 	}
 	var scanErr *JobError
 
@@ -264,12 +245,12 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 	switch err {
 	case errTooManyJobs:
 		restRespErrorMessage(w, http.StatusTooManyRequests, api.RESTErrFailRepoScan,
-			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", scanJobQueueCapacity))
+			fmt.Sprintf("Maximum concurrent scan limit (%v) reached.", RepoScanMgr.maxConcurrentRepoScanTasks))
 		return
 	case errMaxRetryReached:
 		// maximum job retry attempts reached
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFailRepoScan,
-			fmt.Sprintf("Maximum job retry attempts (%v) reached.", scanJobFailRetryMax))
+			fmt.Sprintf("Maximum job retry attempts (%v) reached.", RepoScanMgr.jobFailRetryMax))
 		return
 	}
 
@@ -281,7 +262,7 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 	if scanErr != nil {
 		data.Request.Password = ""
 		if scanErr.Code != 0 && scanErr.Code != api.RESTErrClusterRPCError {
-			restRespErrorMessage(w, http.StatusInternalServerError, scanErr.Code, scanErr.Message)
+			restRespErrorMessage(w, http.StatusInternalServerError, scanErr.Code, scanErr.Error())
 		} else {
 			restRespError(w, http.StatusInternalServerError, scanErr.Code)
 		}

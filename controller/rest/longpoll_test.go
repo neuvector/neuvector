@@ -57,12 +57,15 @@ func TestErrorVariable(t *testing.T) {
 
 // TestNewJobError verifies the creation of a new JobError and its fields.
 func TestNewJobError(t *testing.T) {
-	err := errors.New("test error")
+	errStr := "test error"
+	err := errors.New(errStr)
 	detail := "some detail"
-	jobError := NewJobError(404, err, detail)
+	errCode := 404
+	expectedErr := fmt.Sprintf("JobError Code: %d, Error: %s", errCode, errStr)
+	jobError := NewJobError(errCode, err, detail)
 
-	assert.Equal(t, 404, jobError.Code)
-	assert.Equal(t, "test error", jobError.Message)
+	assert.Equal(t, errCode, jobError.Code)
+	assert.Equal(t, expectedErr, jobError.Error())
 	assert.Equal(t, detail, jobError.Detail)
 }
 
@@ -89,7 +92,7 @@ func TestPoll(t *testing.T) {
 	mockRetry := 1
 	mockStaleJobCleanupInterval := 10 * time.Second
 
-	mgr := NewLongPollOnceMgr(mockTimeOut, mockPoolSize, mockJobQueueCapacity, mockRetry, mockStaleJobCleanupInterval)
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 
 	mockTask := NewMockTask(taskResult, 100*time.Millisecond)
@@ -110,7 +113,7 @@ func TestJobCount(t *testing.T) {
 	mockRetry := 1
 	mockStaleJobCleanupInterval := 10 * time.Second
 
-	mgr := NewLongPollOnceMgr(mockTimeOut, mockPoolSize, mockJobQueueCapacity, mockRetry, mockStaleJobCleanupInterval)
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 
 	// Ensure the job count is 0
@@ -130,7 +133,7 @@ func TestNewJob(t *testing.T) {
 	mockRetry := 10
 	mockStaleJobCleanupInterval := 10 * time.Second
 
-	mgr := NewLongPollOnceMgr(mockTimeOut, mockPoolSize, mockJobQueueCapacity, mockRetry, mockStaleJobCleanupInterval)
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 	mockTask := NewMockTask(taskResult, 1*time.Second)
 
@@ -180,7 +183,7 @@ func TestNewJobWithLargeScaleConcurrency(t *testing.T) {
 	mockStaleJobCleanupInterval := 5 * time.Second
 	waitMockStaleJobCleanupInterval := 8 * time.Second
 
-	mgr := NewLongPollOnceMgr(mockTimeOut, mockPoolSize, mockJobQueueCapacity, mockRetry, mockStaleJobCleanupInterval)
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 
 	var wg sync.WaitGroup
@@ -223,7 +226,7 @@ func TestJobQueueCapacityZero(t *testing.T) {
 	mockRetry := 1
 	mockStaleJobCleanupInterval := 10 * time.Second
 
-	mgr := NewLongPollOnceMgr(mockTimeOut, mockPoolSize, mockJobQueueCapacity, mockRetry, mockStaleJobCleanupInterval)
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 
 	mockTask := NewMockTask(taskResult, 100*time.Millisecond)
@@ -243,7 +246,7 @@ func TestShutdownResourceCleanup(t *testing.T) {
 	mockRetry := 1
 	mockStaleJobCleanupInterval := 10 * time.Second
 
-	mgr := NewLongPollOnceMgr(mockTimeOut, mockPoolSize, mockJobQueueCapacity, mockRetry, mockStaleJobCleanupInterval)
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 
 	// Add some mock jobs to the queue
 	mockTask := NewMockTask(taskResult, 100*time.Millisecond)
