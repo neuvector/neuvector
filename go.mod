@@ -29,7 +29,7 @@ require (
 	github.com/hashicorp/go-version v1.4.0
 	github.com/hashicorp/serf v0.9.7
 	github.com/imdario/mergo v0.3.10 // indirect
-	github.com/jonboulle/clockwork v0.3.0
+	github.com/jonboulle/clockwork v0.5.0
 	github.com/jrhouston/k8slock v0.2.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mattn/go-sqlite3 v1.14.24
