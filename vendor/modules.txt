@@ -52,9 +52,6 @@ github.com/Microsoft/hcsshim/pkg/ociwclayer
 # github.com/alitto/pond v1.8.3
 ## explicit; go 1.19
 github.com/alitto/pond
-# github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
-## explicit
-github.com/armon/go-metrics
 # github.com/aws/aws-sdk-go v1.55.6
 ## explicit; go 1.19
 github.com/aws/aws-sdk-go/aws
@@ -409,21 +406,12 @@ github.com/gregjones/httpcache
 # github.com/hashicorp/go-cleanhttp v0.5.2
 ## explicit; go 1.13
 github.com/hashicorp/go-cleanhttp
-# github.com/hashicorp/go-immutable-radix v1.0.0
-## explicit
-github.com/hashicorp/go-immutable-radix
 # github.com/hashicorp/go-rootcerts v1.0.2
 ## explicit; go 1.12
 github.com/hashicorp/go-rootcerts
 # github.com/hashicorp/go-version v1.4.0
 ## explicit
 github.com/hashicorp/go-version
-# github.com/hashicorp/golang-lru v0.5.4
-## explicit; go 1.12
-github.com/hashicorp/golang-lru/simplelru
-# github.com/hashicorp/serf v0.9.7
-## explicit; go 1.12
-github.com/hashicorp/serf/coordinate
 # github.com/imdario/mergo v0.3.10
 ## explicit; go 1.13
 github.com/imdario/mergo
