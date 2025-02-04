@@ -1,97 +1,79 @@
 package clockwork
 
-import (
-	"sync/atomic"
-	"time"
-)
+import "time"
 
-// Timer provides an interface which can be used instead of directly
-// using the timer within the time module. The real-time timer t
-// provides events through t.C which becomes now t.Chan() to make
-// this channel requirement definable in this interface.
+// Timer provides an interface which can be used instead of directly using
+// [time.Timer]. The real-time timer t provides events through t.C which becomes
+// t.Chan() to make this channel requirement definable in this interface.
 type Timer interface {
 	Chan() <-chan time.Time
 	Reset(d time.Duration) bool
 	Stop() bool
 }
 
-type realTimer struct {
-	*time.Timer
-}
+type realTimer struct{ *time.Timer }
 
 func (r realTimer) Chan() <-chan time.Time {
 	return r.C
 }
 
 type fakeTimer struct {
-	c       chan time.Time
-	clock   FakeClock
-	stop    chan struct{}
-	reset   chan reset
-	stopped uint32
+	// The channel associated with the firer, used to send expiration times.
+	c chan time.Time
+
+	// The time when the firer expires. Only meaningful if the firer is currently
+	// one of a FakeClock's waiters.
+	exp time.Time
+
+	// reset and stop provide the implementation of the respective exported
+	// functions.
+	reset func(d time.Duration) bool
+	stop  func() bool
+
+	// If present when the timer fires, the timer calls afterFunc in its own
+	// goroutine rather than sending the time on Chan().
+	afterFunc func()
 }
 
-func (f *fakeTimer) Chan() <-chan time.Time {
-	return f.c
+func newFakeTimer(fc *FakeClock, afterfunc func()) *fakeTimer {
+	var ft *fakeTimer
+	ft = &fakeTimer{
+		c: make(chan time.Time, 1),
+		reset: func(d time.Duration) bool {
+			fc.l.Lock()
+			defer fc.l.Unlock()
+			// fc.l must be held across the calls to stopExpirer & setExpirer.
+			stopped := fc.stopExpirer(ft)
+			fc.setExpirer(ft, d)
+			return stopped
+		},
+		stop: func() bool { return fc.stop(ft) },
+
+		afterFunc: afterfunc,
+	}
+	return ft
 }
 
-func (f *fakeTimer) Reset(d time.Duration) bool {
-	stopped := f.Stop()
+func (f *fakeTimer) Chan() <-chan time.Time { return f.c }
 
-	f.reset <- reset{t: f.clock.Now().Add(d), next: f.clock.After(d)}
-	if d > 0 {
-		atomic.StoreUint32(&f.stopped, 0)
+func (f *fakeTimer) Reset(d time.Duration) bool { return f.reset(d) }
+
+func (f *fakeTimer) Stop() bool { return f.stop() }
+
+func (f *fakeTimer) expire(now time.Time) *time.Duration {
+	if f.afterFunc != nil {
+		go f.afterFunc()
+		return nil
 	}
 
-	return stopped
-}
-
-func (f *fakeTimer) Stop() bool {
-	if atomic.CompareAndSwapUint32(&f.stopped, 0, 1) {
-		f.stop <- struct{}{}
-		return true
+	// Never block on expiration.
+	select {
+	case f.c <- now:
+	default:
 	}
-	return false
+	return nil
 }
 
-type reset struct {
-	t    time.Time
-	next <-chan time.Time
-}
+func (f *fakeTimer) expiration() time.Time { return f.exp }
 
-// run initializes a background goroutine to send the timer event to the timer channel
-// after the period. Events are discarded if the underlying ticker channel does not have
-// enough capacity.
-func (f *fakeTimer) run(initialDuration time.Duration) {
-	nextTick := f.clock.Now().Add(initialDuration)
-	next := f.clock.After(initialDuration)
-
-	waitForReset := func() (time.Time, <-chan time.Time) {
-		for {
-			select {
-			case <-f.stop:
-				continue
-			case r := <-f.reset:
-				return r.t, r.next
-			}
-		}
-	}
-
-	go func() {
-		for {
-			select {
-			case <-f.stop:
-			case <-next:
-				atomic.StoreUint32(&f.stopped, 1)
-				select {
-				case f.c <- nextTick:
-				default:
-				}
-
-				next = nil
-			}
-
-			nextTick, next = waitForReset()
-		}
-	}()
-}
+func (f *fakeTimer) setExpiration(t time.Time) { f.exp = t }
