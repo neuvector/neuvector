@@ -111,18 +111,39 @@ func (r *gitlab) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 }
 
 func (r *gitlab) getData(ur string) ([]byte, error) {
-	request, _ := http.NewRequest("GET", ur, nil)
-	request.Header.Add("PRIVATE-TOKEN", r.privateToken)
-	resp, err := r.gitlabClient.Do(request)
-	if err != nil {
-		return nil, err
+	var allData []byte
+	page := 1
+	perPage := 100
+	for {
+		paginatedURL := fmt.Sprintf("%s?page=%d&per_page=%d", ur, page, perPage)
+		request, _ := http.NewRequest("GET", paginatedURL, nil)
+		request.Header.Add("PRIVATE-TOKEN", r.privateToken)
+
+		resp, err := r.gitlabClient.Do(request)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(data) == 0 || string(data) == "[]" {
+			break
+		}
+
+		allData = append(allData, data...)
+
+		page++
 	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+
+	return allData, nil
 }
 
 func (r *gitlab) getUsers() ([]gitUser, error) {
