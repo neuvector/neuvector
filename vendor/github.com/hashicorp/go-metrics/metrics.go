@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MIT
+
 package metrics
 
 import (
@@ -40,6 +43,40 @@ func (m *Metrics) SetGaugeWithLabels(key []string, val float32, labels []Label) 
 		return
 	}
 	m.sink.SetGaugeWithLabels(key, val, labelsFiltered)
+}
+
+func (m *Metrics) SetPrecisionGauge(key []string, val float64) {
+	m.SetPrecisionGaugeWithLabels(key, val, nil)
+}
+
+func (m *Metrics) SetPrecisionGaugeWithLabels(key []string, val float64, labels []Label) {
+	if m.HostName != "" {
+		if m.EnableHostnameLabel {
+			labels = append(labels, Label{"host", m.HostName})
+		} else if m.EnableHostname {
+			key = insert(0, m.HostName, key)
+		}
+	}
+	if m.EnableTypePrefix {
+		key = insert(0, "gauge", key)
+	}
+	if m.ServiceName != "" {
+		if m.EnableServiceLabel {
+			labels = append(labels, Label{"service", m.ServiceName})
+		} else {
+			key = insert(0, m.ServiceName, key)
+		}
+	}
+	allowed, labelsFiltered := m.allowMetric(key, labels)
+	if !allowed {
+		return
+	}
+	sink, ok := m.sink.(PrecisionGaugeMetricSink)
+	if !ok {
+		// Sink does not implement PrecisionGaugeMetricSink.
+	} else {
+		sink.SetPrecisionGaugeWithLabels(key, val, labelsFiltered)
+	}
 }
 
 func (m *Metrics) EmitKey(key []string, val float32) {
