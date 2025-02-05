@@ -97,8 +97,8 @@ github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/ssooidc
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/beevik/etree v1.2.0
-## explicit; go 1.13
+# github.com/beevik/etree v1.5.0
+## explicit; go 1.21.0
 github.com/beevik/etree
 # github.com/cenk/hub v1.0.1
 ## explicit
