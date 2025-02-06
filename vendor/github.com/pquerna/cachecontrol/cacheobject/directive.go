@@ -32,7 +32,7 @@ var (
 	ErrQuoteMismatch         = errors.New("Missing closing quote")
 	ErrMaxAgeDeltaSeconds    = errors.New("Failed to parse delta-seconds in `max-age`")
 	ErrSMaxAgeDeltaSeconds   = errors.New("Failed to parse delta-seconds in `s-maxage`")
-	ErrMaxStaleDeltaSeconds  = errors.New("Failed to parse delta-seconds in `min-fresh`")
+	ErrMaxStaleDeltaSeconds  = errors.New("Failed to parse delta-seconds in `max-stale`")
 	ErrMinFreshDeltaSeconds  = errors.New("Failed to parse delta-seconds in `min-fresh`")
 	ErrNoCacheNoArgs         = errors.New("Unexpected argument to `no-cache`")
 	ErrNoStoreNoArgs         = errors.New("Unexpected argument to `no-store`")
@@ -41,6 +41,10 @@ var (
 	ErrMustRevalidateNoArgs  = errors.New("Unexpected argument to `must-revalidate`")
 	ErrPublicNoArgs          = errors.New("Unexpected argument to `public`")
 	ErrProxyRevalidateNoArgs = errors.New("Unexpected argument to `proxy-revalidate`")
+	// Experimental
+	ErrImmutableNoArgs                  = errors.New("Unexpected argument to `immutable`")
+	ErrStaleIfErrorDeltaSeconds         = errors.New("Failed to parse delta-seconds in `stale-if-error`")
+	ErrStaleWhileRevalidateDeltaSeconds = errors.New("Failed to parse delta-seconds in `stale-while-revalidate`")
 )
 
 func whitespace(b byte) bool {
@@ -128,7 +132,6 @@ func parse(value string, cd cacheDirective) error {
 // time in seconds: http://tools.ietf.org/html/rfc7234#section-1.2.1
 //
 // When set to -1, this means unset.
-//
 type DeltaSeconds int32
 
 // Parser for delta-seconds, a uint31, more or less:
@@ -160,10 +163,9 @@ type cacheDirective interface {
 	addPair(s string, v string) error
 }
 
-// LOW LEVEL API: Repersentation of possible request directives in a `Cache-Control` header: http://tools.ietf.org/html/rfc7234#section-5.2.1
+// LOW LEVEL API: Representation of possible request directives in a `Cache-Control` header: http://tools.ietf.org/html/rfc7234#section-5.2.1
 //
 // Note: Many fields will be `nil` in practice.
-//
 type RequestCacheDirectives struct {
 
 	// max-age(delta seconds): http://tools.ietf.org/html/rfc7234#section-5.2.1.1
@@ -184,7 +186,8 @@ type RequestCacheDirectives struct {
 	// by no more than the specified number of seconds.  If no value is
 	// assigned to max-stale, then the client is willing to accept a stale
 	// response of any age.
-	MaxStale DeltaSeconds
+	MaxStale    DeltaSeconds
+	MaxStaleSet bool
 
 	// min-fresh(delta seconds): http://tools.ietf.org/html/rfc7234#section-5.2.1.3
 	//
@@ -222,6 +225,9 @@ type RequestCacheDirectives struct {
 	// wishes to obtain a stored response.
 	OnlyIfCached bool
 
+	// stale-if-error(delta seconds): https://datatracker.ietf.org/doc/html/rfc5861#section-4
+	StaleIfError DeltaSeconds
+
 	// Extensions: http://tools.ietf.org/html/rfc7234#section-5.2.3
 	//
 	// The Cache-Control header field can be extended through the use of one
@@ -236,10 +242,10 @@ func (cd *RequestCacheDirectives) addToken(token string) error {
 	switch token {
 	case "max-age":
 		err = ErrMaxAgeDeltaSeconds
-	case "max-stale":
-		err = ErrMaxStaleDeltaSeconds
 	case "min-fresh":
 		err = ErrMinFreshDeltaSeconds
+	case "max-stale":
+		cd.MaxStaleSet = true
 	case "no-cache":
 		cd.NoCache = true
 	case "no-store":
@@ -248,6 +254,8 @@ func (cd *RequestCacheDirectives) addToken(token string) error {
 		cd.NoTransform = true
 	case "only-if-cached":
 		cd.OnlyIfCached = true
+	case "stale-if-error":
+		err = ErrMaxAgeDeltaSeconds
 	default:
 		cd.Extensions = append(cd.Extensions, token)
 	}
@@ -281,6 +289,11 @@ func (cd *RequestCacheDirectives) addPair(token string, v string) error {
 		err = ErrNoTransformNoArgs
 	case "only-if-cached":
 		err = ErrOnlyIfCachedNoArgs
+	case "stale-if-error":
+		cd.StaleIfError, err = parseDeltaSeconds(v)
+		if err != nil {
+			err = ErrStaleIfErrorDeltaSeconds
+		}
 	default:
 		// TODO(pquerna): this sucks, making user re-parse
 		cd.Extensions = append(cd.Extensions, token+"="+v)
@@ -307,7 +320,6 @@ func ParseRequestCacheControl(value string) (*RequestCacheDirectives, error) {
 // LOW LEVEL API: Repersentation of possible response directives in a `Cache-Control` header: http://tools.ietf.org/html/rfc7234#section-5.2.2
 //
 // Note: Many fields will be `nil` in practice.
-//
 type ResponseCacheDirectives struct {
 
 	// must-revalidate(bool): http://tools.ietf.org/html/rfc7234#section-5.2.2.1
@@ -403,6 +415,21 @@ type ResponseCacheDirectives struct {
 	// proxy-revalidate response directive.
 	SMaxAge DeltaSeconds
 
+	////
+	// Experimental features
+	// - https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#Extension_Cache-Control_directives
+	// - https://www.fastly.com/blog/stale-while-revalidate-stale-if-error-available-today
+	////
+
+	// immutable(cast-to-bool): experimental feature
+	Immutable bool
+
+	// stale-if-error(delta seconds): experimental feature
+	StaleIfError DeltaSeconds
+
+	// stale-while-revalidate(delta seconds): experimental feature
+	StaleWhileRevalidate DeltaSeconds
+
 	// Extensions: http://tools.ietf.org/html/rfc7234#section-5.2.3
 	//
 	// The Cache-Control header field can be extended through the use of one
@@ -416,6 +443,9 @@ func ParseResponseCacheControl(value string) (*ResponseCacheDirectives, error) {
 	cd := &ResponseCacheDirectives{
 		MaxAge:  -1,
 		SMaxAge: -1,
+		// Exerimantal stale timeouts
+		StaleIfError:         -1,
+		StaleWhileRevalidate: -1,
 	}
 
 	err := parse(value, cd)
@@ -446,6 +476,13 @@ func (cd *ResponseCacheDirectives) addToken(token string) error {
 		err = ErrMaxAgeDeltaSeconds
 	case "s-maxage":
 		err = ErrSMaxAgeDeltaSeconds
+	// Experimental
+	case "immutable":
+		cd.Immutable = true
+	case "stale-if-error":
+		err = ErrMaxAgeDeltaSeconds
+	case "stale-while-revalidate":
+		err = ErrMaxAgeDeltaSeconds
 	default:
 		cd.Extensions = append(cd.Extensions, token)
 	}
@@ -500,6 +537,13 @@ func (cd *ResponseCacheDirectives) addPair(token string, v string) error {
 		cd.MaxAge, err = parseDeltaSeconds(v)
 	case "s-maxage":
 		cd.SMaxAge, err = parseDeltaSeconds(v)
+	// Experimental
+	case "immutable":
+		err = ErrImmutableNoArgs
+	case "stale-if-error":
+		cd.StaleIfError, err = parseDeltaSeconds(v)
+	case "stale-while-revalidate":
+		cd.StaleWhileRevalidate, err = parseDeltaSeconds(v)
 	default:
 		// TODO(pquerna): this sucks, making user re-parse, and its technically not 'quoted' like the original,
 		// but this is still easier, just a SplitN on "="
