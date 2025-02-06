@@ -83,32 +83,40 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 	pageWhereTotalCountChanged := -1
 	allFetchedRepositories := []HarborApiRepository{}
 	totalReposInRegistry := -1
+	timesTotalCountChanged := 0
 	for {
 		if pageNum == pageWhereTotalCountChanged {
 			// we've already appended the repos for this page in a previous iteration
 			pageNum++
 			continue
 		}
-		repositoriesForPage, totalCount, err := h.getPageOfRepositories(pageNum)
+		repositoriesForPage, respTotalCount, err := h.getPageOfRepositories(pageNum)
 		if err != nil {
 			return nil, fmt.Errorf("could not get page %d of harbor repositories: %w", pageNum, err)
 		}
 		if totalReposInRegistry == -1 {
-			totalReposInRegistry = totalCount
-		} else if totalReposInRegistry != totalCount {
-			// number of repos changed while we were querying registry
-			// rerun query for all previous pages as well
-			pageWhereTotalCountChanged = pageNum
-			pageNum = 0
-			allFetchedRepositories = []HarborApiRepository{}
-			totalReposInRegistry = totalCount
+			totalReposInRegistry = respTotalCount
+		} else if totalReposInRegistry != respTotalCount {
+			if timesTotalCountChanged < 3 {
+				// number of repos changed while we were querying registry
+				// rerun query for all previous pages as well
+				pageWhereTotalCountChanged = pageNum
+				pageNum = 0
+				allFetchedRepositories = []HarborApiRepository{}
+				totalReposInRegistry = respTotalCount
+				timesTotalCountChanged++
+			} else {
+				log.WithFields(log.Fields{"registry_url": h.regURL}).Warn("harbor registry updating images too rapidly, scan results may exclude newly changed images")
+			}
 		}
 
 		allFetchedRepositories = append(allFetchedRepositories, repositoriesForPage...)
 		if len(allFetchedRepositories) >= totalReposInRegistry {
 			break
-		} else if len(repositoriesForPage) == 0 {
-			return nil, fmt.Errorf("received unexpected empty response from harbor registry for repositories page %d", pageNum)
+		}
+
+		if len(repositoriesForPage) == 0 {
+			log.WithFields(log.Fields{"registry_url": h.regURL}).Warnf("received unexpected empty response from harbor registry for repositories page %d\n", pageNum)
 		}
 		pageNum++
 	}
@@ -135,7 +143,7 @@ func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int,
 	}
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
-	resp, err := h.rc.Client.Do(req)
+	resp, err := h.rc.Client.DoWithRetry(req, 3)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not do request to get all repositories: %w", err)
 	}
@@ -196,10 +204,11 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	req.URL.RawQuery = "with_tag=true" // required to include image tags in response
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
-	resp, err := h.rc.Client.Do(req)
+	resp, err := h.rc.Client.DoWithRetry(req, 3)
 	if err != nil {
-		return nil, fmt.Errorf("could not do request to get all artifacts for repo %s: %w", repository.FullName, err)
+		return nil, fmt.Errorf("could not do request to get all artifacts for repo: %s: %w", repository.FullName, err)
 	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
