@@ -125,7 +125,7 @@ require (
 )
 
 require (
-	github.com/alitto/pond v1.8.3
+	github.com/alitto/pond v1.9.2
 	github.com/containerd/containerd/api v1.8.0
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/mitchellh/pointerstructure v1.2.1
