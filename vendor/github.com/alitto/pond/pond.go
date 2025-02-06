@@ -318,8 +318,14 @@ func (p *WorkerPool) SubmitBefore(task func(), deadline time.Duration) {
 // Stop causes this pool to stop accepting new tasks and signals all workers to exit.
 // Tasks being executed by workers will continue until completion (unless the process is terminated).
 // Tasks in the queue will not be executed.
-func (p *WorkerPool) Stop() {
-	go p.stop(false)
+// This method returns a context object that is cancelled when the pool has stopped completely.
+func (p *WorkerPool) Stop() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		p.stop(false)
+		cancel()
+	}()
+	return ctx
 }
 
 // StopAndWait causes this pool to stop accepting new tasks and then waits for all tasks in the queue
@@ -371,6 +377,7 @@ func (p *WorkerPool) stop(waitForQueuedTasksToComplete bool) {
 	p.tasksCloseOnce.Do(func() {
 		close(p.tasks)
 	})
+
 }
 
 // purge represents the work done by the purger goroutine
@@ -420,7 +427,7 @@ func (p *WorkerPool) maybeStartWorker(firstTask func()) bool {
 	}
 
 	// Launch worker goroutine
-	go worker(p.context, &p.workersWaitGroup, firstTask, p.tasks, p.executeTask)
+	go worker(p.context, &p.workersWaitGroup, firstTask, p.tasks, p.executeTask, &p.tasksWaitGroup)
 
 	return true
 }
