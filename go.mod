@@ -4,7 +4,7 @@ go 1.22
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.8.0
-	k8s.io/cri-api => k8s.io/cri-api v0.25.16
+	k8s.io/cri-api => k8s.io/cri-api v0.27.16
 )
 
 require (
