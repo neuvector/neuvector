@@ -15,6 +15,7 @@ import (
 
 const totalCounterHeaderCanonicalForm string = "X-Total-Count"
 const defaultRepositoryPageSize int = 10
+const maxGetRepoRequeries int = 3
 
 type harbor struct {
 	base
@@ -97,7 +98,7 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 		if totalReposInRegistry == -1 {
 			totalReposInRegistry = respTotalCount
 		} else if totalReposInRegistry != respTotalCount {
-			if timesTotalCountChanged < 3 {
+			if timesTotalCountChanged < maxGetRepoRequeries {
 				// number of repos changed while we were querying registry
 				// rerun query for all previous pages as well
 				pageWhereTotalCountChanged = pageNum
