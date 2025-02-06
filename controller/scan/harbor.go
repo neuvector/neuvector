@@ -6,11 +6,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/neuvector/neuvector/share"
 	log "github.com/sirupsen/logrus"
 )
+
+const totalCounterHeaderCanonicalForm string = "X-Total-Count"
+const defaultRepositoryPageSize int = 10
+const maxGetRepoRequeries int = 3
 
 type harbor struct {
 	base
@@ -74,37 +79,98 @@ func (h *harbor) GetAllImages() (map[share.CLUSImage][]string, error) {
 	return images, nil
 }
 
-// TODO: deal with large registries, implement pagination/chunked responses?
 func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
-	reqUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/repositories")
-	if err != nil {
-		return nil, fmt.Errorf("could not generate repository request url: %w", err)
+	pageNum := 1
+	pageWhereTotalCountChanged := -1
+	allFetchedRepositories := []HarborApiRepository{}
+	totalReposInRegistry := -1
+	timesTotalCountChanged := 0
+	for {
+		if pageNum == pageWhereTotalCountChanged {
+			// we've already appended the repos for this page in a previous iteration
+			pageNum++
+			continue
+		}
+		repositoriesForPage, respTotalCount, err := h.getPageOfRepositories(pageNum)
+		if err != nil {
+			return nil, fmt.Errorf("could not get page %d of harbor repositories: %w", pageNum, err)
+		}
+		if totalReposInRegistry == -1 {
+			totalReposInRegistry = respTotalCount
+		} else if totalReposInRegistry != respTotalCount {
+			if timesTotalCountChanged < maxGetRepoRequeries {
+				// number of repos changed while we were querying registry
+				// rerun query for all previous pages as well
+				pageWhereTotalCountChanged = pageNum
+				pageNum = 0
+				allFetchedRepositories = []HarborApiRepository{}
+				totalReposInRegistry = respTotalCount
+				timesTotalCountChanged++
+			} else {
+				log.WithFields(log.Fields{"registry_url": h.regURL}).Warn("harbor registry updating images too rapidly, scan results may exclude newly changed images")
+			}
+		}
+
+		allFetchedRepositories = append(allFetchedRepositories, repositoriesForPage...)
+		if len(allFetchedRepositories) >= totalReposInRegistry {
+			break
+		}
+
+		if len(repositoriesForPage) == 0 {
+			log.WithFields(log.Fields{"registry_url": h.regURL}).Warnf("received unexpected empty response from harbor registry for repositories page %d\n", pageNum)
+		}
+		pageNum++
 	}
-	req, err := http.NewRequest("GET", reqUrl, nil)
+
+	return allFetchedRepositories, nil
+}
+
+func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int, error) {
+	rawUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/repositories")
 	if err != nil {
-		return nil, fmt.Errorf("could not make request object: %w", err)
+		return nil, 0, fmt.Errorf("could not join repository request url: %w", err)
+	}
+	reqUrl, err := url.Parse(rawUrl)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not parse repository request url: %w", err)
+	}
+	v := url.Values{}
+	v.Set("page", strconv.Itoa(pageNum))
+	v.Set("page_size", strconv.Itoa(defaultRepositoryPageSize))
+	reqUrl.RawQuery = v.Encode()
+	req, err := http.NewRequest("GET", reqUrl.String(), nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not make request object: %w", err)
 	}
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
-	resp, err := h.rc.Client.Do(req)
+	resp, err := h.rc.Client.DoWithRetry(req, 3)
 	if err != nil {
-		return nil, fmt.Errorf("could not do request to get all repositories: %w", err)
+		return nil, 0, fmt.Errorf("could not do request to get all repositories: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
+		return nil, 0, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)
 	}
 	harborRepositories := []HarborApiRepository{}
 	// TODO: more efficiently deal with large responses, instead of reading all into a byte slice
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("could not read response body: %w", err)
+		return nil, 0, fmt.Errorf("could not read response body: %w", err)
 	}
 	err = json.Unmarshal(respBytes, &harborRepositories)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshall response body json: %w", err)
+		return nil, 0, fmt.Errorf("could not unmarshall response body json: %w", err)
 	}
-	return harborRepositories, nil
+	totalCountHeader := resp.Header.Get(totalCounterHeaderCanonicalForm)
+	if totalCountHeader == "" {
+		return nil, 0, fmt.Errorf("could not retrieve total count header from response")
+	}
+	totalCount, err := strconv.Atoi(totalCountHeader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not parse total count header \"%s\" to int: %w", totalCountHeader, err)
+	}
+	return harborRepositories, totalCount, nil
 }
 
 type HarborApiArtifact struct {
@@ -139,10 +205,11 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	req.URL.RawQuery = "with_tag=true" // required to include image tags in response
 	req.SetBasicAuth(h.base.username, h.base.password)
 	req.Header.Add("accept", "application/json")
-	resp, err := h.rc.Client.Do(req)
+	resp, err := h.rc.Client.DoWithRetry(req, 3)
 	if err != nil {
-		return nil, fmt.Errorf("could not do request to get all artifacts for repo %s: %w", repository.FullName, err)
+		return nil, fmt.Errorf("could not do request to get all artifacts for repo: %s: %w", repository.FullName, err)
 	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("received error code from harbor api: %d", resp.StatusCode)

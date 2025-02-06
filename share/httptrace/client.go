@@ -1,6 +1,7 @@
 package httptrace
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -72,6 +73,20 @@ func (tc TraceClient) Do(req *http.Request) (*http.Response, error) {
 	tc.Trace.SendRequest(req.Method, req.URL.String())
 	resp, err := tc.Client.Do(req)
 	return tc.response(resp, err)
+}
+
+func (tc TraceClient) DoWithRetry(req *http.Request, maxRetries int) (resp *http.Response, err error) {
+	for currentTry := 1; currentTry <= maxRetries; currentTry++ {
+		resp, err = tc.Do(req)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second * time.Duration(currentTry*3)) // backoff
+	}
+	if err != nil {
+		err = fmt.Errorf("request failed after %d retries: %w", maxRetries, err)
+	}
+	return resp, err
 }
 
 func (tc TraceClient) RoundTrip(req *http.Request) (*http.Response, error) {
