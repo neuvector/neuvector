@@ -139,16 +139,16 @@ void dpi_ep_set_app(dpi_packet_t *p, uint16_t server, uint16_t application)
 void dpi_ep_set_server_ver(dpi_packet_t *p, char *ver, int len)
 {
     dpi_session_t *s = p->session;
-    int size = min(len, SERVER_VER_SIZE - 1);
+    int size = min(len+1, SERVER_VER_SIZE);
 
     if (!(s->flags & DPI_SESS_FLAG_INGRESS)) return;
 
     io_app_t *app = ep_app_map_locate(p->ep, s->server.port, s->ip_proto);
     if (unlikely(app == NULL)) return;
 
-    strlcpy(app->version, ver, size);
-    app->version[size] = '\0';
-
+    strncpy(app->version, ver, size-1);
+    //version is null terminated
+    app->version[size-1] = '\0';
     DEBUG_LOG(DBG_SESSION, p, "port=%u version=%s\n", s->server.port, app->version);
 }
 

@@ -288,7 +288,8 @@ void ssl_get_sni_v3(dpi_packet_t *p, uint8_t *ptr, ssl_record_t *rec)
             tptr += 2;
             //DEBUG_LOG(DBG_PARSER, p, "ssl: snilen(%hu), sniname(%s)\n", namelen,(char *)tptr);
             int size = min(namelen+1, sizeof(s->vhost));
-            strlcpy((char *)s->vhost, (char *)tptr, size);
+            strncpy((char *)s->vhost, (char *)tptr, size-1);
+            s->vhost[size-1] = '\0';
             s->vhlen = size-1;
             break;
         } else {
