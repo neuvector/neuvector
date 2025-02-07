@@ -102,11 +102,11 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/beevik/etree
 # github.com/cenk/hub v1.0.1
 ## explicit
-# github.com/cenkalti/hub v1.0.1
-## explicit
+# github.com/cenkalti/hub v1.0.2
+## explicit; go 1.20
 github.com/cenkalti/hub
-# github.com/cenkalti/rpc2 v0.0.0-20210604223624-c1acbc6ec984
-## explicit
+# github.com/cenkalti/rpc2 v1.0.4
+## explicit; go 1.20
 github.com/cenkalti/rpc2
 github.com/cenkalti/rpc2/jsonrpc
 # github.com/chai2010/gettext-go v1.0.2

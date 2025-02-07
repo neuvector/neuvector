@@ -11,7 +11,7 @@ require (
 	github.com/Microsoft/hcsshim v0.12.0-rc.1 // indirect
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/beevik/etree v1.5.0
-	github.com/cenkalti/rpc2 v0.0.0-20210604223624-c1acbc6ec984
+	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
 	github.com/containerd/containerd v1.7.25
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
@@ -68,7 +68,7 @@ require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/cenk/hub v1.0.1 // indirect
-	github.com/cenkalti/hub v1.0.1 // indirect
+	github.com/cenkalti/hub v1.0.2 // indirect
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/containerd/cgroups/v3 v3.0.2 // indirect
 	github.com/containerd/continuity v0.4.4 // indirect
