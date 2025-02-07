@@ -637,7 +637,7 @@ static int http_header_host_token(void *param, uint8_t *ptr, int len, int token_
     http_ctx_t *ctx = param;
     dpi_packet_t *p = ctx->p;
     dpi_session_t *s = p->session;
-    uint16_t host_str_len;
+    int host_str_len, size;
     register uint8_t *l = ptr, *end = ptr + len;
 
     while (l < end) {
@@ -647,9 +647,10 @@ static int http_header_host_token(void *param, uint8_t *ptr, int len, int token_
         l ++;
     }
     host_str_len = l-ptr;
-    int size = min(host_str_len+1, sizeof(s->vhost));
-    strlcpy((char *)s->vhost, (char *)ptr, size);
-
+    size = min(host_str_len+1, sizeof(s->vhost));
+    strncpy((char *)s->vhost, (char *)ptr, size-1);
+    //vhost is null terminated
+    s->vhost[size-1] = '\0';
     s->vhlen = size-1;
     DEBUG_LOG(DBG_PARSER, p, "vhostname(%s) vhlen(%hu)\n", (char *)s->vhost, s->vhlen);
 
