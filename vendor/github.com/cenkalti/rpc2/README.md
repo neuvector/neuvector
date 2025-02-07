@@ -2,7 +2,6 @@ rpc2
 ====
 
 [![GoDoc](https://godoc.org/github.com/cenkalti/rpc2?status.png)](https://godoc.org/github.com/cenkalti/rpc2)
-[![Build Status](https://travis-ci.org/cenkalti/rpc2.png)](https://travis-ci.org/cenkalti/rpc2)
 
 rpc2 is a fork of net/rpc package in the standard library.
 The main goal is to add bi-directional support to calls.
