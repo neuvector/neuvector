@@ -68,6 +68,7 @@ const (
 	gke140YAMLFolder    = dstYaml + "gke-1.4.0/"
 	aks140YAMLFolder    = dstYaml + "aks-1.4.0/"
 	eks140YAMLFolder    = dstYaml + "eks-1.4.0/"
+	rke2180YAMLFolder   = dstYaml + "cis-rke2-1.8.0/"
 	kubeGKEMasterTmpl   = srcTmpl + "kube_master_gke_1_0_0.tmpl"
 	kubeGKEWorkerTmpl   = srcTmpl + "kube_worker_gke_1_0_0.tmpl"
 	kubeGKERemediation  = srcRem + "kubecis_gke_1_0_0.rem"
@@ -332,6 +333,12 @@ func (b *Bench) BenchLoop() {
 					masterScript = kubeRunnerTmpl
 					workerScript = kubeRunnerTmpl
 					remediation = k3s180YAMLFolder
+				} else if b.platform == share.PlatformKubernetes && strings.Contains(k8sVer, "rke2") {
+					// currently support CIS-1.8.0 only
+					b.kubeCISVer = "RKE2-1.8.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = rke2180YAMLFolder
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
