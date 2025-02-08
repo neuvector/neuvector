@@ -16,7 +16,7 @@ require (
 	github.com/containerd/containerd v1.7.25
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v26.1.5+incompatible
+	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/fsnotify/fsnotify v1.8.0
