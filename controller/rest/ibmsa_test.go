@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 )
 
@@ -24,6 +25,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 	cacher = &cache.CacheMethod{}
+	rpc.ScannerMgr = rpc.NewScannerManager(2)
 	cache.MockCacheInit()
 	clusHelper.SetCacheMockCallback(share.CLUSConfigSystemKey, cache.MockSystemConfigUpdate)
 	clusHelper.SetCacheMockCallback(share.CLUSConfigUserRoleStore, cache.MockUserRoleConfigUpdate)

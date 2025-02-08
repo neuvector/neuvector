@@ -350,7 +350,7 @@ func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*sh
 	acc := access.NewReaderAccessControl()
 	cfg := cacher.GetSystemConfig(acc)
 
-	busy, idle := rpc.CountScanners()
+	busy, idle := rpc.ScannerMgr.CountScanners()
 	scanners, dbTime, dbVer := cacher.GetScannerCount(acc)
 	c.Scanners = uint32(scanners)
 	c.IdleScanners = idle
