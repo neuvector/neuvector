@@ -14,7 +14,7 @@ require (
 	github.com/cenkalti/rpc2 v0.0.0-20210604223624-c1acbc6ec984
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
 	github.com/containerd/containerd v1.7.25
-	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
+	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/docker/go-units v0.5.0 // indirect
@@ -75,7 +75,6 @@ require (
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.1.0
 	github.com/containerd/ttrpc v1.2.5 // indirect
-	github.com/containerd/typeurl/v2 v2.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
@@ -127,6 +126,7 @@ require (
 require (
 	github.com/alitto/pond v1.9.2
 	github.com/containerd/containerd/api v1.8.0
+	github.com/containerd/typeurl v1.0.2
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
