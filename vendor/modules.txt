@@ -588,7 +588,7 @@ github.com/s3rj1k/go-fanotify/fanotify
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72
+# github.com/spaolacci/murmur3 v1.1.0
 ## explicit
 github.com/spaolacci/murmur3
 # github.com/spf13/cobra v1.7.0
