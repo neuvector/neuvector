@@ -23,9 +23,9 @@ get_argument_value() {
     sed \
         -e 's/\-\-/\n--/g' \
         |
-    grep "^${OPTION}" |
+    grep "^${OPTION}=" |
     sed \
-        -e "s/^${OPTION}=//g"
+        -e "s/^${OPTION}=//g" -e "s/[[:space:]]*$//g"
 }
 
 #check whether an argument exist in command line

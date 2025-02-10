@@ -68,6 +68,7 @@ const (
 	gke140YAMLFolder    = dstYaml + "gke-1.4.0/"
 	aks140YAMLFolder    = dstYaml + "aks-1.4.0/"
 	eks140YAMLFolder    = dstYaml + "eks-1.4.0/"
+	rke2180YAMLFolder   = dstYaml + "cis-rke2-1.8.0/"
 	kubeGKEMasterTmpl   = srcTmpl + "kube_master_gke_1_0_0.tmpl"
 	kubeGKEWorkerTmpl   = srcTmpl + "kube_worker_gke_1_0_0.tmpl"
 	kubeGKERemediation  = srcRem + "kubecis_gke_1_0_0.rem"
@@ -265,6 +266,7 @@ func (b *Bench) BenchLoop() {
 
 			// Check version whenever the benchmark is rerun
 			k8sVer, ocVer := global.ORCH.GetVersion(false, false)
+			log.WithFields(log.Fields{"k8sVer": k8sVer, "ocVer": ocVer, "platform": b.platform, "cloudPlatform": b.cloudPlatform, "flavor": b.flavor}).Info("PPPPPPPPPPPPP")
 			if masterScript == "" {
 				// 1.11- : 1.3.0
 				// 1.13- : 1.4.1
@@ -332,6 +334,13 @@ func (b *Bench) BenchLoop() {
 					masterScript = kubeRunnerTmpl
 					workerScript = kubeRunnerTmpl
 					remediation = k3s180YAMLFolder
+				} else if b.platform == share.PlatformKubernetes && strings.Contains(k8sVer, "rke2") {
+					// currently support CIS-1.8.0 only
+					log.WithFields(log.Fields{"k8sVer": k8sVer, "ocVer": ocVer, "platform": b.platform, "cloudPlatform": b.cloudPlatform, "flavor": b.flavor}).Info("PPPPPPPPPPPPP run rke2")
+					b.kubeCISVer = "RKE2-1.8.0"
+					masterScript = kubeRunnerTmpl
+					workerScript = kubeRunnerTmpl
+					remediation = rke2180YAMLFolder
 				} else {
 					kVer, err := version.NewVersion(k8sVer)
 					if err != nil {
@@ -464,9 +473,9 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 	}
 
-	defer os.Remove(masterScriptSh)
-	defer os.Remove(workerScriptSh)
-	defer os.Remove(journalScriptSh)
+	// defer os.Remove(masterScriptSh)
+	// defer os.Remove(workerScriptSh)
+	// defer os.Remove(journalScriptSh)
 
 	var errMaster, errWorker error
 	var out []byte
@@ -475,6 +484,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	if b.isKubeMaster {
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusRunning)
 
+		log.WithFields(log.Fields{"masterScriptSh": masterScriptSh, "remediation": remediation}).Info("PPPPPPPPPPPPP run master")
 		out, errMaster = b.runKubeBench(share.BenchKubeMaster, masterScriptSh, remediation)
 		if errMaster != nil {
 			log.WithFields(log.Fields{
@@ -484,6 +494,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 			b.logBenchFailure(benchPlatKube, share.BenchStatusKubeMasterFail)
 			b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusKubeMasterFail)
 		} else {
+			log.WithFields(log.Fields{"out": out}).Info("PPPPPPPPPPPPP")
 			list := b.getBenchMsg(out)
 			b.assignKubeBenchMeta(list)
 			b.kubeHostDone = true
@@ -496,6 +507,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 	if b.isKubeWorker {
 		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusRunning)
 
+		log.WithFields(log.Fields{"workerScriptSh": workerScriptSh, "remediation": remediation}).Info("PPPPPPPPPPPPP run worker")
 		out, errWorker = b.runKubeBench(share.BenchKubeWorker, workerScriptSh, remediation)
 		if errWorker != nil {
 			log.WithFields(log.Fields{
@@ -506,6 +518,7 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 			b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusKubeWorkerFail)
 		} else {
 			list := b.getBenchMsg(out)
+			log.WithFields(log.Fields{"list": list}).Info("PPPPPPPPPPPPP")
 			b.assignKubeBenchMeta(list)
 			b.kubeHostDone = true
 			b.logHostResult(list)
@@ -598,6 +611,17 @@ func (b *Bench) RerunKube(cmd, cmdRemap string, forced bool) {
 			log.WithFields(log.Fields{"error": err, "directory": dir}).Error("Error checking directory")
 		}
 	}
+
+	if strings.Contains(k8sVer, "rke2") {
+		// use dir := "/proc/1/root/var/lib/rancher/rke2/server" to check if in RKE2 master
+		// On RKE2 by default, all servers are also agents.
+		dir := "/proc/1/root/var/lib/rancher/rke2/server"
+		if _, err := os.Stat(dir); err == nil {
+			isKubeMaster = true
+		}
+	}
+
+	log.WithFields(log.Fields{"isKubeMaster": isKubeMaster, "isKubeWorker": isKubeWorker, "k8sVer": k8sVer}).Info("PPPPPPPPPPPPP")
 	b.isKubeMaster = isKubeMaster
 	b.isKubeWorker = isKubeWorker
 	var sched bool
@@ -705,6 +729,8 @@ func (b *Bench) parseBenchMsg(line string) (*benchItem, bool) {
 	msg = strings.ReplaceAll(msg, "(Automated)", "")
 	msg = strings.ReplaceAll(msg, "(Manual)", "")
 	msg = strings.TrimSpace(msg)
+
+	log.WithFields(log.Fields{"level": level, "id": id, "msg": msg, "scored": scored, "automated": automated, "profile": profile}).Info("PPPPPPPPPPPPP")
 
 	return &benchItem{
 		level: level, testNum: id, header: msg,

@@ -35,6 +35,7 @@ var (
 	gke140            = "gke-1.4.0"
 	aks140            = "aks-1.4.0"
 	eks140            = "eks-1.4.0"
+	rke2180           = "cis-rke2-1.8.0"
 	defaultCISVersion = "cis-1.8.0"
 	catchDescription  = regexp.MustCompile(`^(.*?) \([^)]*\)$`)
 
@@ -3044,6 +3045,8 @@ func GetCISFolder(platform, flavor, cloudPlatform string) {
 		} else if platform == share.PlatformKubernetes && cloudPlatform == share.CloudEKS {
 			// Currently support EKS-1.4.0 only
 			cisVersion = eks140
+		} else if platform == share.PlatformKubernetes && strings.Contains(k8sVer, "rke2") {
+			cisVersion = rke2180
 		} else if platform == share.PlatformKubernetes && flavor == share.FlavorOpenShift {
 			ocVer, err := version.NewVersion(ocVer)
 			if err != nil {
