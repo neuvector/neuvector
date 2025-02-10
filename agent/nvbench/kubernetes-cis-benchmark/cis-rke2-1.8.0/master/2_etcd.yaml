@@ -1,4 +1,4 @@
-version: cis-1.8
+version: cis-rke2-1.8.0
 id: 2
 title: 2 - etcd
 type: master
@@ -24,21 +24,31 @@ groups:
               if check_argument "$CIS_ETCD_CMD" '--key-file' >/dev/null 2>&1; then
                   cfile=$(get_argument_value "$CIS_ETCD_CMD" '--cert-file')
                   kfile=$(get_argument_value "$CIS_ETCD_CMD" '--key-file')
-                  cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
-                  kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
-                  pass "$check"
-                  pass "      * cert-file: $cfile"
-                  pass "      * key-file: $kfile"
+                  target_cfile="/var/lib/rancher/rke2/server/tls/etcd/server-client.crt"
+                  target_kfile="/var/lib/rancher/rke2/server/tls/etcd/server-client.key"
+
+                  if [ "$cfile" = "$target_cfile" ] && [ "$kfile" = "$target_kfile" ]; then
+                      pass "$check"
+                      pass "      * cert-file: $cfile"
+                      pass "      * key-file: $kfile"
+                  else
+                    warn "$check"
+                    warn "      * cert-file should be: $target_cfile, but is: $cfile"
+                    warn "      * key-file should be: $target_kfile, but is: $kfile"
+                  fi
               else
                 warn "$check"
+                warn "      * key-file is not set"
               fi
           else
               warn "$check"
-          fi        
-        remediation: Follow the etcd service documentation and configure TLS encryption.
-          Then, edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml
-          on the master node and set the below parameters.  --cert-file=</path/to/ca-file>
-          --key-file=</path/to/key-file>
+              warn "      * cert-file is not set"
+          fi
+        remediation: |
+          By default, RKE2 generates cert and key files for etcd.
+          These are located in /var/lib/rancher/rke2/server/tls/etcd/.
+          If this check fails, ensure that the configuration file /var/lib/rancher/rke2/agent/kubelet.kubeconfig
+          has not been modified to use custom cert and key files.
   - id: 2.2
     title: ''
     checks:
@@ -55,13 +65,16 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_ETCD_CMD" '--client-cert-auth' >/dev/null 2>&1; then
+          value=$(get_argument_value "$CIS_ETCD_CMD" '--client-cert-auth')
+          if [ "$value" = "true" ]; then
               pass "$check"
           else
               warn "$check"
           fi        
-        remediation: Edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml
-          on the master node and set the below parameter. --client-cert-auth="true"
+        remediation: |
+          By default, RKE2 sets the --client-cert-auth parameter to true.
+          If this check fails, ensure that the configuration file /var/lib/rancher/rke2/agent/kubelet.kubeconfig
+          has not been modified to disable client certificate authentication.
   - id: 2.3
     title: ''
     checks:
@@ -78,14 +91,18 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_ETCD_CMD" '--auto-tls=true' >/dev/null 2>&1; then
+          value=$(get_argument_value "$CIS_ETCD_CMD" '--auto-tls')
+          if [ "$value" = "true" ]; then
               warn "$check"
           else
               pass "$check"
           fi  
-        remediation: Edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml
-          on the master node and either remove the --auto-tls parameter or set it
-          to false. --auto-tls=false
+        remediation: |
+          By default, RKE2 does not set the --auto-tls parameter.
+          If this check fails, edit the etcd pod specification file /var/lib/rancher/rke2/agent/kubelet.kubeconfig on the master
+          node and either remove the --auto-tls parameter or set it to false.
+          client-transport-security:
+            auto-tls: false
   - id: 2.4
     title: ''
     checks:
@@ -107,22 +124,29 @@ groups:
               if check_argument "$CIS_ETCD_CMD" '--peer-key-file' >/dev/null 2>&1; then
                   cfile=$(get_argument_value "$CIS_ETCD_CMD" '--peer-cert-file')
                   kfile=$(get_argument_value "$CIS_ETCD_CMD" '--peer-key-file')
-                  cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
-                  kfile=$(append_prefix "$CONFIG_PREFIX" "$kfile")
-                  pass "$check"
-                  pass "      * peer-cert-file: $cfile"
-                  pass "      * peer-key-file: $kfile"
+                  target_cfile="/var/lib/rancher/rke2/server/tls/etcd/peer-server-client.crt"
+                  target_kfile="/var/lib/rancher/rke2/server/tls/etcd/peer-server-client.key"
+
+                  if [ "$cfile" = "$target_cfile" ] && [ "$kfile" = "$target_kfile" ]; then
+                      pass "$check"
+                      pass "      * peer-cert-file: $cfile"
+                      pass "      * peer-key-file: $kfile"
+                  else
+                    warn "$check"
+                    warn "      * peer-cert-file should be: $target_cfile, but is: $cfile"
+                    warn "      * peer-key-file should be: $target_kfile, but is: $kfile"
+                  fi
               else
                     warn "$check"
               fi
           else
               warn "$check"
           fi        
-        remediation: Follow the etcd service documentation and configure peer TLS
-          encryption as appropriate for your etcd cluster. Then, edit the etcd pod
-          specification file /etc/kubernetes/manifests/etcd.yaml on the master node
-          and set the below parameters.  --peer-cert-file=</path/to/peer-cert-file>
-          --peer-key-file=</path/to/peer-key-file>
+        remediation: |
+          By default, RKE2 generates peer cert and key files for etcd.
+          These are located in /var/lib/rancher/rke2/server/tls/etcd/.
+          If this check fails, ensure that the configuration file /var/lib/rancher/rke2/server/db/etcd/config
+          has not been modified to use custom peer cert and key files.
   - id: 2.5
     title: ''
     checks:
@@ -140,13 +164,16 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_ETCD_CMD" '--peer-client-cert-auth=true' >/dev/null 2>&1; then
+          value=$(get_argument_value "$CIS_ETCD_CMD" '--peer-client-cert-auth')
+          if [ "$value" = "true" ]; then
               pass "$check"
           else
               warn "$check"
           fi        
-        remediation: Edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml
-          on the master node and set the below parameter. --peer-client-cert-auth=true
+        remediation: |
+          By default, RKE2 sets the --peer-cert-auth parameter to true.
+          If this check fails, ensure that the configuration file /var/lib/rancher/rke2/agent/kubelet.kubeconfig
+          has not been modified to disable peer client certificate authentication.
   - id: 2.6
     title: ''
     checks:
@@ -163,15 +190,18 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_ETCD_CMD" '--peer-auto-tls=true' >/dev/null 2>&1; then
+          value=$(get_argument_value "$CIS_ETCD_CMD" '--peer-auto-tls')
+          if [ "$value" = "true" ]; then
               warn "$check"
-              warn "      * The peer-auto-tls parameter is set to true"
           else
               pass "$check"
           fi        
-        remediation: Edit the etcd pod specification file /etc/kubernetes/manifests/etcd.yaml
-          on the master node and either remove the --peer-auto-tls parameter or set
-          it to false. --peer-auto-tls=false
+        remediation: |
+          By default, RKE2 does not set the --peer-auto-tls parameter.
+          If this check fails, edit the etcd pod specification file /var/lib/rancher/rke2/agent/kubelet.kubeconfig on the master
+          node and either remove the --peer-auto-tls parameter or set it to false.
+          peer-transport-security:
+            auto-tls: false
   - id: 2.7
     title: ''
     checks:
@@ -191,7 +221,7 @@ groups:
           if check_argument "$CIS_ETCD_CMD" '--trusted-ca-file' >/dev/null 2>&1; then
               if check_argument "$CIS_APISERVER_CMD" '--client-ca-file' >/dev/null 2>&1; then
                   tfile=$(get_argument_value "$CIS_ETCD_CMD" '--trusted-ca-file')
-                  cfile=$(get_argument_value "$CIS_APISERVER_CMD" '--client-ca-file')
+                  cfile="/var/lib/rancher/rke2/server/tls/etcd/peer-ca.crt"
                   tfile=$(append_prefix "$CONFIG_PREFIX" "$tfile")
                   cfile=$(append_prefix "$CONFIG_PREFIX" "$cfile")
                   if [ "$tfile" = "$cfile" ]; then
@@ -200,7 +230,6 @@ groups:
                       pass "      * client-ca-file: $cfile"
                   else
                     warn "$check"
-                    warn "      * The trusted-ca-file and client-ca-file are not the same"
                   fi
               else
                   warn "$check"
@@ -210,7 +239,8 @@ groups:
               warn "$check"
               warn "      * trusted-ca-file doesn't exist"
           fi        
-        remediation: Follow the etcd documentation and create a dedicated certificate
-          authority setup for the etcd service. Then, edit the etcd pod specification
-          file /etc/kubernetes/manifests/etcd.yaml on the master node and set the
-          below parameter. --trusted-ca-file=</path/to/ca-file>
+        remediation: |
+          By default, RKE2 generates a unique certificate authority for etcd.
+          This is located at /var/lib/rancher/rke2/server/tls/etcd/peer-ca.crt.
+          If this check fails, ensure that the configuration file /var/lib/rancher/rke2/agent/kubelet.kubeconfig
+          has not been modified to use a shared certificate authority.

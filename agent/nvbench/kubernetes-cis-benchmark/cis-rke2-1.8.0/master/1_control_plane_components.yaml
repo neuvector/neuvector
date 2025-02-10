@@ -1,4 +1,4 @@
-version: cis-1.8
+version: cis-rke2-1.8.0
 id: 1
 title: 1 - Control Plane Components
 type: master
@@ -20,7 +20,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-apiserver.yaml")
+          file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/kube-apiserver.yaml")
 
           if [ -f $file ]; then
             permissions=$(stat -c %a $file)
@@ -35,7 +35,7 @@ groups:
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/agent/pod-manifests/kube-apiserver.yaml
       - id: K.1.1.2
         description: Ensure that the API server pod specification file ownership is
           set to root:root (Automated)
@@ -52,18 +52,18 @@ groups:
           check="$id  - $description"
           if [ -f "$file" ]; then
             ownership=$(stat -c %u%g $file)
-            if [ "$ownership" = "00" ]; then
+            if [ "$ownership" -eq 00 ]; then
               pass "$check"
             else
               warn "$check"
-              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
+              warn "      * Wrong ownership for $file, expected 00, but is $ownership"
             fi
           else
             warn "$check"
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-apiserver.yaml
+          on the control plane node. For example, chown root:root /var/lib/rancher/rke2/agent/pod-manifests/kube-apiserver.yaml
       - id: K.1.1.3
         description: Ensure that the controller manager pod specification file permissions
           are set to 600 or more restrictive (Automated)
@@ -78,7 +78,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
+          file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml")
 
           if [ -f "$file" ]; then
             permissions=$(stat -c %a $file)
@@ -93,7 +93,7 @@ groups:
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml
       - id: K.1.1.4
         description: Ensure that the controller manager pod specification file ownership
           is set to root:root (Automated)
@@ -110,18 +110,18 @@ groups:
           check="$id  - $description"
           if [ -f "$file" ]; then
             ownership=$(stat -c %u%g $file)
-            if [ "$ownership" = "00" ]; then
+            if [ "$ownership" -eq 00 ]; then
               pass "$check"
             else
               warn "$check"
-              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
+              warn "      * Wrong ownership for $file, expected 00, but is $ownership"
             fi
           else
             warn "$check"
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-controller-manager.yaml
+          on the control plane node. For example, chown root:root /var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml
       - id: K.1.1.5
         description: Ensure that the scheduler pod specification file permissions
           are set to 600 or more restrictive (Automated)
@@ -136,7 +136,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
+          file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml")
 
           if [ -f "$file" ]; then
             permissions=$(stat -c %a $file)
@@ -151,7 +151,7 @@ groups:
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/manifests/kube-scheduler.yaml
+          on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml
       - id: K.1.1.6
         description: Ensure that the scheduler pod specification file ownership is
           set to root:root (Automated)
@@ -168,18 +168,18 @@ groups:
           check="$id  - $description"
           if [ -f "$file" ]; then
             ownership=$(stat -c %u%g $file)
-            if [ "$ownership" = "00" ]; then
+            if [ "$ownership" -eq 00 ]; then
               pass "$check"
             else
               warn "$check"
-              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
+              warn "      * Wrong ownership for $file, expected 00, but is $ownership"
             fi
           else
             warn "$check"
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/manifests/kube-scheduler.yaml
+          on the control plane node. For example, chown root:root /var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml
       - id: K.1.1.7
         description: Ensure that the etcd pod specification file permissions are set
           to 600 or more restrictive (Automated)
@@ -194,7 +194,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
+          file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/etcd.yaml")
 
           if [ -f "$file" ]; then
             permissions=$(stat -c %a $file)
@@ -202,14 +202,14 @@ groups:
               pass "$check"
             else
               warn "$check"
-              warn "      * Wrong permissions for $file, expected 600 or less, but is $permissions"
+              warn "      * Wrong permissions for $file, expected 600 or 400, but is $permissions"
             fi
           else
             warn "$check"
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/manifests/etcd.yaml
+          on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/agent/pod-manifests/etcd.yaml
       - id: K.1.1.8
         description: Ensure that the etcd pod specification file ownership is set
           to root:root (Automated)
@@ -226,18 +226,18 @@ groups:
           check="$id  - $description"
           if [ -f "$file" ]; then
             ownership=$(stat -c %u%g $file)
-            if [ "$ownership" = "00" ]; then
+            if [ "$ownership" -eq 00 ]; then
               pass "$check"
             else
               warn "$check"
-              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
+              warn "      * Wrong ownership for $file, expected 00, but is $ownership"
             fi
           else
             warn "$check"
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/manifests/etcd.yaml
+          on the control plane node. For example, chown root:root /var/lib/rancher/rke2/agent/pod-manifests/etcd.yaml
       - id: K.1.1.9
         description: Ensure that the Container Network Interface file permissions
           are set to 600 or more restrictive (Manual)
@@ -280,7 +280,7 @@ groups:
             warn "$check - Non-compliant file(s): $non_compliant_files"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 the related files in etc/cni/net.d
+          on the control plane node. For example, chmod 600 the related files in etc/cni/net.d
       - id: K.1.1.10
         description: Ensure that the Container Network Interface file ownership is
           set to root:root (Manual)
@@ -323,7 +323,7 @@ groups:
             warn "$check - Non-compliant file(s): $non_compliant_files"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root the related files in etc/cni/net.d
+          on the control plane node. For example, chown root:root the related files in etc/cni/net.d
       - id: K.1.1.11
         description: Ensure that the etcd data directory permissions are set to 700
           or more restrictive (Automated)
@@ -338,10 +338,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=""
-          if check_argument "$CIS_ETCD_CMD" '--data-dir' >/dev/null 2>&1; then
-              file=$(get_argument_value "$CIS_ETCD_CMD" '--data-dir'|cut -d " " -f 1)
-          fi
+          file="/var/lib/rancher/rke2/server/db/etcd"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
           if [ -f "$file" ]; then
@@ -374,6 +371,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
+
           if [ -f "$file" ]; then
             ownership=$(stat -c %U:%G $file)
             if [ "$ownership" = "etcd:etcd" ]; then
@@ -391,7 +389,7 @@ groups:
           the below command (based on the etcd data directory found above). For example,
           chown etcd:etcd /var/lib/etcd'
       - id: K.1.1.13
-        description: Ensure that the admin.conf file permissions are set to 600 (Automated)
+        description: Ensure that the admin.conf file permissions are set to 600 or more restrictive (Automated)
         type: master
         category: kubernetes
         scored: true
@@ -403,7 +401,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/etc/kubernetes/admin.conf"
+          file="/var/lib/rancher/rke2/server/cred/admin.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
           if [ -f "$file" ]; then
@@ -419,7 +417,7 @@ groups:
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/admin.conf
+          on the control plane node. For example, chmod 600 /etc/kubernetes/admin.conf
       - id: K.1.1.14
         description: Ensure that the admin.conf file ownership is set to root:root
           (Automated)
@@ -434,6 +432,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
+
           if [ -f "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
@@ -447,7 +446,7 @@ groups:
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/admin.conf
+          on the control plane node. For example, chown root:root /etc/kubernetes/admin.conf
       - id: K.1.1.15
         description: Ensure that the scheduler.conf file permissions are set to 600
           or more restrictive (Automated)
@@ -462,7 +461,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/etc/kubernetes/scheduler.conf"
+          file="/var/lib/rancher/rke2/server/cred/scheduler.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
           if [ -f "$file" ]; then
@@ -478,7 +477,7 @@ groups:
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/scheduler.conf
+          on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/server/cred/scheduler.kubeconfig
       - id: K.1.1.16
         description: Ensure that the scheduler.conf file ownership is set to root:root
           (Automated)
@@ -499,14 +498,14 @@ groups:
               pass "$check"
             else
               warn "$check"
-              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
+              warn "      * Wrong ownership for $file"
             fi
           else
             warn "$check"
             warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/scheduler.conf
+          on the control plane node. For example, chown root:root /var/lib/rancher/rke2/server/cred/scheduler.kubeconfig
       - id: K.1.1.17
         description: Ensure that the controller-manager.conf file permissions are
           set to 600 or more restrictive (Automated)
@@ -521,7 +520,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/etc/kubernetes/controller-manager.conf"
+          file="/var/lib/rancher/rke2/server/cred/controller.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
           if [ -f "$file" ]; then
@@ -537,7 +536,7 @@ groups:
             warn "      * File not found, $file"
           fi        
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod 600 /etc/kubernetes/controller-manager.conf
+          on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/server/cred/controller.kubeconfig
       - id: K.1.1.18
         description: Ensure that the controller-manager.conf file ownership is set
           to root:root (Automated)
@@ -565,7 +564,7 @@ groups:
             warn "      * File not found, $file"
           fi        
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown root:root /etc/kubernetes/controller-manager.conf
+          on the control plane node. For example, chown root:root /var/lib/rancher/rke2/server/cred/controller.kubeconfig
       - id: K.1.1.19
         description: Ensure that the Kubernetes PKI directory and file ownership is
           set to root:root (Automated)
@@ -580,7 +579,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/etc/kubernetes/pki/"
+          file="/var/lib/rancher/rke2/server/tls/"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
           files=$(find $file)
           pass=true
@@ -603,7 +602,7 @@ groups:
             warn "      * Wrong ownership for $failed_file, expected root:root, but is $failed_ownership"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chown -R root:root /etc/kubernetes/pki/
+          on the control plane node. For example, chown -R root:root /var/lib/rancher/rke2/server/tls/
       - id: K.1.1.20
         description: Ensure that the Kubernetes PKI certificate file permissions are
           set to 600 or more restrictive (Manual)
@@ -618,32 +617,31 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          files=$(find "$file" -name "*.crt")
+          files=$(find $file -name "*.crt")
           pass=true
           failed_perm=""
           failed_file=""
-
           for f in ${files}; do
-              permissions=$(stat -c %a "$f")
-              if ! [ "$permissions" -le 600 ]; then
-                  pass=false
-                  failed_perm=$permissions
-                  failed_file=$f
-                  break
-              fi
+            permissions=$(stat -c %a $f)
+            if ! [ "$permissions" -eq 600 -o "$permissions" -eq 400 ]; then
+              pass=false;
+              failed_perm=$permissions
+              failed_file=$f
+              break;
+            fi
           done
 
           if [ "$pass" = "true" ]; then
-              pass "$check"
+            pass "$check"
           else
-              warn "$check"
-              warn "      * Wrong permissions for $failed_file, expected 600 or less, but is $failed_perm"
-          fi       
+            warn "$check"
+            warn "      * Wrong permissions for $failed_file, expected 600 or less, but is $failed_perm"
+          fi        
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod -R 600 /etc/kubernetes/pki/*.crt
+          on the control plane node. For example, chmod -R 600 /var/lib/rancher/rke2/server/tls/*.crt
       - id: K.1.1.21
         description: Ensure that the Kubernetes PKI key file permissions are set to
-          600 (Manual)
+          600 (Automated)
         type: master
         category: kubernetes
         scored: false
@@ -659,10 +657,9 @@ groups:
           pass=true
           failed_perm=""
           failed_file=""
-
           for f in ${files}; do
             permissions=$(stat -c %a $f)
-            if [ "$permissions" -ne 600 ]; then
+            if ! [ "$permissions" -eq 600 ]; then
               pass=false;
               failed_perm=$permissions
               failed_file=$f
@@ -677,7 +674,7 @@ groups:
             warn "      * Wrong permissions for $failed_file, expected 600, but is $failed_perm"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the master node. For example, chmod -R 600 /etc/kubernetes/pki/*.key
+          on the control plane node. For example, chmod -R 600 /var/lib/rancher/rke2/server/tls/*.key
   - id: 1.2
     title: 1.2 - API Server
     checks:
@@ -699,8 +696,11 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the below parameter. --anonymous-auth=false
+        remediation: |
+          By default, RKE2 sets the --anonymous-auth argument to false.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove anything similar to below.
+          kube-apiserver-arg:
+            - "anonymous-auth=true"
       - id: K.1.2.2
         description: Ensure that the --token-auth-file parameter is not set (Automated)
         type: master
@@ -719,11 +719,13 @@ groups:
           else
               pass "$check"
           fi
-        remediation: Follow the documentation and configure alternate mechanisms for
-          authentication. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and remove the --token-auth-file=<filename> parameter.
+        remediation: |
+          Follow the documentation and configure alternate mechanisms for authentication.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove anything similar to below.
+          kube-apiserver-arg:
+            - "token-auth-file=<path>"
       - id: K.1.2.3
-        description: Ensure that the DenyServiceExternalIPs is set (Manual)
+        description: Ensure that the --DenyServiceExternalIPs is set (Manual)
         type: master
         category: kubernetes
         scored: true
@@ -735,13 +737,16 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_APISERVER_CMD" '--DenyServiceExternalIPs' >/dev/null 2>&1; then
+          if check_argument "$CIS_APISERVER_CMD" '--enable-admission-plugins=DenyServiceExternalIPs' >/dev/null 2>&1; then
               pass "$check"
           else
               warn "$check"
           fi
         remediation: |
-          Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and remove the `--DenyServiceExternalIPs'parameter or The Kubernetes API server flag disable-admission-plugins takes a comma-delimited list of admission control plugins to be disabled, even if they are in the list of plugins enabled by default. kube-apiserver --disable-admission-plugins=DenyServiceExternalIPs,AlwaysDeny...
+          By default, RKE2 does not set DenyServiceExternalIPs.
+          To enable this flag, edit the RKE2 config file /etc/rancher/rke2/config.yaml like below.
+          kube-apiserver-arg:
+            - "enable-admission-plugins=DenyServiceExternalIPs"
       - id: K.1.2.4
         description: Ensure that the --kubelet-client-certificate and --kubelet-client-key
           arguments are set as appropriate (Automated)
@@ -769,11 +774,14 @@ groups:
           else
               warn "$check"
           fi  
-        remediation: Follow the Kubernetes documentation and set up the TLS connection
-          between the apiserver and kubelets. Then, edit API server pod specification
-          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
-          set the kubelet client certificate and key parameters as below. --kubelet-client-certificate=<path/to/client-certificate-file>
-          --kubelet-client-key=<path/to/client-key-file>
+        remediation: |
+          By default, RKE2 automatically provides the kubelet client certificate and key.
+          They are generated and located at /var/lib/rancher/rke2/server/tls/client-kube-apiserver.crt and /var/lib/rancher/rke2/server/tls/client-kube-apiserver.key
+          If for some reason you need to provide your own certificate and key, you can set the
+          below parameters in the RKE2 config file /etc/rancher/rke2/config.yaml.
+          kube-apiserver-arg:
+            - "kubelet-client-certificate=<path/to/client-cert-file>"
+            - "kubelet-client-key=<path/to/client-key-file>"
       - id: K.1.2.5
         description: Ensure that the --kubelet-certificate-authority argument is set
           as appropriate (Automated)
@@ -793,11 +801,12 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Follow the Kubernetes documentation and setup the TLS connection
-          between the apiserver and kubelets. Then, edit the API server pod specification
-          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
-          set the -- kubelet-certificate-authority parameter to the path to the cert
-          file for the certificate authority. --kubelet-certificate-authority=<ca-string>
+        remediation: |
+          By default, RKE2 automatically provides the kubelet CA cert file, at /var/lib/rancher/rke2/server/tls/server-ca.crt.
+          If for some reason you need to provide your own ca certificate, look at using the rke2 certificate command line tool.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "kubelet-certificate-authority=<path/to/ca-cert-file>"
       - id: K.1.2.6
         description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
           (Automated)
@@ -817,9 +826,11 @@ groups:
           else
               pass "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --authorization-mode parameter to values
-          other than AlwaysAllow . One such example could be as below. --authorization-mode=RBAC
+        remediation: |
+          By default, RKE2 does not set the --authorization-mode to AlwaysAllow.
+          If this check fails, edit RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines like below.
+          kube-apiserver-arg:
+            - "authorization-mode=AlwaysAllow"
       - id: K.1.2.7
         description: Ensure that the --authorization-mode argument includes Node (Automated)
         type: master
@@ -838,9 +849,10 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --authorization-mode parameter to a value
-          that includes Node . --authorization-mode=Node,RBAC
+        remediation: |
+          By default, RKE2 sets the --authorization-mode to Node and RBAC.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml,
+          ensure that you are not overriding authorization-mode.
       - id: K.1.2.8
         description: Ensure that the --authorization-mode argument includes RBAC (Automated)
         type: master
@@ -859,9 +871,10 @@ groups:
           else
               warn "$check"
           fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --authorization-mode parameter to a value
-          that includes RBAC, for example:--authorization-mode=Node,RBAC
+        remediation: |
+          By default, RKE2 sets the --authorization-mode to Node and RBAC.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml,
+          ensure that you are not overriding authorization-mode.
       - id: K.1.2.9
         description: Ensure that the admission control plugin EventRateLimit is set
           (Manual)
@@ -880,10 +893,12 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Follow the Kubernetes documentation and set the desired limits
-          in a configuration file. Then, edit the API server pod specification file
-          /etc/kubernetes/manifests/kube-apiserver.yaml and set the below parameters.  --enable-admission-plugins=...,EventRateLimit,...
-          --admission-control-config-file=<path/to/configuration/file>
+        remediation: |
+          Follow the Kubernetes documentation and set the desired limits in a configuration file.
+          Then, edit the RKE2 config file /etc/rancher/rke2/config.yaml and set the below parameters.
+          kube-apiserver-arg:
+            - "enable-admission-plugins=...,EventRateLimit,..."
+            - "admission-control-config-file=<path/to/configuration/file>"
       - id: K.1.2.10
         description: Ensure that the admission control plugin AlwaysAdmit is not set
           (Automated)
@@ -902,9 +917,11 @@ groups:
           else
               pass "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and either remove the --enable-admission-plugins parameter,
-          or set it to a value that does not include AlwaysAdmit.
+        remediation: |
+          By default, RKE2 does not set the --enable-admission-plugins to AlwaysAdmit.
+          If this check fails, edit RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines like below.
+          kube-apiserver-arg:
+            - "enable-admission-plugins=AlwaysAdmit"
       - id: K.1.2.11
         description: Ensure that the admission control plugin AlwaysPullImages is
           set (Manual)
@@ -923,9 +940,15 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --enable-admission-plugins parameter to include
-          AlwaysPullImages.  --enable-admission-plugins=...,AlwaysPullImages,...
+        remediation: |
+          Permissive, per CIS guidelines,
+          "This setting could impact offline or isolated clusters, which have images pre-loaded and
+          do not have access to a registry to pull in-use images. This setting is not appropriate for
+          clusters which use this configuration."
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml
+          on the control plane node and set the --enable-admission-plugins parameter to include
+          AlwaysPullImages.
+          --enable-admission-plugins=...,AlwaysPullImages,...
       - id: K.1.2.12
         description: Ensure that the admission control plugin SecurityContextDeny
           is set if PodSecurityPolicy is not used (Manual)
@@ -939,18 +962,10 @@ groups:
           PCI: []
         audit: |
           check="$id  - $description"
-          if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'PodSecurityPolicy' >/dev/null 2>&1; then
-              pass "$check"
-          else
-            if get_argument_value "$CIS_APISERVER_CMD" '--enable-admission-plugins'| grep 'SecurityContextDeny' >/dev/null 2>&1; then
-              pass "$check"
-            else
-              warn "$check"
-            fi
-          fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --enable-admission-plugins parameter to include
-          SecurityContextDeny, unless PodSecurityPolicy is already in place.  --enable-admission-plugins=...,SecurityContextDeny,...
+          pass "$check"      
+        remediation: |
+          Not Applicable.
+          Enabling Pod Security Policy is no longer supported on RKE2 v1.25+ and will cause applications to unexpectedly fail.
       - id: K.1.2.13
         description: Ensure that the admission control plugin ServiceAccount is set
           (Automated)
@@ -969,10 +984,12 @@ groups:
           else
               pass "$check"
           fi        
-        remediation: Follow the documentation and create ServiceAccount objects as
-          per your environment. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and ensure that the --disable-admission-plugins parameter
-          is set to a value that does not include ServiceAccount.
+        remediation: |
+          By default, RKE2 does not set the --disable-admission-plugins to anything.
+          Follow the documentation and create ServiceAccount objects as per your environment.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "disable-admission-plugins=ServiceAccount"
       - id: K.1.2.14
         description: Ensure that the admission control plugin NamespaceLifecycle is
           set (Automated)
@@ -991,9 +1008,11 @@ groups:
           else
               pass "$check"
           fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --disable-admission-plugins parameter to
-          ensure it does not include NamespaceLifecycle.
+        remediation: |
+          By default, RKE2 does not set the --disable-admission-plugins to anything.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "disable-admission-plugins=...,NamespaceLifecycle,..."
       - id: K.1.2.15
         description: Ensure that the admission control plugin NodeRestriction is set
           (Automated)
@@ -1012,10 +1031,12 @@ groups:
           else
               warn "$check"
           fi
-        remediation: Follow the Kubernetes documentation and configure NodeRestriction
-          plug-in on kubelets. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --enable-admission-plugins parameter to a
-          value that includes NodeRestriction. --enable-admission-plugins=...,NodeRestriction,...
+        remediation: |
+          By default, RKE2 sets the --enable-admission-plugins to NodeRestriction.
+          Check the RKE2 config file /etc/rancher/rke2/config.yaml, and ensure that you are not overriding the admission plugins.
+          If you are, include NodeRestriction in the list.
+          kube-apiserver-arg:
+            - "enable-admission-plugins=...,NodeRestriction,..."
       - id: K.1.2.16
         description: Ensure that the --profiling argument is set to false (Automated)
         type: master
@@ -1031,8 +1052,11 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the below parameter. --profiling=false
+        remediation: |
+          By default, RKE2 sets the --profiling argument to false.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "profiling=true"
       - id: K.1.2.17
         description: Ensure that the --audit-log-path argument is set (Automated)
         type: master
@@ -1050,10 +1074,13 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --audit-log-path parameter to a suitable
-          path and file where you would like audit logs to be written, for example:
-          --audit-log-path=/var/log/apiserver/audit.log'
+        remediation: |
+          By default, RKE2 sets the --audit-log-path argument to /var/lib/rancher/rke2/server/logs/audit.log
+          If you want to change this, edit the RKE2 config file /etc/rancher/rke2/config.yaml
+          on the control plane node and set the --audit-log-path parameter to a suitable path and
+          file where you would like audit logs to be written, for example,
+          kube-apiserver-arg:
+            - "audit-log-path=/var/log/rke2/audit.log"
       - id: K.1.2.18
         description: Ensure that the --audit-log-maxage argument is set to 30 or as
           appropriate (Automated)
@@ -1079,9 +1106,12 @@ groups:
           else
               warn "$check"
           fi 
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --audit-log-maxage parameter to 30 or as
-          an appropriate number of days: --audit-log-maxage=30'
+        remediation: |
+          By default, RKE2 sets the --audit-log-maxage argument to 30 days.
+          If you want to change this, edit the RKE2 config file /etc/rancher/rke2/config.yaml
+          on the control plane node and set the --audit-log-maxage parameter to an appropriate number of days, for example,
+          kube-apiserver-arg:
+            - "audit-log-maxage=40"
       - id: K.1.2.19
         description: Ensure that the --audit-log-maxbackup argument is set to 10 or
           as appropriate (Automated)
@@ -1107,9 +1137,13 @@ groups:
           else
               warn "$check"
           fi
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --audit-log-maxbackup parameter to 10 or
-          to an appropriate value. --audit-log-maxbackup=10
+        remediation: |
+          By default, RKE2 sets the --audit-log-maxbackup argument to 10.
+          If you want to change this, edit the RKE2 config file /etc/rancher/rke2/config.yaml
+          on the control plane node and set the --audit-log-maxbackup parameter to an appropriate value.
+          For example,
+          kube-apiserver-arg:
+            - "audit-log-maxbackup=15"
       - id: K.1.2.20
         description: Ensure that the --audit-log-maxsize argument is set to 100 or
           as appropriate (Automated)
@@ -1135,12 +1169,16 @@ groups:
           else
               warn "$check"
           fi
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --audit-log-maxsize parameter to an appropriate
-          size in MB. For example, to set it as 100 MB: --audit-log-maxsize=100'
+        remediation: |
+          By default, RKE2 sets the --audit-log-maxsize argument to 100 MB.
+          If you want to change this, edit the RKE2 config file /etc/rancher/rke2/config.yaml
+          on the control plane node and set the --audit-log-maxsize parameter to an appropriate size in MB.
+          For example,
+          kube-apiserver-arg:
+            - "audit-log-maxsize=150"
       - id: K.1.2.21
         description: Ensure that the --request-timeout argument is set as appropriate
-          (Manual)
+          (Automated)
         type: master
         category: kubernetes
         scored: true
@@ -1156,8 +1194,13 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          and set the below parameter as appropriate and if needed. For example, --request-timeout=300s
+        remediation: |
+          Permissive, per CIS guidelines,
+          "it is recommended to set this limit as appropriate and change the default limit of 60 seconds only if needed".
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml
+          and set the below parameter if needed. For example,
+          kube-apiserver-arg:
+            - "request-timeout=300s"
       - id: K.1.2.22
         description: Ensure that the --service-account-lookup argument is set to true
           (Automated)
@@ -1177,8 +1220,13 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the below parameter. --service-account-lookup=true
+        remediation: |
+          By default, RKE2 does not set the --service-account-lookup argument.
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml and set the service-account-lookup. For example,
+          kube-apiserver-arg:
+            - "service-account-lookup=true"
+          Alternatively, you can delete the service-account-lookup parameter from this file so
+          that the default takes effect.
       - id: K.1.2.23
         description: Ensure that the --service-account-key-file argument is set as
           appropriate (Automated)
@@ -1201,9 +1249,12 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --service-account-key-file parameter to the
-          public key file for service accounts: --service-account-key-file=<filename>'
+        remediation: |
+          RKE2 automatically generates and sets the service account key file.
+          It is located at /var/lib/rancher/rke2/server/tls/service.key.
+          If this check fails, edit RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "service-account-key-file=<path>"
       - id: K.1.2.24
         description: Ensure that the --etcd-certfile and --etcd-keyfile arguments
           are set as appropriate (Automated)
@@ -1233,11 +1284,13 @@ groups:
           else
               warn "$check"
           fi
-        remediation: Follow the Kubernetes documentation and set up the TLS connection
-          between the apiserver and etcd. Then, edit the API server pod specification
-          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
-          set the etcd certificate and key file parameters.  --etcd-certfile=<path/to/client-certificate-file>
-          --etcd-keyfile=<path/to/client-key-file>
+        remediation: |
+          RKE2 automatically generates and sets the etcd certificate and key files.
+          They are located at /var/lib/rancher/rke2/server/tls/etcd/client.crt and /var/lib/rancher/rke2/server/tls/etcd/client.key.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "etcd-certfile=<path>"
+            - "etcd-keyfile=<path>"
       - id: K.1.2.25
         description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
           are set as appropriate (Automated)
@@ -1267,10 +1320,13 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Follow the Kubernetes documentation and set up the TLS connection
-          on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the TLS certificate and private key file parameters.
-          --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key-file=<path/to/tls-key-file>
+        remediation: |
+          By default, RKE2 automatically generates and provides the TLS certificate and private key for the apiserver.
+          They are generated and located at /var/lib/rancher/rke2/server/tls/serving-kube-apiserver.crt and /var/lib/rancher/rke2/server/tls/serving-kube-apiserver.key
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "tls-cert-file=<path>"
+            - "tls-private-key-file=<path>"
       - id: K.1.2.26
         description: Ensure that the --client-ca-file argument is set as appropriate
           (Automated)
@@ -1293,9 +1349,13 @@ groups:
           else
               warn "$check"
           fi
-        remediation: Follow the Kubernetes documentation and set up the TLS connection
-          on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the client certificate authority file. --client-ca-file=<path/to/client-ca-file>
+        remediation: |
+          By default, RKE2 automatically provides the client certificate authority file.
+          It is generated and located at /var/lib/rancher/rke2/server/tls/client-ca.crt.
+          If for some reason you need to provide your own ca certificate, look at using the rke2 certificate command line tool.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "client-ca-file=<path>"
       - id: K.1.2.27
         description: Ensure that the --etcd-cafile argument is set as appropriate
           (Automated)
@@ -1318,13 +1378,16 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Follow the Kubernetes documentation and set up the TLS connection
-          between the apiserver and etcd. Then, edit the API server pod specification
-          file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
-          set the etcd certificate authority file parameter. --etcd-cafile=<path/to/ca-file>
+        remediation: |
+          By default, RKE2 automatically provides the etcd certificate authority file.
+          It is generated and located at /var/lib/rancher/rke2/server/tls/client-ca.crt.
+          If for some reason you need to provide your own ca certificate, look at using the rke2 certificate command line tool.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-apiserver-arg:
+            - "etcd-cafile=<path>"
       - id: K.1.2.28
         description: Ensure that the --encryption-provider-config argument is set
-          as appropriate (Manual)
+          as appropriate (Automated)
         type: master
         category: kubernetes
         scored: false
@@ -1336,18 +1399,18 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config'| grep 'EncryptionConfig' >/dev/null 2>&1; then
+          if get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config=' >/dev/null 2>&1; then
               pass "$check"
           else
               warn "$check"
           fi     
-        remediation: 'Follow the Kubernetes documentation and configure a EncryptionConfig
-          file. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
-          on the master node and set the --encryption-provider-config parameter to
-          the path of that file: --encryption-provider-config=</path/to/EncryptionConfig/File>'
+        remediation: |
+          RKE2 always is configured to encrypt secrets.
+          Secrets encryption is managed with the rke2 secrets-encrypt command line tool.
+          If needed, you can find the generated encryption config at /var/lib/rancher/rke2/server/cred/encryption-config.json
       - id: K.1.2.29
         description: Ensure that encryption providers are appropriately configured
-          (Manual)
+          (Automated)
         type: master
         category: kubernetes
         scored: false
@@ -1360,24 +1423,31 @@ groups:
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--encryption-provider-config' >/dev/null 2>&1; then
-              encryptionConfig=$(get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config')
+              encryptionConfig=$(get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config') 
+              encryptionConfig=$(append_prefix "$CONFIG_PREFIX" "$encryptionConfig")
+
               if [ -f "$encryptionConfig" ]; then
-                if [ $(grep -c "\- aescbc:\|\- kms:\|\- secretbox:" $encryptionConfig) -ne 0 ]; then
+                if [ $(grep -c '"providers":\[.*\("aescbc"\|"kms"\|"secretbox"\)' $encryptionConfig) -ne 0 ]; then
                   pass "$check"
                 else
                   warn "$check"
+                  warn "      * encryption provider is not aescbc, kms, or secretbox in $encryptionConfig"
                 fi
               else
                 warn "$check"
+                warn "      * encryption-provider-config not found, expected: $encryptionConfig"
               fi
           else
               warn "$check"
+              warn "      * encryption-provider-config: not found"
           fi        
-        remediation: Follow the Kubernetes documentation and configure a EncryptionConfig
-          file. In this file, choose aescbc, kms or secretbox as the encryption provider.
+        remediation: |
+          RKE2 always is configured to use the aescbc encryption provider to encrypt secrets.
+          Secrets encryption is managed with the rke2 secrets-encrypt command line tool.
+          If needed, you can find the generated encryption config at /var/lib/rancher/rke2/server/cred/encryption-config.json
       - id: K.1.2.30
         description: Ensure that the API Server only makes use of Strong Cryptographic
-          Ciphers (Manual)
+          Ciphers (Automated)
         type: master
         category: kubernetes
         scored: false
@@ -1401,20 +1471,11 @@ groups:
               warn "$check"
           fi        
         remediation: |
-          Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the Control Plane node and set the below parameter.
-          --tls-cipher-suites=TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384,
-          TLS_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-          TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-          TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-          TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-          TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-          TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-          TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-          TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-          TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-          TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_RSA_WITH_3DES_EDE_CBC_SHA,
-          TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_128_GCM_SHA256,
-          TLS_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_256_GCM_SHA384.
+          By default, the RKE2 kube-apiserver complies with this test. Changes to these values may cause regression, therefore ensure that all apiserver clients support the new TLS configuration before applying it in production deployments.
+          If a custom TLS configuration is required, consider also creating a custom version of this rule that aligns with your requirements.
+          If this check fails, remove any custom configuration around `tls-cipher-suites` or update the /etc/rancher/rke2/config.yaml file to match the default by adding the following:
+          kube-apiserver-arg:
+          - "tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
   - id: 1.3
     title: 1.3 - Controller Manager
     checks:
@@ -1438,9 +1499,12 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: 'Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node and set the --terminated-pod-gc-threshold to an appropriate
-          threshold, for example: --terminated-pod-gc-threshold=10'
+        remediation: |
+          By default, RKE2 sets a terminated-pod-gc-threshold of 1000.
+          If you need to change this value, edit the RKE2 config file /etc/rancher/rke2/config.yaml on the control plane node
+          and set the --terminated-pod-gc-threshold to an appropriate threshold,
+          kube-controller-manager-arg:
+            - "terminated-pod-gc-threshold=10"
       - id: K.1.3.2
         description: Ensure that the --profiling argument is set to false (Automated)
         type: master
@@ -1456,8 +1520,11 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node and set the below parameter. --profiling=false
+        remediation: |
+          By default, RKE2 sets the --profiling argument to false.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-controller-manager-arg:
+            - "profiling=true"
       - id: K.1.3.3
         description: Ensure that the --use-service-account-credentials argument is
           set to true (Automated)
@@ -1477,8 +1544,11 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node to set the below parameter. --use-service-account-credentials=true
+        remediation: |
+          By default, RKE2 sets the --use-service-account-credentials argument to true.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-controller-manager-arg:
+            - "use-service-account-credentials=false"
       - id: K.1.3.4
         description: Ensure that the --service-account-private-key-file argument is
           set as appropriate (Automated)
@@ -1501,9 +1571,12 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node and set the --service-account-privat-key-file parameter
-          to the private key file for service accounts. --service-account-private-key-file=<filename>
+        remediation: |
+          By default, RKE2 automatically provides the service account private key file.
+          It is generated and located at /var/lib/rancher/rke2/server/tls/service.current.key.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-controller-manager-arg:
+            - "service-account-private-key-file=<path>"
       - id: K.1.3.5
         description: Ensure that the --root-ca-file argument is set as appropriate
           (Automated)
@@ -1526,9 +1599,13 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node and set the --root-ca-file parameter to the certificate
-          bundle file`. --root-ca-file=<path/to/file>
+        remediation: |
+          By default, RKE2 automatically provides the root CA file.
+          It is generated and located at /var/lib/rancher/rke2/server/tls/server-ca.crt.
+          If for some reason you need to provide your own ca certificate, look at using the rke2 certificate command line tool.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-controller-manager-arg:
+            - "root-ca-file=<path>"
       - id: K.1.3.6
         description: Ensure that the RotateKubeletServerCertificate argument is set
           to true (Automated)
@@ -1554,9 +1631,12 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node and set the --feature-gates parameter to include RotateKubeletServerCertificate=true.
-          --feature-gates=RotateKubeletServerCertificate=true
+        remediation: |
+          By default, RKE2 does not set the RotateKubeletServerCertificate feature gate.
+          If you have enabled this feature gate, you should remove it.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines like below.
+          kube-controller-manager-arg:
+            - "feature-gate=RotateKubeletServerCertificate"
       - id: K.1.3.7
         description: Ensure that the --bind-address argument is set to 127.0.0.1 (Automated)
         type: master
@@ -1572,8 +1652,11 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
-          on the master node and ensure the correct value for the --bind-address parameter.
+        remediation: |
+          By default, RKE2 sets the --bind-address argument to 127.0.0.1
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-controller-manager-arg:
+            - "bind-address=<IP>"
   - id: 1.4
     title: 1.4 - Scheduler
     checks:
@@ -1592,8 +1675,11 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml
-          file on the master node and set the below parameter. --profiling=false
+        remediation: |
+          By default, RKE2 sets the --profiling argument to false.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-scheduler-arg:
+            - "profiling=true"
       - id: K.1.4.2
         description: Ensure that the --bind-address argument is set to 127.0.0.1 (Automated)
         type: master
@@ -1609,5 +1695,8 @@ groups:
           else
               warn "$check"
           fi        
-        remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml
-          on the master node and ensure the correct value for the --bind-address parameter
+        remediation: |
+          By default, RKE2 sets the --bind-address argument to 127.0.0.1
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
+          kube-scheduler-arg:
+            - "bind-address=<IP>"

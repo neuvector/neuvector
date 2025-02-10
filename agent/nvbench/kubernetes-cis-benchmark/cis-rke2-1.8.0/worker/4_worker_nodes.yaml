@@ -1,4 +1,4 @@
-version: cis-1.8
+version: cis-rke2-1.8.0
 id: 4
 title: 4 - Worker Nodes
 type: node
@@ -20,29 +20,10 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          kubeadm=$(append_prefix "$CONFIG_PREFIX" "/etc/systemd/system/kubelet.service.d/kubeadm.conf")
-          kubeadm10=$(append_prefix "$CONFIG_PREFIX" "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf")
-          if [ -f $kubeadm ]; then
-              # kops
-              file=$kubeadm
-          else
-              file=$kubeadm10
-          fi
-
-          if [ -f "$file" ]; then
-            permissions=$(stat -c %a $file)
-            if [ "$permissions" -eq 600 -o "$permissions" -eq 400 ]; then
-              pass "$check"
-            else
-              warn "$check"
-              warn "      * Wrong permissions for $file, expected 600 or less, but is $permissions"
-            fi
-          else
-            warn "$check"
-            warn "      * The kubelet service file not found, $file"
-          fi
-        remediation: Run the below command (based on the file location on your system)
-          on the each worker node. For example, chmod 600 /etc/systemd/system/kubelet.service.d/kubeadm.conf
+          pass "$check"
+        remediation: |
+          Not Applicable.
+          The kubelet is managed by the RKE2 process. There is no kubelet service file, all configuration is passed in as arguments at runtime.
       - id: K.4.1.2
         description: Ensure that the kubelet service file ownership is set to root:root
           (Automated)
@@ -57,23 +38,13 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
-            ownership=$(stat -c %u%g $file)
-            if [ "$ownership" = "00" ]; then
-              pass "$check"
-            else
-              warn "$check"
-              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
-            fi
-          else
-            warn "$check"
-            warn "      * The kubelet service file not found, $file"
-          fi
-        remediation: Run the below command (based on the file location on your system)
-          on the each worker node. For example, chown root:root /etc/systemd/system/kubelet.service.d/kubeadm.conf
+          pass "$check"
+        remediation: |
+           Not Applicable.
+           The kubelet is managed by the RKE2 process. There is no kubelet service file, all configuration is passed in as arguments at runtime.
       - id: K.4.1.3
         description: If proxy kubeconfig file exists ensure permissions are set to
-          600 or more restrictive (Manual)
+          600 or more restrictive (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -85,14 +56,11 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=""
-          if check_argument "$CIS_PROXY_CMD" '--kubeconfig' >/dev/null 2>&1; then
-              file=$(get_argument_value "$CIS_PROXY_CMD" '--kubeconfig'|cut -d " " -f 1)
-          fi
+          file="/var/lib/rancher/rke2/agent/kubeproxy.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
           if [ -f "$file" ]; then
             permissions=$(stat -c %a $file)
-            if [ "$permissions" -eq 600 -o "$permissions" -eq 400 ]; then
+            if [ "$permissions" -le 600 ]; then
               pass "$check"
             else
               warn "$check"
@@ -100,13 +68,13 @@ groups:
             fi
           else
             warn "$check"
-            warn "      * The kubeconfig file not found, $file"
+            warn "      * kubeconfig file not found, $file"
           fi        
         remediation: Run the below command (based on the file location on your system)
-          on the each worker node. For example, chmod 600 <proxy kubeconfig file>
+          on the each worker node. For example, chmod 600 /var/lib/rancher/rke2/agent/kubeproxy.kubeconfig
       - id: K.4.1.4
         description: If proxy kubeconfig file exists ensure ownership is set to root:root
-          (Manual)
+          (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -128,11 +96,10 @@ groups:
             fi
           else
             warn "$check"
-            warn "      * The kubeconfig file not found, $file"
+            warn "      * kubeconfig file not found, $file"
           fi        
         remediation: Run the below command (based on the file location on your system)
-          on the each worker node. For example, chown root:root <proxy kubeconfig
-          file>
+          on the each worker node. For example, chown root:root /var/lib/rancher/rke2/agent/kubeproxy.kubeconfig
       - id: K.4.1.5
         description: Ensure that the --kubeconfig kubelet.conf file permissions are
           set to 600 or more restrictive (Automated)
@@ -147,15 +114,12 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file=""
-          if check_argument "$CIS_KUBELET_CMD" '--kubeconfig' >/dev/null 2>&1; then
-              file=$(get_argument_value "$CIS_KUBELET_CMD" '--kubeconfig'|cut -d " " -f 1)
-          fi
+          file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
           if [ -f "$file" ]; then
             permissions=$(stat -c %a $file)
-            if [ "$permissions" -eq 600 -o "$permissions" -eq 400 ]; then
+            if [ "$permissions" -le 600 ]; then
               pass "$check"
             else
               warn "$check"
@@ -163,10 +127,10 @@ groups:
             fi
           else
             warn "$check"
-            warn "      * The kubeconfig file not found, $file"
+            warn "      * File not found, $file"
           fi        
         remediation: Run the below command (based on the file location on your system)
-          on the each worker node. For example, chmod 600 /etc/kubernetes/kubelet.conf
+          on the each worker node. For example, chmod 600 /var/lib/rancher/rke2/agent/kubelet.kubeconfig
       - id: K.4.1.6
         description: Ensure that the --kubeconfig kubelet.conf file ownership is set
           to root:root (Automated)
@@ -191,13 +155,13 @@ groups:
             fi
           else
             warn "$check"
-            warn "      * The kubeconfig file not found, $file"
+            warn "      * File not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the each worker node. For example, chown root:root /etc/kubernetes/kubelet.conf
+          on the each worker node. For example, chown root:root /var/lib/rancher/rke2/agent/kubelet.kubeconfig
       - id: K.4.1.7
         description: Ensure that the certificate authorities file permissions are
-          set to 600 or more restrictive (Manual)
+          set to 600 or more restrictive (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -209,31 +173,25 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
-            file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
-            file=$(append_prefix "$CONFIG_PREFIX" "$file")
-            if [ -f "$file" ]; then
-              permissions=$(stat -c %a $file)
-              if [ "$permissions" -le 600 ]; then
-                pass "$check"
-                pass "      * client-ca-file: $file"
-              else
-                warn "$check"
-                  warn "      * Wrong permissions for $file, expected 600 or less, but is $permissions"
-              fi
+          file="/var/lib/rancher/rke2/agent/client-ca.crt"
+          if [ -f "$file" ]; then
+            permissions=$(stat -c %a $file)
+            if [ "$permissions" -le 600 ]; then
+              pass "$check"
+              pass "      * client-ca-file: $file"
             else
               warn "$check"
-              warn "      * The client-ca-file not found, $file"
+              warn "      * Wrong permissions for $file, expected 600 or less, but is $permissions"
             fi
           else
             warn "$check"
-            warn "      * --client-ca-file not set"
+            warn "      * File not found, $file"
           fi
         remediation: Run the following command to modify the file permissions of the
-          --client-ca-file chmod 600 <filename>
+          --client-ca-file chmod 600 /var/lib/rancher/rke2/agent/client-ca.crt
       - id: K.4.1.8
         description: Ensure that the client certificate authorities file ownership
-          is set to root:root (Manual)
+          is set to root:root (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -259,7 +217,7 @@ groups:
               fi
             else
               warn "$check"
-              warn "      * The client-ca-file not found, $file"
+              warn "      * File not found, $file"
             fi
           else
             warn "$check"
@@ -268,7 +226,7 @@ groups:
         remediation: Run the following command to modify the ownership of the --client-ca-file.
           chown root:root <filename>
       - id: K.4.1.9
-        description: if the kubelet config.yaml configuration file is being used validate
+        description: If the kubelet config.yaml configuration file is being used validate
           permissions set to 600 or more restrictive (Automated)
         type: worker
         category: kubernetes
@@ -281,28 +239,10 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
-            file=$(get_argument_value "$CIS_KUBELET_CMD" '--config')
-            file=$(append_prefix "$CONFIG_PREFIX" "$file")
-            if [ -f "$file" ]; then
-              permissions=$(stat -c %a $file)
-              if [ "$permissions" -le 600 ]; then
-                pass "$check"
-                pass "      * kubelet configuration file: $file"
-              else
-                warn "$check"
-                warn "      * Wrong permissions for $file, expected 600 or less, but is $permissions"
-              fi
-            else
-              warn "$check"
-              warn "      * The kubelet configuration file not found, $file"
-            fi
-          else
-            warn "$check"
-            warn "      * kubelet configuration file not set"
-          fi
-        remediation: Run the following command (using the config file location identied
-          in the Audit step) chmod 600 /var/lib/kubelet/config.yaml
+          pass "$check"
+        remediation: |          
+          Not Applicable.
+          The kubelet is managed by the RKE2 process. There is no kubelet config file, all configuration is passed in as arguments at runtime.
       - id: K.4.1.10
         description: If the kubelet config.yaml configuration file is being used validate
           file ownership is set to root:root (Automated)
@@ -317,28 +257,10 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--config' >/dev/null 2>&1; then
-            file=$(get_argument_value "$CIS_KUBELET_CMD" '--config')
-            file=$(append_prefix "$CONFIG_PREFIX" "$file")
-            if [ -f "$file" ]; then
-              ownership=$(stat -c %u%g $file)
-              if [ "$ownership" = "00" ]; then
-                pass "$check"
-                pass "      * kubelet configuration file: $file"
-              else
-                warn "$check"
-                warn "      * Wrong ownership for $file"
-              fi
-            else
-              warn "$check"
-              warn "      * The kubelet configuration file not found, $file"
-            fi
-          else
-            warn "$check"
-            warn "      * kubelet configuration file not set"
-          fi
-        remediation: Run the following command (using the config file location identied
-          in the Audit step) chown root:root /etc/kubernetes/kubelet.conf
+          pass "$check"
+        remediation: |
+          Not Applicable.
+          The kubelet is managed by the RKE2 process. There is no kubelet config file, all configuration is passed in as arguments at runtime.
   - id: 4.2
     title: 4.2 - Kubelet
     checks:
@@ -361,12 +283,12 @@ groups:
               warn "$check"
           fi
         remediation: |
-          If using a Kubelet config file, edit the file to set authentication: anonymous: enabled to false.
-          If using executable arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.        
-          --anonymous-auth=false
-          Based on your system, restart the kubelet service. For example:   
-          systemctl daemon-reload 
-          systemctl restart kubelet.service                   
+          By default, RKE2 sets the --anonymous-auth to false.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines similar to below.
+          kubelet-arg:
+            - "anonymous-auth=true"
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service         
       - id: K.4.2.2
         description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
           (Automated)
@@ -387,12 +309,12 @@ groups:
               pass "$check"
           fi
         remediation: |
-          If using a Kubelet config file, edit the file to set authorization: mode to Webhook.
-          If using executable arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable.        
-          --authorization-mode=Webhook
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload 
-          systemctl restart kubelet.service
+          By default, RKE2 does not set the --authorization-mode to AlwaysAllow.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines similar to below.
+          kubelet-arg:
+            - "authorization-mode=AlwaysAllow"
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.3
         description: Ensure that the --client-ca-file argument is set as appropriate
           (Automated)
@@ -416,14 +338,10 @@ groups:
               warn "$check"
           fi        
         remediation: |
-          If using a Kubelet config file, edit the file to set authentication: x509: clientCAFile to the location of the client CA file.
-          If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameter in KUBELET_AUTHZ_ARGS variable.
-          --client-ca-file=<path/to/client-ca-file>
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload
-          systemctl restart kubelet.service
+          By default, RKE2 automatically provides the client ca certificate for the Kubelet.
+          It is generated and located at /var/lib/rancher/rke2/agent/client-ca.crt
       - id: K.4.2.4
-        description: Verify that the --read-only-port argument is set to 0 (Manual)
+        description: Verify that the --read-only-port argument is set to 0 (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -447,12 +365,12 @@ groups:
               warn "$check"
           fi        
         remediation: |
-          If using a Kubelet config file, edit the file to set readOnlyPort to 0.
-          If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
-          --read-only-port=0
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload
-          systemctl restart kubelet.service
+          By default, RKE2 sets the --read-only-port to 0. If you have set this to a different value, you
+          should set it back to 0. Edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines similar to below.
+          kubelet-arg:
+            - "read-only-port=XXXX"
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.5
         description: Ensure that the --streaming-connection-idle-timeout argument
           is not set to 0 (Manual)
@@ -472,12 +390,11 @@ groups:
               pass "$check"
           fi        
         remediation: |
-          If using a Kubelet config file, edit the file to set streamingConnectionIdleTimeout to a value other than 0. 
-          If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
-          --streaming-connection-idle-timeout=5m
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload 
-          systemctl restart kubelet.service
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
+          kubelet-arg:
+            - "streaming-connection-idle-timeout=5m"
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.6
         description: Ensure that the --make-iptables-util-chains argument is set to
           true (Automated)
@@ -495,13 +412,14 @@ groups:
               warn "$check"
           fi        
         remediation: |
-          If using a Kubelet config file, edit the file to set makeIPTablesUtilChains: true. 
-          If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and remove the --mak-iptables-util-chains argument from the KUBELET_SYSTEM_PODS_ARGS variable. 
-          Based on your system, restart the kubelet service. For example:        
-          systemctl daemon-reload 
-          systemctl restart kubelet.service
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter.
+          kubelet-arg:
+            - "make-iptables-util-chains=true"
+          Or, remove the --make-iptables-util-chains argument to let RKE2 use the default value.
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.7
-        description: Ensure that the --hostname-override argument is not set (Manual)
+        description: Ensure that the --hostname-override argument is not set (Automated)
         type: worker
         category: kubernetes
         scored: false
@@ -515,10 +433,10 @@ groups:
           else
               pass "$check"
           fi        
-        remediation: 'Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-          on each worker node and remove the --hostname-override argument from the
-          KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet
-          service. For example:  systemctl daemon-reload systemctl restart kubelet.service'
+        remediation: |
+          Not Applicable.
+          By default, RKE2 does set the --hostname-override argument. Per CIS guidelines, this is to comply
+          with cloud providers that require this flag to ensure that hostname matches node names.
       - id: K.4.2.8
         description: Ensure that the eventRecordQPS argument is set to a level which
           ensures appropriate event capture (Manual)
@@ -542,15 +460,15 @@ groups:
               warn "$check"
               warn "      * --event-qps is not set"
           fi        
-        remediation: 'If using a Kubelet config file, edit the file to set eventRecordQPS:
-          to an appropriate level. If using command line arguments, edit the kubelet
-          service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each
-          worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
-          Based on your system, restart the kubelet service. For example:  systemctl
-          daemon-reload systemctl restart kubelet.service'
+        remediation: |
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
+          kubelet-arg:
+            - "event-qps=<value>"
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.9
         description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
-          are set as appropriate (Manual)
+          are set as appropriate (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -578,12 +496,12 @@ groups:
               warn "$check"
           fi        
         remediation: |
-          If using a Kubelet config file, edit the file to set tlsCertFile to the location of the certificate file to use to identify this Kubelet, and tlsPrivateKeyFile to the location of the corresponding private key file. 
-          If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameters in KUBELET_CERTIFICATE_ARGS variable.  
-          --tls-cert-file=<path/to/tls-certificate-file> --tls-private-key-file=<path/to/tls-key-file> 
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload 
-          systemctl restart kubelet.service                    
+          By default, RKE2 automatically provides the TLS certificate and private key for the Kubelet.
+          They are generated and located at /var/lib/rancher/rke2/agent/serving-kubelet.crt and /var/lib/rancher/rke2/agent/serving-kubelet.key
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines similar to below.
+          kubelet-arg:
+            - "tls-cert-file=<path/to/tls-cert-file>"
+            - "tls-private-key-file=<path/to/tls-private-key-file>"            
       - id: K.4.2.10
         description: Ensure that the --rotate-certificates argument is not set to
           false (Automated)
@@ -604,14 +522,13 @@ groups:
             pass "$check"
           fi        
         remediation: |
-          If using a Kubelet config file, edit the file to add the line rotateCertificates: true or remove it altogether to use the default value.
-          If using command line arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and remove --rotat-certificates=false argument from the KUBELET_CERTIFICATE_ARGS variable.
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload 
-          systemctl restart kubelet.service 
+          By default, RKE2 does not set the --rotate-certificates argument.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any rotate-certificates parameter.
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.11
         description: Verify that the RotateKubeletServerCertificate argument is set
-          to true (Manual)
+          to true (Automated)
         type: worker
         category: kubernetes
         scored: true
@@ -623,20 +540,20 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+          file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=true/p' $file)
-          if [ -z "$found" ]; then
+          found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=false/p' $file)
+          if [ "$found" ]; then
               warn "$check"
+              warn "      * RotateKubeletServerCertificate should be: true, but is: false"
           else
               pass "$check"
           fi
         remediation: |
-          Edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the below parameter in KUBELET_CERTIFICATE_ARGS variable.
-          --feature-gates=RotateKubeletServerCertificate=true
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload
-          systemctl restart kubelet.service
+          By default, RKE2 does not set the RotateKubeletServerCertificate feature gate.
+          If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any RotateKubeletServerCertificate parameter.
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
       - id: K.4.2.12
         description: Ensure that the Kubelet only makes use of Strong Cryptographic
           Ciphers (Manual)
@@ -682,13 +599,12 @@ groups:
               pass "$check"
           fi
         remediation: |
-          If using a Kubelet config file, edit the file to set TLSCipherSuites: to TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 ,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 ,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
-          ,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256 or to a subset of these values.   
-          If using executable arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the --tls-cipher-suites parameter as follows, or to a subset of these values.                 
-          --tls-ciphe-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256
-          Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload 
-          systemctl restart kubelet.service     
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml,
+          kubelet-arg:
+            - "tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+          or to a subset of these values.
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service     
       - id: K.4.2.13
         description: Ensure that a limit is set on pod PIDs (Manual)
         type: worker
@@ -701,6 +617,9 @@ groups:
           check="$id  - $description"
           manual "$check"
           manual "      * Review the Kubelet's start-up parameters for the value of --pod-max-pids, and check the Kubelet configuration file for the PodPidsLimit . If neither of these values is set, then there is no limit in place."   
-        remediation: Decide on an appropriate level for this parameter and set it,
-          either via the --pod-max-pids command line parameter or the PodPidsLimit
-          configuration file setting.
+        remediation: |
+          Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
+          kubelet-arg:
+            - "pod-max-pids=<value>"
+          Based on your system, restart the RKE2 service. For example,
+          systemctl restart rke2-server.service
