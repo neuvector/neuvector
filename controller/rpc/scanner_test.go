@@ -125,17 +125,28 @@ func TestRemoveScanner(t *testing.T) {
 
 	// Remove non exist scanner
 	err = mockScannerMgr.RemoveScanner("not exist id")
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, expectedRemainingSignals, actualSignals, "creditPool should be drained correctly after removing a scanner")
-	assert.Equal(t, mockScannerCount-2, len(mockScannerMgr.scannerLoadBalancer.activeScanners), "activeScanners should be updated")
-	assert.Equal(t, mockScannerCount-2, mockScannerMgr.scannerLoadBalancer.heap.Len(), "heap should be updated")
+	assert.Equal(t, mockScannerCount-2, len(mockScannerMgr.scannerLoadBalancer.activeScanners), "activeScanners value in consistent")
+	assert.Equal(t, mockScannerCount-2, mockScannerMgr.scannerLoadBalancer.heap.Len(), "heap value in consistent")
 	verifyActiveScanners(t, mockScannerMgr, mockScannerCount-2, expectedRemainingSignals)
 
-	// Remove all
-	for _, s := range mockScanners {
-		err := mockScannerMgr.RemoveScanner(s.ID)
-		assert.Nil(t, err)
+	// Remove the last scanner
+	for i := 0; i < mockScannerCount; i++ {
+		err := mockScannerMgr.RemoveScanner(mockScannerIDs[i])
+		// invariant: remove the first two scanners should be fail
+		if i > 1 {
+			assert.Nil(t, err)
+		} else {
+			// invariant: remove the first two scanners should be fail, since we remove the scanner before
+			assert.NotNil(t, err)
+			actualSignals = len(mockScannerMgr.creditPool)
+			assert.Equal(t, expectedRemainingSignals, actualSignals, "creditPool should be drained correctly after removing a scanner")
+			assert.Equal(t, mockScannerCount-2, len(mockScannerMgr.scannerLoadBalancer.activeScanners), "activeScanners value in consistent")
+			assert.Equal(t, mockScannerCount-2, mockScannerMgr.scannerLoadBalancer.heap.Len(), "heap value in consistent")
+			verifyActiveScanners(t, mockScannerMgr, mockScannerCount-2, expectedRemainingSignals)
+		}
 	}
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, 0, actualSignals, "creditPool should be drained correctly after removing a scanner")
