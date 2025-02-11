@@ -279,6 +279,7 @@ func main() {
 	scanJobFailRetryMax := flag.Int("scan_job_fail_retry_max", 5, "Maximum retry attempts for failed scan jobs")
 	staleScanJobCleanupIntervalHour := flag.Int("stale_scan_job_cleanup_interval_hour", 1, "Interval (in hours) for cleaning up stale scan jobs")
 	repoScanLongPollTimeout := flag.Int("repo_scan_long_poll_timeout", 30, "Timeout for long polling repository scan jobs")
+	maxScannerLimitPerNode := flag.Int("max_scanner_limit_per_node", 128, "Maximum number of scanner tasks per node")
 	flag.Parse()
 
 	// default log_level is LogLevel_Info
@@ -978,7 +979,7 @@ func main() {
 	rest.CrdValidateReqManager()
 
 	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
-	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks)
+	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks, *maxScannerLimitPerNode)
 
 	// start rest server
 	go rest.StartRESTServer(

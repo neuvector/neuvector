@@ -373,9 +373,9 @@ type longpollManyMgr struct {
 	jobs                       map[interface{}]*longpollManyJob
 }
 
-func NewLongPollManyMgr(timeout, linger time.Duration, max, maxConcurrentRepoScanTasks int) *longpollManyMgr {
+func NewLongPollManyMgr(timeout, linger time.Duration, maxConcurrentRepoScanTasks int) *longpollManyMgr {
 	return &longpollManyMgr{
-		max:                        max,
+		max:                        maxConcurrentRepoScanTasks,
 		timeout:                    timeout,
 		linger:                     linger,
 		maxConcurrentRepoScanTasks: maxConcurrentRepoScanTasks,
