@@ -471,9 +471,9 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 	}
 
-	// defer os.Remove(masterScriptSh)
-	// defer os.Remove(workerScriptSh)
-	// defer os.Remove(journalScriptSh)
+	defer os.Remove(masterScriptSh)
+	defer os.Remove(workerScriptSh)
+	defer os.Remove(journalScriptSh)
 
 	var errMaster, errWorker error
 	var out []byte
