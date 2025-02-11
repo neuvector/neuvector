@@ -94,7 +94,8 @@ func TestRemoveScanner(t *testing.T) {
 	mockScannerMgr.scannerLoadBalancer.activeScanners[mockScannerIDs[0]].availableScanCredits--
 
 	// Remove the first scanner
-	mockScannerMgr.RemoveScanner(mockScannerIDs[0])
+	err := mockScannerMgr.RemoveScanner(mockScannerIDs[0])
+	assert.Nil(t, err)
 
 	// Verify that the scanner is removed
 	_, exists := mockScannerMgr.scannerLoadBalancer.activeScanners[mockScannerIDs[0]]
@@ -110,7 +111,8 @@ func TestRemoveScanner(t *testing.T) {
 	actualSignals := len(mockScannerMgr.creditPool)
 	assert.Equal(t, expectedRemainingSignals, actualSignals, "creditPool should be drained correctly after removing a scanner")
 
-	mockScannerMgr.RemoveScanner(mockScannerIDs[1])
+	err = mockScannerMgr.RemoveScanner(mockScannerIDs[1])
+	assert.Nil(t, err)
 	// Remove scanner[1]
 	// Init signals: maxConns * (mockScannerCount-1) = 3 * 2 = 6
 	// After removing the scanner -> expected remaining = maxConns * (mockScannerCount - 2) = 3 * 1 = 3
@@ -122,7 +124,8 @@ func TestRemoveScanner(t *testing.T) {
 	verifyActiveScanners(t, mockScannerMgr, mockScannerCount-2, expectedRemainingSignals)
 
 	// Remove non exist scanner
-	mockScannerMgr.RemoveScanner("not exist id")
+	err = mockScannerMgr.RemoveScanner("not exist id")
+	assert.Nil(t, err)
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, expectedRemainingSignals, actualSignals, "creditPool should be drained correctly after removing a scanner")
 	assert.Equal(t, mockScannerCount-2, len(mockScannerMgr.scannerLoadBalancer.activeScanners), "activeScanners should be updated")
@@ -131,7 +134,8 @@ func TestRemoveScanner(t *testing.T) {
 
 	// Remove all
 	for _, s := range mockScanners {
-		mockScannerMgr.RemoveScanner(s.ID)
+		err := mockScannerMgr.RemoveScanner(s.ID)
+		assert.Nil(t, err)
 	}
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, 0, actualSignals, "creditPool should be drained correctly after removing a scanner")
@@ -296,7 +300,8 @@ func TestLargeScaleScannerManagement(t *testing.T) {
 
 	// Cleanup: Remove all scanners
 	for _, id := range mockScannerIDs {
-		mockScannerMgr.RemoveScanner(id)
+		err := mockScannerMgr.RemoveScanner(id)
+		assert.Nil(t, err)
 	}
 
 	// Verify all scanners are removed
@@ -309,7 +314,7 @@ func TestLargeScaleScannerManagement(t *testing.T) {
 	assert.Equal(t, 0, actualSignals, "creditPool should have no remaining signals after all removals")
 }
 
-func addScannersConcurrently(t *testing.T, mgr *ScanCreditManager, scanners []*share.CLUSScanner, done chan struct{}) {
+func addScannersConcurrently(mgr *ScanCreditManager, scanners []*share.CLUSScanner, done chan struct{}) {
 	var wg sync.WaitGroup
 	wg.Add(len(scanners))
 
@@ -365,14 +370,15 @@ func releaseScannersConcurrently(mgr *ScanCreditManager, scanners []string, done
 	close(done)
 }
 
-func removeScannersConcurrently(mgr *ScanCreditManager, scannerIDs []string, done chan struct{}) {
+func removeScannersConcurrently(t *testing.T, mgr *ScanCreditManager, scannerIDs []string, done chan struct{}) {
 	var wg sync.WaitGroup
 	wg.Add(len(scannerIDs))
 
 	for _, id := range scannerIDs {
 		go func(scannerID string) {
 			defer wg.Done()
-			mgr.RemoveScanner(scannerID)
+			err := mgr.RemoveScanner(scannerID)
+			assert.Nil(t, err)
 		}(id)
 	}
 
@@ -394,7 +400,7 @@ func TestConcurrentScannerManagement(t *testing.T) {
 
 	firstBatchSize := mockScannerCount / 2
 
-	addScannersConcurrently(t, mockScannerMgr, mockScanners[:firstBatchSize], nil)
+	addScannersConcurrently(mockScannerMgr, mockScanners[:firstBatchSize], nil)
 	verifyActiveScanners(t, mockScannerMgr, firstBatchSize, firstBatchSize*maxConns)
 
 	numAcquisitions := firstBatchSize * maxConns
@@ -411,8 +417,8 @@ func TestConcurrentScannerManagement(t *testing.T) {
 	addDone := make(chan struct{})
 	removeDone := make(chan struct{})
 	go releaseScannersConcurrently(mockScannerMgr, acquiredScanners, releaseDone)
-	go addScannersConcurrently(t, mockScannerMgr, mockScanners[firstBatchSize:], addDone)
-	go removeScannersConcurrently(mockScannerMgr, mockScannerIDs[:firstBatchSize], removeDone)
+	go addScannersConcurrently(mockScannerMgr, mockScanners[firstBatchSize:], addDone)
+	go removeScannersConcurrently(t, mockScannerMgr, mockScannerIDs[:firstBatchSize], removeDone)
 
 	// Wait for both operations to complete
 	<-releaseDone
@@ -427,7 +433,7 @@ func TestConcurrentScannerManagement(t *testing.T) {
 	}
 
 	// remove the remaining scanners
-	removeScannersConcurrently(mockScannerMgr, mockScannerIDs[firstBatchSize:], nil)
+	removeScannersConcurrently(t, mockScannerMgr, mockScannerIDs[firstBatchSize:], nil)
 	// Verify all scanners are removed
 	verifyActiveScanners(t, mockScannerMgr, 0, 0)
 

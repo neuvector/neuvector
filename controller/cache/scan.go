@@ -1169,7 +1169,10 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 			delete(scannerCacheMap, id)
 			cacheMutexUnlock()
 
-			rpc.ScanCreditMgr.RemoveScanner(id)
+			err := rpc.ScanCreditMgr.RemoveScanner(id)
+			if err != nil {
+				log.WithError(err).Warn("failed to remove scanner from reg scheduler")
+			}
 			if err := scan.RemoveScanner(id); err != nil {
 				log.WithError(err).Warn("failed to remove scanner from reg scheduler")
 			}

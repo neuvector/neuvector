@@ -48,7 +48,8 @@ func TestLoadBalancerReleaseScanCredit(t *testing.T) {
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
 	mgr.RegisterScanner(scanner, 2)
-	mgr.ReleaseScanCredit(scanner.ID)
+	err := mgr.ReleaseScanCredit(scanner.ID)
+	assert.Nil(t, err)
 
 	assert.Equal(t, 3, mgr.activeScanners["scanner1"].availableScanCredits)
 }
@@ -58,12 +59,13 @@ func TestLoadBalancerAcquireScanCredit(t *testing.T) {
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
 	mgr.RegisterScanner(scanner, 2)
-	mgr.AcquireScanCredit(scanner.ID)
+	err := mgr.AcquireScanCredit(scanner.ID)
+	assert.Nil(t, err)
 
 	assert.Equal(t, 1, mgr.activeScanners["scanner1"].availableScanCredits)
 
 	// Try decreasing below zero (should fail)
-	err := mgr.AcquireScanCredit(scanner.ID)
+	err = mgr.AcquireScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
 	err = mgr.AcquireScanCredit(scanner.ID) // Now at -1
