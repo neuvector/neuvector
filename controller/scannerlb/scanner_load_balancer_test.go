@@ -1,4 +1,4 @@
-package rpc
+package scannerlb
 
 import (
 	"testing"
@@ -10,8 +10,8 @@ import (
 func TestNewScannerLoadBalancer(t *testing.T) {
 	lb := NewScannerLoadBalancer()
 	assert.NotNil(t, lb)
-	assert.Equal(t, 0, lb.heap.Len())
-	assert.Equal(t, 0, len(lb.activeScanners))
+	assert.Equal(t, 0, lb.Heap.Len())
+	assert.Equal(t, 0, len(lb.ActiveScanners))
 }
 
 func TestRegisterScanner(t *testing.T) {
@@ -20,9 +20,9 @@ func TestRegisterScanner(t *testing.T) {
 
 	lb.RegisterScanner(scanner, 2)
 
-	assert.Equal(t, 1, lb.heap.Len())
-	assert.Equal(t, 1, len(lb.activeScanners))
-	assert.Equal(t, 2, lb.activeScanners["scanner1"].availableScanCredits)
+	assert.Equal(t, 1, lb.Heap.Len())
+	assert.Equal(t, 1, len(lb.ActiveScanners))
+	assert.Equal(t, 2, lb.ActiveScanners["scanner1"].AvailableScanCredits)
 }
 
 func TestUnregisterScanner(t *testing.T) {
@@ -33,9 +33,9 @@ func TestUnregisterScanner(t *testing.T) {
 	scannerEntry, err := lb.UnregisterScanner(scanner.ID)
 
 	assert.Nil(t, err)
-	assert.Equal(t, 0, lb.heap.Len())
-	assert.Equal(t, 0, len(lb.activeScanners))
-	assert.Equal(t, scanner, scannerEntry.scanner)
+	assert.Equal(t, 0, lb.Heap.Len())
+	assert.Equal(t, 0, len(lb.ActiveScanners))
+	assert.Equal(t, scanner, scannerEntry.Scanner)
 
 	// Try removing again (should fail)
 	scannerEntry, err = lb.UnregisterScanner(scanner.ID)
@@ -51,7 +51,7 @@ func TestLoadBalancerReleaseScanCredit(t *testing.T) {
 	err := lb.ReleaseScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
-	assert.Equal(t, 3, lb.activeScanners["scanner1"].availableScanCredits)
+	assert.Equal(t, 3, lb.ActiveScanners["scanner1"].AvailableScanCredits)
 }
 
 func TestLoadBalancerAcquireScanCredit(t *testing.T) {
@@ -62,7 +62,7 @@ func TestLoadBalancerAcquireScanCredit(t *testing.T) {
 	err := lb.AcquireScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
-	assert.Equal(t, 1, lb.activeScanners["scanner1"].availableScanCredits)
+	assert.Equal(t, 1, lb.ActiveScanners["scanner1"].AvailableScanCredits)
 
 	// Try decreasing below zero (should fail)
 	err = lb.AcquireScanCredit(scanner.ID)
@@ -110,6 +110,6 @@ func TestPickLeastLoadedScanner(t *testing.T) {
 		pickedScanner, err := lb.PickLeastLoadedScanner()
 		assert.Nil(t, err)
 		assert.Equal(t, step.expectedID, pickedScanner.ID)
-		assert.Equal(t, step.expectedCreditAfter, lb.activeScanners[step.expectedID].availableScanCredits)
+		assert.Equal(t, step.expectedCreditAfter, lb.ActiveScanners[step.expectedID].AvailableScanCredits)
 	}
 }
