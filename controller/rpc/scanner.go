@@ -24,12 +24,12 @@ type ScanCreditManager struct {
 var ScanCreditMgr *ScanCreditManager
 var acquireScanCreditTimeout = time.Minute * 3
 
-func NewScanCreditManager(maxConns, maxScannerLimitPerNode int) *ScanCreditManager {
+func NewScanCreditManager(maxConns, scannerLBMax int) *ScanCreditManager {
 	return &ScanCreditManager{
 		scannerLoadBalancer: NewScannerLoadBalancer(),
 		maxConns:            maxConns,
-		// maxScannerLimitPerNode*(maxConns+1) ensures that the creditPool channel has sufficient capacity to handle task signals without blocking.
-		creditPool: make(chan struct{}, maxScannerLimitPerNode*(maxConns+1)),
+		// scanLBMax*(maxConns+1) ensures that the creditPool channel has sufficient capacity to handle task signals without blocking.
+		creditPool: make(chan struct{}, scannerLBMax*(maxConns+1)),
 	}
 }
 

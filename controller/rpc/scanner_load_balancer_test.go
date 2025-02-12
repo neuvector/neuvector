@@ -8,92 +8,92 @@ import (
 )
 
 func TestNewScannerLoadBalancer(t *testing.T) {
-	mgr := NewScannerLoadBalancer()
-	assert.NotNil(t, mgr)
-	assert.Equal(t, 0, mgr.heap.Len())
-	assert.Equal(t, 0, len(mgr.activeScanners))
+	lb := NewScannerLoadBalancer()
+	assert.NotNil(t, lb)
+	assert.Equal(t, 0, lb.heap.Len())
+	assert.Equal(t, 0, len(lb.activeScanners))
 }
 
 func TestRegisterScanner(t *testing.T) {
-	mgr := NewScannerLoadBalancer()
+	lb := NewScannerLoadBalancer()
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
-	mgr.RegisterScanner(scanner, 2)
+	lb.RegisterScanner(scanner, 2)
 
-	assert.Equal(t, 1, mgr.heap.Len())
-	assert.Equal(t, 1, len(mgr.activeScanners))
-	assert.Equal(t, 2, mgr.activeScanners["scanner1"].availableScanCredits)
+	assert.Equal(t, 1, lb.heap.Len())
+	assert.Equal(t, 1, len(lb.activeScanners))
+	assert.Equal(t, 2, lb.activeScanners["scanner1"].availableScanCredits)
 }
 
 func TestUnregisterScanner(t *testing.T) {
-	mgr := NewScannerLoadBalancer()
+	lb := NewScannerLoadBalancer()
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
-	mgr.RegisterScanner(scanner, 2)
-	scannerEntry, err := mgr.UnregisterScanner(scanner.ID)
+	lb.RegisterScanner(scanner, 2)
+	scannerEntry, err := lb.UnregisterScanner(scanner.ID)
 
 	assert.Nil(t, err)
-	assert.Equal(t, 0, mgr.heap.Len())
-	assert.Equal(t, 0, len(mgr.activeScanners))
+	assert.Equal(t, 0, lb.heap.Len())
+	assert.Equal(t, 0, len(lb.activeScanners))
 	assert.Equal(t, scanner, scannerEntry.scanner)
 
 	// Try removing again (should fail)
-	scannerEntry, err = mgr.UnregisterScanner(scanner.ID)
+	scannerEntry, err = lb.UnregisterScanner(scanner.ID)
 	assert.Nil(t, scannerEntry)
 	assert.NotNil(t, err)
 }
 
 func TestLoadBalancerReleaseScanCredit(t *testing.T) {
-	mgr := NewScannerLoadBalancer()
+	lb := NewScannerLoadBalancer()
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
-	mgr.RegisterScanner(scanner, 2)
-	err := mgr.ReleaseScanCredit(scanner.ID)
+	lb.RegisterScanner(scanner, 2)
+	err := lb.ReleaseScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
-	assert.Equal(t, 3, mgr.activeScanners["scanner1"].availableScanCredits)
+	assert.Equal(t, 3, lb.activeScanners["scanner1"].availableScanCredits)
 }
 
 func TestLoadBalancerAcquireScanCredit(t *testing.T) {
-	mgr := NewScannerLoadBalancer()
+	lb := NewScannerLoadBalancer()
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
-	mgr.RegisterScanner(scanner, 2)
-	err := mgr.AcquireScanCredit(scanner.ID)
+	lb.RegisterScanner(scanner, 2)
+	err := lb.AcquireScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
-	assert.Equal(t, 1, mgr.activeScanners["scanner1"].availableScanCredits)
+	assert.Equal(t, 1, lb.activeScanners["scanner1"].availableScanCredits)
 
 	// Try decreasing below zero (should fail)
-	err = mgr.AcquireScanCredit(scanner.ID)
+	err = lb.AcquireScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
-	err = mgr.AcquireScanCredit(scanner.ID) // Now at -1
+	err = lb.AcquireScanCredit(scanner.ID) // Now at -1
 	assert.NotNil(t, err)
 
 	// Try decreasing again (when no scanner)
-	err = mgr.AcquireScanCredit("scanner2")
+	err = lb.AcquireScanCredit("scanner2")
 	assert.NotNil(t, err)
 
 	// Try decreasing again (when no scanner)
-	mgr.RegisterScanner(scanner, 2)
-	scannerEntry, err := mgr.UnregisterScanner(scanner.ID)
+	lb.RegisterScanner(scanner, 2)
+	scannerEntry, err := lb.UnregisterScanner(scanner.ID)
 	assert.Nil(t, err)
 	assert.NotNil(t, scannerEntry)
 
-	err = mgr.AcquireScanCredit(scanner.ID)
+	err = lb.AcquireScanCredit(scanner.ID)
 	assert.NotNil(t, err)
 }
 
 func TestPickLeastLoadedScanner(t *testing.T) {
-	mgr := NewScannerLoadBalancer()
+	lb := NewScannerLoadBalancer()
 	scanner1 := &share.CLUSScanner{ID: "scanner1"}
 	scanner2 := &share.CLUSScanner{ID: "scanner2"}
 	scanner3 := &share.CLUSScanner{ID: "scanner3"}
 
-	mgr.RegisterScanner(scanner1, 2)
-	mgr.RegisterScanner(scanner2, 2) // Scanner2 should be picked first
-	mgr.RegisterScanner(scanner3, 1)
+	lb.RegisterScanner(scanner1, 2)
+	lb.RegisterScanner(scanner2, 2) // Scanner2 should be picked first
+	lb.RegisterScanner(scanner3, 1)
 
 	expectedOrder := []struct {
 		expectedID          string
@@ -107,9 +107,9 @@ func TestPickLeastLoadedScanner(t *testing.T) {
 	}
 
 	for _, step := range expectedOrder {
-		pickedScanner, err := mgr.PickLeastLoadedScanner()
+		pickedScanner, err := lb.PickLeastLoadedScanner()
 		assert.Nil(t, err)
 		assert.Equal(t, step.expectedID, pickedScanner.ID)
-		assert.Equal(t, step.expectedCreditAfter, mgr.activeScanners[step.expectedID].availableScanCredits)
+		assert.Equal(t, step.expectedCreditAfter, lb.activeScanners[step.expectedID].availableScanCredits)
 	}
 }

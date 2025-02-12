@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/google/btree"
 	"github.com/neuvector/neuvector/share"
@@ -27,6 +28,7 @@ type scannerEntry struct {
 
 // ScannerLoadBalancer manages scanner workload using a B-tree heap.
 type ScannerLoadBalancer struct {
+	mutex          sync.RWMutex
 	activeScanners map[string]*scannerEntry
 	heap           *btree.BTree
 }
@@ -47,33 +49,37 @@ func NewScannerLoadBalancer() *ScannerLoadBalancer {
 	}
 }
 
-func (mgr *ScannerLoadBalancer) RegisterScanner(scanner *share.CLUSScanner, availableScanCredits int) {
+func (lb *ScannerLoadBalancer) RegisterScanner(scanner *share.CLUSScanner, availableScanCredits int) {
+	lb.mutex.Lock()
+	defer lb.mutex.Unlock()
 	entry := &scannerEntry{scanner: scanner, availableScanCredits: availableScanCredits}
-	mgr.activeScanners[scanner.ID] = entry
-	mgr.heap.ReplaceOrInsert(entry)
+	lb.activeScanners[scanner.ID] = entry
+	lb.heap.ReplaceOrInsert(entry)
 }
 
-func (mgr *ScannerLoadBalancer) UnregisterScanner(scannerId string) (*scannerEntry, error) {
-	entry, exists := mgr.activeScanners[scannerId]
+func (lb *ScannerLoadBalancer) UnregisterScanner(scannerId string) (*scannerEntry, error) {
+	lb.mutex.Lock()
+	defer lb.mutex.Unlock()
+	entry, exists := lb.activeScanners[scannerId]
 	if !exists {
 		return nil, fmt.Errorf("scanner %s not found", scannerId)
 	}
-	mgr.heap.Delete(entry)
-	delete(mgr.activeScanners, scannerId)
+	lb.heap.Delete(entry)
+	delete(lb.activeScanners, scannerId)
 	return entry, nil
 }
 
-func (mgr *ScannerLoadBalancer) updateScanCredit(scannerId string, delta int) error {
+func (lb *ScannerLoadBalancer) updateScanCredit(scannerId string, delta int) error {
 	if delta == 0 {
 		return fmt.Errorf("delta should not be 0")
 	}
 
-	entry, exists := mgr.activeScanners[scannerId]
+	entry, exists := lb.activeScanners[scannerId]
 	if !exists {
 		return fmt.Errorf("scanner %s not found", scannerId)
 	}
 
-	mgr.heap.Delete(entry) // Remove outdated entry
+	lb.heap.Delete(entry) // Remove outdated entry
 
 	newCredit := entry.availableScanCredits + delta
 	if newCredit < 0 {
@@ -83,30 +89,38 @@ func (mgr *ScannerLoadBalancer) updateScanCredit(scannerId string, delta int) er
 	entry.availableScanCredits = newCredit
 
 	if newCredit > 0 {
-		mgr.heap.ReplaceOrInsert(entry) // Reinsert updated entry
+		lb.heap.ReplaceOrInsert(entry) // Reinsert updated entry
 	}
 
 	return nil
 }
 
-func (mgr *ScannerLoadBalancer) GetActiveScanners() map[string]*scannerEntry {
-	return mgr.activeScanners
+func (lb *ScannerLoadBalancer) GetActiveScanners() map[string]*scannerEntry {
+	lb.mutex.RLock()
+	defer lb.mutex.RUnlock()
+	return lb.activeScanners
 }
 
-func (mgr *ScannerLoadBalancer) ReleaseScanCredit(scannerId string) error {
-	return mgr.updateScanCredit(scannerId, 1)
+func (lb *ScannerLoadBalancer) ReleaseScanCredit(scannerId string) error {
+	lb.mutex.Lock()
+	defer lb.mutex.Unlock()
+	return lb.updateScanCredit(scannerId, 1)
 }
 
-func (mgr *ScannerLoadBalancer) AcquireScanCredit(scannerId string) error {
-	return mgr.updateScanCredit(scannerId, -1)
+// No mutex here, because it's called by PickLeastLoadedScanner, which already has a mutex.
+func (lb *ScannerLoadBalancer) AcquireScanCredit(scannerId string) error {
+	return lb.updateScanCredit(scannerId, -1)
 }
 
-func (mgr *ScannerLoadBalancer) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
-	if mgr.heap.Len() == 0 {
+func (lb *ScannerLoadBalancer) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
+	lb.mutex.Lock()
+	defer lb.mutex.Unlock()
+
+	if lb.heap.Len() == 0 {
 		return nil, fmt.Errorf("no scanner found")
 	}
-	entry := mgr.heap.Max().(*scannerEntry)
-	err := mgr.AcquireScanCredit(entry.scanner.ID)
+	entry := lb.heap.Max().(*scannerEntry)
+	err := lb.AcquireScanCredit(entry.scanner.ID)
 	if err != nil {
 		return nil, err
 	}
