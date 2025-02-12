@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/scannerlb"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 )
@@ -18,7 +19,7 @@ type ScanCreditManager struct {
 	maxConns            int
 	mutex               sync.RWMutex
 	creditPool          chan struct{}
-	scannerLoadBalancer *ScannerLoadBalancer
+	scannerLoadBalancer *scannerlb.ScannerLoadBalancer
 }
 
 var ScanCreditMgr *ScanCreditManager
@@ -26,7 +27,7 @@ var acquireScanCreditTimeout = time.Minute * 3
 
 func NewScanCreditManager(maxConns, scannerLBMax int) *ScanCreditManager {
 	return &ScanCreditManager{
-		scannerLoadBalancer: NewScannerLoadBalancer(),
+		scannerLoadBalancer: scannerlb.NewScannerLoadBalancer(),
 		maxConns:            maxConns,
 		// scanLBMax*(maxConns+1) ensures that the creditPool channel has sufficient capacity to handle task signals without blocking.
 		creditPool: make(chan struct{}, scannerLBMax*(maxConns+1)),
@@ -113,9 +114,9 @@ func (mgr *ScanCreditManager) RemoveScanner(scannerID string) error {
 
 	// endpoint is also the key
 	if scannerEntry != nil {
-		endpoint := mgr.getScannerEndpoint(scannerEntry.scanner)
+		endpoint := mgr.getScannerEndpoint(scannerEntry.Scanner)
 		cluster.DeleteGRPCClient(endpoint)
-		availableSlots := max(0, scannerEntry.availableScanCredits)
+		availableSlots := max(0, scannerEntry.AvailableScanCredits)
 		// Drain availableSlots tokens from creditPool to maintain balance
 		for i := 0; i < availableSlots; i++ {
 			select {
@@ -142,7 +143,7 @@ func (mgr *ScanCreditManager) getScannerServiceClient(sid string, shouldIncremen
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	s, ok := mgr.scannerLoadBalancer.activeScanners[sid]
+	s, ok := mgr.scannerLoadBalancer.ActiveScanners[sid]
 	if !ok {
 		err := fmt.Errorf("scanner not found")
 		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error()
@@ -150,7 +151,7 @@ func (mgr *ScanCreditManager) getScannerServiceClient(sid string, shouldIncremen
 	}
 
 	// endpoint is also the key
-	endpoint := mgr.getScannerEndpoint(s.scanner)
+	endpoint := mgr.getScannerEndpoint(s.Scanner)
 	if cluster.GetGRPCClientEndpoint(endpoint) == "" {
 		if err := cluster.CreateGRPCClient(endpoint, endpoint, true, mgr.createScannerServiceWrapper); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("CreateGRPCClient")
@@ -160,7 +161,7 @@ func (mgr *ScanCreditManager) getScannerServiceClient(sid string, shouldIncremen
 	c, err := cluster.GetGRPCClient(endpoint, nil, nil)
 	if err == nil {
 		if shouldIncrementTask {
-			s.availableScanCredits++
+			s.AvailableScanCredits++
 		}
 		return c.(share.ScannerServiceClient), sid, nil
 	} else {
@@ -176,8 +177,8 @@ func (mgr *ScanCreditManager) getAllAvailableScanners() map[string]share.CLUSSca
 	ret := map[string]share.CLUSScanner{}
 
 	for id, scanner := range mgr.scannerLoadBalancer.GetActiveScanners() {
-		if scanner != nil && scanner.scanner != nil {
-			ret[id] = *scanner.scanner
+		if scanner != nil && scanner.Scanner != nil {
+			ret[id] = *scanner.Scanner
 		}
 	}
 
@@ -189,7 +190,7 @@ func (mgr *ScanCreditManager) CountScanners() (busy, idle uint32) {
 	defer mgr.mutex.RUnlock()
 
 	for _, s := range mgr.scannerLoadBalancer.GetActiveScanners() {
-		if s.availableScanCredits > 0 {
+		if s.AvailableScanCredits > 0 {
 			busy++
 		} else {
 			idle++
