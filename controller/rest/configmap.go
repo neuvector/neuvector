@@ -38,6 +38,7 @@ type configMapHandlerContext struct {
 	subDetail         string
 	alwaysReload      bool // set by each HandlerFunc
 	defAdminLoaded    bool // set only when default admin user is loaded from userinitcfg.yaml
+	acc               *access.AccessControl
 }
 
 var cfgmapRetryTimer *time.Timer
@@ -63,7 +64,10 @@ func handleldapcfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 	context.alwaysReload = rconf.AlwaysReload
 
 	name := "ldap1"
-	accAdmin := access.NewAdminAccessControl()
+	accAdmin := context.acc
+	if accAdmin == nil {
+		accAdmin = access.NewAdminAccessControl()
+	}
 	if !context.gotAllCustomRoles {
 		if roles := clusHelper.GetAllCustomRoles(accAdmin); len(roles) > 0 {
 			cacher.PutCustomRoles(roles)
@@ -120,7 +124,10 @@ func handlesamlcfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 	context.alwaysReload = rconf.AlwaysReload
 
 	name := "saml1"
-	accAdmin := access.NewAdminAccessControl()
+	accAdmin := context.acc
+	if accAdmin == nil {
+		accAdmin = access.NewAdminAccessControl()
+	}
 	if !context.gotAllCustomRoles {
 		if roles := clusHelper.GetAllCustomRoles(accAdmin); len(roles) > 0 {
 			cacher.PutCustomRoles(roles)
@@ -176,7 +183,10 @@ func handleoidccfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 	context.alwaysReload = rconf.AlwaysReload
 
 	name := "openId1"
-	accAdmin := access.NewAdminAccessControl()
+	accAdmin := context.acc
+	if accAdmin == nil {
+		accAdmin = access.NewAdminAccessControl()
+	}
 	if !context.gotAllCustomRoles {
 		if roles := clusHelper.GetAllCustomRoles(accAdmin); len(roles) > 0 {
 			cacher.PutCustomRoles(roles)
@@ -629,7 +639,10 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 	}
 	context.alwaysReload = rconf.AlwaysReload
 
-	accAdmin := access.NewAdminAccessControl()
+	accAdmin := context.acc
+	if accAdmin == nil {
+		accAdmin = access.NewAdminAccessControl()
+	}
 	if !context.gotAllCustomRoles {
 		if roles := clusHelper.GetAllCustomRoles(accAdmin); len(roles) > 0 {
 			cacher.PutCustomRoles(roles)
@@ -800,7 +813,13 @@ func HandleAdminUserUpdate() {
 
 			}
 
-			accAdmin := access.NewAdminAccessControl()
+			membership := clusHelper.GetFedMembership()
+			var accAdmin *access.AccessControl
+			if membership.FedRole == api.FedRoleMaster {
+				accAdmin = access.NewFedAdminAccessControl()
+			} else {
+				accAdmin = access.NewAdminAccessControl()
+			}
 			for _, ruser := range rconf.Users {
 				if ruser == nil || ruser.Fullname != common.DefaultAdminUser {
 					continue
@@ -858,6 +877,12 @@ func LoadInitCfg(load bool, platform string) bool {
 	var context configMapHandlerContext
 
 	context.platform = platform
+	membership := clusHelper.GetFedMembership()
+	if membership.FedRole == api.FedRoleMaster {
+		context.acc = access.NewFedAdminAccessControl()
+	} else {
+		context.acc = access.NewAdminAccessControl()
+	}
 	for _, configMap := range configMaps {
 		// check whether we need to retry loading configmap when it failed in the last loading
 		if tried := cfgmapTried[configMap.Type]; tried >= 6 {
@@ -1052,15 +1077,19 @@ func handlefedcfg(yaml_data []byte) (string, error) {
 					UseProxy:           &rconf.UseProxy,
 					DeployRepoScanData: rconf.DeployRepoScanData,
 				}
-				if _, _, _, err = promoteToMaster(nil, acc, &login, reqData); err == nil {
-					if m := clusHelper.GetFedMembership(); m.FedRole == api.FedRoleMaster {
-						msg = fmt.Sprintf("Successfully set up primary cluster for federation(%s:%d)",
-							rconf.PrimaryRestInfo.Server, rconf.PrimaryRestInfo.Port)
-					}
-				} else {
+				if _, _, _, err = promoteToMaster(nil, acc, &login, reqData); err != nil {
 					log.WithFields(log.Fields{"err": err}).Debug("promote")
 				}
 			}
+		}
+		if err == nil {
+			resultStr := "Failed to"
+			if m := clusHelper.GetFedMembership(); m.FedRole == api.FedRoleMaster {
+				resultStr = "Successfully"
+			}
+			msg = fmt.Sprintf("%s set up primary cluster for federation(%s:%d)",
+				resultStr, rconf.PrimaryRestInfo.Server, rconf.PrimaryRestInfo.Port)
+			access.UpdateUserRoleForFedRoleChange(api.FedRoleMaster)
 		}
 	} else {
 		// to be a managed cluster
@@ -1109,11 +1138,7 @@ func handlefedcfg(yaml_data []byte) (string, error) {
 				}
 				for i := 0; i < 3; i++ {
 					if _, _, _, err = joinFed(nil, acc, &login, reqData); err == nil {
-						if m := clusHelper.GetFedMembership(); m.FedRole == api.FedRoleJoint {
-							msg = fmt.Sprintf("Successfully set up managed cluster(%s:%d) to join federation(primary cluster: %s:%d)",
-								rconf.ManagedRestInfo.Server, rconf.ManagedRestInfo.Port, rconf.PrimaryRestInfo.Server, rconf.PrimaryRestInfo.Port)
-							break
-						}
+						break
 					} else {
 						log.WithFields(log.Fields{"err": err}).Debug("join")
 					}
@@ -1121,11 +1146,34 @@ func handlefedcfg(yaml_data []byte) (string, error) {
 				}
 			}
 		}
+		if err == nil {
+			resultStr := "Failed to"
+			if m := clusHelper.GetFedMembership(); m.FedRole == api.FedRoleJoint {
+				resultStr = "Successfully"
+			}
+			msg = fmt.Sprintf("%s set up managed cluster(%s:%d) to join federation(primary cluster: %s:%d)", resultStr,
+				rconf.ManagedRestInfo.Server, rconf.ManagedRestInfo.Port, rconf.PrimaryRestInfo.Server, rconf.PrimaryRestInfo.Port)
+			access.UpdateUserRoleForFedRoleChange(api.FedRoleNone)
+		}
 	}
-	log.WithFields(log.Fields{"msg": msg, "err": err}).Info()
+	log.WithFields(log.Fields{"msg": msg, "fedOp": fedOp, "err": err}).Info()
 
-	if fedOp != "" && err != nil {
-		err = fmt.Errorf("Failed to %s for federation setup(%s)", fedOp, err.Error())
+	if fedOp != "" {
+		if err != nil {
+			err = fmt.Errorf("Failed to %s for federation setup(%s)", fedOp, err.Error())
+		} else {
+			i := 0
+			for ; i < 12; i++ {
+				if cfgmapTried == nil {
+					// LoadInitCfg() called by main is done, successful or not
+					cfgmapTried = make(map[string]int) // cfg type -> tried times(<0 means no need to retry)
+					LoadInitCfg(true, localDev.Host.Platform)
+					break
+				}
+				time.Sleep(time.Minute)
+			}
+			log.WithFields(log.Fields{"i": i}).Info("reload non-fedinitcfg.yaml configmap")
+		}
 	}
 
 	return msg, err
