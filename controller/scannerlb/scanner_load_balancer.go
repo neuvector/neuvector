@@ -108,7 +108,7 @@ func (lb *ScannerLoadBalancer) ReleaseScanCredit(scannerId string) error {
 }
 
 // No mutex here, because it's called by PickLeastLoadedScanner, which already has a mutex.
-func (lb *ScannerLoadBalancer) AcquireScanCredit(scannerId string) error {
+func (lb *ScannerLoadBalancer) acquireScanCredit(scannerId string) error {
 	return lb.updateScanCredit(scannerId, -1)
 }
 
@@ -120,7 +120,7 @@ func (lb *ScannerLoadBalancer) PickLeastLoadedScanner() (*share.CLUSScanner, err
 		return nil, fmt.Errorf("no scanner found")
 	}
 	entry := lb.Heap.Max().(*ScannerEntry)
-	err := lb.AcquireScanCredit(entry.Scanner.ID)
+	err := lb.acquireScanCredit(entry.Scanner.ID)
 	if err != nil {
 		return nil, err
 	}

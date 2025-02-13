@@ -59,20 +59,20 @@ func TestLoadBalancerAcquireScanCredit(t *testing.T) {
 	scanner := &share.CLUSScanner{ID: "scanner1"}
 
 	lb.RegisterScanner(scanner, 2)
-	err := lb.AcquireScanCredit(scanner.ID)
+	err := lb.acquireScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1, lb.ActiveScanners["scanner1"].AvailableScanCredits)
 
 	// Try decreasing below zero (should fail)
-	err = lb.AcquireScanCredit(scanner.ID)
+	err = lb.acquireScanCredit(scanner.ID)
 	assert.Nil(t, err)
 
-	err = lb.AcquireScanCredit(scanner.ID) // Now at -1
+	err = lb.acquireScanCredit(scanner.ID) // Now at -1
 	assert.NotNil(t, err)
 
 	// Try decreasing again (when no scanner)
-	err = lb.AcquireScanCredit("scanner2")
+	err = lb.acquireScanCredit("scanner2")
 	assert.NotNil(t, err)
 
 	// Try decreasing again (when no scanner)
@@ -81,7 +81,7 @@ func TestLoadBalancerAcquireScanCredit(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, scannerEntry)
 
-	err = lb.AcquireScanCredit(scanner.ID)
+	err = lb.acquireScanCredit(scanner.ID)
 	assert.NotNil(t, err)
 }
 
