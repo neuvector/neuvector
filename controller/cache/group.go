@@ -1017,9 +1017,9 @@ func (m CacheMethod) CreateService(svc *api.RESTServiceConfig, acc *access.Acces
 	}
 
 	cacheMutexLock()
-	defer cacheMutexUnlock()
-
-	if _, ok := groupCacheMap[wlc.learnedGroupName]; ok {
+	_, ok := groupCacheMap[wlc.learnedGroupName]
+	cacheMutexUnlock()
+	if ok {
 		return common.ErrObjectExists
 	}
 
@@ -1383,7 +1383,9 @@ func groupWorkloadJoin(id string, param interface{}) {
 		if isLeader() {
 			if bHasGroupProfile {
 				policyMode, profileMode := getNewServicePolicyMode()
+				cacheMutexUnlock()
 				_ = createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
+				cacheMutexLock()
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				}
@@ -1624,7 +1626,8 @@ func refreshGroupMember(cache *groupCache) {
 	}
 
 	if bHasCustomGroupProfile {
-		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
+		// avoid cacheMutex which was locked by the caller
+		go dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
 	}
 }
 
@@ -2162,9 +2165,7 @@ func domainChange(domain share.CLUSDomain) {
 
 	var groups []*groupCache
 
-	cacheMutexLock()
-	defer cacheMutexUnlock()
-
+	cacheMutexRLock()
 	for _, cache := range groupCacheMap {
 		if utils.IsCustomProfileGroup(cache.group.Name) {
 			for _, crt := range cache.group.Criteria {
@@ -2175,11 +2176,14 @@ func domainChange(domain share.CLUSDomain) {
 			}
 		}
 	}
+	cacheMutexRUnlock()
 
 	// For every workload, re-calculate its membership
 	dptLearnedGrpAdds := utils.NewSet()
 	for _, cache := range groups {
-		cache.members.Clear() // reset
+		cache.members.Clear()     // reset
+		dptLearnedGrpAdds.Clear() // reset
+		cacheMutexLock()
 		for _, wlc := range wlCacheMap {
 			if !wlc.workload.Running {
 				continue
@@ -2193,6 +2197,8 @@ func domainChange(domain share.CLUSDomain) {
 				wlc.groups.Remove(cache.group.Name)
 			}
 		}
+		cacheMutexUnlock()
+		// avoid cacheMutex
 		dispatchHelper.CustomGroupUpdate(cache.group.Name, dptLearnedGrpAdds, isLeader())
 	}
 }
