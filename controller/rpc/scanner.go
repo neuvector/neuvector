@@ -10,112 +10,204 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/scannerlb"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 )
 
-type scannerAct struct {
-	scanner  *share.CLUSScanner
-	scanning uint32
+type ScanCreditManager struct {
+	maxConns            int
+	mutex               sync.RWMutex
+	creditPool          chan struct{}
+	scannerLoadBalancer *scannerlb.ScannerLoadBalancer
 }
 
-var scanners map[string]*scannerAct = make(map[string]*scannerAct)
-var scanMutex sync.RWMutex
+var ScanCreditMgr *ScanCreditManager
+var acquireScanCreditTimeout = time.Minute * 3
 
-func AddScanner(scanner *share.CLUSScanner) {
-	scanMutex.Lock()
-	defer scanMutex.Unlock()
-	scanners[scanner.ID] = &scannerAct{scanner: scanner}
-}
-
-func RemoveScanner(scannerID string) {
-	scanMutex.Lock()
-	s, ok := scanners[scannerID]
-	if ok {
-		delete(scanners, scannerID)
+func NewScanCreditManager(maxConns, scannerLBMax int) *ScanCreditManager {
+	return &ScanCreditManager{
+		scannerLoadBalancer: scannerlb.NewScannerLoadBalancer(),
+		maxConns:            maxConns,
+		// scanLBMax*(maxConns+1) ensures that the creditPool channel has sufficient capacity to handle task signals without blocking.
+		creditPool: make(chan struct{}, scannerLBMax*(maxConns+1)),
 	}
-	scanMutex.Unlock()
+}
+
+func (mgr *ScanCreditManager) decScanningCount(sid string) {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	err := mgr.scannerLoadBalancer.ReleaseScanCredit(sid)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error()
+	}
+}
+
+func (mgr *ScanCreditManager) releaseScanCredit(sid string) {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	err := mgr.scannerLoadBalancer.ReleaseScanCredit(sid)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error()
+	} else {
+		mgr.signalScanCredit()
+	}
+}
+
+// acquireScanCredit continuously checks for an available scanner with fewer active tasks than the maximum allowed.
+// It locks the ScanCreditManager's mutex to safely access the activeScanners map and iterates through the scanners.
+// If it finds a scanner with active tasks less than the maximum connections (maxConns), it increments the active task count,
+// unlocks the mutex, and returns the scanner's ID. If no scanner is available, it waits for a signal on the creditPool channel
+// indicating that a scanner has become available.
+func (mgr *ScanCreditManager) acquireScanCredit() (string, error) {
+	for {
+		// Wait for a scanner to become available or timeout to avoid indefinite blocking
+		select {
+		case <-mgr.creditPool:
+			mgr.mutex.Lock()
+			defer mgr.mutex.Unlock()
+
+			// Use a heap to find the scanner with the least active tasks
+			scanner, err := mgr.scannerLoadBalancer.PickLeastLoadedScanner()
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PickLeastLoadedScanner")
+				return "", err
+			}
+			return scanner.ID, nil
+		case <-time.After(acquireScanCreditTimeout):
+			log.Debug("No scanner available, retrying...")
+		}
+	}
+}
+
+func (mgr *ScanCreditManager) signalScanCredit() {
+	select {
+	case mgr.creditPool <- struct{}{}:
+		// Singal the pending task
+	default:
+		// Signal already pending, do not block
+	}
+}
+
+func (mgr *ScanCreditManager) AddScanner(scanner *share.CLUSScanner) {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+	mgr.scannerLoadBalancer.RegisterScanner(scanner, mgr.maxConns)
+
+	// Signal availability for this scanner's maximum allowed connections
+	for i := 0; i < mgr.maxConns; i++ {
+		mgr.signalScanCredit()
+	}
+}
+
+func (mgr *ScanCreditManager) RemoveScanner(scannerID string) error {
+	mgr.mutex.Lock()
+	scannerEntry, err := mgr.scannerLoadBalancer.UnregisterScanner(scannerID)
+	mgr.mutex.Unlock()
+
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "scanner": scannerID}).Error()
+		return err
+	}
 
 	// endpoint is also the key
-	if s != nil {
-		endpoint := getScannerEndpoint(s.scanner)
+	if scannerEntry != nil {
+		endpoint := mgr.getScannerEndpoint(scannerEntry.Scanner)
 		cluster.DeleteGRPCClient(endpoint)
+		availableSlots := max(0, scannerEntry.AvailableScanCredits)
+		// Drain availableSlots tokens from creditPool to maintain balance
+		for i := 0; i < availableSlots; i++ {
+			select {
+			case <-mgr.creditPool:
+				// Successfully drained one slot
+			default:
+				// No more slots to drain;
+			}
+		}
 	}
+	return err
 }
 
-func getScannerEndpoint(scanner *share.CLUSScanner) string {
+func (mgr *ScanCreditManager) getScannerEndpoint(scanner *share.CLUSScanner) string {
 	return fmt.Sprintf("%s:%v", scanner.RPCServer, scanner.RPCServerPort)
 }
 
-func createScannerServiceWrapper(conn *grpc.ClientConn) cluster.Service {
+func (mgr *ScanCreditManager) createScannerServiceWrapper(conn *grpc.ClientConn) cluster.Service {
 	return share.NewScannerServiceClient(conn)
 }
 
-func decScanningCount(sid string) {
-	scanMutex.RLock()
-	defer scanMutex.RUnlock()
+// shouldIncrementTask not apply for Ping, if the acquireScanCredit is called by ScanImage should be true
+func (mgr *ScanCreditManager) getScannerServiceClient(sid string, shouldIncrementTask bool) (share.ScannerServiceClient, string, error) {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
 
-	s, ok := scanners[sid]
-	if ok && s.scanning > 0 {
-		s.scanning--
-	}
-}
-
-func getScannerServiceClient(sid string, forScan bool) (share.ScannerServiceClient, error) {
-	scanMutex.RLock()
-	defer scanMutex.RUnlock()
-
-	s, ok := scanners[sid]
+	s, ok := mgr.scannerLoadBalancer.ActiveScanners[sid]
 	if !ok {
-		err := fmt.Errorf("Scanner not found")
+		err := fmt.Errorf("scanner not found")
 		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error()
-		return nil, err
+		return nil, sid, err
 	}
 
 	// endpoint is also the key
-	endpoint := getScannerEndpoint(s.scanner)
+	endpoint := mgr.getScannerEndpoint(s.Scanner)
 	if cluster.GetGRPCClientEndpoint(endpoint) == "" {
-		if err := cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper); err != nil {
+		if err := cluster.CreateGRPCClient(endpoint, endpoint, true, mgr.createScannerServiceWrapper); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("CreateGRPCClient")
 		}
 	}
 
 	c, err := cluster.GetGRPCClient(endpoint, nil, nil)
 	if err == nil {
-		if forScan {
-			s.scanning++
+		if shouldIncrementTask {
+			s.AvailableScanCredits++
 		}
-		return c.(share.ScannerServiceClient), nil
+		return c.(share.ScannerServiceClient), sid, nil
 	} else {
 		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error("Failed to connect to grpc server")
-		return nil, err
+		return nil, sid, err
 	}
 }
 
-func getAllAvailabeScanners() map[string]share.CLUSScanner {
-	scanMutex.RLock()
-	defer scanMutex.RUnlock()
+func (mgr *ScanCreditManager) getAllAvailableScanners() map[string]share.CLUSScanner {
+	mgr.mutex.RLock()
+	defer mgr.mutex.RUnlock()
 
 	ret := map[string]share.CLUSScanner{}
 
-	for id, scanner := range scanners {
-		if scanner != nil && scanner.scanner != nil {
-			ret[id] = *scanner.scanner
+	for id, scanner := range mgr.scannerLoadBalancer.GetActiveScanners() {
+		if scanner != nil && scanner.Scanner != nil {
+			ret[id] = *scanner.Scanner
 		}
 	}
 
 	return ret
 }
 
+func (mgr *ScanCreditManager) CountScanners() (busy, idle uint32) {
+	mgr.mutex.RLock()
+	defer mgr.mutex.RUnlock()
+
+	for _, s := range mgr.scannerLoadBalancer.GetActiveScanners() {
+		if s.AvailableScanCredits > 0 {
+			busy++
+		} else {
+			idle++
+		}
+	}
+	return busy, idle
+}
+
 // This function performs a task on all scanners.
 // This would take a while if the task is time-consuming.
-func RunTaskForEachScanner(cb func(share.ScannerServiceClient) error) error {
-	activeScanners := getAllAvailabeScanners()
+func (mgr *ScanCreditManager) RunTaskForEachScanner(cb func(share.ScannerServiceClient) error) error {
+	activeScanners := mgr.getAllAvailableScanners()
 
 	for id, scanner := range activeScanners {
-		endpoint := getScannerEndpoint(&scanner)
+		endpoint := mgr.getScannerEndpoint(&scanner)
 		if cluster.GetGRPCClientEndpoint(endpoint) == "" {
-			if err := cluster.CreateGRPCClient(endpoint, endpoint, true, createScannerServiceWrapper); err != nil {
+			if err := cluster.CreateGRPCClient(endpoint, endpoint, true, mgr.createScannerServiceWrapper); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("CreateGRPCClient")
 			}
 		}
@@ -131,44 +223,8 @@ func RunTaskForEachScanner(cb func(share.ScannerServiceClient) error) error {
 	return nil
 }
 
-// scanner can handle multiple requests at a time. It's OK not to check then schedule without lock.
-func getAvaliableScanner() string {
-	var s *scannerAct
-
-	scanMutex.RLock()
-	defer scanMutex.RUnlock()
-
-	// first try to find the idle scanner
-	for _, s = range scanners {
-		if s.scanning == 0 {
-			return s.scanner.ID
-		}
-	}
-
-	// then locate any scanner
-	for _, s = range scanners {
-		return s.scanner.ID
-	}
-
-	return ""
-}
-
-func CountScanners() (busy, idle uint32) {
-	scanMutex.RLock()
-	defer scanMutex.RUnlock()
-
-	for _, s := range scanners {
-		if s.scanning > 0 {
-			busy++
-		} else {
-			idle++
-		}
-	}
-	return busy, idle
-}
-
 func Ping(scanner string, timeout time.Duration) error {
-	client, err := getScannerServiceClient(scanner, false)
+	client, _, err := ScanCreditMgr.getScannerServiceClient(scanner, false)
 	if err != nil {
 		return err
 	}
@@ -183,20 +239,23 @@ func Ping(scanner string, timeout time.Duration) error {
 func ScanRunning(scanner string, agentID, id string, objType share.ScanObjectType, timeout time.Duration) (*share.ScanResult, error) {
 	ep := findEnforcerServerEndpoint(agentID)
 	if ep == "" {
-		return nil, fmt.Errorf("Cannot find enforcer endpoint")
+		return nil, fmt.Errorf("cannot find enforcer endpoint")
 	}
 
-	client, err := getScannerServiceClient(scanner, true)
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, true)
+	defer ScanCreditMgr.decScanningCount(scanner)
 	if err != nil {
 		return nil, err
 	}
-	defer decScanningCount(scanner)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	result, err := client.ScanRunning(ctx, &share.ScanRunningRequest{
-		Type: objType, ID: id, AgentID: agentID, AgentRPCEndPoint: ep,
+		Type:             objType,
+		ID:               id,
+		AgentID:          agentID,
+		AgentRPCEndPoint: ep,
 	})
 
 	clusHelper := kv.GetClusterHelper()
@@ -208,11 +267,11 @@ func ScanRunning(scanner string, agentID, id string, objType share.ScanObjectTyp
 }
 
 func ScanPlatform(scanner string, k8sVersion, ocVersion string, timeout time.Duration) (*share.ScanResult, error) {
-	client, err := getScannerServiceClient(scanner, true)
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, true)
+	defer ScanCreditMgr.decScanningCount(scanner)
 	if err != nil {
 		return nil, err
 	}
-	defer decScanningCount(scanner)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -256,21 +315,36 @@ func ScanPlatform(scanner string, k8sVersion, ocVersion string, timeout time.Dur
 }
 
 func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest) (*share.ScanResult, error) {
+	shouldIncrementTask := true
+	hasAcquiredScanner := false
+
+	// When scanner is empty, it indicates that the CI plugins are calling the scan.
+	// In this case, we set shouldIncrementTask to false to avoid double counting.
 	if scanner == "" {
-		// This happens when called by ci/cd scan from the REST
-		scanner = getAvaliableScanner()
-		if scanner == "" {
-			err := fmt.Errorf("No scanner available")
-			log.WithFields(log.Fields{"error": err}).Error()
+		var err error
+		scanner, err = ScanCreditMgr.acquireScanCredit()
+		if err != nil {
 			return nil, err
 		}
+		shouldIncrementTask = false
+		hasAcquiredScanner = true
 	}
 
-	client, err := getScannerServiceClient(scanner, true)
+	// Ensure that resources are properly released or task counts are decremented when the function exits
+	defer func() {
+		if hasAcquiredScanner {
+			// Release the scanner slot back to the availability channel
+			ScanCreditMgr.releaseScanCredit(scanner)
+		} else {
+			// Decrement the active task count for the scanner
+			ScanCreditMgr.decScanningCount(scanner)
+		}
+	}()
+
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, shouldIncrementTask)
 	if err != nil {
 		return nil, err
 	}
-	defer decScanningCount(scanner)
 
 	result, err := client.ScanImage(ctx, req)
 	if err == nil {
@@ -289,18 +363,16 @@ func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest)
 }
 
 func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.ScanResult, error) {
-	scanner := getAvaliableScanner()
-	if scanner == "" {
-		err := fmt.Errorf("No scanner available")
-		log.WithFields(log.Fields{"error": err}).Error()
-		return nil, err
-	}
-
-	client, err := getScannerServiceClient(scanner, true)
+	scanner, err := ScanCreditMgr.acquireScanCredit()
 	if err != nil {
 		return nil, err
 	}
-	defer decScanningCount(scanner)
+
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, true)
+	defer ScanCreditMgr.releaseScanCredit(scanner)
+	if err != nil {
+		return nil, err
+	}
 
 	req := &share.ScanAppRequest{
 		Packages: pkgs,
@@ -317,10 +389,8 @@ func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.Scan
 }
 
 func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInput) (*share.ScanResult, error) {
-	scanner := getAvaliableScanner()
-	if scanner == "" {
-		err := fmt.Errorf("No scanner available")
-		log.WithFields(log.Fields{"error": err}).Error()
+	scanner, err := ScanCreditMgr.acquireScanCredit()
+	if err != nil {
 		return nil, err
 	}
 
@@ -332,13 +402,13 @@ func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInpu
 		ScanSecrets: true, // default: always
 	}
 
-	client, err := getScannerServiceClient(scanner, true)
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, true)
+	defer ScanCreditMgr.releaseScanCredit(scanner)
 	if err != nil {
-		err := fmt.Errorf("No scan client available")
+		err := fmt.Errorf("no scan client available")
 		log.WithFields(log.Fields{"error": err}).Error()
 		return nil, err
 	}
-	defer decScanningCount(scanner)
 
 	result, err := client.ScanAwsLambda(ctx, req)
 	if err != nil {
@@ -361,7 +431,8 @@ func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInpu
 
 func ScanCacheGetStat(scanner string) (*share.ScanCacheStatRes, error) {
 	log.WithFields(log.Fields{"scanner": scanner}).Debug()
-	client, err := getScannerServiceClient(scanner, true)
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, true)
+	defer ScanCreditMgr.decScanningCount(scanner)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +443,8 @@ func ScanCacheGetStat(scanner string) (*share.ScanCacheStatRes, error) {
 }
 
 func ScanCacheGetData(scanner string) (*share.ScanCacheDataRes, error) {
-	client, err := getScannerServiceClient(scanner, true)
+	client, scanner, err := ScanCreditMgr.getScannerServiceClient(scanner, true)
+	defer ScanCreditMgr.decScanningCount(scanner)
 	if err != nil {
 		return nil, err
 	}
