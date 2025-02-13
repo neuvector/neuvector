@@ -3,6 +3,7 @@ package fsmon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -262,6 +263,11 @@ func NewFileWatcher(config *FileMonitorConfig, logLevel string) (*FileWatch, err
 
 	go fw.loop()
 	return fw, nil
+}
+
+func bIgnoredErrors(err error) bool {
+	err = errors.Unwrap(err)
+	return os.IsNotExist(err) || errors.Is(err, syscall.EINVAL) || errors.Is(err, syscall.EBADF)
 }
 
 func (w *FileWatch) sendMsg(cid string, path string, event uint32, pInfo []*ProcInfo, mode string) {

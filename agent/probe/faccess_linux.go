@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	fanotify "github.com/s3rj1k/go-fanotify/fanotify"
@@ -196,6 +197,11 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 	return fa, true
 }
 
+func bIgnoredErrors(err error) bool {
+	err = errors.Unwrap(err)
+	return os.IsNotExist(err) || errors.Is(err, syscall.EINVAL) || errors.Is(err, syscall.EBADF)
+}
+
 // ///
 func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
@@ -203,7 +209,7 @@ func (fa *FileAccessCtrl) addDirMarks(pid int, dirs []string) (bool, int) {
 		path := ppath + dir
 		err := fa.fanfd.Mark(unix.FAN_MARK_ADD, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path)
 		if err != nil {
-			if !os.IsNotExist(errors.Unwrap(err)) {
+			if !bIgnoredErrors(err) {
 				log.WithFields(log.Fields{"path": path, "error": err}).Error("FA: ")
 			}
 		} else {
@@ -220,7 +226,7 @@ func (fa *FileAccessCtrl) removeDirMarks(pid int, dirs []string) int {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, dir := range dirs {
 		path := ppath + dir
-		if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+		if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag|unix.FAN_EVENT_ON_CHILD, unix.AT_FDCWD, path); err != nil && !bIgnoredErrors(err) {
 			log.WithFields(log.Fields{"error": err}).Error()
 		}
 	}
@@ -233,7 +239,7 @@ func (fa *FileAccessCtrl) addFileMarks(pid int, files []string) (bool, int) {
 		path := filepath.Join(ppath, file)
 		err := fa.fanfd.Mark(unix.FAN_MARK_ADD, fa.cflag, unix.AT_FDCWD, path)
 		if err != nil {
-			if !os.IsNotExist(errors.Unwrap(err)) {
+			if !bIgnoredErrors(err) {
 				log.WithFields(log.Fields{"path": path, "error": err}).Error()
 				return false, 0
 			}
@@ -248,8 +254,8 @@ func (fa *FileAccessCtrl) removeFileMarks(pid int, files []string) int {
 	ppath := fmt.Sprintf(procRootMountPoint, pid)
 	for _, file := range files {
 		path := filepath.Join(ppath, file)
-		if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
-			if !os.IsNotExist(errors.Unwrap(err)) {
+		if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, fa.cflag, unix.AT_FDCWD, path); err != nil && !bIgnoredErrors(err) {
+			if !bIgnoredErrors(err) {
 				log.WithFields(log.Fields{"path": path, "error": err}).Error()
 				return 0
 			}
@@ -266,7 +272,7 @@ func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 		return false
 	}
 
-	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); err != nil && !bIgnoredErrors(err) {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
 	return true
@@ -279,7 +285,7 @@ func (fa *FileAccessCtrl) isSupportExecPerm() bool {
 		return false
 	}
 
-	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); err != nil && !os.IsNotExist(errors.Unwrap(err)) {
+	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); err != nil && !bIgnoredErrors(err) {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
 	return true
