@@ -108,6 +108,7 @@ typedef struct proc_info_ {
     struct timeval start;
     int exit_count;
     int exit_status;
+    int signal;
 } proc_info_t;
 
 #define SCRIPT_SYSCTL   "sysctl -p"
@@ -765,7 +766,7 @@ static int exit_monitor(void)
 
 static void proc_exit_handler(int signal)
 {
-    int i, status, exit_status;
+    int i, status, exit_status, childsig;
     pid_t pid;
 
     /* Wait for a child process to exit */
@@ -778,8 +779,16 @@ static void proc_exit_handler(int signal)
 
         if (WIFEXITED(status)) {
             exit_status = WEXITSTATUS(status);
-        } else {
+            childsig = 0;
+        } else if (WIFSIGNALED(status)) {
             exit_status = -1;
+            childsig = WTERMSIG(status);;
+        } else if (WIFSTOPPED(status)) {
+            exit_status = -1;
+            childsig = WSTOPSIG(status);
+        } else {
+            exit_status = -2;
+            childsig = -2;
         }
 
         for (i = 0; i < PROC_MAX; i ++) {
@@ -790,6 +799,7 @@ static void proc_exit_handler(int signal)
             g_procs[i].exit_status = exit_status;
             g_procs[i].exit_count ++;
             g_procs[i].running = false;
+            g_procs[i].signal = childsig;
         }
     }
 }
@@ -967,8 +977,8 @@ int main (int argc, char **argv)
             if (g_procs[i].active && !g_procs[i].running) {
                 if (g_procs[i].pid > 0) {
                     // Previous process exited.
-                    debug("Process %s exit status %d, pid=%d\n",
-                          g_procs[i].name, g_procs[i].exit_status, g_procs[i].pid);
+                    debug("Process %s exit status %d, signal %d, pid=%d\n",
+                          g_procs[i].name, g_procs[i].exit_status, g_procs[i].signal, g_procs[i].pid);
 
                     g_procs[i].pid = 0;
 
