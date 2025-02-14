@@ -1010,34 +1010,47 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 			farFilters = far.Filters
 		}
 
+		monFiltersCRD := utils.NewSet()
 		// adding new CRD entries
 		for _, ffp := range profile.Filters {
 			// access filter
 			base, regex, _ := parseFileFilter(ffp.Filter) // should be validated before
 			key := utils.FilterIndexKey(base, regex)
+			if reviewType == share.ReviewTypeCRD {
+				if _, exist := far.Filters[key]; exist {
+					if _, ok := cacher.IsPrdefineFileGroup(ffp.Filter, ffp.Recursive); ok {
+						for i := range mon.Filters {
+							if mon.Filters[i].Filter == ffp.Filter && !mon.Filters[i].CustomerAdd {
+								// remove the predefined from the main filters
+								delete(far.Filters, key)
+								mon.Filters = append(mon.Filters[:i], mon.Filters[i+1:]...)
+								break
+							}
+						}
+					}
+				}
+			}
 			if a, exist := farFilters[key]; exist {
 				a.Behavior = ffp.Behavior
 				a.Apps = append([]string(nil), ffp.Apps...)
 				a.UpdatedAt = time.Now().UTC()
 				farFilters[key] = a
-			} else {
-				log.WithFields(log.Fields{"key": key, "behavior": ffp.Behavior}).Debug("CRD: new entry")
 				if reviewType == share.ReviewTypeCRD {
-					log.WithFields(log.Fields{"key": key, "behavior": ffp.Behavior}).Debug("CRD: new entry")
-					if _, exist := far.Filters[key]; exist {
-						if _, ok := cacher.IsPrdefineFileGroup(ffp.Filter, ffp.Recursive); ok {
-							for i := range mon.Filters {
-								if mon.Filters[i].Filter == ffp.Filter && !mon.Filters[i].CustomerAdd {
-									// remove the predefined from the main filters
-									delete(far.Filters, key)
-									mon.Filters = append(mon.Filters[:i], mon.Filters[i+1:]...)
-									break
-								}
-							}
+					if !monFiltersCRD.Contains(ffp.Filter) {
+						f := &share.CLUSFileMonitorFilter{
+							Filter:      ffp.Filter,
+							Path:        base,
+							Regex:       regex,
+							Recursive:   ffp.Recursive,
+							Behavior:    ffp.Behavior,
+							CustomerAdd: true,
 						}
+						monFilters = append(monFilters, *f)
+						monFiltersCRD.Add(ffp.Filter)
 					}
 				}
-
+			} else {
+				log.WithFields(log.Fields{"key": key, "behavior": ffp.Behavior}).Debug("CRD: new entry")
 				a := &share.CLUSFileAccessFilterRule{
 					CustomerAdd: true,
 					Behavior:    ffp.Behavior,
