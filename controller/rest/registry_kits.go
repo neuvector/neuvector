@@ -96,6 +96,7 @@ func handlerDebugRegistryImage(w http.ResponseWriter, r *http.Request, ps httpro
 
 const (
 	tidLength                = 16
+	maxRepoScanTasks         = 32
 	maxRegTestTasks          = 8
 	maxMessageSize           = 1024
 	regTestTimeout           = time.Minute * 20
