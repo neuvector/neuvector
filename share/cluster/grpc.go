@@ -415,6 +415,8 @@ func isUnixSocketEndpoint(endpoint string) bool {
 	return !strings.Contains(endpoint, ":")
 }
 
+// Create a GRPCClient, connect to remote and see if GRPCCompressed is enabled.
+// After that, close the connection.
 func IsControllerGRPCCommpressed(endpoint string) bool {
 	var err error
 	var c *GRPCClient
@@ -431,6 +433,7 @@ func IsControllerGRPCCommpressed(endpoint string) bool {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to get controller cap client")
 		return false
 	}
+	defer c.Close()
 
 	s := share.NewControllerCapServiceClient(c.GetClient())
 
@@ -442,6 +445,8 @@ func IsControllerGRPCCommpressed(endpoint string) bool {
 	}
 }
 
+// Create a GRPCClient, connect to remote and see if GRPCCompressed is enabled.
+// After that, close the connection.
 func IsEnforcerGRPCCommpressed(endpoint string) bool {
 	var err error
 	var c *GRPCClient
@@ -458,6 +463,7 @@ func IsEnforcerGRPCCommpressed(endpoint string) bool {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to get enforcer cap client")
 		return false
 	}
+	defer c.Close()
 
 	s := share.NewEnforcerCapServiceClient(c.GetClient())
 
