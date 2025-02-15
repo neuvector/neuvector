@@ -30,7 +30,6 @@ import (
 
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -43,6 +42,7 @@ import (
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 	digest "github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
