@@ -125,6 +125,20 @@ func scanMutexRUnlock() {
 	cctx.MutexLog.WithFields(log.Fields{"goroutine": utils.GetGID()}).Debug("Released")
 }
 
+// If objType is not recognized, returns base AutoScan setting
+func isInfoAutoScanEnabled(info *scanInfo, cfg *share.CLUSScanConfig) bool {
+	enableAutoScanBool := cfg.AutoScan
+	switch info.objType {
+	case share.ScanObjectType_CONTAINER:
+		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanWorkload
+	case share.ScanObjectType_HOST:
+		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanHost
+	case share.ScanObjectType_PLATFORM:
+		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanPlatform
+	}
+	return enableAutoScanBool
+}
+
 type scanTask struct {
 	id       string
 	priority scheduler.Priority
@@ -166,7 +180,7 @@ func (t *scanTask) rpcScanRunning(scanner string, info *scanInfo) {
 		var requeue bool
 		scanMutexRLock()
 		if info, ok := scanMap[t.id]; ok {
-			if (info.priority == scheduler.PriorityHigh || scanCfg.AutoScan) && info.retry < maxRetry {
+			if (info.priority == scheduler.PriorityHigh || isInfoAutoScanEnabled(info, &scanCfg)) && info.retry < maxRetry {
 				info.retry++
 				cctx.ScanLog.WithFields(log.Fields{
 					"id": t.id, "type": info.objType, "retry": info.retry,
@@ -249,8 +263,6 @@ func (t *scanTask) Expire() {
 func enableAutoScan() {
 	cctx.ScanLog.Debug("")
 
-	scanCfg.AutoScan = true
-
 	// Queue all workload for scan - this can take a long
 	// time if we have lots of containers, so use a separate
 	// thread to do it
@@ -266,8 +278,8 @@ func enableAutoScan() {
 		}
 		scanMutexUnlock()
 		for _, st := range all {
-			if !scanCfg.AutoScan {
-				break
+			if !isInfoAutoScanEnabled(st.info, &scanCfg) {
+				continue
 			}
 			if st.info.status == statusScanNone || st.info.status == statusScanning {
 				task := &scanTask{id: st.id, priority: scheduler.PriorityLow}
@@ -293,8 +305,6 @@ func enableAutoScan() {
 func disableAutoScan() {
 	cctx.ScanLog.WithFields(log.Fields{"isScanner": isScanner()}).Debug("")
 
-	scanCfg.AutoScan = false
-
 	if !isScanner() {
 		return
 	}
@@ -302,6 +312,9 @@ func disableAutoScan() {
 	go func() {
 		scanMutexLock()
 		for id, info := range scanMap {
+			if isInfoAutoScanEnabled(info, &scanCfg) {
+				continue
+			}
 			if info.status == statusScanScheduled && info.priority == scheduler.PriorityLow {
 				info.status = statusScanNone
 				info.retry = 0
@@ -613,7 +626,11 @@ func scannerDBChange(newVer string) {
 		return
 	}
 
-	if !scanCfg.AutoScan {
+	// Skip if no auto-scan options are enabled
+	if !scanCfg.EnableAutoScanWorkload &&
+		!scanCfg.EnableAutoScanHost &&
+		!scanCfg.EnableAutoScanPlatform &&
+		!scanCfg.AutoScan {
 		return
 	}
 
@@ -688,7 +705,7 @@ func scanMapAdd(taskId string, agentId string, idns []api.RESTIDName, objType sh
 			task := &scanTask{id: taskId, priority: scheduler.PriorityHigh}
 			scanScher.AddTask(task, true)
 			updateScanState(taskId, info.objType, api.ScanStatusScheduled)
-		} else if scanCfg.AutoScan {
+		} else if isInfoAutoScanEnabled(info, &scanCfg) {
 			info.status = statusScanScheduled
 			info.priority = scheduler.PriorityLow
 			task := &scanTask{id: taskId, priority: scheduler.PriorityLow}
@@ -784,7 +801,28 @@ func scanAgentDelete(id string, param interface{}) {
 	}
 }
 
-func scanConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
+func CompareScanConfig(src, target *share.CLUSScanConfig) (shouldEnable, shouldDisable bool) {
+	// Check changes in scan configurations
+	scanPairs := []struct {
+		srcEnabled    bool
+		targetEnabled bool
+	}{
+		{src.EnableAutoScanWorkload, target.EnableAutoScanWorkload},
+		{src.EnableAutoScanHost, target.EnableAutoScanHost},
+		{src.EnableAutoScanPlatform, target.EnableAutoScanPlatform},
+		{src.AutoScan, target.AutoScan},
+	}
+
+	// Track if any scan option was enabled or disabled
+	for _, pair := range scanPairs {
+		shouldEnable = shouldEnable || (!pair.srcEnabled && pair.targetEnabled)
+		shouldDisable = shouldDisable || (pair.srcEnabled && !pair.targetEnabled)
+	}
+
+	return shouldEnable, shouldDisable
+}
+
+func scanConfigUpdate(nType cluster.ClusterNotifyType, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var cfg share.CLUSScanConfig
@@ -794,9 +832,13 @@ func scanConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 		}
 
 		cctx.ScanLog.WithFields(log.Fields{"config": cfg}).Debug("")
-		if cfg.AutoScan && !scanCfg.AutoScan {
+
+		shouldEnableAutoScan, shouldDisableAutoScan := CompareScanConfig(&scanCfg, &cfg)
+		scanCfg = cfg
+		if shouldEnableAutoScan {
 			enableAutoScan()
-		} else if !cfg.AutoScan && scanCfg.AutoScan {
+		}
+		if shouldDisableAutoScan {
 			disableAutoScan()
 		}
 	case cluster.ClusterNotifyDelete:
@@ -1328,14 +1370,13 @@ func (m CacheMethod) GetScanConfig(acc *access.AccessControl) (*api.RESTScanConf
 		return nil, common.ErrObjectAccessDenied
 	}
 
-	var cfg *api.RESTScanConfig
-	if scanCfg.AutoScan {
-		cfg = &api.RESTScanConfig{AutoScan: true}
-	} else {
-		cfg = &api.RESTScanConfig{AutoScan: false}
-	}
-
-	return cfg, nil
+	// Separate auto scan for workload, host and platform for fine-grained control
+	return &api.RESTScanConfig{
+		AutoScan:               scanCfg.AutoScan,
+		EnableAutoScanWorkload: scanCfg.EnableAutoScanWorkload,
+		EnableAutoScanHost:     scanCfg.EnableAutoScanHost,
+		EnableAutoScanPlatform: scanCfg.EnableAutoScanPlatform,
+	}, nil
 }
 
 func (m CacheMethod) GetScanStatus(acc *access.AccessControl) (*api.RESTScanStatus, error) {

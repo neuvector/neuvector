@@ -37,6 +37,71 @@ func handlerScannerList(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get scanner list")
 }
 
+func applyScanConfigUpdates(sconf *api.RESTScanConfigConfig, cconf *share.CLUSScanConfig) error {
+	// fromNewClient is true if the request is from a 5.4.3+ http client
+	fromNewClient := false
+	if sconf.AutoScan != nil {
+		cconf.AutoScan = *sconf.AutoScan
+	}
+
+	updateAutoScanWorkload := false
+	updateAutoScanHost := false
+	updateAutoScanPlatform := false
+	// update from the 5.4.3+ http client => use the pointer to update the config
+	if sconf.EnableAutoScanWorkload != nil {
+		fromNewClient = true
+		cconf.EnableAutoScanWorkload = *sconf.EnableAutoScanWorkload
+		updateAutoScanWorkload = true
+	}
+	if sconf.EnableAutoScanHost != nil {
+		fromNewClient = true
+		cconf.EnableAutoScanHost = *sconf.EnableAutoScanHost
+		updateAutoScanHost = true
+	}
+	if sconf.EnableAutoScanPlatform != nil {
+		fromNewClient = true
+		cconf.EnableAutoScanPlatform = *sconf.EnableAutoScanPlatform
+		updateAutoScanPlatform = true
+	}
+
+	// Retrieve existing scan configuration from the cluster before applying updates.
+	// This ensures NeuVector doesn't accidentally override existing settings that should be preserved.
+	// For example, if only some auto-scan flags are being updated, we want to keep the
+	// previous values for any flags that aren't being modified in this request.
+	oldCfg, _ := cluster.Get(share.CLUSConfigScanKey)
+	if oldCfg != nil {
+		var oldCLUSScanConfig share.CLUSScanConfig
+		err := json.Unmarshal(oldCfg, &oldCLUSScanConfig)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("Failed to unmarshal old scan config")
+			return err
+		}
+
+		// make sure the new config is not overriding the old config
+		if !updateAutoScanPlatform {
+			cconf.EnableAutoScanPlatform = cconf.EnableAutoScanPlatform || oldCLUSScanConfig.EnableAutoScanPlatform
+		}
+		if !updateAutoScanWorkload {
+			cconf.EnableAutoScanWorkload = cconf.EnableAutoScanWorkload || oldCLUSScanConfig.EnableAutoScanWorkload
+		}
+		if !updateAutoScanHost {
+			cconf.EnableAutoScanHost = cconf.EnableAutoScanHost || oldCLUSScanConfig.EnableAutoScanHost
+		}
+	}
+
+	// if one of the fields is not set, we need to set the auto scan to false
+	// this is to ensure that the old config is not overridden by the new config
+	if fromNewClient {
+		if cconf.EnableAutoScanPlatform && cconf.EnableAutoScanWorkload && cconf.EnableAutoScanHost {
+			cconf.AutoScan = true
+		} else {
+			cconf.AutoScan = false
+		}
+	}
+
+	return nil
+}
+
 func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -61,10 +126,15 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	cconf := &share.CLUSScanConfig{AutoScan: sconf.Config.AutoScan}
-
+	cconf := &share.CLUSScanConfig{}
 	if !acc.Authorize(cconf, nil) {
 		restRespAccessDenied(w, login)
+		return
+	}
+
+	if err := applyScanConfigUpdates(sconf.Config, cconf); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("applyScanConfigUpdates error")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailReadCluster)
 		return
 	}
 
@@ -91,7 +161,7 @@ func handlerScanConfigGet(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	resp := &api.RESTScanConfigData{Config: cfg}
+	resp := &api.RESTScanConfigResp{Config: cfg}
 	restRespSuccess(w, r, resp, acc, login, nil, "Get scan setting")
 }
 
