@@ -312,8 +312,19 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 
 	acc := access.NewAdminAccessControl()
 	_, err = configSystemConfig(nil, acc, nil, "configmap", share.ScopeLocal, context.platform, &rconf)
-	if err == nil && rc.ScanConfig != nil && rc.ScanConfig.AutoScan != nil {
-		cconf := &share.CLUSScanConfig{AutoScan: *rc.ScanConfig.AutoScan}
+
+	if err == nil && rc.ScanConfig != nil &&
+		(rc.ScanConfig.AutoScan != nil ||
+			rc.ScanConfig.EnableAutoScanWorkload != nil ||
+			rc.ScanConfig.EnableAutoScanHost != nil ||
+			rc.ScanConfig.EnableAutoScanPlatform != nil) {
+
+		cconf := &share.CLUSScanConfig{}
+		err = applyScanConfigUpdates(rc.ScanConfig, cconf)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("applyScanConfigUpdates error")
+			return err
+		}
 		value, _ := json.Marshal(cconf)
 		err = cluster.Put(share.CLUSConfigScanKey, value)
 	}

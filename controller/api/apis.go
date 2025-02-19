@@ -2244,14 +2244,26 @@ type RESTServiceBatchConfigData struct {
 }
 
 type RESTScanConfig struct {
-	AutoScan bool `json:"auto_scan"`
+	AutoScan bool `json:"auto_scan"` // Deprecated, keeps for backward compatibility
+	// New fields for auto scan, to separate from the old unified auto scan
+	EnableAutoScanWorkload bool `json:"enable_auto_scan_workload"`
+	EnableAutoScanHost     bool `json:"enable_auto_scan_host"`
+	EnableAutoScanPlatform bool `json:"enable_auto_scan_platform"`
 }
 
 type RESTScanConfigConfig struct {
-	AutoScan *bool `json:"auto_scan"`
+	AutoScan *bool `json:"auto_scan"` // Deprecated, keeps for backward compatibility
+	// New fields for auto scan, to separate from the old unified auto scan
+	EnableAutoScanWorkload *bool `json:"enable_auto_scan_workload"`
+	EnableAutoScanHost     *bool `json:"enable_auto_scan_host"`
+	EnableAutoScanPlatform *bool `json:"enable_auto_scan_platform"`
 }
 
 type RESTScanConfigData struct {
+	Config *RESTScanConfigConfig `json:"config"`
+}
+
+type RESTScanConfigResp struct {
 	Config *RESTScanConfig `json:"config"`
 }
 

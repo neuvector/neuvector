@@ -2363,11 +2363,11 @@ paths:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTScanConfigData'
+            $ref: '#/definitions/RESTScanConfigResp'
     patch:
       tags:
         - Scan
-      summary: Update scan configure
+      summary: Update scan configure, Auto-scan can be configured globally or with fine-grained control for workloads, hosts, or platforms. However, if any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host, or enable_auto_scan_platform) is set to false, auto-scan will be disabled overall, because these flags collectively represent a "scan all" setting.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -9125,17 +9125,64 @@ definitions:
     type: object
     required:
       - auto_scan
+      - enable_auto_scan_workload
+      - enable_auto_scan_host
+      - enable_auto_scan_platform
     properties:
       auto_scan:
+        description: set to true to enable all kind of auto-scan
         type: boolean
         example: false
+      enable_auto_scan_workload:
+        description: set to true to enable auto-scan for workload
+        type: boolean
+        example: false
+      enable_auto_scan_host:
+        description: set to true to enable auto-scan for host
+        type: boolean
+        example: false
+      enable_auto_scan_platform:
+        description: set to true to enable auto-scan for platform
+        type: boolean
+        example: false
+  RESTScanConfigConfig:
+    type: object
+    required:
+      - auto_scan
+      - enable_auto_scan_workload
+      - enable_auto_scan_host
+      - enable_auto_scan_platform
+    properties:
+      auto_scan:
+        description: set to true to enable all kind of auto-scan
+        type: boolean
+        example: false
+      enable_auto_scan_workload:
+        description: set to true to enable auto-scan for workload
+        type: boolean
+        example: false
+      enable_auto_scan_host:
+        description: set to true to enable auto-scan for host
+        type: boolean
+        example: false
+      enable_auto_scan_platform:
+        description: set to true to enable auto-scan for platform
+        type: boolean
+        example: false        
   RESTScanConfigData:
     type: object
     required:
       - config
     properties:
       config:
-        $ref: '#/definitions/RESTScanConfig'
+        $ref: '#/definitions/RESTScanConfigConfig'
+  RESTScanConfigResp:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: '#/definitions/RESTScanConfig'        
   RESTScanImageSummaryData:
     type: object
     required:
