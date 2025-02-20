@@ -319,8 +319,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			rc.ScanConfig.EnableAutoScanHost != nil ||
 			rc.ScanConfig.EnableAutoScanPlatform != nil) {
 
-		cconf := &share.CLUSScanConfig{}
-		err = applyScanConfigUpdates(rc.ScanConfig, cconf)
+		cconf, err := applyScanConfigUpdates(rc.ScanConfig)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("applyScanConfigUpdates error")
 			return err
