@@ -9147,11 +9147,7 @@ definitions:
         example: false
   RESTScanConfigConfig:
     type: object
-    required:
-      - auto_scan
-      - enable_auto_scan_workload
-      - enable_auto_scan_host
-      - enable_auto_scan_platform
+    minProperties: 1
     properties:
       auto_scan:
         description: set to true to enable all kind of auto-scan
@@ -9168,7 +9164,7 @@ definitions:
       enable_auto_scan_platform:
         description: set to true to enable auto-scan for platform
         type: boolean
-        example: false        
+        example: false
   RESTScanConfigData:
     type: object
     required:
