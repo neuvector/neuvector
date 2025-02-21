@@ -24,10 +24,11 @@ import (
 )
 
 const (
-	repoRepoLimitDefault    = 200
-	repoTagLimitDefault     = 20
-	gcrDefaultURL           = "https://gcr.io"
-	ibmcloudDefaultTokenUrl = "https://iam.cloud.ibm.com/identity/token"
+	repoRepoLimitDefault       = 200
+	repoTagLimitDefault        = 20
+	gcrDefaultURL              = "https://gcr.io"
+	ibmcloudDefaultTokenUrl    = "https://iam.cloud.ibm.com/identity/token"
+	githubContainerRegistryUrl = "https://ghcr.io/"
 )
 
 type tFedRegistryConfig struct {
@@ -407,6 +408,11 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 				return
 			}
 		}
+	}
+
+	if rconf.Type == share.RegistryTypeGitHub {
+		reg := githubContainerRegistryUrl // can't take pointers of constants, must be redirected to var
+		rconf.Registry = &reg
 	}
 
 	// Jfrog config
