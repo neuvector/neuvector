@@ -2367,7 +2367,7 @@ paths:
     patch:
       tags:
         - Scan
-      summary: Update scan configure, Auto-scan can be configured globally or with fine-grained control for workloads, hosts, or platforms. However, if any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is set to false, auto-scan will be disabled overall, because these flags collectively represent a "scan all" setting.
+      summary: Update scan configure, Auto-scan can be configured globally or with fine-grained control for workloads, hosts. However, if any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is set to false, auto-scan will be disabled overall, because these flags collectively represent a "scan all" setting.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
