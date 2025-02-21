@@ -986,10 +986,13 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
 				}
 
-				if isLeader() && scanCfg.AutoScan {
-					if incd.ID == share.CLUSIncidHostPackageUpdated {
+				if isLeader() {
+					enableAutoScanHost := (scanCfg.EnableAutoScanHost || scanCfg.AutoScan)
+					if enableAutoScanHost && incd.ID == share.CLUSIncidHostPackageUpdated {
 						_ = cacher.ScanHost(incd.HostID, access.NewReaderAccessControl())
-					} else if incd.ID == share.CLUSIncidContainerPackageUpdated {
+					}
+					enableAutoScanWorkload := (scanCfg.EnableAutoScanWorkload || scanCfg.AutoScan)
+					if enableAutoScanWorkload && incd.ID == share.CLUSIncidContainerPackageUpdated {
 						_ = cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl())
 					}
 				}
