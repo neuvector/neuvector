@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const _retryBackoffFactor int = 3
+
 type HTTPTrace interface {
 	SetPhase(message string)
 	SendRequest(method, url string)
@@ -81,7 +83,9 @@ func (tc TraceClient) DoWithRetry(req *http.Request, maxRetries int) (resp *http
 		if err == nil {
 			break
 		}
-		time.Sleep(time.Second * time.Duration(currentTry*3)) // backoff
+		if currentTry != maxRetries {
+			time.Sleep(time.Second * time.Duration(currentTry*_retryBackoffFactor))
+		}
 	}
 	if err != nil {
 		err = fmt.Errorf("request failed after %d retries: %w", maxRetries, err)

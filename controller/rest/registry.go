@@ -24,10 +24,11 @@ import (
 )
 
 const (
-	repoRepoLimitDefault    = 200
-	repoTagLimitDefault     = 20
-	gcrDefaultURL           = "https://gcr.io"
-	ibmcloudDefaultTokenUrl = "https://iam.cloud.ibm.com/identity/token"
+	repoRepoLimitDefault       = 200
+	repoTagLimitDefault        = 20
+	gcrDefaultURL              = "https://gcr.io"
+	ibmcloudDefaultTokenUrl    = "https://iam.cloud.ibm.com/identity/token"
+	githubContainerRegistryUrl = "https://ghcr.io/"
 )
 
 type tFedRegistryConfig struct {
@@ -113,6 +114,10 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 	for n, filter := range filters {
 		var org, repo, tag string
 		var err error
+
+		if filter == "*" && regType == share.RegistryTypeGitHub {
+			return nil, fmt.Errorf("filter \"*\" is unsupported by registry type %s", share.RegistryTypeGitHub)
+		}
 
 		i := strings.Index(filter, "/")
 		if i > 0 {
@@ -403,6 +408,11 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 				return
 			}
 		}
+	}
+
+	if rconf.Type == share.RegistryTypeGitHub {
+		reg := githubContainerRegistryUrl // can't take pointers of constants, must be redirected to var
+		rconf.Registry = &reg
 	}
 
 	// Jfrog config
