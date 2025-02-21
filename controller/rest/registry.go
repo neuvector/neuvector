@@ -114,6 +114,10 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 		var org, repo, tag string
 		var err error
 
+		if filter == "*" && regType == share.RegistryTypeGitHub {
+			return nil, fmt.Errorf("filter \"*\" is unsupported by registry type %s", share.RegistryTypeGitHub)
+		}
+
 		i := strings.Index(filter, "/")
 		if i > 0 {
 			org = filter[:i]
