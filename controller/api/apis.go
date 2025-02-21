@@ -2248,7 +2248,6 @@ type RESTScanConfig struct {
 	// New fields for auto scan, to separate from the old unified auto scan
 	EnableAutoScanWorkload bool `json:"enable_auto_scan_workload"`
 	EnableAutoScanHost     bool `json:"enable_auto_scan_host"`
-	EnableAutoScanPlatform bool `json:"enable_auto_scan_platform"`
 }
 
 type RESTScanConfigConfig struct {
@@ -2256,7 +2255,6 @@ type RESTScanConfigConfig struct {
 	// New fields for auto scan, to separate from the old unified auto scan
 	EnableAutoScanWorkload *bool `json:"enable_auto_scan_workload"`
 	EnableAutoScanHost     *bool `json:"enable_auto_scan_host"`
-	EnableAutoScanPlatform *bool `json:"enable_auto_scan_platform"`
 }
 
 type RESTScanConfigData struct {

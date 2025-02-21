@@ -316,8 +316,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 	if err == nil && rc.ScanConfig != nil &&
 		(rc.ScanConfig.AutoScan != nil ||
 			rc.ScanConfig.EnableAutoScanWorkload != nil ||
-			rc.ScanConfig.EnableAutoScanHost != nil ||
-			rc.ScanConfig.EnableAutoScanPlatform != nil) {
+			rc.ScanConfig.EnableAutoScanHost != nil) {
 
 		cconf, err := applyScanConfigUpdates(rc.ScanConfig)
 		if err != nil {
