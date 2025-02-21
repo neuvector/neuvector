@@ -134,7 +134,7 @@ func isInfoAutoScanEnabled(info *scanInfo, cfg *share.CLUSScanConfig) bool {
 	case share.ScanObjectType_HOST:
 		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanHost
 	case share.ScanObjectType_PLATFORM:
-		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanPlatform
+		enableAutoScanBool = false // platform is not supported for auto scan
 	}
 	return enableAutoScanBool
 }
@@ -629,7 +629,6 @@ func scannerDBChange(newVer string) {
 	// Skip if no auto-scan options are enabled
 	if !scanCfg.EnableAutoScanWorkload &&
 		!scanCfg.EnableAutoScanHost &&
-		!scanCfg.EnableAutoScanPlatform &&
 		!scanCfg.AutoScan {
 		return
 	}
@@ -809,7 +808,6 @@ func CompareScanConfig(src, target *share.CLUSScanConfig) (shouldEnable, shouldD
 	}{
 		{src.EnableAutoScanWorkload, target.EnableAutoScanWorkload},
 		{src.EnableAutoScanHost, target.EnableAutoScanHost},
-		{src.EnableAutoScanPlatform, target.EnableAutoScanPlatform},
 		{src.AutoScan, target.AutoScan},
 	}
 
@@ -1375,7 +1373,6 @@ func (m CacheMethod) GetScanConfig(acc *access.AccessControl) (*api.RESTScanConf
 		AutoScan:               scanCfg.AutoScan,
 		EnableAutoScanWorkload: scanCfg.EnableAutoScanWorkload,
 		EnableAutoScanHost:     scanCfg.EnableAutoScanHost,
-		EnableAutoScanPlatform: scanCfg.EnableAutoScanPlatform,
 	}, nil
 }
 

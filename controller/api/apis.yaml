@@ -2367,7 +2367,7 @@ paths:
     patch:
       tags:
         - Scan
-      summary: Update scan configure, Auto-scan can be configured globally or with fine-grained control for workloads, hosts, or platforms. However, if any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host, or enable_auto_scan_platform) is set to false, auto-scan will be disabled overall, because these flags collectively represent a "scan all" setting.
+      summary: Update scan configure, Auto-scan can be configured globally or with fine-grained control for workloads, hosts, or platforms. However, if any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is set to false, auto-scan will be disabled overall, because these flags collectively represent a "scan all" setting.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -9127,7 +9127,6 @@ definitions:
       - auto_scan
       - enable_auto_scan_workload
       - enable_auto_scan_host
-      - enable_auto_scan_platform
     properties:
       auto_scan:
         description: set to true to enable all kind of auto-scan
@@ -9139,10 +9138,6 @@ definitions:
         example: false
       enable_auto_scan_host:
         description: set to true to enable auto-scan for host
-        type: boolean
-        example: false
-      enable_auto_scan_platform:
-        description: set to true to enable auto-scan for platform
         type: boolean
         example: false
   RESTScanConfigConfig:
@@ -9159,10 +9154,6 @@ definitions:
         example: false
       enable_auto_scan_host:
         description: set to true to enable auto-scan for host
-        type: boolean
-        example: false
-      enable_auto_scan_platform:
-        description: set to true to enable auto-scan for platform
         type: boolean
         example: false
   RESTScanConfigData:
