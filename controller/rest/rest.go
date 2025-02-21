@@ -173,6 +173,7 @@ var restErrMessage = []string{
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
 	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
 	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
+	api.RESTErrPollJobNotFoundError:  "Job not found in the Job Queue",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -1584,10 +1585,11 @@ func InitContext(ctx *Context) {
 	initHttpClients()
 }
 
-func StartRESTServer(isNewCluster bool, isLead bool) {
+func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax int, repoScanLongPollTimeout, staleScanJobCleanupIntervalHour time.Duration) {
 	initDefaultRegistries()
-	newRepoScanMgr()
+	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax)
 	newRegTestMgr()
+	defer RepoScanMgr.Shutdown() // RepoScanMgr is initialized in StartRESTServer; ensure it is closed to prevent goroutine leaks.
 
 	if localDev.Host.Platform == share.PlatformKubernetes {
 		k8sPlatform = true
