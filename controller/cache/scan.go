@@ -133,8 +133,6 @@ func isInfoAutoScanEnabled(info *scanInfo, cfg *share.CLUSScanConfig) bool {
 		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanWorkload
 	case share.ScanObjectType_HOST:
 		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanHost
-	case share.ScanObjectType_PLATFORM:
-		enableAutoScanBool = false // platform is not supported for auto scan
 	}
 	return enableAutoScanBool
 }
@@ -180,7 +178,7 @@ func (t *scanTask) rpcScanRunning(scanner string, info *scanInfo) {
 		var requeue bool
 		scanMutexRLock()
 		if info, ok := scanMap[t.id]; ok {
-			if (info.priority == scheduler.PriorityHigh || isInfoAutoScanEnabled(info, &scanCfg)) && info.retry < maxRetry {
+			if (info.priority == scheduler.PriorityHigh || (info.objType != share.ScanObjectType_PLATFORM && isInfoAutoScanEnabled(info, &scanCfg))) && info.retry < maxRetry {
 				info.retry++
 				cctx.ScanLog.WithFields(log.Fields{
 					"id": t.id, "type": info.objType, "retry": info.retry,
@@ -278,7 +276,7 @@ func enableAutoScan() {
 		}
 		scanMutexUnlock()
 		for _, st := range all {
-			if !isInfoAutoScanEnabled(st.info, &scanCfg) {
+			if st.info.objType == share.ScanObjectType_PLATFORM || !isInfoAutoScanEnabled(st.info, &scanCfg) {
 				continue
 			}
 			if st.info.status == statusScanNone || st.info.status == statusScanning {
@@ -312,7 +310,7 @@ func disableAutoScan() {
 	go func() {
 		scanMutexLock()
 		for id, info := range scanMap {
-			if isInfoAutoScanEnabled(info, &scanCfg) {
+			if info.objType == share.ScanObjectType_PLATFORM || isInfoAutoScanEnabled(info, &scanCfg) {
 				continue
 			}
 			if info.status == statusScanScheduled && info.priority == scheduler.PriorityLow {
