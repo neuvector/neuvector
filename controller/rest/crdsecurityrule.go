@@ -2310,10 +2310,7 @@ func (h *nvCrdHandler) validateCrdProcessRules(rules []*api.RESTProcessProfileEn
 		}
 
 		key := fmt.Sprintf("%s:%s:%s", r.Name, r.Path, r.Action)
-		if ruleSet.Contains(key) {
-			buffer.WriteString(fmt.Sprintf(" Duplicated process rule entry: : %s \n", msg))
-			errCnt++
-		} else {
+		if !ruleSet.Contains(key) {
 			ruleSet.Add(key)
 		}
 
