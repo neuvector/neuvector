@@ -29,8 +29,7 @@ type ScannerEntry struct {
 // ScannerLoadBalancer manages scanner workload using a B-tree heap.
 type ScannerLoadBalancer struct {
 	mutex          sync.RWMutex
-	ActiveScanners map[string]*ScannerEntry
-	Heap           *btree.BTree
+	ActiveScanners []*ScannerEntry
 }
 
 // Define sorting order: least running tasks first.
@@ -44,8 +43,7 @@ func (a *ScannerEntry) Less(b btree.Item) bool {
 
 func NewScannerLoadBalancer() *ScannerLoadBalancer {
 	return &ScannerLoadBalancer{
-		ActiveScanners: make(map[string]*ScannerEntry),
-		Heap:           btree.New(2),
+		ActiveScanners: make([]*ScannerEntry, 0),
 	}
 }
 
@@ -53,49 +51,33 @@ func (lb *ScannerLoadBalancer) RegisterScanner(scanner *share.CLUSScanner, avail
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
 	entry := &ScannerEntry{Scanner: scanner, AvailableScanCredits: availableScanCredits}
-	lb.ActiveScanners[scanner.ID] = entry
-	lb.Heap.ReplaceOrInsert(entry)
+	lb.ActiveScanners = append(lb.ActiveScanners, entry)
 }
 
 func (lb *ScannerLoadBalancer) UnregisterScanner(scannerId string) (*ScannerEntry, error) {
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
-	entry, exists := lb.ActiveScanners[scannerId]
-	if !exists {
-		return nil, fmt.Errorf("scanner %s not found", scannerId)
+	for i, entry := range lb.ActiveScanners {
+		if entry.Scanner.ID == scannerId {
+			lb.ActiveScanners = append(lb.ActiveScanners[:i], lb.ActiveScanners[i+1:]...)
+			return entry, nil
+		}
 	}
-	lb.Heap.Delete(entry)
-	delete(lb.ActiveScanners, scannerId)
-	return entry, nil
+	return nil, fmt.Errorf("scanner %s not found", scannerId)
 }
 
-func (lb *ScannerLoadBalancer) updateScanCredit(scannerId string, delta int) error {
-	if delta == 0 {
-		return fmt.Errorf("delta should not be 0")
+func (lb *ScannerLoadBalancer) GetScanner(scannerId string) (*ScannerEntry, error) {
+	lb.mutex.RLock()
+	defer lb.mutex.RUnlock()
+	for _, entry := range lb.ActiveScanners {
+		if entry.Scanner.ID == scannerId {
+			return entry, nil
+		}
 	}
-
-	entry, exists := lb.ActiveScanners[scannerId]
-	if !exists {
-		return fmt.Errorf("scanner %s not found", scannerId)
-	}
-
-	lb.Heap.Delete(entry) // Remove outdated entry
-
-	newCredit := entry.AvailableScanCredits + delta
-	if newCredit < 0 {
-		return fmt.Errorf("scanner %s active scan credits cannot be negative", scannerId)
-	}
-
-	entry.AvailableScanCredits = newCredit
-
-	if newCredit > 0 {
-		lb.Heap.ReplaceOrInsert(entry) // Reinsert updated entry
-	}
-
-	return nil
+	return nil, fmt.Errorf("scanner %s not found", scannerId)
 }
 
-func (lb *ScannerLoadBalancer) GetActiveScanners() map[string]*ScannerEntry {
+func (lb *ScannerLoadBalancer) GetActiveScanners() []*ScannerEntry {
 	lb.mutex.RLock()
 	defer lb.mutex.RUnlock()
 	return lb.ActiveScanners
@@ -104,26 +86,44 @@ func (lb *ScannerLoadBalancer) GetActiveScanners() map[string]*ScannerEntry {
 func (lb *ScannerLoadBalancer) ReleaseScanCredit(scannerId string) error {
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
-	return lb.updateScanCredit(scannerId, 1)
+
+	for _, entry := range lb.ActiveScanners {
+		if entry.Scanner.ID == scannerId {
+			entry.AvailableScanCredits++
+			return nil
+		}
+	}
+	return fmt.Errorf("scanner %s not found", scannerId)
 }
 
 // No mutex here, because it's called by PickLeastLoadedScanner, which already has a mutex.
-func (lb *ScannerLoadBalancer) acquireScanCredit(scannerId string) error {
-	return lb.updateScanCredit(scannerId, -1)
-}
+// func (lb *ScannerLoadBalancer) acquireScanCredit(scannerId string) error {
+// 	return lb.updateScanCredit(scannerId, -1)
+// }
 
 func (lb *ScannerLoadBalancer) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
 
-	if lb.Heap.Len() == 0 {
+	if len(lb.ActiveScanners) == 0 {
 		return nil, fmt.Errorf("no scanner found")
 	}
-	entry := lb.Heap.Max().(*ScannerEntry)
-	err := lb.acquireScanCredit(entry.Scanner.ID)
-	if err != nil {
-		return nil, err
+
+	maxScanCredits := -1 // Initialize to an impossible value
+	maxScanCreditsIndex := -1
+
+	for i := 0; i < len(lb.ActiveScanners); i++ {
+		scanCredits := lb.ActiveScanners[i].AvailableScanCredits
+		if (maxScanCreditsIndex == -1 || scanCredits > maxScanCredits) && scanCredits > 0 {
+			maxScanCredits = scanCredits
+			maxScanCreditsIndex = i
+		}
 	}
 
-	return entry.Scanner, nil
+	if maxScanCreditsIndex != -1 {
+		lb.ActiveScanners[maxScanCreditsIndex].AvailableScanCredits--
+		return lb.ActiveScanners[maxScanCreditsIndex].Scanner, nil
+	}
+
+	return nil, fmt.Errorf("no scanner available")
 }
