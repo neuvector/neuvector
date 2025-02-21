@@ -91,15 +91,16 @@ func TestRemoveScanner(t *testing.T) {
 
 	// Simulate the assignment of the first scanner (scanner[0]) to handle a scan task.
 	<-mockScannerMgr.creditPool
-	mockScannerMgr.scannerLoadBalancer.ActiveScanners[mockScannerIDs[0]].AvailableScanCredits--
+	mockScannerMgr.scannerLoadBalancer.ActiveScanners[0].AvailableScanCredits--
 
 	// Remove the first scanner
 	err := mockScannerMgr.RemoveScanner(mockScannerIDs[0])
 	assert.Nil(t, err)
 
 	// Verify that the scanner is removed
-	_, exists := mockScannerMgr.scannerLoadBalancer.ActiveScanners[mockScannerIDs[0]]
-	assert.False(t, exists, "Scanner should be removed from activeScanners")
+	scannerEntry, err := mockScannerMgr.scannerLoadBalancer.GetScanner(mockScannerIDs[0])
+	assert.NotNil(t, err)
+	assert.Nil(t, scannerEntry)
 
 	// Calculate expected remaining signals
 	// Initial signals: maxConns * mockScannerCount = 3 * 3 = 9
@@ -129,7 +130,6 @@ func TestRemoveScanner(t *testing.T) {
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, expectedRemainingSignals, actualSignals, "creditPool should be drained correctly after removing a scanner")
 	assert.Equal(t, mockScannerCount-2, len(mockScannerMgr.scannerLoadBalancer.ActiveScanners), "activeScanners value in consistent")
-	assert.Equal(t, mockScannerCount-2, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "heap value in consistent")
 	verifyActiveScanners(t, mockScannerMgr, mockScannerCount-2, expectedRemainingSignals)
 
 	// Remove the last scanner
@@ -144,14 +144,12 @@ func TestRemoveScanner(t *testing.T) {
 			actualSignals = len(mockScannerMgr.creditPool)
 			assert.Equal(t, expectedRemainingSignals, actualSignals, "creditPool should be drained correctly after removing a scanner")
 			assert.Equal(t, mockScannerCount-2, len(mockScannerMgr.scannerLoadBalancer.ActiveScanners), "activeScanners value in consistent")
-			assert.Equal(t, mockScannerCount-2, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "heap value in consistent")
 			verifyActiveScanners(t, mockScannerMgr, mockScannerCount-2, expectedRemainingSignals)
 		}
 	}
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, 0, actualSignals, "creditPool should be drained correctly after removing a scanner")
 	assert.Equal(t, 0, len(mockScannerMgr.scannerLoadBalancer.ActiveScanners), "activeScanners should be empty")
-	assert.Equal(t, 0, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "heap should be empty")
 	verifyActiveScanners(t, mockScannerMgr, 0, 0)
 }
 
@@ -165,7 +163,7 @@ func TestAcquireScanCredit(t *testing.T) {
 		scannerMgr.AddScanner(s)
 	}
 
-	// Initially, creditPool should have maxConns * 2 signals
+	// Initially, creditPool should have maxConns * mockScannerCount signals
 	initialSignals := maxConns * mockScannerCount
 	actualSignals := len(scannerMgr.creditPool)
 	assert.Equal(t, initialSignals, actualSignals, "creditPool should have initial signals equal to maxConns * number of scanners")
@@ -177,21 +175,19 @@ func TestAcquireScanCredit(t *testing.T) {
 	assert.Contains(t, mockScannerIDs, acquiredScanner, "Acquired scanner should be in mockScannerIDs")
 
 	// Verify that availableScanCredits for the acquired scanner is incremented
-	s, exists := scannerMgr.scannerLoadBalancer.ActiveScanners[acquiredScanner]
-	assert.True(t, exists, "Acquired scanner should exist in activeScanners")
-	assert.Equal(t, 1, s.AvailableScanCredits, "availableScanCredits should be incremented after acquisition")
+	scannerEntry, err := scannerMgr.scannerLoadBalancer.GetScanner(acquiredScanner)
+	assert.Nil(t, err)
+	assert.Equal(t, maxConns-1, scannerEntry.AvailableScanCredits, "availableScanCredits should be incremented after acquisition")
 
 	// creditPool should have one less signal
 	remainingSignals := initialSignals - 1
 	actualSignals = len(scannerMgr.creditPool)
 	assert.Equal(t, remainingSignals, actualSignals, "creditPool should have one less signal after acquisition")
 
-	// Verify the scanner is in the heap
-	assert.True(t, scannerMgr.scannerLoadBalancer.Heap.Has(s), "Acquired scanner should be in the heap")
-	assert.Equal(t, mockScannerCount, scannerMgr.scannerLoadBalancer.Heap.Len(), "After adding a scanner, the heap should have the same length as the number of scanners")
-
-	// Verify the scanner is in the activeScanners map
-	assert.True(t, scannerMgr.scannerLoadBalancer.ActiveScanners[acquiredScanner] != nil, "Acquired scanner should be in the activeScanners map")
+	// release the scanner
+	scannerMgr.releaseScanCredit(acquiredScanner)
+	actualSignals = len(scannerMgr.creditPool)
+	assert.Equal(t, initialSignals, actualSignals, "creditPool should have one less signal after acquisition")
 }
 
 // TestReleaseScanCredit verifies the releaseScanCredit method.
@@ -223,14 +219,12 @@ func TestReleaseScanCredit(t *testing.T) {
 	actualSignals = len(mockScannerMgr.creditPool)
 	assert.Equal(t, expectedSingals, actualSignals, "creditPool should have %d signals after acquiring all scanners", expectedSingals)
 
-	// Verify the scanners are in the heap
-	mockScanner1, exists1 := mockScannerMgr.scannerLoadBalancer.ActiveScanners[scannerID1]
-	mockScanner2, exists2 := mockScannerMgr.scannerLoadBalancer.ActiveScanners[scannerID2]
-	assert.True(t, exists1, "Acquired scanner1 should exist in activeScanners")
-	assert.True(t, exists2, "Acquired scanner2 should exist in activeScanners")
-	assert.False(t, mockScannerMgr.scannerLoadBalancer.Heap.Has(mockScanner1), "Acquired scanner1 should not be in the heap")
-	assert.False(t, mockScannerMgr.scannerLoadBalancer.Heap.Has(mockScanner2), "Acquired scanner2 should not be in the heap")
-	assert.Equal(t, 0, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "After adding two scanners, the heap should have the same length as the number of scanners")
+	mockScanner1, err := mockScannerMgr.scannerLoadBalancer.GetScanner(scannerID1)
+	assert.Nil(t, err)
+	mockScanner2, err := mockScannerMgr.scannerLoadBalancer.GetScanner(scannerID2)
+	assert.Nil(t, err)
+	assert.Equal(t, maxConns-1, mockScanner1.AvailableScanCredits, "Acquired scanner1 should exist in activeScanners")
+	assert.Equal(t, maxConns-1, mockScanner2.AvailableScanCredits, "Acquired scanner2 should exist in activeScanners")
 
 	// Release scanner1, expectedSingals should increase one singe we have a new one to use
 	mockScannerMgr.releaseScanCredit(scannerID1)
@@ -241,17 +235,12 @@ func TestReleaseScanCredit(t *testing.T) {
 	assert.Equal(t, expectedSingals, actualSignals, "creditPool should have %d signals after acquiring all scanners", expectedSingals)
 
 	// Verify that availableScanCredits for scanner1 is decremented
-	s1, exists1 := mockScannerMgr.scannerLoadBalancer.ActiveScanners[scannerID1]
-	s2, exists2 := mockScannerMgr.scannerLoadBalancer.ActiveScanners[scannerID2]
-	assert.True(t, exists1, "scanner1 should exist in activeScanners")
-	assert.True(t, exists2, "scanner2 should exist in activeScanners")
-	assert.Equal(t, 1, s1.AvailableScanCredits, "availableScanCredits for scanner1 should be decremented after release")
-	assert.Equal(t, 0, s2.AvailableScanCredits, "availableScanCredits for scanner2 should remain unchanged")
-
-	// Verify the scanners are in the heap
-	assert.True(t, mockScannerMgr.scannerLoadBalancer.Heap.Has(s1), "Acquired scanner1 should be in the heap")
-	assert.False(t, mockScannerMgr.scannerLoadBalancer.Heap.Has(s2), "Acquired scanner2 should not be in the heap")
-	assert.Equal(t, 1, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "After adding two scanners, the heap should have the same length as the number of scanners")
+	mockScanner1, err = mockScannerMgr.scannerLoadBalancer.GetScanner(scannerID1)
+	assert.Nil(t, err)
+	mockScanner2, err = mockScannerMgr.scannerLoadBalancer.GetScanner(scannerID2)
+	assert.Nil(t, err)
+	assert.Equal(t, maxConns, mockScanner1.AvailableScanCredits, "availableScanCredits for scanner1 should be decremented after release")
+	assert.Equal(t, maxConns-1, mockScanner2.AvailableScanCredits, "availableScanCredits for scanner2 should remain unchanged")
 }
 
 // TestLargeScaleScannerManagement verifies the large-scale scanner management of the scanner manager.
@@ -419,26 +408,27 @@ func TestConcurrentScannerManagement(t *testing.T) {
 
 	// Verify that all scanners are fully utilized
 	assert.Equal(t, numAcquisitions, len(acquiredScanners), "Number of acquired scanners should not exceed max capacity")
-	assert.Equal(t, 0, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "Heap should be empty after full acquisition")
+	assert.Equal(t, firstBatchSize, len(mockScannerMgr.scannerLoadBalancer.ActiveScanners), "activeScanners aize should be equal to firstBatchSize after full acquisition")
 	for scannerID := range mockScannerMgr.scannerLoadBalancer.ActiveScanners {
 		assert.Equal(t, 0, mockScannerMgr.scannerLoadBalancer.ActiveScanners[scannerID].AvailableScanCredits, "All scanners should have zero available credits")
 	}
 
 	releaseDone := make(chan struct{})
 	addDone := make(chan struct{})
-	removeDone := make(chan struct{})
 	go releaseScannersConcurrently(mockScannerMgr, acquiredScanners, releaseDone)
 	go addScannersConcurrently(mockScannerMgr, mockScanners[firstBatchSize:], addDone)
-	go removeScannersConcurrently(t, mockScannerMgr, mockScannerIDs[:firstBatchSize], removeDone)
 
 	// Wait for both operations to complete
 	<-releaseDone
 	<-addDone
+
+	removeDone := make(chan struct{})
+	go removeScannersConcurrently(t, mockScannerMgr, mockScannerIDs[:firstBatchSize], removeDone)
 	<-removeDone
 
 	// Verify that the heap contains all scanners (since we added while releasing)
 	verifyActiveScanners(t, mockScannerMgr, firstBatchSize, maxConns*firstBatchSize)
-	assert.Equal(t, firstBatchSize, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "Heap should contain all newly added scanners")
+	assert.Equal(t, firstBatchSize, len(mockScannerMgr.scannerLoadBalancer.ActiveScanners), "activeScanners should contain all newly added scanners")
 	for scannerID := range mockScannerMgr.scannerLoadBalancer.ActiveScanners {
 		assert.Equal(t, maxConns, mockScannerMgr.scannerLoadBalancer.ActiveScanners[scannerID].AvailableScanCredits, "Newly added scanners should have max available credits")
 	}
@@ -450,8 +440,5 @@ func TestConcurrentScannerManagement(t *testing.T) {
 
 	// Ensure no remaining signals in the credit pool
 	assert.Equal(t, 0, len(mockScannerMgr.creditPool), "creditPool should have no remaining signals after all removals")
-
-	// Verify the heap is empty
-	assert.Equal(t, 0, mockScannerMgr.scannerLoadBalancer.Heap.Len(), "Heap should be empty after all removals")
 	assert.Equal(t, 0, len(mockScannerMgr.scannerLoadBalancer.ActiveScanners), "activeScanners map should be empty after all removals")
 }

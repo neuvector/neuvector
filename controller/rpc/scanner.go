@@ -143,9 +143,8 @@ func (mgr *ScanCreditManager) getScannerServiceClient(sid string, shouldIncremen
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	s, ok := mgr.scannerLoadBalancer.ActiveScanners[sid]
-	if !ok {
-		err := fmt.Errorf("scanner not found")
+	s, err := mgr.scannerLoadBalancer.GetScanner(sid)
+	if err != nil {
 		log.WithFields(log.Fields{"error": err, "scanner": sid}).Error()
 		return nil, sid, err
 	}
@@ -176,9 +175,9 @@ func (mgr *ScanCreditManager) getAllAvailableScanners() map[string]share.CLUSSca
 
 	ret := map[string]share.CLUSScanner{}
 
-	for id, scanner := range mgr.scannerLoadBalancer.GetActiveScanners() {
+	for _, scanner := range mgr.scannerLoadBalancer.GetActiveScanners() {
 		if scanner != nil && scanner.Scanner != nil {
-			ret[id] = *scanner.Scanner
+			ret[scanner.Scanner.ID] = *scanner.Scanner
 		}
 	}
 
