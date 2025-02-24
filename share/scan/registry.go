@@ -19,6 +19,7 @@ import (
 )
 
 const mediaTypeCosign = "application/vnd.dev.cosign.simplesigning.v1+json"
+const mediaTypeTotoAttestation = "application/vnd.dsse.envelope.v1+json"
 const quayRegistryURL = "https://quay.io"
 const cosignSignatureTagSuffix = ".sig"
 
@@ -64,6 +65,10 @@ func isQuayRegistry(rc *RegClient) bool {
 	return false
 }
 
+func isCosignPayload(mediaType string) bool {
+	return mediaType == mediaTypeCosign || mediaType == mediaTypeTotoAttestation
+}
+
 func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *registry.ManifestInfo) bool {
 	allLayersAreCosignPayloads := true
 
@@ -79,7 +84,7 @@ func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *regist
 				layer := manV2.Layers[j]
 				imageInfo.Layers = append(imageInfo.Layers, string(layer.Digest))
 				imageInfo.Sizes[string(layer.Digest)] = layer.Size
-				if layer.MediaType != mediaTypeCosign {
+				if !isCosignPayload(layer.MediaType) {
 					allLayersAreCosignPayloads = false
 				}
 
@@ -91,7 +96,7 @@ func copyV2Layers(imageInfo *ImageInfo, manV2 *manifestV2.Manifest, ccmi *regist
 			layer := manV2.Layers[j]
 			imageInfo.Layers = append(imageInfo.Layers, string(layer.Digest))
 			imageInfo.Sizes[string(layer.Digest)] = layer.Size
-			if layer.MediaType != mediaTypeCosign {
+			if !isCosignPayload(layer.MediaType) {
 				allLayersAreCosignPayloads = false
 			}
 		}
