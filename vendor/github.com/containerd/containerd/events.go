@@ -22,7 +22,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/protobuf"
@@ -64,7 +63,7 @@ func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Ev
 
 func (e *eventRemote) Forward(ctx context.Context, envelope *events.Envelope) error {
 	req := &eventsapi.ForwardRequest{
-		Envelope: &types.Envelope{
+		Envelope: &eventsapi.Envelope{
 			Timestamp: protobuf.ToTimestamp(envelope.Timestamp),
 			Namespace: envelope.Namespace,
 			Topic:     envelope.Topic,
