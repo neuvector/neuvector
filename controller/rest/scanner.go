@@ -52,6 +52,12 @@ func applyScanConfigUpdates(sconf *api.RESTScanConfigConfig) (*share.CLUSScanCon
 			return nil, err
 		}
 		cconf = &oldCLUSScanConfig
+
+		// if the old config is true for auto scan, we need to set the workload and host config to true
+		if cconf.AutoScan {
+			cconf.EnableAutoScanWorkload = true
+			cconf.EnableAutoScanHost = true
+		}
 	} else {
 		cconf = &share.CLUSScanConfig{}
 	}
@@ -60,6 +66,15 @@ func applyScanConfigUpdates(sconf *api.RESTScanConfigConfig) (*share.CLUSScanCon
 	fromNewClient := false
 	if sconf.AutoScan != nil {
 		cconf.AutoScan = *sconf.AutoScan
+
+		// if the new config is true for auto scan, we need to set the workload and host config to true
+		if cconf.AutoScan {
+			cconf.EnableAutoScanWorkload = true
+			cconf.EnableAutoScanHost = true
+		} else {
+			cconf.EnableAutoScanWorkload = false
+			cconf.EnableAutoScanHost = false
+		}
 	}
 
 	// update from the 5.4.3+ http client => use the pointer to update the config
