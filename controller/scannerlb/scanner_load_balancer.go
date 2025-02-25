@@ -4,21 +4,29 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/google/btree"
 	"github.com/neuvector/neuvector/share"
 )
 
-// ScannerLoadBalancer implements an efficient scanner workload distribution system
-// to address resource imbalance issues when multiple scanners are available.
-// It uses a combination of a B-tree and a map to achieve O(log n) performance
-// for scanner selection and updates:
-//   - B-tree maintains scanners ordered by their available scan credits,
-//     enabling quick access to the least loaded scanner
-//   - Map provides O(1) lookups for scanner updates and removals
+// ScannerLoadBalancer implements a load balancing system for distributing scan workloads
+// across multiple scanner instances. It maintains a list of active scanners and their
+// available scan credits (capacity for concurrent scans).
 //
-// The load balancer ensures that scan tasks are distributed evenly across
-// available scanners by always selecting the scanner with the most
-// available scan credits for new tasks.
+// Key features:
+// - Efficient O(n) selection of least loaded scanner
+// - Thread-safe operations via mutex locking
+// - Dynamic registration/unregistration of scanners
+// - Credit-based workload tracking per scanner
+//
+// The load balancer ensures optimal resource utilization by:
+// 1. Always selecting the scanner with the most available scan credits for new tasks
+// 2. Tracking and updating scan credits as tasks complete
+// 3. Maintaining an accurate view of system-wide scanner capacity
+//
+// Usage:
+// - Register scanners with initial scan credit allocation
+// - Pick scanner for new scan tasks via PickLeastLoadedScanner()
+// - Release scan credits when tasks complete via ReleaseScanCredit()
+// - Remove scanners via UnregisterScanner() when they go offline
 
 // ScannerEntry represents an active scanner instance and its running tasks.
 type ScannerEntry struct {
@@ -30,15 +38,6 @@ type ScannerEntry struct {
 type ScannerLoadBalancer struct {
 	mutex          sync.RWMutex
 	ActiveScanners []*ScannerEntry
-}
-
-// Define sorting order: least running tasks first.
-func (a *ScannerEntry) Less(b btree.Item) bool {
-	// Compare based on availableScanCredits, and use scanner ID as a tiebreaker
-	if a.AvailableScanCredits == b.(*ScannerEntry).AvailableScanCredits {
-		return a.Scanner.ID < b.(*ScannerEntry).Scanner.ID
-	}
-	return a.AvailableScanCredits < b.(*ScannerEntry).AvailableScanCredits
 }
 
 func NewScannerLoadBalancer() *ScannerLoadBalancer {
