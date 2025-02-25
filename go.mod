@@ -52,7 +52,7 @@ require (
 	golang.org/x/sys v0.30.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/grpc/security/advancedtls v1.0.0
-	gopkg.in/ldap.v2 v2.5.1
+	gopkg.in/ldap.v3 v3.4.10
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.3
 	k8s.io/apiextensions-apiserver v0.29.3
@@ -131,6 +131,7 @@ require (
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
 	github.com/quay/clair/v2 v2.1.8
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
+	gopkg.in/ldap.v2 v2.5.1
 )
 
 require (
