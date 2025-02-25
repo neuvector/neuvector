@@ -4,7 +4,7 @@ go 1.22
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.8.0
-	k8s.io/cri-api => k8s.io/cri-api v0.25.16
+	k8s.io/cri-api => k8s.io/cri-api v0.31.6
 )
 
 require (
@@ -54,12 +54,12 @@ require (
 	google.golang.org/grpc/security/advancedtls v1.0.0
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.29.3
-	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.29.3
-	k8s.io/client-go v0.29.3
-	k8s.io/cri-api v0.29.3
-	k8s.io/kubectl v0.29.3
+	k8s.io/api v0.31.6
+	k8s.io/apiextensions-apiserver v0.31.6
+	k8s.io/apimachinery v0.31.6
+	k8s.io/client-go v0.31.6
+	k8s.io/cri-api v0.31.6
+	k8s.io/kubectl v0.31.6
 	sigs.k8s.io/yaml v1.4.0
 )
 
