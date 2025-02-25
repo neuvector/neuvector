@@ -136,6 +136,7 @@ const (
 	RegistryTypeGitlab           = "Gitlab"
 	RegistryTypeIBMCloud         = "IBM Cloud Container Registry"
 	RegistryTypeHarbor           = "Harbor Registry"
+	RegistryTypeGitHub           = "GitHub Container Registry"
 )
 
 const (
