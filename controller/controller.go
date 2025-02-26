@@ -274,7 +274,7 @@ func main() {
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	maxScannerTasks := flag.Int("max_scanner_tasks", 2, "Maximum number of concurrent tasks a scanner can handle")
-	maxConcurrentRepoScanTasks := flag.Int("max_concurrent_repo_scan_tasks", 16, "Maximum number of concurrent repository scan tasks")
+	maxConcurrentRepoScanTasks := flag.Int("max_concurrent_repo_scan_tasks", 32, "Maximum number of concurrent repository scan tasks")
 	scanJobQueueCapacity := flag.Int("scan_job_queue_capacity", 2048, "Capacity of the scan job queue for pending tasks")
 	scanJobFailRetryMax := flag.Int("scan_job_fail_retry_max", 5, "Maximum retry attempts for failed scan jobs")
 	staleScanJobCleanupIntervalHour := flag.Int("stale_scan_job_cleanup_interval_hour", 1, "Interval (in hours) for cleaning up stale scan jobs")
