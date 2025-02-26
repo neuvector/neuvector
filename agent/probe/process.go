@@ -2944,10 +2944,13 @@ func (p *Probe) isNVChildProcess(c *procContainer, proc *procInternal) bool {
 	mLog.WithFields(log.Fields{"path": path, "ppath": ppath, "nvRole": nvRole, "ppid": ppid}).Debug()
 	if isManagerType(nvRole) && ppath == "/usr/bin/bash" {
 		if path == "/usr/bin/python3.12" {
-			if len(proc.cmds) == 3 && proc.cmds[1] == "/usr/local/bin/cli" {
-				c.outsider.Remove(pid)
-				c.children.Add(pid)
-				return true
+			if len(proc.cmds) > 1 {
+				switch proc.cmds[1] {
+				case "/usr/local/bin/cli", "/usr/local/bin/cli.py":
+					c.outsider.Remove(pid)
+					c.children.Add(pid)
+					return true
+				}
 			}
 		}
 		return path == ppath /// only for cli case
