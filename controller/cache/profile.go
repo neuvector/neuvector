@@ -29,6 +29,13 @@ func profileConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var profile share.CLUSProcessProfile
+		if len(value) >= 2 && value[0] == 31 && value[1] == 139 {
+			value = utils.GunzipBytes(value)
+			if value == nil {
+				log.WithFields(log.Fields{"key": key, "len": len(value)}).Debug("Fail to unzip data")
+				return
+			}
+		}
 		if err := json.Unmarshal(value, &profile); err != nil {
 			log.WithFields(log.Fields{"err": err}).Debug("Fail to decode")
 			return

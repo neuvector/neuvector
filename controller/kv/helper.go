@@ -453,8 +453,7 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 		if value, err, wrt = UpgradeAndConvert(key, value); wrt {
 			value, rev, err = cluster.GetRev(key)
 			// [31, 139] is the first 2 bytes of gzip-format data
-			if len(value) >= 2 && value[0] == 31 && value[1] == 139 &&
-				(strings.HasPrefix(key, share.CLUSCrdProcStore) || strings.HasPrefix(key, share.CLUSConfigCrdStore)) {
+			if needToUnzip(key, value) {
 				value = utils.GunzipBytes(value)
 				if value == nil {
 					err = fmt.Errorf("Failed to unzip data")
@@ -465,7 +464,7 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 	}
 }
 
-func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, value []byte) error {
+func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, value []byte, quiet bool) error {
 	if len(value) >= cluster.KVValueSizeMax { // 512 * 1024
 		zb := utils.GzipBytes(value)
 		if len(zb) >= cluster.KVValueSizeMax { // 512 * 1024
@@ -474,17 +473,33 @@ func (m clusterHelper) putSizeAware(txn *cluster.ClusterTransact, key string, va
 			return err
 		}
 		if txn != nil {
-			txn.PutBinary(key, zb)
+			if quiet {
+				txn.PutQuiet(key, zb)
+			} else {
+				txn.PutBinary(key, zb)
+			}
 			return nil
 		} else {
-			return cluster.PutBinary(key, zb)
+			if quiet {
+				return cluster.PutQuiet(key, zb)
+			} else {
+				return cluster.PutBinary(key, zb)
+			}
 		}
 	} else {
 		if txn != nil {
-			txn.Put(key, value)
+			if quiet {
+				txn.PutQuiet(key, value)
+			} else {
+				txn.Put(key, value)
+			}
 			return nil
 		} else {
-			return cluster.Put(key, value)
+			if quiet {
+				return cluster.PutQuiet(key, value)
+			} else {
+				return cluster.Put(key, value)
+			}
 		}
 	}
 }
@@ -1277,7 +1292,7 @@ func (m clusterHelper) PutProcessProfile(group string, pg *share.CLUSProcessProf
 	if err := m.DuplicateNetworkKey(key, value); err != nil {
 		return err
 	}
-	return cluster.PutQuiet(key, value)
+	return m.putSizeAware(nil, key, value, true)
 }
 
 func (m clusterHelper) PutProcessProfileTxn(txn *cluster.ClusterTransact, group string, pg *share.CLUSProcessProfile) error {
@@ -1292,8 +1307,11 @@ func (m clusterHelper) PutProcessProfileTxn(txn *cluster.ClusterTransact, group 
 		return err
 	}
 	log.WithFields(log.Fields{"key": key, "group": pg.Group, "mode": pg.Mode, "process": len(pg.Process)}).Debug()
-	txn.PutQuiet(key, value)
-	return m.DuplicateNetworkKeyTxn(txn, key, value)
+	if err := m.putSizeAware(txn, key, value, true); err == nil {
+		return m.DuplicateNetworkKeyTxn(txn, key, value)
+	} else {
+		return err
+	}
 }
 
 func (m clusterHelper) PutProcessProfileIfNotExist(group string, pg *share.CLUSProcessProfile) error {
@@ -1306,6 +1324,9 @@ func (m clusterHelper) PutProcessProfileIfNotExist(group string, pg *share.CLUSP
 	log.WithFields(log.Fields{"key": key, "group": pg.Group, "process": len(pg.Process)}).Debug("GRP: ")
 	if err := m.DuplicateNetworkKeyIfNotExist(key, value); err != nil {
 		return err
+	}
+	if needToZip(key, value) {
+		value = utils.GzipBytes(value)
 	}
 	return cluster.PutIfNotExist(key, value, true)
 }
@@ -2398,7 +2419,7 @@ func (m clusterHelper) PutCrdSecurityRuleRecord(crdKind, crdName string, rule *s
 	if err != nil {
 		return err
 	}
-	return m.putSizeAware(nil, key, value)
+	return m.putSizeAware(nil, key, value, false)
 }
 
 func (m clusterHelper) DeleteCrdSecurityRuleRecord(crdKind, crdName string) error {
@@ -2964,7 +2985,7 @@ func (m clusterHelper) PutCrdRecord(record *share.CLUSCrdRecord, name string) er
 	if err != nil {
 		return err
 	}
-	return m.putSizeAware(nil, key, value)
+	return m.putSizeAware(nil, key, value, false)
 }
 
 func (m clusterHelper) DeleteCrdRecord(name string) error {
@@ -2990,7 +3011,7 @@ func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error 
 	if err != nil {
 		return err
 	}
-	if err := m.putSizeAware(txn, key, value); err != nil {
+	if err := m.putSizeAware(txn, key, value, false); err != nil {
 		txn.Close()
 		return err
 	}

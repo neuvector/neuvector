@@ -796,7 +796,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
 					//for CLUSConfigSystemKey only
 					_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
-					if len(array) >= cluster.KVValueSizeMax && strings.HasPrefix(key, share.CLUSConfigCrdStore) { // 512 * 1024
+					if needToZip(key, array) {
 						zb := utils.GzipBytes(array)
 						txn.PutBinary(key, zb)
 					} else {
