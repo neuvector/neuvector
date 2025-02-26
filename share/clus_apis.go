@@ -698,9 +698,9 @@ type CLUSScanState struct {
 }
 
 type CLUSScanConfig struct {
-	AutoScan               bool `json:"auto_scan"`
-	EnableAutoScanWorkload bool `json:"enable_auto_scan_workload"`
-	EnableAutoScanHost     bool `json:"enable_auto_scan_host"`
+	AutoScan               bool  `json:"auto_scan"`
+	EnableAutoScanWorkload *bool `json:"enable_auto_scan_workload"`
+	EnableAutoScanHost     *bool `json:"enable_auto_scan_host"`
 }
 
 type CLUSCtrlVersion struct {

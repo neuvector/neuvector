@@ -2247,8 +2247,8 @@ type RESTServiceBatchConfigData struct {
 type RESTScanConfig struct {
 	AutoScan bool `json:"auto_scan"` // Deprecated, keeps for backward compatibility
 	// New fields for auto scan, to separate from the old unified auto scan
-	EnableAutoScanWorkload bool `json:"enable_auto_scan_workload"`
-	EnableAutoScanHost     bool `json:"enable_auto_scan_host"`
+	EnableAutoScanWorkload *bool `json:"enable_auto_scan_workload,omitempty"`
+	EnableAutoScanHost     *bool `json:"enable_auto_scan_host,omitempty"`
 }
 
 type RESTScanConfigConfig struct {

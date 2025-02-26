@@ -987,11 +987,17 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 				}
 
 				if isLeader() {
-					enableAutoScanHost := (scanCfg.EnableAutoScanHost || scanCfg.AutoScan)
+					enableAutoScanHost := scanCfg.AutoScan
+					if scanCfg.EnableAutoScanHost != nil {
+						enableAutoScanHost = *scanCfg.EnableAutoScanHost
+					}
 					if enableAutoScanHost && incd.ID == share.CLUSIncidHostPackageUpdated {
 						_ = cacher.ScanHost(incd.HostID, access.NewReaderAccessControl())
 					}
-					enableAutoScanWorkload := (scanCfg.EnableAutoScanWorkload || scanCfg.AutoScan)
+					enableAutoScanWorkload := scanCfg.AutoScan
+					if scanCfg.EnableAutoScanWorkload != nil {
+						enableAutoScanWorkload = *scanCfg.EnableAutoScanWorkload
+					}
 					if enableAutoScanWorkload && incd.ID == share.CLUSIncidContainerPackageUpdated {
 						_ = cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl())
 					}

@@ -52,49 +52,20 @@ func applyScanConfigUpdates(sconf *api.RESTScanConfigConfig) (*share.CLUSScanCon
 			return nil, err
 		}
 		cconf = &oldCLUSScanConfig
-
-		// if the old config is true for auto scan, we need to set the workload and host config to true
-		if cconf.AutoScan {
-			cconf.EnableAutoScanWorkload = true
-			cconf.EnableAutoScanHost = true
-		}
 	} else {
 		cconf = &share.CLUSScanConfig{}
 	}
 
-	// fromNewClient is true if the request is from a 5.4.3+ http client
-	fromNewClient := false
 	if sconf.AutoScan != nil {
 		cconf.AutoScan = *sconf.AutoScan
-
-		// if the new config is true for auto scan, we need to set the workload and host config to true
-		if cconf.AutoScan {
-			cconf.EnableAutoScanWorkload = true
-			cconf.EnableAutoScanHost = true
-		} else {
-			cconf.EnableAutoScanWorkload = false
-			cconf.EnableAutoScanHost = false
-		}
 	}
 
 	// update from the 5.4.3+ http client => use the pointer to update the config
 	if sconf.EnableAutoScanWorkload != nil {
-		fromNewClient = true
-		cconf.EnableAutoScanWorkload = *sconf.EnableAutoScanWorkload
+		cconf.EnableAutoScanWorkload = sconf.EnableAutoScanWorkload
 	}
 	if sconf.EnableAutoScanHost != nil {
-		fromNewClient = true
-		cconf.EnableAutoScanHost = *sconf.EnableAutoScanHost
-	}
-
-	// if one of the fields is not set, we need to set the auto scan to false
-	// this is to ensure that the old config is not overridden by the new config
-	if fromNewClient {
-		if cconf.EnableAutoScanWorkload && cconf.EnableAutoScanHost {
-			cconf.AutoScan = true
-		} else {
-			cconf.AutoScan = false
-		}
+		cconf.EnableAutoScanHost = sconf.EnableAutoScanHost
 	}
 
 	return cconf, nil
