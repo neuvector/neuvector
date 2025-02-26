@@ -2367,7 +2367,7 @@ paths:
     patch:
       tags:
         - Scan
-      summary: Auto-scan can be configured either globally or with fine-grained control for workloads and hosts. If any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is explicitly provided, its value is adopted ignore the auto-scan setting.
+      summary: Auto-scan can be configured either globally or with fine-grained control for workloads and hosts. If any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is explicitly provided, its value takes precedence and overrides the auto-scan setting.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
