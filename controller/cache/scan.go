@@ -629,15 +629,15 @@ func scannerDBChange(newVer string) {
 	}
 
 	// Skip if no auto-scan options are enabled
-	enableAutoScanWorkload := false
+	enableAutoScanWorkload := scanCfg.AutoScan
 	if scanCfg.EnableAutoScanWorkload != nil {
 		enableAutoScanWorkload = *scanCfg.EnableAutoScanWorkload
 	}
-	enableAutoScanHost := false
+	enableAutoScanHost := scanCfg.AutoScan
 	if scanCfg.EnableAutoScanHost != nil {
 		enableAutoScanHost = *scanCfg.EnableAutoScanHost
 	}
-	if !enableAutoScanWorkload && !enableAutoScanHost && !scanCfg.AutoScan {
+	if !enableAutoScanWorkload && !enableAutoScanHost {
 		return
 	}
 
@@ -808,28 +808,38 @@ func scanAgentDelete(id string, param interface{}) {
 	}
 }
 
-func CompareScanConfig(currentCfg, updateCfg *share.CLUSScanConfig) (shouldEnable, shouldDisable bool) {
-	// Check changes in scan configurations
-	scanPairs := []struct {
-		currentEnabled *bool
-		updateEnabled  *bool
-	}{
-		{currentCfg.EnableAutoScanWorkload, updateCfg.EnableAutoScanWorkload},
-		{currentCfg.EnableAutoScanHost, updateCfg.EnableAutoScanHost},
-		{&currentCfg.AutoScan, &updateCfg.AutoScan},
-	}
+func CompareScanConfig(currentCfg, updateCfg *share.CLUSScanConfig) (bool, bool) {
+	// Fallback: use global auto-scan setting.
+	shouldEnable := !currentCfg.AutoScan && updateCfg.AutoScan
+	shouldDisable := currentCfg.AutoScan && !updateCfg.AutoScan
 
-	// Track if any scan option was enabled or disabled
-	for _, pair := range scanPairs {
-		if pair.currentEnabled != nil && pair.updateEnabled != nil {
-			shouldEnable = shouldEnable || (!*pair.currentEnabled && *pair.updateEnabled)
-			shouldDisable = shouldDisable || (*pair.currentEnabled && !*pair.updateEnabled)
-		} else if pair.updateEnabled != nil {
-			shouldEnable = shouldEnable || *pair.updateEnabled
-			shouldDisable = shouldDisable || !*pair.updateEnabled
+	workloadProvided := updateCfg.EnableAutoScanWorkload != nil
+	hostProvided := updateCfg.EnableAutoScanHost != nil
+
+	// if the workload or host is provided, we need to evaluate the detailed settings, not the global auto-scan setting
+	if workloadProvided || hostProvided {
+		currentWorkloadEnable := currentCfg.AutoScan
+		if currentCfg.EnableAutoScanWorkload != nil {
+			currentWorkloadEnable = *currentCfg.EnableAutoScanWorkload
+		}
+		currentHostEnable := currentCfg.AutoScan
+		if currentCfg.EnableAutoScanHost != nil {
+			currentHostEnable = *currentCfg.EnableAutoScanHost
+		}
+
+		if workloadProvided && hostProvided {
+			shouldEnable = (!currentWorkloadEnable && *updateCfg.EnableAutoScanWorkload) ||
+				(!currentHostEnable && *updateCfg.EnableAutoScanHost)
+			shouldDisable = (currentWorkloadEnable && !*updateCfg.EnableAutoScanWorkload) ||
+				(currentHostEnable && !*updateCfg.EnableAutoScanHost)
+		} else if workloadProvided {
+			shouldEnable = (!currentWorkloadEnable && *updateCfg.EnableAutoScanWorkload)
+			shouldDisable = (currentWorkloadEnable && !*updateCfg.EnableAutoScanWorkload)
+		} else {
+			shouldEnable = !currentHostEnable && *updateCfg.EnableAutoScanHost
+			shouldDisable = currentHostEnable && !*updateCfg.EnableAutoScanHost
 		}
 	}
-
 	return shouldEnable, shouldDisable
 }
 
