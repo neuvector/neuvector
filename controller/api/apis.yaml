@@ -2367,8 +2367,7 @@ paths:
     patch:
       tags:
         - Scan
-      summary: |
-        Update scan configuration. Auto-scan can be configured either globally or with fine-grained control for workloads and hosts. If any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is explicitly set to false, auto-scan will be disabled overall, as these flags collectively define a "scan all" setting. When enable_auto_scan_workload or enable_auto_scan_host is provided (non-nil), its value is adopted because the REST client  explicitly intends to enable or disable its auto setting.
+      summary: Auto-scan can be configured either globally or with fine-grained control for workloads and hosts. If any of the detailed control fields (enable_auto_scan_workload, enable_auto_scan_host) is explicitly provided, its value is adopted ignore the auto-scan setting.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -9128,15 +9127,15 @@ definitions:
       - auto_scan
     properties:
       auto_scan:
-        description: Global auto-scan setting. When true, auto-scan is enabled unless one of the detailed control flags (enable_auto_scan_workload or enable_auto_scan_host) is explicitly set to false.
+        description: Global auto-scan setting. When true, auto-scan is adopted unless one of the detailed control flags (enable_auto_scan_workload or enable_auto_scan_host) is explicitly provided (non-nil).
         type: boolean
         example: false
       enable_auto_scan_workload:
-        description: Optional detailed control for workload auto-scan. If provided (non-nil), its value is adopted. If explicitly set to false, it disables auto-scan for workloads and forces auto_scan to false.
+        description: Optional detailed control for workload auto-scan. If provided (non-nil), its value is adopted.
         type: boolean
         example: false
       enable_auto_scan_host:
-        description: Optional detailed control for host auto-scan. If provided (non-nil), its value is adopted. If explicitly set to false, it disables auto-scan for hosts and forces auto_scan to false.
+        description: Optional detailed control for host auto-scan. If provided (non-nil), its value is adopted.
         type: boolean
         example: false
   RESTScanConfigConfig:
@@ -9144,15 +9143,15 @@ definitions:
     minProperties: 1
     properties:
       auto_scan:
-        description: Global auto-scan setting. When true, auto-scan is enabled unless one of the detailed control flags (enable_auto_scan_workload or enable_auto_scan_host) is explicitly set to false.
+        description: Global auto-scan setting. When true, auto-scan is adopted unless one of the detailed control flags (enable_auto_scan_workload or enable_auto_scan_host) is explicitly provided (non-nil).
         type: boolean
         example: false
       enable_auto_scan_workload:
-        description: Optional detailed control for workload auto-scan. If provided (non-nil), its value is adopted. If explicitly set to false, it disables auto-scan for workloads and forces auto_scan to false.
+        description: Optional detailed control for workload auto-scan. If provided (non-nil), its value is adopted.
         type: boolean
         example: false
       enable_auto_scan_host:
-        description: Optional detailed control for host auto-scan. If provided (non-nil), its value is adopted. If explicitly set to false, it disables auto-scan for hosts and forces auto_scan to false.
+        description: Optional detailed control for host auto-scan. If provided (non-nil), its value is adopted.
         type: boolean
         example: false
   RESTScanConfigData:
