@@ -130,9 +130,13 @@ func isInfoAutoScanEnabled(info *scanInfo, cfg *share.CLUSScanConfig) bool {
 	enableAutoScanBool := cfg.AutoScan
 	switch info.objType {
 	case share.ScanObjectType_CONTAINER:
-		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanWorkload
+		if cfg.EnableAutoScanWorkload != nil {
+			enableAutoScanBool = *cfg.EnableAutoScanWorkload
+		}
 	case share.ScanObjectType_HOST:
-		enableAutoScanBool = enableAutoScanBool || cfg.EnableAutoScanHost
+		if cfg.EnableAutoScanHost != nil {
+			enableAutoScanBool = *cfg.EnableAutoScanHost
+		}
 	}
 	return enableAutoScanBool
 }
@@ -625,9 +629,15 @@ func scannerDBChange(newVer string) {
 	}
 
 	// Skip if no auto-scan options are enabled
-	if !scanCfg.EnableAutoScanWorkload &&
-		!scanCfg.EnableAutoScanHost &&
-		!scanCfg.AutoScan {
+	enableAutoScanWorkload := false
+	if scanCfg.EnableAutoScanWorkload != nil {
+		enableAutoScanWorkload = *scanCfg.EnableAutoScanWorkload
+	}
+	enableAutoScanHost := false
+	if scanCfg.EnableAutoScanHost != nil {
+		enableAutoScanHost = *scanCfg.EnableAutoScanHost
+	}
+	if !enableAutoScanWorkload && !enableAutoScanHost && !scanCfg.AutoScan {
 		return
 	}
 
@@ -798,21 +808,26 @@ func scanAgentDelete(id string, param interface{}) {
 	}
 }
 
-func CompareScanConfig(src, target *share.CLUSScanConfig) (shouldEnable, shouldDisable bool) {
+func CompareScanConfig(currentCfg, updateCfg *share.CLUSScanConfig) (shouldEnable, shouldDisable bool) {
 	// Check changes in scan configurations
 	scanPairs := []struct {
-		srcEnabled    bool
-		targetEnabled bool
+		currentEnabled *bool
+		updateEnabled  *bool
 	}{
-		{src.EnableAutoScanWorkload, target.EnableAutoScanWorkload},
-		{src.EnableAutoScanHost, target.EnableAutoScanHost},
-		{src.AutoScan, target.AutoScan},
+		{currentCfg.EnableAutoScanWorkload, updateCfg.EnableAutoScanWorkload},
+		{currentCfg.EnableAutoScanHost, updateCfg.EnableAutoScanHost},
+		{&currentCfg.AutoScan, &updateCfg.AutoScan},
 	}
 
 	// Track if any scan option was enabled or disabled
 	for _, pair := range scanPairs {
-		shouldEnable = shouldEnable || (!pair.srcEnabled && pair.targetEnabled)
-		shouldDisable = shouldDisable || (pair.srcEnabled && !pair.targetEnabled)
+		if pair.currentEnabled != nil && pair.updateEnabled != nil {
+			shouldEnable = shouldEnable || (!*pair.currentEnabled && *pair.updateEnabled)
+			shouldDisable = shouldDisable || (*pair.currentEnabled && !*pair.updateEnabled)
+		} else if pair.updateEnabled != nil {
+			shouldEnable = shouldEnable || *pair.updateEnabled
+			shouldDisable = shouldDisable || !*pair.updateEnabled
+		}
 	}
 
 	return shouldEnable, shouldDisable
