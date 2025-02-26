@@ -318,10 +318,10 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			rc.ScanConfig.EnableAutoScanWorkload != nil ||
 			rc.ScanConfig.EnableAutoScanHost != nil) {
 
-		cconf, err := applyScanConfigUpdates(rc.ScanConfig)
-		if err != nil {
-			log.WithFields(log.Fields{"err": err}).Error("applyScanConfigUpdates error")
-			return err
+		cconf, err2 := applyScanConfigUpdates(rc.ScanConfig)
+		if err2 != nil {
+			log.WithFields(log.Fields{"err": err2}).Error("applyScanConfigUpdates error")
+			return err2
 		}
 		value, _ := json.Marshal(cconf)
 		err = cluster.Put(share.CLUSConfigScanKey, value)

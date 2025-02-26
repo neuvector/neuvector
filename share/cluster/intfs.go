@@ -711,13 +711,6 @@ func Transact() *ClusterTransact {
 	return &ClusterTransact{}
 }
 
-func min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}
-
 func (t *ClusterTransact) PutBinary(key string, value []byte) {
 	if len(value) >= KVValueSizeMax {
 		// we assume binary data is already in gzip format so do not try to gzip it again
@@ -820,6 +813,50 @@ func apply(entries []transactEntry) (bool, error) {
 	return ok, err
 }
 
+// caller of this function must make sure 'entries' meets these 2 conditions:
+// 1. their estimated transaction request body length < 512*1024
+// 2. there are <= 64 entries
+func applyImpl(entries []transactEntry) (bool, error) {
+
+	if len(entries) == 0 {
+		return true, nil
+	}
+
+	if _, err := apply(entries); err != nil {
+		// There is no better way to handle one transaction error
+		// So we simply iterate the entries in this transaction and re-do them like the non-transaction approach.
+		// However, by using transaction, we reduce the driver calls so theoretically we shuld see less error.
+		var errFinal error
+		for _, entry := range entries {
+			switch entry.verb {
+			case clusterTransactDelete:
+				if err := Delete(entry.key); err != nil {
+					log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("delete")
+					errFinal = err
+				}
+			case clusterTransactPut:
+				if err := Put(entry.key, entry.value); err != nil {
+					log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("put")
+					errFinal = err
+				}
+			case clusterTransactDeleteTree:
+				if err := DeleteTree(entry.key); err != nil {
+					log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("delete tree")
+					errFinal = err
+				}
+			}
+		}
+		if errFinal != nil {
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+// consul kv transaction request body is limited by
+// 1. 512*1024 bytes length max &
+// 2. 64 entries max
 func (t *ClusterTransact) Apply() (bool, error) {
 	log.Debug("Transact")
 
@@ -827,43 +864,48 @@ func (t *ClusterTransact) Apply() (bool, error) {
 		return true, nil
 	}
 
-	if len(t.entries) <= 64 {
-		return apply(t.entries)
-	} else {
-		var errFinal error
-		for i := 0; i < len(t.entries); i += 64 {
-			entries := t.entries[i:min(i+64, len(t.entries))]
-			if _, err := apply(entries); err != nil {
-				log.WithFields(log.Fields{"i": i, "len": len(t.entries), "error": err}).Error("Failed to write txn keys")
-				// There is no better way to handle one transaction error when there are >64 entries.
-				// So we simply iterate the entries in this transaction and re-do them like the non-transaction approach.
-				// However, by using transaction, we reduce the driver calls so theoretically we shuld see less error.
-				for _, entry := range entries {
-					switch entry.verb {
-					case clusterTransactDelete:
-						if err := Delete(entry.key); err != nil {
-							log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("delete")
-							errFinal = err
-						}
-					case clusterTransactPut:
-						if err := Put(entry.key, entry.value); err != nil {
-							log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("put")
-							errFinal = err
-						}
-					case clusterTransactDeleteTree:
-						if err := DeleteTree(entry.key); err != nil {
-							log.WithFields(log.Fields{"key": entry.key, "error": err}).Error("delete tree")
-							errFinal = err
-						}
-					}
-				}
+	const maxSize int = (512 * 1024) - 2
+	var ok bool
+	var err error
+	var startIdx int              // inclusive
+	var collectedSizeEstimate int // size estimate of collected entries
+	var numCollected int          // number of collected entries
+
+	for i := range t.entries {
+		// estimated size of this entry object in transaction req body
+		entrySizeEstimate := 160 + len(t.entries[i].key) + ((2 + len(t.entries[i].value)) * 4 / 3)
+		// check whether including this entry in the transaction req will make the request body size too big or too many entries.
+		if numCollected >= 64 || ((collectedSizeEstimate + entrySizeEstimate) > maxSize) {
+			// this entry will make the transaction req failed because of size too big or too many entries.
+			// so send those already collected entries in a transaction req first & let this entry be in the next transaction req.
+			entries := t.entries[startIdx:i] // this entry is not included
+			ok, err = applyImpl(entries)
+			if err != nil {
+				log.WithFields(log.Fields{"startIdx": startIdx, "entries": len(entries), "sizeEstimate": collectedSizeEstimate,
+					"error": err}).Error("Failed to write txn keys")
+				return ok, err
 			}
+
+			// let this entry be the 1st entry in the next transaction req.
+			numCollected = 1
+			collectedSizeEstimate = entrySizeEstimate
+			startIdx = i
+		} else {
+			numCollected++
+			collectedSizeEstimate += entrySizeEstimate
 		}
-		if errFinal != nil {
-			return false, errFinal
-		}
-		return true, nil
 	}
+	if numCollected > 0 {
+		// for the last entries that are not applied yet
+		entries := t.entries[startIdx:]
+		ok, err = applyImpl(entries)
+		if err != nil {
+			log.WithFields(log.Fields{"startIdx": startIdx, "entries": len(entries), "sizeEstimate": collectedSizeEstimate,
+				"error": err}).Error("Failed to write txn keys")
+		}
+	}
+
+	return ok, err
 }
 
 func (t *ClusterTransact) HasData() bool {

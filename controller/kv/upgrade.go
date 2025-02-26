@@ -601,16 +601,12 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 	var v interface{}
 	var wrt bool
 	var policyListKey bool
-	var crdKey bool
 
 	if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
 		policyListKey = true
 	}
-	if strings.HasPrefix(key, share.CLUSCrdProcStore) || strings.HasPrefix(key, share.CLUSConfigCrdStore) {
-		crdKey = true
-	}
 	// [31, 139] is the first 2 bytes of gzip-format data
-	if policyListKey || (crdKey && len(value) >= 2 && value[0] == 31 && value[1] == 139) {
+	if policyListKey || needToUnzip(key, value) {
 		if value = utils.GunzipBytes(value); value == nil {
 			log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
 			return value, nil, false
@@ -622,7 +618,7 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 		var err error
 		newv, _ := json.Marshal(v)
 		// currently we only zip nw policy rulelist & longer-than-512k-crd-keys
-		if policyListKey || (crdKey && len(newv) >= cluster.KVValueSizeMax) { // 512 * 1024
+		if policyListKey || needToZip(key, newv) {
 			new_zb := utils.GzipBytes(newv)
 			err = cluster.PutBinary(key, new_zb)
 		} else {

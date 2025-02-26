@@ -148,6 +148,29 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 // Endpoint name to endping
 var cfgEndpointMap map[string]*cfgEndpoint = make(map[string]*cfgEndpoint)
 
+func supportGzipValue(key string) bool {
+	for _, prefix := range []string{share.CLUSCrdProcStore, share.CLUSConfigCrdStore, share.CLUSConfigProcessProfileStore} {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func needToZip(key string, value []byte) bool {
+	if len(value) >= cluster.KVValueSizeMax && supportGzipValue(key) { // 512 * 1024
+		return true
+	}
+	return false
+}
+
+func needToUnzip(key string, value []byte) bool {
+	if len(value) >= 2 && value[0] == 31 && value[1] == 139 && supportGzipValue(key) {
+		return true
+	}
+	return false
+}
+
 func purgeFedFilter(epName, key string) bool {
 	return false // no purge
 }
@@ -527,7 +550,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 				_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
 				//for CLUSConfigSystemKey only
 				_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
-				if len(array) >= cluster.KVValueSizeMax && strings.HasPrefix(key, share.CLUSConfigCrdStore) { // 512 * 1024
+				if needToZip(key, array) {
 					zb := utils.GzipBytes(array)
 					txn.PutBinary(key, zb)
 				} else {
@@ -599,7 +622,7 @@ func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 						value = newValue
 					}
 					// [31, 139] is the first 2 bytes of gzip-format data
-					if strings.HasPrefix(key, share.CLUSConfigCrdStore) && len(value) >= 2 && value[0] == 31 && value[1] == 139 {
+					if needToUnzip(key, value) {
 						if value = utils.GunzipBytes(value); value == nil {
 							log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
 							continue
