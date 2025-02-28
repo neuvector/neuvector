@@ -119,18 +119,26 @@ func (q *VulQueryFilter) GetAssestBasedFilters() map[string]int {
 	return stats
 }
 
-func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter) ([]*DbVulAsset, int, []string, error) {
+func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter) ([]*DbVulAsset, int, []string, bool, error) {
 	dialect := goqu.Dialect("sqlite3")
 	db := dbHandle
 
 	perf := make([]string, 0)
+
+	// check if CVEDB is ready
+	CVEDBReady := true
+	cveDBCount := funcGetCveDbRecordCount()
+	if cveDBCount == 0 {
+		CVEDBReady = false
+	}
+
 	columns := []interface{}{"id", "type", "assetid", "idns", "vulsb"}
 
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
-	log.WithFields(log.Fields{"statement": statement, "args": args}).Debug("GetVulAssetSessionV2, fetch assets")
+	log.WithFields(log.Fields{"statement": statement, "args": args, "CVEDBReady": CVEDBReady}).Debug("GetVulAssetSessionV2, fetch assets")
 	rows, err := db.Query(statement, args...)
 	if err != nil {
-		return nil, 0, perf, err
+		return nil, 0, perf, CVEDBReady, err
 	}
 	defer rows.Close()
 
@@ -149,7 +157,7 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 		err = rows.Scan(&dbId, &assetType, &assetid, &idnsStr, &vulsBytes)
 		if err != nil {
 			pool.StopAndWait()
-			return nil, 0, perf, err
+			return nil, 0, perf, CVEDBReady, err
 		}
 
 		assetCount++
@@ -225,7 +233,7 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 	elapsed = time.Since(start)
 	perf = append(perf, fmt.Sprintf("2c, process vuls, took=%v", elapsed))
 
-	return dataSlice, nTotalCVE, perf, nil
+	return dataSlice, nTotalCVE, perf, CVEDBReady, nil
 }
 
 func batchProcessVulAsset(pool *pond.WorkerPool, mu *sync.Mutex, dbVulAssets map[string]*DbVulAsset, assetid, assetType, idnsStr string, vulsBytes []byte) {
