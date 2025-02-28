@@ -17,6 +17,9 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
+const riskPageReady = "ready"
+const riskPagePending = "pending"
+
 func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -75,14 +78,22 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 
 	// get vul records in vulAssets table
 	start = time.Now()
-	vulAssets, nTotalCVE, perf, err := db.FilterVulAssetsV2(allowed, queryFilter)
+	vulAssets, nTotalCVE, perf, CVEDBReady, err := db.FilterVulAssetsV2(allowed, queryFilter)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("FilterVulAssets error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
 		return
 	}
+
+	if CVEDBReady {
+		queryStat.Status = riskPageReady
+	} else {
+		vulAssets = nil
+		queryStat.Status = riskPagePending
+	}
+
 	elapsed = time.Since(start)
-	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("2/4, get filtered vulasset from db, took=%v", elapsed))
+	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("2/4, get filtered vulasset from db, CVEDBReady=%v, took=%v", CVEDBReady, elapsed))
 	queryStat.PerfStats = append(queryStat.PerfStats, perf...)
 
 	// get [top_image] and [top_nodes] summary,
@@ -125,7 +136,15 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	queryStat.Summary.TopImages = top5Images
 	queryStat.Summary.TopNodes = top5Nodes
 
-	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "querytoken": queryStat.QueryToken}).Debug("createVulAssetSession")
+	if !CVEDBReady {
+		log.Info("CVEDB is not ready yet.")
+		queryStat.TotalRecordCount = 0
+		queryStat.TotalMatchedRecordCount = 0
+		queryStat.Summary.TopImages = []*api.AssetCVECount{}
+		queryStat.Summary.TopNodes = []*api.AssetCVECount{}
+	}
+
+	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "querytoken": queryStat.QueryToken, "CVEDBReady": CVEDBReady}).Debug("createVulAssetSession")
 
 	if queryFilter.Debug == 0 {
 		queryStat.PerfStats = nil
@@ -322,7 +341,7 @@ func _createVulQuerySession(qsr *api.QuerySessionRequest) error {
 	allowed := getAllAllowedResourceId(acc)
 
 	// get all records in vulAssets table which represent the complete data
-	vulAssets, _, _, err := db.FilterVulAssetsV2(allowed, queryFilter)
+	vulAssets, _, _, _, err := db.FilterVulAssetsV2(allowed, queryFilter)
 	if err != nil {
 		return err
 	}

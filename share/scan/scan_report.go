@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
@@ -951,6 +950,7 @@ func GetCVERecord(name, dbKey, baseOS string) *api.RESTVulnerability {
 	}
 
 	cvedb := sdb.CVEDB
+
 	if dbKey != "" {
 		if vr, ok := cvedb[dbKey]; ok {
 			fillVulFields(vr, vul)
@@ -975,27 +975,7 @@ func GetCVERecord(name, dbKey, baseOS string) *api.RESTVulnerability {
 	return vul
 }
 
-// load simulation
-func Perf_getRandomCVEs(count int) []string {
+func GetCVEDBRecordCount() int {
 	sdb := GetScannerDB()
-	cvedb := sdb.CVEDB
-
-	// Get all cve names
-	keys := make([]string, 0, len(cvedb))
-	for key := range cvedb {
-		keys = append(keys, key)
-	}
-
-	// Shuffle the keys
-	rand.Shuffle(len(keys), func(i, j int) {
-		keys[i], keys[j] = keys[j], keys[i]
-	})
-
-	// Pick the first 'count' keys
-	if count > len(keys) {
-		count = len(keys)
-	}
-	selectedKeys := keys[:count]
-
-	return selectedKeys
+	return len(sdb.CVEDB)
 }

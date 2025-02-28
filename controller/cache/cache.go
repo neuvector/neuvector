@@ -2144,6 +2144,7 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	db.SetGetCVERecordFunc(GetCVERecord)
 	db.SetGetCVEListFunc(ExtractVulAttributes)
 	db.SetFillVulPackagesFunc(FillVulPackages)
+	db.SetGetCveDbRecordCountFunc(GetCVEDBRecordCount)
 
 	go ProcReportBkgSvc()
 	go FileReportBkgSvc()
@@ -2364,4 +2365,8 @@ func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
 		FeedRating:  cve.FeedRating,
 	}
 	return vul
+}
+
+func GetCVEDBRecordCount() int {
+	return scanUtils.GetCVEDBRecordCount()
 }

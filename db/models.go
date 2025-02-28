@@ -195,6 +195,7 @@ var funcGetCveRecord func(string, string, string) *DbVulAsset
 var funcGetCVEList func([]byte, string) []string
 var funcFillVulPackages func(*sync.Mutex, map[string]map[string]utils.Set, []byte, string, *[]string, map[string]*int) error
 var funcGetImageCVECount func(string, string) (int, int, int, error) // funcGetImageCVECount
+var funcGetCveDbRecordCount func() int
 var memdbMutex sync.RWMutex
 
 func CreateVulAssetDb(useLocal bool) error {
@@ -307,6 +308,10 @@ func SetFillVulPackagesFunc(funcObj func(*sync.Mutex, map[string]map[string]util
 
 func SetGetCVECountFunc(getImageCVECount func(string, string) (int, int, int, error)) {
 	funcGetImageCVECount = getImageCVECount
+}
+
+func SetGetCveDbRecordCountFunc(getCveDbRecordCount func() int) {
+	funcGetCveDbRecordCount = getCveDbRecordCount
 }
 
 func getVulassetSchema() []string {

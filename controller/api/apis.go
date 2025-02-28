@@ -4224,6 +4224,7 @@ type RESTVulQueryStats struct {
 	QueryToken              string                  `json:"query_token"`
 	PerfStats               []string                `json:"debug_perf_stats"`
 	Summary                 *VulAssetSessionSummary `json:"summary"`
+	Status                  string                  `json:"status"`
 }
 
 // for asset pagination
