@@ -1627,6 +1627,15 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 							PersonalAccessTokenCommitterName: githubCfg.PersonalAccessTokenCommitterName,
 							PersonalAccessTokenEmail:         githubCfg.PersonalAccessTokenEmail,
 						}
+					} else if rr.AzureDevopsConfiguration != nil {
+						azureDevopsCfg := *rr.AzureDevopsConfiguration
+						cr.AzureDevopsConfiguration = &share.RemoteRepository_AzureDevopsConfiguration{
+							OrganizationName:    *azureDevopsCfg.OrganizationName,
+							ProjectName:         *azureDevopsCfg.ProjectName,
+							RepoName:            *azureDevopsCfg.RepoName,
+							BranchName:          *azureDevopsCfg.BranchName,
+							PersonalAccessToken: *azureDevopsCfg.PersonalAccessToken,
+						}
 					}
 					if len(*rc.RemoteRepositories) > 1 || !cr.IsValid() {
 						err := errors.New("Unsupported remote repository nickname or provider")

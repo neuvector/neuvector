@@ -45,8 +45,9 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if remoteRepository.Provider != share.RemoteRepositoryProvider_GitHub {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "the only supported provider is github")
+	if remoteRepository.Provider != share.RemoteRepositoryProvider_GitHub && remoteRepository.Provider != share.RemoteRepositoryProvider_AzureDevops {
+		msg := fmt.Sprintf("the only supported providers are '%s' and '%s'", share.RemoteRepositoryProvider_GitHub, share.RemoteRepositoryProvider_AzureDevops)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
 		return
 	}
 
@@ -56,7 +57,7 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		Comment:  remoteRepository.Comment,
 		Enable:   remoteRepository.Enable,
 	}
-	if remoteRepository.GitHubConfiguration != nil {
+	if remoteRepository.Provider == share.RemoteRepositoryProvider_GitHub && remoteRepository.GitHubConfiguration != nil {
 		githubCfg := *remoteRepository.GitHubConfiguration
 		repo.GitHubConfiguration = &share.RemoteRepository_GitHubConfiguration{
 			RepositoryOwnerUsername:          githubCfg.RepositoryOwnerUsername,
@@ -65,6 +66,15 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 			PersonalAccessToken:              githubCfg.PersonalAccessToken,
 			PersonalAccessTokenCommitterName: githubCfg.PersonalAccessTokenCommitterName,
 			PersonalAccessTokenEmail:         githubCfg.PersonalAccessTokenEmail,
+		}
+	} else if remoteRepository.Provider == share.RemoteRepositoryProvider_AzureDevops && remoteRepository.AzureDevopsConfiguration != nil {
+		azureDevopsCfg := *remoteRepository.AzureDevopsConfiguration
+		repo.AzureDevopsConfiguration = &share.RemoteRepository_AzureDevopsConfiguration{
+			OrganizationName:    *azureDevopsCfg.OrganizationName,
+			ProjectName:         *azureDevopsCfg.ProjectName,
+			RepoName:            *azureDevopsCfg.RepoName,
+			BranchName:          *azureDevopsCfg.BranchName,
+			PersonalAccessToken: *azureDevopsCfg.PersonalAccessToken,
 		}
 	}
 
@@ -228,14 +238,21 @@ func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RE
 		return s != nil
 	}
 
+	replaceIfSet := func(toReplace, replacement *string) {
+		if isSet(replacement) {
+			*toReplace = *replacement
+		}
+	}
+
 	if updates.Enable != nil {
 		base.Enable = *updates.Enable
 	}
 
+	if isSet(updates.Comment) {
+		base.Comment = *updates.Comment
+	}
+
 	if base.Provider == share.RemoteRepositoryProvider_GitHub {
-		if isSet(updates.Comment) {
-			base.Comment = *updates.Comment
-		}
 		if isSet(updates.GitHubConfiguration.RepositoryOwnerUsername) {
 			base.GitHubConfiguration.RepositoryOwnerUsername = *updates.GitHubConfiguration.RepositoryOwnerUsername
 		}
@@ -256,8 +273,16 @@ func getUpdatedRemoteRepository(base share.CLUSRemoteRepository, updates *api.RE
 		}
 	}
 
-	if base.Provider != "github" {
-		return share.CLUSRemoteRepository{}, errors.New(`only "github" provider is allowed`)
+	if base.Provider == share.RemoteRepositoryProvider_AzureDevops {
+		replaceIfSet(&base.AzureDevopsConfiguration.OrganizationName, updates.AzureDevopsConfiguration.OrganizationName)
+		replaceIfSet(&base.AzureDevopsConfiguration.ProjectName, updates.AzureDevopsConfiguration.ProjectName)
+		replaceIfSet(&base.AzureDevopsConfiguration.RepoName, updates.AzureDevopsConfiguration.RepoName)
+		replaceIfSet(&base.AzureDevopsConfiguration.BranchName, updates.AzureDevopsConfiguration.BranchName)
+		replaceIfSet(&base.AzureDevopsConfiguration.PersonalAccessToken, updates.AzureDevopsConfiguration.PersonalAccessToken)
+	}
+
+	if base.Provider != share.RemoteRepositoryProvider_GitHub && base.Provider != share.RemoteRepositoryProvider_AzureDevops {
+		return share.CLUSRemoteRepository{}, errors.New(`only "github" or "azure devops" are allowed as providers`)
 	}
 
 	if !base.IsValid() {
