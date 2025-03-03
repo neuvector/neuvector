@@ -3,10 +3,10 @@ package remote_repository
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"errors"
 	"strings"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -17,13 +17,13 @@ var ErrBranchDoesNotExist = errors.New("branch does not exist")
 var ErrFileAlreadyExists = errors.New("file already exists at path")
 var AzureApiAlreadyExistsErrorFormat = "The path '%s' specified in the add operation already exists. Please specify a new path."
 
-const(
-	AzureApiPushOperationAdd = "add"
+const (
+	AzureApiPushOperationAdd  = "add"
 	AzureApiPushOperationEdit = "edit"
 )
 
 const (
-	AzureApiRepoEndpointRefs = "refs"
+	AzureApiRepoEndpointRefs   = "refs"
 	AzureApiRepoEndpointPushes = "pushes"
 )
 
