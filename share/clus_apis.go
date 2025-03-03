@@ -3100,33 +3100,46 @@ type RemoteRepository_GitHubConfiguration struct {
 
 // TODO: generalize this
 func (g *RemoteRepository_GitHubConfiguration) IsValid() bool {
-	isEmpty := func(s string) bool {
-		return s == ""
-	}
-	requiredFields := []string{
+	return NoneEmpty([]string{
 		g.RepositoryOwnerUsername,
 		g.RepositoryName,
 		g.RepositoryBranchName,
 		g.PersonalAccessToken,
 		g.PersonalAccessTokenCommitterName,
 		g.PersonalAccessTokenEmail,
-	}
-	for _, requiredField := range requiredFields {
-		if isEmpty(requiredField) {
-			return false
-		}
-	}
-	return true
+	})
 }
 
-const RemoteRepositoryProvider_GitHub string = "github"
+type RemoteRepository_AzureDevopsConfiguration struct {
+	OrganizationName    string `json:"organization_name"`
+	ProjectName         string `json:"project_name"`
+	RepoName            string `json:"repo_name"`
+	BranchName          string `json:"branch_name"`
+	PersonalAccessToken string `json:"personal_access_token,cloak"`
+}
+
+func (a *RemoteRepository_AzureDevopsConfiguration) IsValid() bool {
+	return NoneEmpty([]string{
+		a.OrganizationName,
+		a.ProjectName,
+		a.RepoName,
+		a.BranchName,
+		a.PersonalAccessToken,
+	})
+}
+
+const (
+	RemoteRepositoryProvider_GitHub      string = "github"
+	RemoteRepositoryProvider_AzureDevops string = "azure devops"
+)
 
 type CLUSRemoteRepository struct {
-	Nickname            string                                `json:"nickname"`
-	Provider            string                                `json:"provider"`
-	Comment             string                                `json:"comment"`
-	Enable              bool                                  `json:"enable"`
-	GitHubConfiguration *RemoteRepository_GitHubConfiguration `json:"github_configuration"`
+	Nickname                 string                                     `json:"nickname"`
+	Provider                 string                                     `json:"provider"`
+	Comment                  string                                     `json:"comment"`
+	Enable                   bool                                       `json:"enable"`
+	GitHubConfiguration      *RemoteRepository_GitHubConfiguration      `json:"github_configuration"`
+	AzureDevopsConfiguration *RemoteRepository_AzureDevopsConfiguration `json:"azure_devops_configuration"`
 }
 
 func (r *CLUSRemoteRepository) IsValid() bool {
@@ -3139,5 +3152,23 @@ func (r *CLUSRemoteRepository) IsValid() bool {
 		}
 		return r.GitHubConfiguration.IsValid()
 	}
+	if r.Provider == RemoteRepositoryProvider_AzureDevops {
+		if r.AzureDevopsConfiguration == nil {
+			return false
+		}
+		return r.AzureDevopsConfiguration.IsValid()
+	}
 	return false
+}
+
+func NoneEmpty(stringsToCheck []string) bool {
+	isEmpty := func(s string) bool {
+		return s == ""
+	}
+	for _, str := range stringsToCheck {
+		if isEmpty(str) {
+			return false
+		}
+	}
+	return true
 }

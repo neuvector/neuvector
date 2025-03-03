@@ -359,6 +359,14 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 				PersonalAccessTokenCommitterName: rr.GitHubConfiguration.PersonalAccessTokenCommitterName,
 				PersonalAccessTokenEmail:         rr.GitHubConfiguration.PersonalAccessTokenEmail,
 			}
+		} else if rr.Provider == share.RemoteRepositoryProvider_AzureDevops && rr.AzureDevopsConfiguration != nil {
+			repo.AzureDevopsConfiguration = &api.RESTRemoteRepo_AzureDevopsConfig{
+				OrganizationName:    &rr.AzureDevopsConfiguration.OrganizationName,
+				ProjectName:         &rr.AzureDevopsConfiguration.ProjectName,
+				RepoName:            &rr.AzureDevopsConfiguration.RepoName,
+				BranchName:          &rr.AzureDevopsConfiguration.BranchName,
+				PersonalAccessToken: &rr.AzureDevopsConfiguration.PersonalAccessToken,
+			}
 		}
 		rconf.RemoteRepositories[i] = repo
 	}
