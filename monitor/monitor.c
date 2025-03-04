@@ -615,6 +615,7 @@ static pid_t fork_exec(int i)
             args[a ++] = "--addr=:8181";
         }
         args[a ++] = "--log-level=error";
+        args[a ++] = "--v0-compatible";
         args[a] = NULL;
         break;
     default:
