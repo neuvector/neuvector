@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,17 +15,16 @@ import (
 	"github.com/mitchellh/pointerstructure"
 	log "github.com/sirupsen/logrus"
 
+	syslog "github.com/dmachard/go-clientsyslog"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/httpclient"
 	"github.com/neuvector/neuvector/share/utils"
-	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
 const syslogFacility = syslog.LOG_LOCAL0
 const notificationHeader = "notification"
 const syslogTimeout = time.Second * 30
-const syslogDialTimeout = time.Second * 30
 
 type Syslogger struct {
 	syslog     bool
@@ -102,7 +102,7 @@ func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
 				fmt.Println(logText)
 			}
 			if s.syslog {
-				err = s.send(logText, prio)
+				err = s.sendWithTimeout(logText, prio, syslogTimeout)
 			}
 		}
 	} else {
@@ -112,12 +112,31 @@ func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
 				fmt.Println(logText)
 			}
 			if s.syslog {
-				err = s.send(logText, prio)
+				err = s.sendWithTimeout(logText, prio, syslogTimeout)
 			}
 		}
 	}
 
 	return err
+}
+
+// sendWithTimeout ensures send() does not block for longer than the given timeout.
+func (s *Syslogger) sendWithTimeout(text string, prio syslog.Priority, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	errChan := make(chan error, 1)
+
+	go func() {
+		errChan <- s.send(text, prio)
+	}()
+
+	select {
+	case err := <-errChan:
+		return err
+	case <-ctx.Done():
+		return fmt.Errorf("syslog send timed out after %s", timeout)
+	}
 }
 
 func appendLogField(logText string, tag string, v reflect.Value) string {
@@ -206,22 +225,22 @@ func (s *Syslogger) send(text string, prio syslog.Priority) error {
 
 		s.Close()
 	}
-	if wr, err := s.makeDial(prio, syslogDialTimeout); err != nil {
+	if wr, err := s.makeDial(prio); err != nil {
 		return err
 	} else {
 		wr.SetFormatter(syslog.RFC5424Formatter)
-		wr.SetSendTimeout(syslogTimeout)
+		// wr.SetSendTimeout(syslogTimeout)
 		s.writer = wr
 		return s.sendWithLevel(text, prio)
 	}
 }
 
-func (s *Syslogger) makeDial(prio syslog.Priority, timeout time.Duration) (*syslog.Writer, error) {
+func (s *Syslogger) makeDial(prio syslog.Priority) (*syslog.Writer, error) {
 	if s.proto == "tcp+tls" {
-		return syslog.DialWithTLSCert("tcp+tls", s.addr, timeout, syslogFacility|prio, "neuvector", []byte(s.serverCert))
+		return syslog.DialWithTLSCert("tcp+tls", s.addr, syslogFacility|prio, "neuvector", []byte(s.serverCert))
 	}
 
-	return syslog.Dial(s.proto, s.addr, timeout, syslogFacility|prio, "neuvector")
+	return syslog.Dial(s.proto, s.addr, syslogFacility|prio, "neuvector")
 }
 
 // --

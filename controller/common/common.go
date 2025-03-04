@@ -16,11 +16,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	syslog "github.com/dmachard/go-clientsyslog"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/utils"
-	syslog "github.com/neuvector/neuvector/share/utils/srslog"
 )
 
 const DefIdleTimeoutInternal uint32 = 300
