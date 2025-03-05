@@ -355,6 +355,9 @@ func main() {
 		*custom_check_control = share.CustomCheckControl_Disable
 	}
 
+	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
+	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks, *scannerLBMax)
+
 	// Set global objects at the very first
 	platform, flavor, cloudPlatform, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
 	if err != nil {
@@ -977,9 +980,6 @@ func main() {
 
 	// To prevent crd webhookvalidating timeout need queue the crd and process later.
 	rest.CrdValidateReqManager()
-
-	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
-	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks, *scannerLBMax)
 
 	// start rest server
 	go rest.StartRESTServer(
