@@ -12,7 +12,8 @@
     "gomodVendor"
   ],
   "ignorePaths": [
-    "vendor/**/Dockerfile"
+    "vendor/**/Dockerfile",
+    "vendor/**/requirements.txt"
   ],
   "packageRules": [
     {
