@@ -2941,15 +2941,21 @@ func (p *Probe) isNVChildProcess(c *procContainer, proc *procInternal) bool {
 		}
 	}
 
-	mLog.WithFields(log.Fields{"path": path, "ppath": ppath, "nvRole": nvRole, "ppid": ppid}).Debug()
-	if isManagerType(nvRole) && ppath == "/usr/bin/bash" {
-		if path == "/usr/bin/python3.12" {
-			if len(proc.cmds) > 1 {
-				switch proc.cmds[1] {
-				case "/usr/local/bin/cli", "/usr/local/bin/cli.py":
-					c.outsider.Remove(pid)
-					c.children.Add(pid)
-					return true
+	mLog.WithFields(log.Fields{"path": path, "ppath": ppath, "nvRole": nvRole, "ppid": ppid, "cmds": proc.cmds}).Debug()
+	if isManagerType(nvRole) {
+		switch path {
+		case "/usr/bin/python3.12", "/usr/bin/bash":
+			for i, cmd := range proc.cmds {
+				if i == 1 {
+					switch cmd {
+					case "/usr/local/bin/cli", "/usr/local/bin/cli.py":
+						c.outsider.Remove(pid)
+						c.children.Add(pid)
+						return true
+					}
+				}
+				if i > 1 {
+					break // not for cli
 				}
 			}
 		}
