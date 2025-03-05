@@ -6,6 +6,11 @@
     "main"
   ],
   "prHourlyLimit": 4,
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths",
+    "gomodVendor"
+  ],
   "packageRules": [
     {
       "description": "Enable security only bumps for release branches",
