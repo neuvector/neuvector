@@ -1,0 +1,64 @@
+name: CodeQL
+on:
+  workflow_dispatch:
+  pull_request:
+
+  push:
+    branches:
+    - main
+
+  schedule:
+    - cron: '00 9 * * 2'
+
+permissions: {}
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'go', 'actions', 'cpp' ]
+
+    steps:
+      - name: Install Dependencies
+        if: matrix.language != 'actions'
+        run: |
+          sudo apt update
+          sudo apt install -y gcc-13 g++-13 make build-essential libpcap-dev libpcre3-dev libpcre2-dev curl wget zip git libnfnetlink-dev libnetfilter-queue-dev libmnl-dev liburcu-dev libjansson-dev libjemalloc-dev libhyperscan-dev
+
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 10
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 10
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b56ba49b26e50535fa1e7f7db0f4f7b4bf65d80d # v3.28.10
+        with:
+          languages: ${{matrix.language}}
+          # xref: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
+          # xref: https://codeql.github.com/codeql-query-help/go/
+          # xref: https://codeql.github.com/codeql-query-help/cpp/
+          config: |
+            paths-ignore:
+              - vendor/
+              - vendor/**/*
+
+      - name: Build Controller
+        if: matrix.language == 'go'
+        run: ./package/build_controller.sh
+      - name: Build Enforcer
+        if: matrix.language == 'cpp'
+        run: ./package/build_enforcer.sh
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b56ba49b26e50535fa1e7f7db0f4f7b4bf65d80d # v3.28.10
+        with:
+          category: "/language:${{matrix.language}}"
