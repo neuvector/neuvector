@@ -5,5 +5,19 @@
   "baseBranches": [
     "main"
   ],
-  "prHourlyLimit": 2
+  "prHourlyLimit": 4,
+  "packageRules": [
+    {
+      "description": "Enable security only bumps for release branches",
+      "enabled": false,
+      "matchBaseBranches": [
+        "release/5.4.x",
+        "release/5.3.x"
+      ]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "osvVulnerabilityAlerts": true
 }
