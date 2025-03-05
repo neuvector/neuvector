@@ -11,6 +11,9 @@
     "gomodUpdateImportPaths",
     "gomodVendor"
   ],
+  "ignorePaths": [
+    "vendor/**/Dockerfile"
+  ],
   "packageRules": [
     {
       "description": "Enable security only bumps for release branches",
