@@ -1,28 +1,29 @@
 name: golangci-lint
 on:
+  workflow_dispatch:
   pull_request:
 
-permissions:
-  contents: read
-  pull-requests: read
+permissions: {}
 
 jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
         with:
-          go-version: '1.23'
+          go-version: stable
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt install -y libpcre3-dev
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@2226d7cb06a077cd73e56eedd38eecad18e5d837 # v6.5.0
         with:
-          version: v1.60
-          args: --timeout=30m --new-from-rev=${{ github.event.pull_request.base.sha }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          install-mode: binary
+          args: --timeout=30m
