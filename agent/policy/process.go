@@ -37,7 +37,6 @@ var k8sGrpProbe utils.Set = utils.NewSet()
 func (e *Engine) UpdateProcessPolicy(name string, profile *share.CLUSProcessProfile) (bool, *share.CLUSProcessProfile) {
 	e.Mutex.Lock()
 	defer e.Mutex.Unlock()
-
 	exist, ok := e.ProcessPolicy[name]
 	if !ok || !reflect.DeepEqual(exist, profile) {
 		e.ProcessPolicy[name] = profile
@@ -57,7 +56,18 @@ func (e *Engine) ObtainProcessPolicy(name, id string) (*share.CLUSProcessProfile
 	e.Mutex.Lock()
 	profile := e.ProcessPolicy[name]
 	e.Mutex.Unlock()
-	if profile != nil { // the process policy per group has been fetched
+	if profile == nil { // a temporary learned group
+		profile = &share.CLUSProcessProfile{
+			Group:    name,
+			Mode:     share.PolicyModeLearn,
+			Process:  make([]*share.CLUSProcessProfileEntry, 0),
+			CfgType:  share.Learned,
+			Baseline: share.ProfileBasic, // avoid false positive events
+		}
+		e.Mutex.Lock()
+		e.ProcessPolicy[name] = profile
+		e.Mutex.Unlock()
+	} else { // the process policy per group has been fetched
 		if grp_profile, ok := e.getGroupRule(id); ok {
 			if grp_profile == nil { // neuvector pods only
 				return profile, true
@@ -74,9 +84,7 @@ func (e *Engine) ObtainProcessPolicy(name, id string) (*share.CLUSProcessProfile
 			return grp_profile, true
 		}
 	}
-
-	// log.WithFields(log.Fields{"name": name}).Debug("GRP: process profile not ready")
-	return nil, false
+	return profile, true
 }
 
 func (e *Engine) IsK8sGroupWithProbe(name string) bool {
