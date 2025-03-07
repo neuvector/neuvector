@@ -191,22 +191,30 @@ func sortProbeContainerByNetMode(starts utils.Set) []*container.ContainerMetaExt
 
 // Enforcer cannot run together with enforcer.
 // With SDN, enforcer can run together with controller; otherwise, port conflict will prevent them from running.
-func checkAntiAffinity(containers []*container.ContainerMeta, skips ...string) error {
-	skipSet := utils.NewSet()
-	for _, skip := range skips {
-		skipSet.Add(skip)
-	}
-
+func checkAntiAffinity(containers []*container.ContainerMeta) error {
+	enforcerSet := make(map[string]string)
 	for _, c := range containers {
-		if skipSet.Contains(c.ID) {
-			continue
-		}
-
 		if v, ok := c.Labels[share.NeuVectorLabelRole]; ok {
 			if strings.Contains(v, share.NeuVectorRoleEnforcer) {
-				return fmt.Errorf("Must not run with another enforcer")
+				enforcerSet[c.ID] = c.Name
 			}
 		}
+	}
+
+	if len(enforcerSet) != 1 {
+		if len(enforcerSet) == 0 {
+			return fmt.Errorf("there is no enforcer running")
+		}
+		enforcerList := ""
+		for id, name := range enforcerSet {
+			enforcerList += fmt.Sprintf("ID: %s, Name: %s ", id, name)
+		}
+		return fmt.Errorf("there are more than one enforcer running. %s", enforcerList)
+	}
+
+	for id, name := range enforcerSet {
+		Agent.ID = id
+		Agent.Name = name
 	}
 	return nil
 }
@@ -480,7 +488,7 @@ func main() {
 	var retry int
 	retryDuration := time.Duration(time.Second * 2)
 	for {
-		err = checkAntiAffinity(containers, Agent.ID, parentAgent.ID)
+		err = checkAntiAffinity(containers)
 		if err != nil {
 			// Anti affinity check failure might be because the old enforcer is not stopped yet.
 			// This can happen when user switches from an enforcer to an allinone on the same host.
@@ -489,7 +497,7 @@ func main() {
 			retry++
 			if retry == 10 {
 				retryDuration = time.Duration(time.Second * 30)
-				log.Info("Will retry affinity check every 30 seconds")
+				log.WithFields(log.Fields{"error": err}).Info("Will retry affinity check every 30 seconds")
 			}
 			time.Sleep(retryDuration)
 
