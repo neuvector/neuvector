@@ -1234,16 +1234,24 @@ func groupWorkloadLeave(id string, param interface{}) {
 	wl := wlc.workload
 
 	var memberLeave bool
+
+	profileMode := share.PolicyModeUnavailable
 	bHasGroupProfile := utils.HasGroupProfiles(wlc.learnedGroupName)
 	dptCustomGrps := utils.NewSet()
 
 	cacheMutexLock()
-	for _, cache := range groupCacheMap {
+	for svc, cache := range groupCacheMap {
+		if svc == wlc.learnedGroupName {
+			profileMode = cache.group.ProfileMode
+		}
+
 		if cache.members.Contains(wl.ID) {
 			wlc.groups.Remove(cache.group.Name)
 			cache.members.Remove(wl.ID)
-			if bHasGroupProfile && utils.IsCustomProfileGroup(cache.group.Name) {
-				dptCustomGrps.Add(cache.group.Name)
+			if bHasGroupProfile {
+				if utils.IsCustomProfileGroup(cache.group.Name) {
+					dptCustomGrps.Add(cache.group.Name)
+				}
 			}
 			memberLeave = true
 			log.WithFields(log.Fields{"group": cache.group.Name}).Debug("Leave group")
@@ -1265,7 +1273,7 @@ func groupWorkloadLeave(id string, param interface{}) {
 
 	// warning: avoid cacheMutexLock() before calling below function
 	if memberLeave && bHasGroupProfile {
-		dispatchHelper.WorkloadLeave(wlc.workload.HostID, wlc.learnedGroupName, id, dptCustomGrps, isLeader())
+		dispatchHelper.WorkloadLeave(wlc.workload.HostID, wlc.learnedGroupName, id, profileMode, dptCustomGrps, isLeader())
 	}
 }
 
@@ -1379,6 +1387,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 	// creation; in multi-controller case, when the new controller joins the cluster, the
 	// order of cluster watch update for workload and group is not guaranteed.
 	// Join and create learned group.
+	pmode := share.PolicyModeUnavailable
 	if cache, ok := groupCacheMap[wlc.learnedGroupName]; !ok || isDummyGroupCache(cache) {
 		if isLeader() {
 			if bHasGroupProfile {
@@ -1389,12 +1398,14 @@ func groupWorkloadJoin(id string, param interface{}) {
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
 				}
+				pmode = profileMode
 			}
 			// Members is calculated when group change is handled
 			// Service address is updated when group change is handled. It cannot be written
 			// into the cluster as service IP cannot be ported to other systems.
 		}
 	} else {
+		pmode = cache.group.ProfileMode
 		if !cache.members.Contains(wl.ID) {
 			wlc.groups.Add(wlc.learnedGroupName)
 			cache.members.Add(wl.ID)
@@ -1441,7 +1452,7 @@ func groupWorkloadJoin(id string, param interface{}) {
 				cacheMutexUnlock()
 			}
 		}
-		dispatchHelper.WorkloadJoin(wlc.workload.HostID, wlc.learnedGroupName, id, dptCustomGrpAdds, isLeader())
+		dispatchHelper.WorkloadJoin(wlc.workload.HostID, wlc.learnedGroupName, id, pmode, dptCustomGrpAdds, isLeader())
 	}
 }
 

@@ -25,12 +25,12 @@ import (
 // (2) Custom (user-defined) groups: associated criteria with Service groups; like: containers, fed.containers, fed.custom, custom.pods
 
 type DispatcherHelper interface {
-	WorkloadJoin(node, group, id string, customGrps utils.Set, bLeader bool)
-	WorkloadLeave(node, group, id string, customGrps utils.Set, bLeader bool)
+	WorkloadJoin(node, group, id, mode string, customGrps utils.Set, bLeader bool)
+	WorkloadLeave(node, group, id, mode string, customGrps utils.Set, bLeader bool)
 	NodeLeave(node string, bLeader bool)
 	CustomGroupUpdate(group string, serviceGrps utils.Set, bLeader bool)
 	CustomGroupDelete(group string, bLeader bool)
-	PutProfile(group, subkey string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error
+	PutProfile(group, subkey, mode string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error
 	IsGroupAdded(group string) bool
 }
 
@@ -41,6 +41,8 @@ type keyMappingHelper struct {
 	obj string // object/config/(ept)/
 	prf string // profiles/(ept)/
 }
+
+const emptyID = ""
 
 // counting (profile) workloads on a node
 type nodeMemberCache struct {
@@ -59,6 +61,7 @@ type kvDispatcher struct {
 	profileKeys    []keyMappingHelper          // utility: profile keys in the object/ store
 	matchedGrpFunc FuncIsGroupMember           // help purging custom groups when workloads leave.
 	getKvDataFunc  FuncGetConfigKVData
+	enforcingGrp   utils.Set
 }
 
 // ////////////////////////////////
@@ -123,6 +126,71 @@ func (dpt *kvDispatcher) unlock() {
 		return exCustomGrps
 	}
 */
+
+// maintain the members for leader/follower controllers
+func (dpt *kvDispatcher) addEnforcingGroups(group string) {
+	dpt.enforcingGrp.Add(group)
+	for node := range dpt.nodes.Iter() {
+		n := node.(string)
+		if nodeCache, ok := dpt.node2groups[n]; ok {
+			if members, ok := nodeCache.members[group]; !ok {
+				nodeCache.members[group] = utils.NewSet(emptyID) // add a mock entry
+			} else {
+				members.Add(emptyID)
+			}
+		}
+	}
+}
+
+func (dpt *kvDispatcher) setEnforcingGroups(group string, bSetup bool) {
+	if bSetup {
+		dpt.enforcingGrp.Add(group)
+	} else {
+		if !dpt.enforcingGrp.Contains(group) {
+			return // do nothing
+		}
+		dpt.enforcingGrp.Remove(group)
+	}
+
+	for node := range dpt.nodes.Iter() {
+		n := node.(string)
+		if nodeCache, ok := dpt.node2groups[n]; ok {
+			if members, ok := nodeCache.members[group]; !ok {
+				if bSetup {
+					nodeCache.members[group] = utils.NewSet(emptyID)
+					// log.WithFields(log.Fields{"group": group, "node": n}).Debug()
+					txn := cluster.Transact()
+					dpt.copyProfileKeys(n, group, txn)
+					if _, err := txn.Apply(); err != nil {
+						log.WithFields(log.Fields{"error": err, "group": group}).Error()
+					}
+					txn.Close()
+				}
+			} else {
+				if !bSetup {
+					members.Remove(emptyID)
+					if members.Cardinality() == 0 { // purge the group from the node
+						delete(nodeCache.members, group)
+						if nodes, ok := dpt.group2nodes[group]; ok {
+							nodes.Remove(n)
+							if nodes.Cardinality() == 0 {
+								delete(dpt.group2nodes, group) // remove reference to save memory
+							}
+						}
+						log.WithFields(log.Fields{"group": group, "node": n}).Debug("purge")
+						txn := cluster.Transact()
+						dpt.removeProfileKeys(n, group, txn)
+						if _, err := txn.Apply(); err != nil {
+							log.WithFields(log.Fields{"error": err, "group": group}).Error("delete failed")
+						}
+						txn.Close()
+					}
+				}
+			}
+		}
+	}
+}
+
 func (dpt *kvDispatcher) purgeCustomGroupsByNodeGroups(node string, customGrps utils.Set) utils.Set {
 	exCustomGrps := utils.NewSet()
 
@@ -172,7 +240,7 @@ func (dpt *kvDispatcher) refreshServiceGroup2Nodes(group, node, id string, bRemo
 		if ids, ok := nodeCache.members[group]; ok {
 			ids.Remove(id)
 			// log.WithFields(log.Fields{"group": group, "cnt": ids.Cardinality()}).Debug("DPT:")
-			if ids.Cardinality() == 0 {
+			if ids.Cardinality() == 0 || (ids.Cardinality() == 1 && ids.Contains(emptyID)) {
 				bGroupChanged = true // removed
 				delete(nodeCache.members, group)
 				nodes.Remove(node)
@@ -241,7 +309,7 @@ func (dpt *kvDispatcher) copyProfileKeys(node, group string, txn *cluster.Cluste
 }
 
 func (dpt *kvDispatcher) removeProfileKeys(node, group string, txn *cluster.ClusterTransact) {
-	// log.WithFields(log.Fields{"group": group, "node": node}).Debug("DPT: ")
+	// log.WithFields(log.Fields{"group": group, "node": node}).Debug("DPT:")
 	for _, m := range dpt.profileKeys {
 		key := fmt.Sprintf("%s%s/%s%s", share.CLUSNodeStore, node, m.prf, group)
 		// log.WithFields(log.Fields{"key": key}).Debug("DPT:")
@@ -270,10 +338,14 @@ func (dpt *kvDispatcher) buildCustomGroups(node string, customGrps utils.Set, tx
 }
 
 // from cacher
-func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.Set, bLeader bool) {
+func (dpt *kvDispatcher) WorkloadJoin(node, group, id, mode string, customGrps utils.Set, bLeader bool) {
 	// log.WithFields(log.Fields{"node": node, "group": group, "id": id, "customs": customGrps.String()}).Debug("DPT:")
 	dpt.lock()
 	defer dpt.unlock()
+
+	if mode == share.PolicyModeEvaluate || mode == share.PolicyModeEnforce {
+		dpt.addEnforcingGroups(group)
+	}
 
 	// check node
 	var bNewNode, bNewGroup bool
@@ -317,11 +389,16 @@ func (dpt *kvDispatcher) WorkloadJoin(node, group, id string, customGrps utils.S
 //
 //	(1) (current) purge the custom groups immediately(it needs the validatation of all other groups/workloads).
 //	(2) a 30-minutes timer to purge the unaffected custom groups
-func (dpt *kvDispatcher) WorkloadLeave(node, group, id string, customGrps utils.Set, bLeader bool) {
-	// log.WithFields(log.Fields{"node": node, "group": group, "id": id, "customs": customGrps.String()}).Debug("DPT:")
-
+func (dpt *kvDispatcher) WorkloadLeave(node, group, id, mode string, customGrps utils.Set, bLeader bool) {
 	dpt.lock()
 	defer dpt.unlock()
+
+	if mode == share.PolicyModeEvaluate || mode == share.PolicyModeEnforce {
+		dpt.addEnforcingGroups(group)
+		return // do not remove enforcing groups
+	}
+
+	// log.WithFields(log.Fields{"node": node, "group": group, "mode": mode}).Debug("DPT:")
 	removeCustomGrp := utils.NewSet()
 	bRemoveGroup := dpt.refreshServiceGroup2Nodes(group, node, id, true)
 
@@ -434,7 +511,7 @@ func (dpt *kvDispatcher) CustomGroupDelete(group string, bLeader bool) {
 
 // sample: nodes/ubuntu:2YZB:5T5K:....../profiles/process/containers
 // subkey includes the profile/ + <type> /+ <group name>
-func (dpt *kvDispatcher) PutProfile(group, subkey string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error {
+func (dpt *kvDispatcher) PutProfile(group, subkey, mode string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error {
 	var err error
 	// if nodes, put them into profile/
 	if utils.IsGroupNodes(group) {
@@ -459,8 +536,8 @@ func (dpt *kvDispatcher) PutProfile(group, subkey string, value []byte, txn *clu
 		defer txn.Close()
 	}
 
-	dpt.lockR()
-	defer dpt.unlockR()
+	dpt.lock()
+	defer dpt.unlock()
 	if nodes, ok := dpt.group2nodes[group]; ok {
 		for node := range nodes.Iter() {
 			key := share.CLUSNodeProfileKey(node.(string), subkey)
@@ -480,6 +557,13 @@ func (dpt *kvDispatcher) PutProfile(group, subkey string, value []byte, txn *clu
 		if err != nil {
 			log.WithFields(log.Fields{"group": group, "key": subkey, "error": err, "bPutIfNotExist": bPutIfNotExist}).Error("DPT:")
 		}
+	}
+
+	switch mode {
+	case share.PolicyModeEvaluate, share.PolicyModeEnforce:
+		dpt.setEnforcingGroups(group, true)
+	case share.PolicyModeLearn:
+		dpt.setEnforcingGroups(group, false)
 	}
 	return err
 }
@@ -501,6 +585,7 @@ func initDispatcher(matcher FuncIsGroupMember, getter FuncGetConfigKVData) {
 	dispatcher = &kvDispatcher{
 		nodes:          utils.NewSet(), // reference
 		customs:        utils.NewSet(),
+		enforcingGrp:   utils.NewSet(),
 		node2groups:    make(map[string]*nodeMemberCache),
 		group2nodes:    make(map[string]utils.Set),
 		matchedGrpFunc: matcher,
