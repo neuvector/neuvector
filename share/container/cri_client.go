@@ -263,28 +263,45 @@ func criGetSelfID(conn *grpc.ClientConn, ctx context.Context, rid string) (strin
 	}
 
 	resp_containers, err := criListContainers(conn, ctx, true)
-	if err == nil && resp_containers != nil {
-		for _, c := range resp_containers.Containers {
-			cid := c.GetId()
-			// from id or sandboxID
-			if rid != "" {
-				if rid == cid || rid == c.GetPodSandboxId() {
-					return cid, nil
-				}
-			}
+	if err != nil || resp_containers == nil {
+		log.WithFields(log.Fields{"podname": podname, "rid": rid}).Debug("failed to list containers")
+		return rid, err
+	}
 
-			// from pod name
-			if podname != "" {
-				if labels := c.GetLabels(); labels != nil {
-					if pod, ok := labels["io.kubernetes.pod.name"]; ok && pod == podname {
-						// log.WithFields(log.Fields{"id": cid, "podname": podname}).Debug()
+	if len(resp_containers.Containers) == 0 {
+		log.WithFields(log.Fields{"podname": podname, "rid": rid}).Debug("no containers found in the response")
+		return rid, fmt.Errorf("no containers found")
+	}
+
+	var containerID string
+	for _, c := range resp_containers.Containers {
+		cid := c.GetId()
+		labels := c.GetLabels()
+
+		// from id or sandboxID
+		if rid != "" && (rid == cid || rid == c.GetPodSandboxId()) {
+			return cid, nil
+		}
+
+		// from pod name
+		if podname != "" && labels != nil {
+			if pod, ok := labels["io.kubernetes.pod.name"]; ok && pod == podname {
+				if nvrole, ok := labels["neuvector.role"]; ok {
+					if nvrole == "enforcer" || nvrole == "controller" || nvrole == "controller+enforcer+manager" {
+						// log.WithFields(log.Fields{"id": cid, "podname": podname, "nvrole": nvrole}).Debug()
 						return cid, nil
 					}
+				}
+				if containerID == "" {
+					containerID = cid
 				}
 			}
 		}
 	}
-	log.WithFields(log.Fields{"podname": podname, "rid": rid}).Debug() // not found
+	if containerID != "" {
+		return containerID, nil
+	}
+	log.WithFields(log.Fields{"podname": podname, "rid": rid}).Debug("no matching container found") // not found
 	return rid, err
 }
 
