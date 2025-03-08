@@ -225,11 +225,11 @@ github.com/containerd/platforms
 # github.com/containerd/ttrpc v1.2.5
 ## explicit; go 1.19
 github.com/containerd/ttrpc
-# github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
+# github.com/containerd/typeurl v1.0.2
 ## explicit; go 1.13
 github.com/containerd/typeurl
-# github.com/containerd/typeurl/v2 v2.1.1
-## explicit; go 1.13
+# github.com/containerd/typeurl/v2 v2.2.3
+## explicit; go 1.21
 github.com/containerd/typeurl/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.5
 ## explicit; go 1.11
@@ -358,6 +358,7 @@ github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
+github.com/gogo/protobuf/types
 # github.com/golang-jwt/jwt/v5 v5.2.1
 ## explicit; go 1.18
 github.com/golang-jwt/jwt/v5
