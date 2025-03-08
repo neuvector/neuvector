@@ -606,7 +606,7 @@ github.com/streadway/simpleuuid
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
-# github.com/urfave/cli/v2 v2.27.5
+# github.com/urfave/cli/v2 v2.27.6
 ## explicit; go 1.18
 github.com/urfave/cli/v2
 # github.com/vishvananda/netlink v1.3.0
