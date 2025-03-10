@@ -273,7 +273,7 @@ func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr
 			PIPS:   tpips,
 		},
 	}
-	if pips == nil || len(pips) <= 0 {
+	if len(pips) <= 0 {
 		data.AddMAC.PIPS = nil
 	}
 	msg, _ := json.Marshal(data)
@@ -1037,6 +1037,7 @@ func dpKeepAlive() {
 }
 
 func monitorDP() {
+	//nolint:staticcheck // SA1015
 	dpTicker := time.Tick(dpKeepAliveInterval)
 	dpConnJamRetry := 0
 

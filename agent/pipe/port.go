@@ -1392,7 +1392,7 @@ func createIptablesNvQuarRules() {
 
 func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 	var cmd string
-	if appMap == nil || len(appMap) <= 0 {
+	if len(appMap) <= 0 {
 		cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
 		if _, dbgError := shellCombined(cmd); dbgError != nil {
 			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
@@ -1447,7 +1447,7 @@ func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[sha
 
 func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[share.CLUSProtoPort]*share.CLUSApp) {
 	var cmd string
-	if appMap == nil || len(appMap) <= 0 {
+	if len(appMap) <= 0 {
 		cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)
 		if _, err := shellCombined(cmd); err != nil {
 			cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, qno)

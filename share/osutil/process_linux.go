@@ -230,7 +230,7 @@ func getCGroupSocketTable(rootPid int, tbl map[uint32]SocketInfo, file string, t
 			}
 		}
 
-		if tokens == nil || len(tokens) < 9 {
+		if len(tokens) < 9 {
 			continue
 		}
 
@@ -290,7 +290,7 @@ func getConnectionByFile(fileName string, inodes utils.Set, tcp bool, sport uint
 			}
 		}
 
-		if tokens == nil || len(tokens) < 9 {
+		if len(tokens) < 9 {
 			continue
 		}
 

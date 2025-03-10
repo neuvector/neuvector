@@ -329,8 +329,10 @@ func (w *FileWatch) sendMsg(cid string, path string, event uint32, pInfo []*Proc
 }
 
 func (w *FileWatch) loop() {
+	//nolint:staticcheck // SA1015
 	msgTicker := time.Tick(time.Second * 4)
 	// every 10s send learning rules to controller
+	//nolint:staticcheck // SA1015
 	learnTicker := time.Tick(time.Second * 10)
 
 	for {

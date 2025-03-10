@@ -360,6 +360,7 @@ func RegisterLeadChangeWatcher(fn LeadChangeCallback, lead string) {
 	})
 
 	go func() {
+		//nolint:staticcheck // SA1015
 		leadMonitorTicker := time.Tick(time.Second * 5)
 		for {
 			select {

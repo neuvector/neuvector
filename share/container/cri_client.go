@@ -87,6 +87,7 @@ func newCriClient(sock string, ctx context.Context) (*grpc.ClientConn, *criRT.Ve
 	}
 
 	log.WithFields(log.Fields{"addr": addr}).Debug()
+	//nolint:staticcheck // SA1019
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(4*time.Second), grpc.WithDialer(dialer))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect, make sure you are running as root and the runtime has been started: %v", err)

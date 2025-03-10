@@ -281,6 +281,7 @@ func (p *Probe) netlinkProcMonitor() {
 	var rebuildCounter int64 = -1
 	const ticker_unit_in_seconds = 2
 	const cleanupCounter = 10 * 60 / ticker_unit_in_seconds // 10 minutes
+	//nolint:staticcheck // SA1015
 	ticker := time.Tick(time.Second * ticker_unit_in_seconds)
 	log.Info("PROC: Start real-time process listener")
 	for {
