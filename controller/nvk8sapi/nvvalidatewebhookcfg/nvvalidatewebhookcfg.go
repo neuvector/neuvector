@@ -781,11 +781,11 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 			} else {
 				c_sig := make(chan os.Signal, 1)
 				signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
-				//nolint:staticcheck // SA1015
-				ticker := time.Tick(time.Second)
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
 				for i := 0; i < 10; i++ {
 					select {
-					case <-ticker:
+					case <-ticker.C:
 						if err, svcInfo := GetValidateWebhookSvcInfo(svcname); err == nil {
 							if svcInfo.LabelTag == tag && svcInfo.LabelEcho == tag {
 								// one nv controller processed our UPDATE svc request
@@ -871,11 +871,11 @@ func EchoAdmWebhookConnection(tagExpected, svcname string) {
 	}
 	c_sig := make(chan os.Signal, 1)
 	signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
-	//nolint:staticcheck // SA1015
-	ticker := time.Tick(time.Second)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for i := 0; i < 4; i++ {
 		select {
-		case <-ticker:
+		case <-ticker.C:
 			obj, err := global.ORCH.GetResource(resource.RscTypeService, resource.NvAdmSvcNamespace, svcname)
 			if err != nil {
 				log.WithFields(log.Fields{"namespace": resource.NvAdmSvcNamespace, "service": svcname, "err": err}).Error("resource no found")
