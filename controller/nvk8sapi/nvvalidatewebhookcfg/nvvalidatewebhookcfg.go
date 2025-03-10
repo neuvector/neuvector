@@ -781,6 +781,7 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 			} else {
 				c_sig := make(chan os.Signal, 1)
 				signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
+				//nolint:staticcheck // SA1015
 				ticker := time.Tick(time.Second)
 				for i := 0; i < 10; i++ {
 					select {
@@ -870,6 +871,7 @@ func EchoAdmWebhookConnection(tagExpected, svcname string) {
 	}
 	c_sig := make(chan os.Signal, 1)
 	signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
+	//nolint:staticcheck // SA1015
 	ticker := time.Tick(time.Second)
 	for i := 0; i < 4; i++ {
 		select {

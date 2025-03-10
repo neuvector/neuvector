@@ -153,6 +153,7 @@ func checkAggrLogsCache(alwaysFlush bool) {
 func CleanupSessCfgCache() {
 	cSig := make(chan os.Signal, 1)
 	signal.Notify(cSig, os.Interrupt, syscall.SIGTERM)
+	//nolint:staticcheck // SA1015
 	ticker := time.Tick(time.Minute)
 Loop:
 	for {

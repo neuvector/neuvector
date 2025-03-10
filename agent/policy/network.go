@@ -768,7 +768,7 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
 				for id, wl := range wlMap {
 					if strings.Contains(addr.PolicyMode, wl.PolicyMode) {
-						if addr.NatPortApp == nil || len(addr.NatPortApp) <= 0 { //PAI
+						if len(addr.NatPortApp) <= 0 { //PAI
 							wlList = append(wlList, &share.CLUSWorkloadAddr{WlID: id,
 								LocalPortApp: addr.LocalPortApp, NatPortApp: addr.NatPortApp})
 						} else {

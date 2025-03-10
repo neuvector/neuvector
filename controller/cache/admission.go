@@ -1998,6 +1998,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 }
 
 func (m CacheMethod) WaitUntilApiPathReady() bool {
+	//nolint:staticcheck // SA1015
 	ticker := time.Tick(time.Second)
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
