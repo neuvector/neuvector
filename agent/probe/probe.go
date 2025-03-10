@@ -226,8 +226,11 @@ func (p *Probe) monitorProcessChanges() {
 }
 
 func (p *Probe) loop() {
+	//nolint:staticcheck // SA1015
 	scanTicker := time.Tick(time.Second * 1)
+	//nolint:staticcheck // SA1015
 	purgeHistoryTicker := time.Tick(time.Second * 60)
+	//nolint:staticcheck // SA1015
 	aggregateReportTicker := time.Tick(time.Second * 5)
 	var scan bool
 	var pidSetNew utils.Set

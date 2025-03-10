@@ -1846,6 +1846,7 @@ func (rs *Registry) polling(ctx context.Context) {
 		smd.scanLog.WithFields(log.Fields{"PollPeriod": rs.config.PollPeriod}).Error("Polling interval out of range")
 		return
 	}
+	//nolint:staticcheck // SA1015
 	ticker := time.Tick(time.Second * time.Duration(rs.config.PollPeriod))
 	for {
 		select {
