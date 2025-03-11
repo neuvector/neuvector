@@ -16,16 +16,18 @@ import (
 type MockTask struct {
 	result        interface{}
 	sleepDuration time.Duration
+	started       chan struct{}
 }
 
 // NewMockTask creates a new instance of MockTask with the given result and sleep duration.
 // Parameters:
 // - result: The result to return after the task is run.
 // - sleepDuration: The duration to sleep to simulate work.
-func NewMockTask(result interface{}, sleepDuration time.Duration) MockTask {
+func NewMockTask(result interface{}, sleepDuration time.Duration, started chan struct{}) MockTask {
 	return MockTask{
 		result:        result,
 		sleepDuration: sleepDuration,
+		started:       started,
 	}
 }
 
@@ -36,6 +38,9 @@ func NewMockTask(result interface{}, sleepDuration time.Duration) MockTask {
 // Returns:
 // - The predefined result after sleeping.
 func (m *MockTask) Run(arg interface{}) (interface{}, *JobError) {
+	if m.started != nil {
+		close(m.started)
+	}
 	time.Sleep(m.sleepDuration)
 	return m.result, nil
 }
@@ -95,7 +100,7 @@ func TestPoll(t *testing.T) {
 	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 
-	mockTask := NewMockTask(taskResult, 100*time.Millisecond)
+	mockTask := NewMockTask(taskResult, 100*time.Millisecond, nil)
 	job, jobErr := mgr.NewJob(key, &mockTask, nil)
 	assert.NotNil(t, job, "Expected job to be non-nil for key %s", key)
 	assert.Nil(t, jobErr, "Unexpected error creating job %s: %v", key, jobErr)
@@ -125,9 +130,10 @@ func TestJobCount(t *testing.T) {
 	assert.Equal(t, mgr.GetJobCount(), 1)
 }
 
-// TestNewJob verifies that a job fails correctly after exceeding the maximum number of retry attempts, and queeu capacity
+// TestNewJob verifies that a job fails correctly after exceeding the maximum number of retry attempts
 func TestNewJob(t *testing.T) {
 	mockTimeOut := 1 * time.Second
+	mockTaskDuration := 3 * mockTimeOut
 	mockPoolSize := 1
 	mockJobQueueCapacity := 1
 	mockRetry := 10
@@ -135,7 +141,7 @@ func TestNewJob(t *testing.T) {
 
 	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
-	mockTask := NewMockTask(taskResult, 1*time.Second)
+	mockTask := NewMockTask(taskResult, mockTaskDuration, nil)
 
 	// Create a job that will fail and retry
 	retryMaxJob, err := mgr.NewJob("retryMaxJob", &mockTask, nil)
@@ -151,27 +157,48 @@ func TestNewJob(t *testing.T) {
 	retryMaxJob, err = mgr.NewJob("retryMaxJob", &mockTask, nil)
 	assert.Nil(t, retryMaxJob)
 	assert.Equal(t, errMaxRetryReached, err)
+}
 
-	// Create a job that will fail and retry
-	time.Sleep(1 * time.Second) // wait for job to be done
-	retryEnqueueFailJob, err := mgr.NewJob("retryEnqueueFail", &mockTask, nil)
+// TestNewJobWithJobQueueFull verifies that a job fails correctly when the job queue is full
+func TestNewJobWithJobQueueFull(t *testing.T) {
+	// Configuration
+	mockTimeOut := 1 * time.Second
+	mockTaskDuration := 5 * time.Second // Long enough to keep workers busy
+	mockPoolSize := 1                   // Single worker to control execution
+	mockJobQueueCapacity := 1           // Small queue capacity to fill easily
+	mockRetry := 10
+	mockStaleJobCleanupInterval := 10 * time.Second
+
+	// Initialize the manager
+	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
+	defer mgr.Shutdown()
+
+	// Create a mock task that takes time to execute
+	taskResult := "task completed"
+	firstTask := NewMockTask(taskResult, mockTaskDuration, make(chan struct{}))
+	secondTask := NewMockTask(taskResult, mockTaskDuration, nil)
+	thirdTask := NewMockTask(taskResult, mockTaskDuration, nil)
+
+	// Fill the worker pool (1 worker) with a long-running job
+	firstJob, err := mgr.NewJob("firstJob", &firstTask, nil)
 	assert.Nil(t, err)
-	assert.NotNil(t, retryEnqueueFailJob)
-	assert.Equal(t, Pending, retryEnqueueFailJob.Status)
+	assert.NotNil(t, firstJob)
+	assert.Equal(t, Pending, firstJob.Status)
+	<-firstTask.started // wait for the job to start
 
-	// Fill the job queue by adding a dummy job
-	dummyTask := NewMockTask(taskResult, 10*time.Second)
-	dummyJob, err := mgr.NewJob("dummyJob", &dummyTask, nil)
+	// Step 2: Fill the job queue (capacity = 1) with another job
+	secondJob, err := mgr.NewJob("secondJob", &secondTask, nil)
 	assert.Nil(t, err)
-	assert.NotNil(t, dummyJob)
-	assert.Equal(t, Pending, dummyJob.Status)
+	assert.NotNil(t, secondJob)
+	assert.Equal(t, Pending, secondJob.Status)
 
-	// Simulate job failure and retry
-	retryEnqueueFailJob.Status = Retry
-	// Attempt to create the job again, expecting it to fail due to max retries reached
-	retryEnqueueFailJob, err = mgr.NewJob("retryEnqueueFail", &mockTask, nil)
-	assert.Nil(t, retryEnqueueFailJob)
+	// Step 4: Attempt to add a third job, which should fail due to a full queue
+	thirdJob, err := mgr.NewJob("thirdJob", &thirdTask, nil)
+	assert.Nil(t, thirdJob)
 	assert.Equal(t, errTooManyJobs, err)
+
+	// Verify the job count
+	assert.Equal(t, 2, mgr.GetJobCount(), "Expected 2 jobs in the manager (1 running, 1 queued)")
 }
 
 // TestNewJobWithLargeScaleConcurrency tests the creation and processing of 1000 jobs concurrently to ensure scalability and thread safety.
@@ -193,7 +220,7 @@ func TestNewJobWithLargeScaleConcurrency(t *testing.T) {
 			defer wg.Done()
 			key := fmt.Sprintf("key-%d", index)
 
-			mockTask := NewMockTask(taskResult, 100*time.Millisecond)
+			mockTask := NewMockTask(taskResult, 100*time.Millisecond, nil)
 			job, err := mgr.NewJob(key, &mockTask, nil)
 			assert.Nil(t, err, "Unexpected error creating job %s: %v", key, err)
 			assert.NotNil(t, job, "Expected job to be non-nil for key %s", key)
@@ -229,7 +256,7 @@ func TestJobQueueCapacityZero(t *testing.T) {
 	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 	defer mgr.Shutdown()
 
-	mockTask := NewMockTask(taskResult, 100*time.Millisecond)
+	mockTask := NewMockTask(taskResult, 100*time.Millisecond, nil)
 	// Attempt to add a job should immediately return an error
 	job, err := mgr.NewJob("key1", &mockTask, nil)
 	assert.Nil(t, job, "Expected no job to be created when queue capacity is zero")
@@ -249,7 +276,7 @@ func TestShutdownResourceCleanup(t *testing.T) {
 	mgr := NewLongPollOnceMgr(mockTimeOut, mockStaleJobCleanupInterval, mockPoolSize, mockJobQueueCapacity, mockRetry)
 
 	// Add some mock jobs to the queue
-	mockTask := NewMockTask(taskResult, 100*time.Millisecond)
+	mockTask := NewMockTask(taskResult, 100*time.Millisecond, nil)
 	jobKeys := []string{"key1", "key2", "key3"}
 	for _, key := range jobKeys {
 		job, err := mgr.NewJob(key, &mockTask, nil)
