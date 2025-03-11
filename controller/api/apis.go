@@ -4071,7 +4071,7 @@ type RESTRemoteRepositoryConfig struct {
 	Comment                  *string                                  `json:"comment"`
 	Enable                   *bool                                    `json:"enable"`
 	GitHubConfiguration      *RESTRemoteRepository_GitHubConfigConfig `json:"github_configuration"`
-	AzureDevopsConfiguration *RESTRemoteRepo_AzureDevopsConfig
+	AzureDevopsConfiguration *RESTRemoteRepo_AzureDevopsConfig        `json:"azure_devops_configuration"`
 }
 
 type RESTRemoteRepositoryConfigData struct {
