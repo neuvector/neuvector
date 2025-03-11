@@ -51,6 +51,13 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
+	getStrValue := func(str *string) string {
+		if str != nil {
+			return *str
+		}
+		return ""
+	}
+
 	repo := share.CLUSRemoteRepository{
 		Nickname: remoteRepository.Nickname,
 		Provider: remoteRepository.Provider,
@@ -70,11 +77,16 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 	} else if remoteRepository.Provider == share.RemoteRepositoryProvider_AzureDevops && remoteRepository.AzureDevopsConfiguration != nil {
 		azureDevopsCfg := *remoteRepository.AzureDevopsConfiguration
 		repo.AzureDevopsConfiguration = &share.RemoteRepository_AzureDevopsConfiguration{
-			OrganizationName:    *azureDevopsCfg.OrganizationName,
-			ProjectName:         *azureDevopsCfg.ProjectName,
-			RepoName:            *azureDevopsCfg.RepoName,
-			BranchName:          *azureDevopsCfg.BranchName,
-			PersonalAccessToken: *azureDevopsCfg.PersonalAccessToken,
+			OrganizationName:    getStrValue(azureDevopsCfg.OrganizationName),
+			ProjectName:         getStrValue(azureDevopsCfg.ProjectName),
+			RepoName:            getStrValue(azureDevopsCfg.RepoName),
+			BranchName:          getStrValue(azureDevopsCfg.BranchName),
+			PersonalAccessToken: getStrValue(azureDevopsCfg.PersonalAccessToken),
+		}
+
+		if !repo.AzureDevopsConfiguration.IsValid() {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "all fields are required for azure devops remote repository configuration")
+			return
 		}
 	}
 
