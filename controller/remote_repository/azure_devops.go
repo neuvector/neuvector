@@ -133,6 +133,10 @@ func (exp *azureDevopsExport) getRef() (AzureDevopsApi_Ref, error) {
 }
 
 func (exp *azureDevopsExport) pushFileToRepo(ref AzureDevopsApi_Ref, pushOperation string) error {
+	commitComment := exp.exportOptions.Comment
+	if commitComment == "" {
+		commitComment = fmt.Sprintf("import %s", exp.exportOptions.FilePath)
+	}
 	requestBody := AzureDevopsApi_RepoPushRequest{
 		RefUpdates: []RefUpdates{
 			{
@@ -142,7 +146,7 @@ func (exp *azureDevopsExport) pushFileToRepo(ref AzureDevopsApi_Ref, pushOperati
 		},
 		Commits: []Commits{
 			{
-				Comment: exp.exportOptions.Comment,
+				Comment: commitComment,
 				Changes: []Changes{
 					{
 						ChangeType: pushOperation,
