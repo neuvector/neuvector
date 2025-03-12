@@ -121,6 +121,9 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 		}
 
 		i := strings.Index(filter, "/")
+		if len(filter) > 1 && i == len(filter)-1 {
+			return nil, fmt.Errorf("invalid filter \"%s\": trailing slash not allowed in filter", filter)
+		}
 		if i > 0 {
 			org = filter[:i]
 			filter = filter[i+1:]
