@@ -37,7 +37,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neuvector/k8s v1.4.1-0.20240927235747-43bcf20a80a3
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runtime-spec v1.2.0
+	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/russellhaering/gosaml2 v0.9.1
