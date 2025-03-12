@@ -25,7 +25,7 @@ COPY upgrader/ /src/upgrader
 COPY vendor /src/vendor
 COPY go.mod go.sum base.h defs.h genlic.sh /src/
 WORKDIR /src
-RUN sed -i -e 's/interim.*xxxx/'"${VERSION:1}"'/g' ./controller/version.go
+RUN sed -i -e 's#interim.*xxxx#'"${VERSION}"'#g' ./controller/version.go
 RUN bash package/build_controller.sh
 
 #

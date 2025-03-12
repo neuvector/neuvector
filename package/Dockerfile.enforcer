@@ -27,7 +27,7 @@ ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 
 COPY . /src
 WORKDIR /src
-RUN sed -i -e 's/interim.*xxxx/'"${VERSION:1}"'/g' ./agent/version.go
+RUN sed -i -e 's#interim.*xxxx#'"${VERSION}"'#g' ./agent/version.go
 RUN bash package/build_enforcer.sh
 
 #
