@@ -1,6 +1,8 @@
 module github.com/neuvector/neuvector
 
-go 1.22
+go 1.23.0
+
+toolchain go1.24.1
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.8.0
@@ -48,7 +50,7 @@ require (
 	github.com/vishvananda/netlink v1.3.0
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/net v0.35.0
-	golang.org/x/oauth2 v0.26.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/sys v0.30.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/grpc/security/advancedtls v1.0.0
