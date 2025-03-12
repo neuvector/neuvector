@@ -20,17 +20,23 @@ import (
 )
 
 // CommonAPIClient is the common methods between stable and experimental versions of APIClient.
-type CommonAPIClient interface {
+//
+// Deprecated: use [APIClient] instead. This type will be an alias for [APIClient] in the next release, and removed after.
+type CommonAPIClient = stableAPIClient
+
+// APIClient is an interface that clients that talk with a docker server must implement.
+type APIClient interface {
+	stableAPIClient
+	CheckpointAPIClient // CheckpointAPIClient is still experimental.
+}
+
+type stableAPIClient interface {
 	ConfigAPIClient
 	ContainerAPIClient
 	DistributionAPIClient
 	ImageAPIClient
-	NodeAPIClient
 	NetworkAPIClient
 	PluginAPIClient
-	ServiceAPIClient
-	SwarmAPIClient
-	SecretAPIClient
 	SystemAPIClient
 	VolumeAPIClient
 	ClientVersion() string
@@ -39,45 +45,61 @@ type CommonAPIClient interface {
 	ServerVersion(ctx context.Context) (types.Version, error)
 	NegotiateAPIVersion(ctx context.Context)
 	NegotiateAPIVersionPing(types.Ping)
-	DialHijack(ctx context.Context, url, proto string, meta map[string][]string) (net.Conn, error)
+	HijackDialer
 	Dialer() func(context.Context) (net.Conn, error)
 	Close() error
+	SwarmManagementAPIClient
+}
+
+// SwarmManagementAPIClient defines all methods for managing Swarm-specific
+// objects.
+type SwarmManagementAPIClient interface {
+	SwarmAPIClient
+	NodeAPIClient
+	ServiceAPIClient
+	SecretAPIClient
+	ConfigAPIClient
+}
+
+// HijackDialer defines methods for a hijack dialer.
+type HijackDialer interface {
+	DialHijack(ctx context.Context, url, proto string, meta map[string][]string) (net.Conn, error)
 }
 
 // ContainerAPIClient defines API client methods for the containers
 type ContainerAPIClient interface {
 	ContainerAttach(ctx context.Context, container string, options container.AttachOptions) (types.HijackedResponse, error)
-	ContainerCommit(ctx context.Context, container string, options container.CommitOptions) (types.IDResponse, error)
+	ContainerCommit(ctx context.Context, container string, options container.CommitOptions) (container.CommitResponse, error)
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerDiff(ctx context.Context, container string) ([]container.FilesystemChange, error)
-	ContainerExecAttach(ctx context.Context, execID string, config types.ExecStartCheck) (types.HijackedResponse, error)
-	ContainerExecCreate(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error)
-	ContainerExecInspect(ctx context.Context, execID string) (types.ContainerExecInspect, error)
+	ContainerExecAttach(ctx context.Context, execID string, options container.ExecAttachOptions) (types.HijackedResponse, error)
+	ContainerExecCreate(ctx context.Context, container string, options container.ExecOptions) (container.ExecCreateResponse, error)
+	ContainerExecInspect(ctx context.Context, execID string) (container.ExecInspect, error)
 	ContainerExecResize(ctx context.Context, execID string, options container.ResizeOptions) error
-	ContainerExecStart(ctx context.Context, execID string, config types.ExecStartCheck) error
+	ContainerExecStart(ctx context.Context, execID string, options container.ExecStartOptions) error
 	ContainerExport(ctx context.Context, container string) (io.ReadCloser, error)
-	ContainerInspect(ctx context.Context, container string) (types.ContainerJSON, error)
-	ContainerInspectWithRaw(ctx context.Context, container string, getSize bool) (types.ContainerJSON, []byte, error)
+	ContainerInspect(ctx context.Context, container string) (container.InspectResponse, error)
+	ContainerInspectWithRaw(ctx context.Context, container string, getSize bool) (container.InspectResponse, []byte, error)
 	ContainerKill(ctx context.Context, container, signal string) error
-	ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error)
+	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
 	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
 	ContainerPause(ctx context.Context, container string) error
 	ContainerRemove(ctx context.Context, container string, options container.RemoveOptions) error
 	ContainerRename(ctx context.Context, container, newContainerName string) error
 	ContainerResize(ctx context.Context, container string, options container.ResizeOptions) error
 	ContainerRestart(ctx context.Context, container string, options container.StopOptions) error
-	ContainerStatPath(ctx context.Context, container, path string) (types.ContainerPathStat, error)
-	ContainerStats(ctx context.Context, container string, stream bool) (types.ContainerStats, error)
-	ContainerStatsOneShot(ctx context.Context, container string) (types.ContainerStats, error)
+	ContainerStatPath(ctx context.Context, container, path string) (container.PathStat, error)
+	ContainerStats(ctx context.Context, container string, stream bool) (container.StatsResponseReader, error)
+	ContainerStatsOneShot(ctx context.Context, container string) (container.StatsResponseReader, error)
 	ContainerStart(ctx context.Context, container string, options container.StartOptions) error
 	ContainerStop(ctx context.Context, container string, options container.StopOptions) error
-	ContainerTop(ctx context.Context, container string, arguments []string) (container.ContainerTopOKBody, error)
+	ContainerTop(ctx context.Context, container string, arguments []string) (container.TopResponse, error)
 	ContainerUnpause(ctx context.Context, container string) error
-	ContainerUpdate(ctx context.Context, container string, updateConfig container.UpdateConfig) (container.ContainerUpdateOKBody, error)
+	ContainerUpdate(ctx context.Context, container string, updateConfig container.UpdateConfig) (container.UpdateResponse, error)
 	ContainerWait(ctx context.Context, container string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error)
-	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
-	CopyToContainer(ctx context.Context, container, path string, content io.Reader, options types.CopyToContainerOptions) error
-	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (types.ContainersPruneReport, error)
+	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, container.PathStat, error)
+	CopyToContainer(ctx context.Context, container, path string, content io.Reader, options container.CopyToContainerOptions) error
+	ContainersPrune(ctx context.Context, pruneFilters filters.Args) (container.PruneReport, error)
 }
 
 // DistributionAPIClient defines API client methods for the registry
@@ -91,30 +113,42 @@ type ImageAPIClient interface {
 	BuildCachePrune(ctx context.Context, opts types.BuildCachePruneOptions) (*types.BuildCachePruneReport, error)
 	BuildCancel(ctx context.Context, id string) error
 	ImageCreate(ctx context.Context, parentReference string, options image.CreateOptions) (io.ReadCloser, error)
-	ImageHistory(ctx context.Context, image string) ([]image.HistoryResponseItem, error)
-	ImageImport(ctx context.Context, source types.ImageImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error)
-	ImageInspectWithRaw(ctx context.Context, image string) (types.ImageInspect, []byte, error)
+	ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error)
+
 	ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
-	ImageLoad(ctx context.Context, input io.Reader, quiet bool) (types.ImageLoadResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
 	ImagePush(ctx context.Context, ref string, options image.PushOptions) (io.ReadCloser, error)
 	ImageRemove(ctx context.Context, image string, options image.RemoveOptions) ([]image.DeleteResponse, error)
-	ImageSearch(ctx context.Context, term string, options types.ImageSearchOptions) ([]registry.SearchResult, error)
-	ImageSave(ctx context.Context, images []string) (io.ReadCloser, error)
+	ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error)
 	ImageTag(ctx context.Context, image, ref string) error
-	ImagesPrune(ctx context.Context, pruneFilter filters.Args) (types.ImagesPruneReport, error)
+	ImagesPrune(ctx context.Context, pruneFilter filters.Args) (image.PruneReport, error)
+
+	ImageInspect(ctx context.Context, image string, _ ...ImageInspectOption) (image.InspectResponse, error)
+	ImageHistory(ctx context.Context, image string, _ ...ImageHistoryOption) ([]image.HistoryResponseItem, error)
+	ImageLoad(ctx context.Context, input io.Reader, _ ...ImageLoadOption) (image.LoadResponse, error)
+	ImageSave(ctx context.Context, images []string, _ ...ImageSaveOption) (io.ReadCloser, error)
+
+	ImageAPIClientDeprecated
+}
+
+// ImageAPIClientDeprecated defines deprecated methods of the ImageAPIClient.
+type ImageAPIClientDeprecated interface {
+	// ImageInspectWithRaw returns the image information and its raw representation.
+	//
+	// Deprecated: Use [Client.ImageInspect] instead. Raw response can be obtained using the [ImageInspectWithRawResponse] option.
+	ImageInspectWithRaw(ctx context.Context, image string) (image.InspectResponse, []byte, error)
 }
 
 // NetworkAPIClient defines API client methods for the networks
 type NetworkAPIClient interface {
 	NetworkConnect(ctx context.Context, network, container string, config *network.EndpointSettings) error
-	NetworkCreate(ctx context.Context, name string, options types.NetworkCreate) (types.NetworkCreateResponse, error)
+	NetworkCreate(ctx context.Context, name string, options network.CreateOptions) (network.CreateResponse, error)
 	NetworkDisconnect(ctx context.Context, network, container string, force bool) error
-	NetworkInspect(ctx context.Context, network string, options types.NetworkInspectOptions) (types.NetworkResource, error)
-	NetworkInspectWithRaw(ctx context.Context, network string, options types.NetworkInspectOptions) (types.NetworkResource, []byte, error)
-	NetworkList(ctx context.Context, options types.NetworkListOptions) ([]types.NetworkResource, error)
+	NetworkInspect(ctx context.Context, network string, options network.InspectOptions) (network.Inspect, error)
+	NetworkInspectWithRaw(ctx context.Context, network string, options network.InspectOptions) (network.Inspect, []byte, error)
+	NetworkList(ctx context.Context, options network.ListOptions) ([]network.Summary, error)
 	NetworkRemove(ctx context.Context, network string) error
-	NetworksPrune(ctx context.Context, pruneFilter filters.Args) (types.NetworksPruneReport, error)
+	NetworksPrune(ctx context.Context, pruneFilter filters.Args) (network.PruneReport, error)
 }
 
 // NodeAPIClient defines API client methods for the nodes
@@ -165,7 +199,7 @@ type SwarmAPIClient interface {
 
 // SystemAPIClient defines API client methods for the system
 type SystemAPIClient interface {
-	Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error)
+	Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error)
 	Info(ctx context.Context) (system.Info, error)
 	RegistryLogin(ctx context.Context, auth registry.AuthConfig) (registry.AuthenticateOKBody, error)
 	DiskUsage(ctx context.Context, options types.DiskUsageOptions) (types.DiskUsage, error)
@@ -179,7 +213,7 @@ type VolumeAPIClient interface {
 	VolumeInspectWithRaw(ctx context.Context, volumeID string) (volume.Volume, []byte, error)
 	VolumeList(ctx context.Context, options volume.ListOptions) (volume.ListResponse, error)
 	VolumeRemove(ctx context.Context, volumeID string, force bool) error
-	VolumesPrune(ctx context.Context, pruneFilter filters.Args) (types.VolumesPruneReport, error)
+	VolumesPrune(ctx context.Context, pruneFilter filters.Args) (volume.PruneReport, error)
 	VolumeUpdate(ctx context.Context, volumeID string, version swarm.Version, options volume.UpdateOptions) error
 }
 
