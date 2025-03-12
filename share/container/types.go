@@ -391,6 +391,10 @@ func isKubeletLikely(cmds []string) bool {
 			matchedCnt++
 		}
 
+		if strings.HasPrefix(cmd, "--containerd=") {
+			matchedCnt++
+		}
+
 		if matchedCnt >= 2 {
 			log.WithFields(log.Fields{"cmds": cmds}).Debug()
 			return true
@@ -461,6 +465,10 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 							if strings.HasPrefix(cmd, "--container-runtime-endpoint=") {
 								// log.WithFields(log.Fields{"cmd": cmd}).Debug("found")
 								cmd = strings.TrimPrefix(cmd, "--container-runtime-endpoint=")
+								cmd = strings.TrimPrefix(cmd, "unix://") // remove "unix://" if exist
+								endpoint = cmd
+							} else if strings.HasPrefix(cmd, "--containerd=") {
+								cmd = strings.TrimPrefix(cmd, "--containerd=")
 								cmd = strings.TrimPrefix(cmd, "unix://") // remove "unix://" if exist
 								endpoint = cmd
 							}
