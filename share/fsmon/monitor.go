@@ -428,7 +428,7 @@ func (w *FileWatch) learnFromEvents(rootPid int, fmod fileMod, path string, even
 	w.mux.Lock()
 	grp, ok := w.groups[rootPid]
 	if !ok {
-		log.WithFields(log.Fields{"rootPid": rootPid}).Debug("FMON: group not found")
+
 		w.mux.Unlock()
 		return
 	}
@@ -908,9 +908,8 @@ func (w *FileWatch) handleDirEvents(fmod fileMod, info os.FileInfo, fullPath, pa
 func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath string, pid int) uint32 {
 	var event uint32
 	if info != nil {
-		log.WithFields(log.Fields{"fullPath": fullPath, "finfo": fmod.finfo}).Debug()
+		log.WithFields(log.Fields{"fullPath": fullPath, "finfo": fmod.finfo, "mask": fmod.mask}).Debug()
 		if (fmod.mask & inodeMovedMask) > 0 {
-			log.WithFields(log.Fields{"fullPath": fullPath, "finfo": fmod.finfo}).Debug()
 			event = fileEventMovedTo
 			w.addFile(true, fmod.finfo) // follow up ?
 		} else if (fmod.mask & syscall.IN_ATTRIB) > 0 {
@@ -925,9 +924,10 @@ func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath st
 					if !osutil.HashZero(fmod.finfo.Hash) {
 						event = fileEventModified
 					}
-					fmod.finfo.Hash = hash
 				}
-			} else if (fmod.mask & syscall.IN_MODIFY) > 0 {
+				fmod.finfo.Hash = hash
+			}
+			if (fmod.mask & (syscall.IN_CLOSE_WRITE | syscall.IN_MODIFY)) > 0 {
 				event = fileEventModified
 			}
 		} else {
