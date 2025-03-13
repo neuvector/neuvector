@@ -832,5 +832,5 @@ func decodeSnapshotter(info map[string]string) (string, error) {
 	//	     }
 	//  }
 
-	return "", errors.New("not found")
+	return "", nil
 }
