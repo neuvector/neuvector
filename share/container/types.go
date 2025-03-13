@@ -1,6 +1,7 @@
 package container
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -395,6 +396,10 @@ func isKubeletLikely(cmds []string) bool {
 			matchedCnt++
 		}
 
+		if strings.HasPrefix(cmd, "--config-dir=") {
+			matchedCnt++
+		}
+
 		if matchedCnt >= 2 {
 			log.WithFields(log.Fields{"cmds": cmds}).Debug()
 			return true
@@ -432,6 +437,50 @@ func isK3sLikely(cmds []string) (string, bool) {
 	return "", false
 }
 
+func getRuntimeSocketFromConfigFile(fpath string) (string, error) {
+	var endpoint string
+	f, err := os.Open(fpath)
+	if err != nil {
+		return endpoint, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		s := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(s, "containerRuntimeEndpoint:") {
+			endpoint = strings.TrimPrefix(s, "containerRuntimeEndpoint:")
+			endpoint = strings.TrimSpace(endpoint)
+			break
+		}
+	}
+	return endpoint, nil
+}
+
+func getRuntimeSocketFromConfigDir(dir string) (string, error) {
+	var endpoint string
+	entries, err := os.ReadDir(filepath.Join("/proc/1/root", dir))
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error()
+		return endpoint, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		if endpt, err := getRuntimeSocketFromConfigFile(filepath.Join("/proc/1/root", dir, entry.Name())); err == nil {
+			if endpt != "" {
+				endpoint = endpt
+				break
+			}
+		}
+	}
+	log.WithFields(log.Fields{"endpoint": endpoint}).Debug()
+	return endpoint, nil
+}
+
 func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool) {
 	// (1) iterating proc paths to find the "kubelet"
 	if d, err := os.Open("/proc"); err != nil {
@@ -463,7 +512,7 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 						for _, cmd := range cmds {
 							// log.WithFields(log.Fields{"cmd": cmd}).Debug()
 							if strings.HasPrefix(cmd, "--container-runtime-endpoint=") {
-								// log.WithFields(log.Fields{"cmd": cmd}).Debug("found")
+								// depreciated in 1.32
 								cmd = strings.TrimPrefix(cmd, "--container-runtime-endpoint=")
 								cmd = strings.TrimPrefix(cmd, "unix://") // remove "unix://" if exist
 								endpoint = cmd
@@ -471,8 +520,21 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 								cmd = strings.TrimPrefix(cmd, "--containerd=")
 								cmd = strings.TrimPrefix(cmd, "unix://") // remove "unix://" if exist
 								endpoint = cmd
+							} else if strings.HasPrefix(cmd, "--config-dir=") {
+								cmd = strings.TrimPrefix(cmd, "--config-dir=")
+								if endpt, err := getRuntimeSocketFromConfigDir(cmd); err == nil {
+									endpt = strings.TrimPrefix(endpt, "unix://") // remove "unix://" if exist
+									endpoint = endpt
+								}
+							} else if strings.HasPrefix(cmd, "--config=") {
+								cmd = strings.TrimPrefix(cmd, "--config=")
+								if endpt, err := getRuntimeSocketFromConfigFile(cmd); err == nil {
+									endpt = strings.TrimPrefix(endpt, "unix://") // remove "unix://" if exist
+									endpoint = endpt
+								}
 							}
 
+							// depreciated in 1.27
 							if strings.HasPrefix(cmd, "--pod-infra-container-image=") {
 								pause_img = strings.TrimPrefix(cmd, "--pod-infra-container-image=")
 							}
