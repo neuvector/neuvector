@@ -751,7 +751,6 @@ func (p *Probe) evalNewRunningApp(pid int) {
 
 	if !ok || c == nil {
 		// disappeared, short-live application
-		mLog.WithFields(log.Fields{"proc": proc, "pid": pid}).Debug()
 		return
 	}
 
@@ -2409,15 +2408,8 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	nShellCmd := p.isShellScript(id, proc)
 	mode, baseline, derivedGroup, svcGroup, allowSuspicious, err := p.procPolicyLookupFunc(id, proc.riskType, proc.pname, proc.ppath, proc.pid, proc.pgid, nShellCmd, pp)
 	if err != nil {
-		// add container task has not established yets
-		go func() {
-			time.Sleep(3 * time.Second)
-			if (proc.reported & profileReported) == 0 {
-				p.lockProcMux()
-				p.procProfileEval(id, proc, bKeepAlive)
-				p.unlockProcMux()
-			}
-		}()
+		// add conatiner task has not established yet
+		// log.WithFields(log.Fields{"name": proc.name, "error": err}).Debug("PROC:")
 		return share.PolicyActionAllow, false // assuming it is allowed so far
 	}
 
@@ -2511,7 +2503,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 	}
 
 	// multiple learn process event are okay because they are merged at controllers.
-	if derivedGroup != share.GroupNVProtect && pp.Action == share.PolicyActionLearn {
+	if pp.Action == share.PolicyActionLearn {
 		p.reportLearnProc(svcGroup, pp)
 	}
 
