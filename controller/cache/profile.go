@@ -93,10 +93,6 @@ func handleProfileReport(gproc map[string][]*share.CLUSProcessProfileEntry) erro
 					return errors.New("fail to find group")
 				}
 			}
-			// not at the learning stage
-			if profile.Mode == share.PolicyModeEvaluate || profile.Mode == share.PolicyModeEnforce {
-				continue
-			}
 			for _, proc := range procs {
 				if proc.Action == share.PolicyActionLearn {
 					proc.Action = share.PolicyActionAllow
