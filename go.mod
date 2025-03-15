@@ -54,7 +54,7 @@ require (
 	golang.org/x/sys v0.31.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/grpc/security/advancedtls v1.0.0
-	gopkg.in/ldap.v2 v2.5.1
+	gopkg.in/ldap.v3 v3.4.10
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.3
 	k8s.io/apiextensions-apiserver v0.29.3
