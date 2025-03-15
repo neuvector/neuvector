@@ -122,7 +122,7 @@ github.com/codeskyblue/go-sh
 # github.com/containerd/cgroups/v3 v3.0.2
 ## explicit; go 1.18
 github.com/containerd/cgroups/v3/cgroup1/stats
-# github.com/containerd/containerd v1.7.25
+# github.com/containerd/containerd v1.7.26
 ## explicit; go 1.21
 github.com/containerd/containerd
 github.com/containerd/containerd/archive
@@ -222,7 +222,7 @@ github.com/containerd/log
 # github.com/containerd/platforms v0.2.1
 ## explicit; go 1.20
 github.com/containerd/platforms
-# github.com/containerd/ttrpc v1.2.5
+# github.com/containerd/ttrpc v1.2.7
 ## explicit; go 1.19
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
