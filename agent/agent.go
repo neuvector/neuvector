@@ -700,6 +700,8 @@ func main() {
 		KubePlatform:         Host.Platform == share.PlatformKubernetes,
 		KubeFlavor:           Host.Flavor,
 		WalkHelper:           walkerTask,
+		SelfID:               Agent.ID,
+		PodID:                parentAgent.ID,
 	}
 
 	if prober, err = probe.New(&probeConfig, gInfo.agentConfig.LogLevel); err != nil {

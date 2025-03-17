@@ -35,6 +35,8 @@ type ProbeConfig struct {
 	KubePlatform         bool
 	KubeFlavor           string
 	WalkHelper           *workerlet.Tasker
+	SelfID               string
+	PodID                string
 }
 
 const (
