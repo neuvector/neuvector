@@ -922,8 +922,11 @@ func (w *FileWatch) handleFileEvents(fmod fileMod, info os.FileInfo, fullPath st
 			if hash, err := osutil.GetFileHash(fullPath); err == nil {
 				if hash != fmod.finfo.Hash {
 					if !osutil.HashZero(fmod.finfo.Hash) {
-						event = fileEventModified
+						fmod.finfo.Hash = hash
+						return fileEventModified
 					}
+				} else {
+					return fileEventAccessed
 				}
 				fmod.finfo.Hash = hash
 			}

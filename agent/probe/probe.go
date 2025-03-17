@@ -60,7 +60,8 @@ type Probe struct {
 	inspectProcess  utils.Set
 	chanEvalAppPid  chan int // pid
 	selfID          string   // enforcer/allinone container id
-	agentSessionID  int      // session processs ID for agent/container process launcher
+	podID           string
+	agentSessionID  int // session processs ID for agent/container process launcher
 	resetIoNodes    bool
 	resetProcTbl    bool //  patch netlink overflow and lost packets
 	deferCStartRpt  bool // defer start container report
@@ -316,6 +317,8 @@ func New(pc *ProbeConfig, logLevel string) (*Probe, error) {
 		chanEvalAppPid: make(chan int, 2048),
 		procHistoryMap: make(map[string][]*procInternal),
 		pMsgAggregates: make(map[string]*probeMsgAggregate),
+		selfID:         pc.SelfID,
+		podID:          pc.PodID,
 	}
 
 	// for process
@@ -330,7 +333,6 @@ func New(pc *ProbeConfig, logLevel string) (*Probe, error) {
 		log.Info("Process profiler is disabled")
 	}
 
-	p.selfID = global.RT.GetSelfID()
 	p.agentSessionID = osutil.GetSessionId(p.agentPid)
 	//log.WithFields(log.Fields{"sessionID": p.agentSessionID, "container ID": p.selfID}).Info("PROC: ")
 

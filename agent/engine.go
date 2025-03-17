@@ -228,27 +228,6 @@ func isContainerNetHostMode(info *container.ContainerMetaExtra, parent *containe
 	return false
 }
 
-// TODO: add more verifications to exclude hacker containers
-func nvPod2Role(pod string) string {
-	// Assume the pod name must be of pattern, neuvector-controller-pod-xxxx or dss-controller-pod-xxxx (OEM)
-	if !strings.HasPrefix(pod, "neuvector-") && !strings.HasPrefix(pod, "dss-") {
-		return ""
-	}
-
-	role := pod
-	if index := strings.LastIndex(role, "-pod"); index != -1 {
-		role = role[:index]
-		if index = strings.Index(role, "-"); index != -1 {
-			role = role[index+1:]
-			return role
-		} else {
-			return ""
-		}
-	} else {
-		return ""
-	}
-}
-
 func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	// log.WithFields(log.Fields{"role": role, "pid": rootPid}).Debug("PROC:")
 	// 1st screening
@@ -283,7 +262,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	}
 
 	if cmds, err := global.SYS.ReadCmdLine(rootPid); err == nil && len(cmds) > 0 {
-		//	log.WithFields(log.Fields{"role": role, "cmds": cmds}).Debug("PROC:")
+		// log.WithFields(log.Fields{"role": role, "cmds": cmds}).Debug("PROC:")
 		for _, cmd := range cmds {
 			if strings.HasPrefix(cmd, entryPtSig) { // matched at least two criteria
 				return true
@@ -309,30 +288,13 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 		}
 	}
 
-	// orchestra platforms
+	// kubenetes platforms
 	if podname, ok := labels[container.KubeKeyPodName]; ok {
-		role := nvPod2Role(podname)
-		if role == "" {
-			// 2nd try
-			if app, ok := labels[container.KubeKeyAppName]; ok {
-				role = nvPod2Role(app)
-			}
-			if role == "" {
-				return "", false
-			}
-		}
-
-		if isNeuvectorFunctionRole(role, info.Pid) {
-			return role, true
-		}
-
-		// POD for neuvector
-		if isChild, _ := getSharedContainer(info); !isChild {
-			//	log.WithFields(log.Fields{"labels": labels, "podname": podname}).Debug("PROC: POD")
-			return role, true
-		} else { // a child
-			if !info.Running {
-				// and exited neuvector containers
+		if strings.HasPrefix(info.Name, "k8s_POD") {
+			// sandbox of the agent
+			agtPodName := Agent.Labels[container.KubeKeyPodName]
+			if agtPodName == podname {
+				role := Agent.Labels[share.NeuVectorLabelRole]
 				return role, true
 			}
 		}
