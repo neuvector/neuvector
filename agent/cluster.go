@@ -350,6 +350,11 @@ func putMemoryPressureEvent(rpt *system.MemoryPressureReport, setRisingEdge bool
 func putLocalInfo() {
 	log.Debug()
 
+	if Agent.JoinedAt.IsZero() {
+		log.WithFields(log.Fields{"agent": Agent}).Info("agent info is not ready yet")
+		return
+	}
+
 	value, _ := json.Marshal(Host)
 	key := share.CLUSHostKey(Host.ID, "agent")
 	if err := cluster.Put(key, value); err != nil {
