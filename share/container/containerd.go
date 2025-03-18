@@ -210,7 +210,7 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		}
 	}
 
-	if meta, pid, attempt, err := d.GetContainerCriSupplement(c.ID()); err == nil {
+	if meta, pid, attempt, err := d.GetContainerCriSupplement(c.ID()); err == nil && meta != nil {
 		// log.WithFields(log.Fields{"meta": meta}).Info("CRI")
 		state := containerd.Stopped
 		if meta.Running {
