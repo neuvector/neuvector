@@ -1,32 +1,32 @@
-* @holyspectral @BinX-Suse @yasker 
+* @holyspectral @BinX-Suse
 /*
 /vendor/
-/CODEOWNERS @holyspectral @BinX-Suse @yasker
-/.github/ @neuvector/build @yasker  
-/build/ @neuvector/build @yasker 
-/controller/ @neuvector/controller @yasker 
-/controller/scan/ @neuvector/controller @neuvector/scanner @yasker 
-/db/ @neuvector/controller @yasker 
-/dp/ @neuvector/dp @yasker
-/templates/ @neuvector/controller @yasker 
-/upgrader/ @neuvector/controller @yasker 
-/agent/ @neuvector/enforcer @yasker 
-/tools/ @neuvector/enforcer @yasker 
-/monitor/ @neuvector/enforcer @neuvector/controller @yasker 
-/scripts/ @neuvector/enforcer @neuvector/controller @yasker 
-/share/auth/ @neuvector/controller @yasker 
-/share/cluster/ @neuvector/enforcer @neuvector/controller @yasker 
-/share/container/ @neuvector/enforcer @yasker 
-/share/fsmon/ @neuvector/enforcer @yasker 
-/share/global/ @neuvector/enforcer @neuvector/controller @yasker 
-/share/healthz @neuvector/controller @yasker 
-/share/httpclient/ @neuvector/controller @neuvector/scanner @yasker 
-/share/httptrace/ @neuvector/controller @neuvector/scanner @yasker 
-/share/k8sutils/ @neuvector/controller @yasker 
-/share/licenseinfo/ @neuvector/controller @yasker 
-/share/migration/ @neuvector/controller @yasker 
-/share/orchestration/ @neuvector/controller @yasker 
-/share/osutil/ @neuvector/enforcer @yasker 
-/share/scan/ @neuvector/enforcer @neuvector/controller @neuvector/scanner @yasker 
-/share/utils/ @neuvector/enforcer @neuvector/controller @neuvector/scanner @yasker 
+/CODEOWNERS @holyspectral @BinX-Suse
+/.github/ @neuvector/build
+/build/ @neuvector/build
+/controller/ @neuvector/controller
+/controller/scan/ @neuvector/controller @neuvector/scanner
+/db/ @neuvector/controller
+/dp/ @neuvector/dp
+/templates/ @neuvector/controller
+/upgrader/ @neuvector/controller
+/agent/ @neuvector/enforcer
+/tools/ @neuvector/enforcer
+/monitor/ @neuvector/enforcer @neuvector/controller
+/scripts/ @neuvector/enforcer @neuvector/controller
+/share/auth/ @neuvector/controller
+/share/cluster/ @neuvector/enforcer @neuvector/controller
+/share/container/ @neuvector/enforcer
+/share/fsmon/ @neuvector/enforcer
+/share/global/ @neuvector/enforcer @neuvector/controller
+/share/healthz @neuvector/controller
+/share/httpclient/ @neuvector/controller @neuvector/scanner
+/share/httptrace/ @neuvector/controller @neuvector/scanner
+/share/k8sutils/ @neuvector/controller
+/share/licenseinfo/ @neuvector/controller
+/share/migration/ @neuvector/controller
+/share/orchestration/ @neuvector/controller
+/share/osutil/ @neuvector/enforcer
+/share/scan/ @neuvector/enforcer @neuvector/controller @neuvector/scanner
+/share/utils/ @neuvector/enforcer @neuvector/controller @neuvector/scanner
 
