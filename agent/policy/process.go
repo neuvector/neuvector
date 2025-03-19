@@ -55,7 +55,6 @@ func (e *Engine) UpdateProcessPolicy(name string, profile *share.CLUSProcessProf
 func (e *Engine) ObtainProcessPolicy(name, id string) (*share.CLUSProcessProfile, bool) {
 	e.Mutex.Lock()
 	profile := e.ProcessPolicy[name]
-	e.Mutex.Unlock()
 	if profile == nil { // a temporary learned group
 		profile = &share.CLUSProcessProfile{
 			Group:    name,
@@ -64,10 +63,10 @@ func (e *Engine) ObtainProcessPolicy(name, id string) (*share.CLUSProcessProfile
 			CfgType:  share.Learned,
 			Baseline: share.ProfileBasic, // avoid false positive events
 		}
-		e.Mutex.Lock()
 		e.ProcessPolicy[name] = profile
 		e.Mutex.Unlock()
 	} else { // the process policy per group has been fetched
+		e.Mutex.Unlock()
 		if grp_profile, ok := e.getGroupRule(id); ok {
 			if grp_profile == nil { // neuvector pods only
 				return profile, true
