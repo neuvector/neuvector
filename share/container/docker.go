@@ -16,6 +16,7 @@ import (
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerEvent "github.com/docker/docker/api/types/events"
 	dockerImage "github.com/docker/docker/api/types/image"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 	dockerSystem "github.com/docker/docker/api/types/system"
 	dockerClient "github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
@@ -261,7 +262,7 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		copy(meta.Healthcheck, info.Config.Healthcheck.Test)
 	}
 
-	if info, _, err := d.client.ImageInspectWithRaw(context.Background(), meta.ImageID); err == nil {
+	if info, err := d.client.ImageInspect(context.Background(), meta.ImageID); err == nil {
 		meta.Author = info.Author
 		if tm, err := time.Parse(time.RFC3339, info.Created); err == nil {
 			meta.ImgCreateAt = tm
@@ -310,7 +311,7 @@ func (d *dockerDriver) GetImageHistory(name string) ([]*ImageHistory, error) {
 }
 
 func (d *dockerDriver) GetImage(name string) (*ImageMeta, error) {
-	info, _, err := d.client.ImageInspectWithRaw(context.Background(), name)
+	info, err := d.client.ImageInspect(context.Background(), name)
 	if err == nil {
 		meta := &ImageMeta{
 			ID:       info.ID,
@@ -394,7 +395,7 @@ func (d *dockerDriver) GetImageFile(id string) (io.ReadCloser, error) {
 
 // List network doesn't give container list in some network, such as ingress, but inspect gives the detail.
 func (d *dockerDriver) GetNetworkEndpoint(netID, container, epName string) (*NetworkEndpoint, error) {
-	network, err := d.client.NetworkInspect(context.Background(), netID, dockerTypes.NetworkInspectOptions{})
+	network, err := d.client.NetworkInspect(context.Background(), netID, dockerNetwork.InspectOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -416,14 +417,14 @@ func (d *dockerDriver) GetNetworkEndpoint(netID, container, epName string) (*Net
 }
 
 func (d *dockerDriver) ListNetworks() (map[string]*Network, error) {
-	networks, err := d.client.NetworkList(context.Background(), dockerTypes.NetworkListOptions{})
+	networks, err := d.client.NetworkList(context.Background(), dockerNetwork.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	netmap := make(map[string]*Network, len(networks))
 	for _, n := range networks {
-		network, err := d.client.NetworkInspect(context.Background(), n.ID, dockerTypes.NetworkInspectOptions{})
+		network, err := d.client.NetworkInspect(context.Background(), n.ID, dockerNetwork.InspectOptions{})
 		if err != nil {
 			continue
 		}
@@ -531,7 +532,7 @@ func (d *dockerDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 
 	var bRunning, bTimeoutError bool
 	for {
-		msgs, errCh := d.client.Events(ctx, dockerTypes.EventsOptions{})
+		msgs, errCh := d.client.Events(ctx, dockerEvent.ListOptions{})
 		bRunning = true
 		bTimeoutError = false
 		for bRunning {
@@ -677,7 +678,7 @@ func (d *dockerDriver) getImageRepoTag(imageID, imageName string) string {
 			return imageName // simplest matched form since it could be re-tagged  in native docker env
 		}
 
-		image, _, err := d.client.ImageInspectWithRaw(context.Background(), imageID)
+		image, err := d.client.ImageInspect(context.Background(), imageID)
 		if err == nil && len(image.RepoTags) > 0 {
 			for _, repo := range image.RepoTags {
 				repoTag = repo // report the last one
@@ -690,7 +691,7 @@ func (d *dockerDriver) getImageRepoTag(imageID, imageName string) string {
 	// Then, derived it from the 2nd resort(a partial name)
 	if strings.HasPrefix(imageName, "sha256:") || isSha256String(imageName) {
 		// retrive repoTag
-		image, _, err := d.client.ImageInspectWithRaw(context.Background(), imageName)
+		image, err := d.client.ImageInspect(context.Background(), imageName)
 		if err == nil && len(image.RepoTags) > 0 {
 			for _, repo := range image.RepoTags {
 				repoTag = repo // report the last one
