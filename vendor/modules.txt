@@ -575,8 +575,8 @@ github.com/remyoudompheng/bigfft
 github.com/russellhaering/gosaml2
 github.com/russellhaering/gosaml2/types
 github.com/russellhaering/gosaml2/uuid
-# github.com/russellhaering/goxmldsig v1.4.0
-## explicit; go 1.15
+# github.com/russellhaering/goxmldsig v1.5.0
+## explicit; go 1.21.0
 github.com/russellhaering/goxmldsig
 github.com/russellhaering/goxmldsig/etreeutils
 github.com/russellhaering/goxmldsig/types
