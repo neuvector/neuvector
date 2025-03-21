@@ -41,7 +41,7 @@ require (
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/russellhaering/gosaml2 v0.9.1
-	github.com/russellhaering/goxmldsig v1.4.0
+	github.com/russellhaering/goxmldsig v1.5.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/streadway/simpleuuid v0.0.0-20130420165545-6617b501e485
