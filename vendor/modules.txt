@@ -570,8 +570,8 @@ github.com/quay/clair/v2/pkg/tarutil
 # github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578
 ## explicit; go 1.12
 github.com/remyoudompheng/bigfft
-# github.com/russellhaering/gosaml2 v0.9.1
-## explicit; go 1.13
+# github.com/russellhaering/gosaml2 v0.10.0
+## explicit; go 1.21.0
 github.com/russellhaering/gosaml2
 github.com/russellhaering/gosaml2/types
 github.com/russellhaering/gosaml2/uuid
