@@ -63,6 +63,9 @@ func (ea *EncryptedAssertion) DecryptBytes(cert *tls.Certificate) ([]byte, error
 		}
 		return plainText, nil
 	case MethodAES128CBC, MethodAES256CBC, MethodTripleDESCBC:
+		if len(data)%k.BlockSize() != 0 {
+			return nil, fmt.Errorf("encrypted data is not a multiple of the expected CBC block size %d: actual size %d", k.BlockSize(), len(data))
+		}
 		nonce, data := data[:k.BlockSize()], data[k.BlockSize():]
 		c := cipher.NewCBCDecrypter(k, nonce)
 		c.CryptBlocks(data, data)

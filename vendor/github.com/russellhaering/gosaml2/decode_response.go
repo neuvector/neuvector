@@ -204,6 +204,7 @@ func (sp *SAMLServiceProvider) validateElementSignature(el *etree.Element) (*etr
 	return sp.validationContext().Validate(el)
 }
 
+// deprecated
 func (sp *SAMLServiceProvider) validateAssertionSignatures(el *etree.Element) error {
 	signedAssertions := 0
 	unsignedAssertions := 0
@@ -264,55 +265,131 @@ func (sp *SAMLServiceProvider) ValidateEncodedResponse(encodedResponse string) (
 	}
 
 	// Parse the raw response
-	doc, el, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
+	doc, unverifiedResponse, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
 	if err != nil {
 		return nil, err
 	}
 
 	var responseSignatureValidated bool
-	if !sp.SkipSignatureValidation {
-		el, err = sp.validateElementSignature(el)
-		if err == dsig.ErrMissingSignature {
-			// Unfortunately we just blew away our Response
-			el = doc.Root()
-		} else if err != nil {
-			return nil, err
-		} else if el == nil {
-			return nil, fmt.Errorf("missing transformed response")
-		} else {
-			responseSignatureValidated = true
+	// storing our final response to return back
+	decodedResponse := &types.Response{}
+	// user has decided to skip signature verification
+	// just unmarshal the untrusted el
+
+	if sp.SkipSignatureValidation {
+		err = xmlUnmarshalElement(unverifiedResponse, decodedResponse)
+		if err != nil {
+			return nil, fmt.Errorf("unable to unmarshal response: %v", err)
 		}
+
+		decodedResponse.SignatureValidated = false
+		err := sp.Validate(decodedResponse)
+		if err != nil {
+			return nil, err
+		}
+		return decodedResponse, nil
 	}
 
-	err = sp.decryptAssertions(el)
+	// first get SignedResponse, if any
+	signedResponseEl, err := sp.validateElementSignature(unverifiedResponse)
+
+	// continue for unsigned Response, maybe individual Assertions are still signed
+	if err == dsig.ErrMissingSignature {
+		// Unfortunately we just blew away our Response
+		unverifiedResponse = doc.Root()
+	} else if err != nil {
+		return nil, err
+	} else if signedResponseEl == nil {
+		return nil, fmt.Errorf("missing transformed response")
+	} else {
+		// good case, no errors when verifying signature
+		// 1. Response is signed
+		// optionally decrypt each assertion
+		err = sp.decryptAssertions(signedResponseEl)
+		if err != nil {
+			return nil, err
+		}
+
+		responseSignatureValidated = true
+
+		err = xmlUnmarshalElement(signedResponseEl, decodedResponse)
+		if err != nil {
+			return nil, fmt.Errorf("unable to unmarshal response: %v", err)
+		}
+		decodedResponse.SignatureValidated = responseSignatureValidated
+
+		err := sp.Validate(decodedResponse)
+		if err != nil {
+			return nil, err
+		}
+		return decodedResponse, nil
+	}
+
+	// now we have a tricky case,
+	// unsigned response but have some signed Assertions
+	// unmarshal into decodedResponse,
+
+	err = xmlUnmarshalElement(unverifiedResponse, decodedResponse)
 	if err != nil {
 		return nil, err
 	}
 
-	var assertionSignaturesValidated bool
-	if !sp.SkipSignatureValidation {
-		err = sp.validateAssertionSignatures(el)
-		if err == dsig.ErrMissingSignature {
-			if !responseSignatureValidated {
-				return nil, fmt.Errorf("response and/or assertions must be signed")
-			}
-		} else if err != nil {
-			return nil, err
-		} else {
-			assertionSignaturesValidated = true
-		}
+	// keep in mind anything inside the Response is technically untrusted
+	// however, we have to keep the relevant details such as StatusCode
+	// We reset the underlying assertions & encrypted assertions to []
+
+	decodedResponse.SignatureValidated = false
+	decodedResponse.Assertions = []types.Assertion{}
+	decodedResponse.EncryptedAssertions = []types.EncryptedAssertion{}
+
+	// first decrypt all assertions
+	err = sp.decryptAssertions(unverifiedResponse)
+	if err != nil {
+		return nil, err
 	}
 
-	decodedResponse := &types.Response{}
-	err = xmlUnmarshalElement(el, decodedResponse)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal response: %v", err)
-	}
-	decodedResponse.SignatureValidated = responseSignatureValidated
-	if assertionSignaturesValidated {
-		for idx := 0; idx < len(decodedResponse.Assertions); idx++ {
-			decodedResponse.Assertions[idx].SignatureValidated = true
+	// iterate through each Assertion inside our etree unverifiedResponse
+	addSignedAssertion := func(ctx etreeutils.NSContext, unverifiedAssertion *etree.Element) error {
+		parent := unverifiedAssertion.Parent()
+		if parent == nil {
+			return fmt.Errorf("parent is nil")
 		}
+		if parent != unverifiedResponse {
+			return fmt.Errorf("found assertion with unexpected parent element: %s", unverifiedAssertion.Parent().Tag)
+		}
+
+		detached, err := etreeutils.NSDetatch(ctx, unverifiedAssertion) // make a detached copy
+		if err != nil {
+			return fmt.Errorf("unable to detach unverified assertion: %v", err)
+		}
+
+		// signedAssertion after checking for errors
+		signedAssertion, err := sp.validationContext().Validate(detached)
+
+		if err != nil {
+			return err // return any errors including unsignedAssertions
+		}
+
+		decodedAssertion := &types.Assertion{}
+
+		err = xmlUnmarshalElement(signedAssertion, decodedAssertion)
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal assertion: %v", err)
+		}
+
+		decodedAssertion.SignatureValidated = true
+
+		// now add it to decodedResponse
+		decodedResponse.Assertions = append(decodedResponse.Assertions, *decodedAssertion)
+
+		return nil
+	}
+
+	// iterate through each Assertion through our unverified Response
+	// our decodedResponse contains a empty list of Assertions
+	// throughout iteration, we will add signed assertions to the decodedResponse
+	if err := etreeutils.NSFindIterate(unverifiedResponse, SAMLAssertionNamespace, AssertionTag, addSignedAssertion); err != nil {
+		return nil, err
 	}
 
 	err = sp.Validate(decodedResponse)
