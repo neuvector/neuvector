@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-ldap/ldap/v3"
 	"github.com/neuvector/neuvector/share/httpclient"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/ldap.v2"
 )
 
 type LDAPClient struct {
@@ -36,6 +36,7 @@ func (lc *LDAPClient) Connect() error {
 		var err error
 		address := fmt.Sprintf("%s:%d", lc.Host, lc.Port)
 		if !lc.UseSSL {
+			//nolint:staticcheck // SA1019
 			l, err = ldap.Dial("tcp", address)
 			if err != nil {
 				return err
@@ -56,6 +57,7 @@ func (lc *LDAPClient) Connect() error {
 		} else {
 			sharedConfig := httpclient.GetTLSConfig()
 
+			//nolint:staticcheck // SA1019
 			l, err = ldap.DialTLS("tcp", address, &tls.Config{
 				InsecureSkipVerify: sharedConfig.InsecureSkipVerify,
 				ServerName:         lc.Host,
