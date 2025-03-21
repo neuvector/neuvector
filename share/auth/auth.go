@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/beevik/etree"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/jonboulle/clockwork"
 	saml2 "github.com/russellhaering/gosaml2"
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"gopkg.in/ldap.v2"
 
 	"errors"
 
