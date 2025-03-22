@@ -15,7 +15,7 @@ require (
 	github.com/beevik/etree v1.5.0
 	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
-	github.com/containerd/containerd v1.7.27
+	github.com/containerd/containerd/v2 v2.0.4
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v26.1.5+incompatible
