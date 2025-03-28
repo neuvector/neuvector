@@ -369,6 +369,14 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 
 	// count admission control rule to score
 	s.DenyAdmCtrlRules = len(admValidateDenyCache.RuleHeads)
+	for _, rh := range admValidateDenyCache.RuleHeads {
+		if r, ok := admValidateDenyCache.RuleMap[rh.ID]; ok && !r.Disable {
+			s.EnabledDenyAdmCtrlRules++
+		}
+	}
+	if admStateCache.Enable {
+		s.AdmCtrlMode = admStateCache.Mode
+	}
 
 	cacheMutexRUnlock()
 

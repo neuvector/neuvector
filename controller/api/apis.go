@@ -1750,16 +1750,18 @@ type RESTRiskScoreMetricsCVE struct {
 }
 
 type RESTRiskScoreMetrics struct {
-	Platform         string                    `json:"platform"`
-	K8sVersion       string                    `json:"kube_version"`
-	OCVersion        string                    `json:"openshift_version"`
-	NewServiceMode   string                    `json:"new_service_policy_mode"`
-	NewProfileMode   string                    `json:"new_service_profile_mode"`
-	DenyAdmCtrlRules int                       `json:"deny_adm_ctrl_rules"`
-	Hosts            int                       `json:"hosts"`
-	WLs              RESTRiskScoreMetricsWL    `json:"workloads"`
-	Groups           RESTRiskScoreMetricsGroup `json:"groups"`
-	CVEs             RESTRiskScoreMetricsCVE   `json:"cves"`
+	Platform                string                    `json:"platform"`
+	K8sVersion              string                    `json:"kube_version"`
+	OCVersion               string                    `json:"openshift_version"`
+	NewServiceMode          string                    `json:"new_service_policy_mode"`
+	NewProfileMode          string                    `json:"new_service_profile_mode"`
+	AdmCtrlMode             string                    `json:"adm_mode"`
+	EnabledDenyAdmCtrlRules int                       `json:"enabled_deny_adm_ctrl_rules"`
+	DenyAdmCtrlRules        int                       `json:"deny_adm_ctrl_rules"`
+	Hosts                   int                       `json:"hosts"`
+	WLs                     RESTRiskScoreMetricsWL    `json:"workloads"`
+	Groups                  RESTRiskScoreMetricsGroup `json:"groups"`
+	CVEs                    RESTRiskScoreMetricsCVE   `json:"cves"`
 }
 
 type RESTExposedEndpoint struct {
