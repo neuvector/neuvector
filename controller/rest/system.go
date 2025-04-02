@@ -309,15 +309,28 @@ func calcSecurityScore(metrics *api.RESTRiskScoreMetrics, login *loginSession) a
 	// Max: 4, 4, 4
 	var privilegedContainerScore int
 	var runAsRootScore int
-	var admissionRuleScore int
+	var admissionRuleScore int = MAX_ADMISSION_RULE_SCORE
 	if metrics.WLs.PrivilegedWLs > 0 {
 		privilegedContainerScore = MAX_PRIVILEGED_CONTAINER_SCORE
 	}
 	if metrics.WLs.RootWLs > 0 {
 		runAsRootScore = MAX_RUN_AS_ROOT_CONTAINER_SCORE
 	}
-	if metrics.DenyAdmCtrlRules > 0 {
-		admissionRuleScore = MAX_ADMISSION_RULE_SCORE
+	if metrics.DenyAdmCtrlRules == 0 {
+		if metrics.AdmCtrlMode == "" {
+			admissionRuleScore = MAX_ADMISSION_RULE_SCORE
+		} else if metrics.AdmCtrlMode == share.AdmCtrlModeMonitor {
+			admissionRuleScore = MAX_ADMISSION_RULE_SCORE * 0.75
+		} else if metrics.AdmCtrlMode == share.AdmCtrlModeProtect {
+			admissionRuleScore = MAX_ADMISSION_RULE_SCORE * 0.5
+		}
+	}
+	if metrics.EnabledDenyAdmCtrlRules > 0 {
+		if metrics.AdmCtrlMode == share.AdmCtrlModeMonitor {
+			admissionRuleScore = MAX_ADMISSION_RULE_SCORE * 0.25
+		} else if metrics.AdmCtrlMode == share.AdmCtrlModeProtect {
+			admissionRuleScore = 0
+		}
 	}
 
 	// Vulnerability exploit risk (Only PodScore). Max: 16
