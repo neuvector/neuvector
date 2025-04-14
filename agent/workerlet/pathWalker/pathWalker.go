@@ -300,7 +300,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 func (tm *taskMain) WalkPackageTask(req workerlet.WalkGetPackageRequest) {
 	var data share.ScanData
 	scanUtil := scan.NewScanUtil(tm.sys)
-	data.Buffer, data.Error = scanUtil.GetRunningPackages(req.Id, req.ObjType, req.Pid, req.Kernel, req.PidHost)
+	data.Buffer, data.Error = scanUtil.GetRunningPackages(req.Id, req.ObjType, req.Pid, req.Kernel, req.ImageRepo, req.PidHost)
 
 	// outputs:
 	output, err := json.Marshal(data)

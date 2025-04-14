@@ -22,11 +22,12 @@ type WalkPathRequest struct {
 }
 
 type WalkGetPackageRequest struct {
-	Pid     int                  `json:"pid"`
-	Id      string               `json:"id"`
-	Kernel  string               `json:"kernel"`
-	ObjType share.ScanObjectType `json:"objType"`
-	PidHost bool                 `json:"pidHost"`
+	Pid       int                  `json:"pid"`
+	Id        string               `json:"id"`
+	Kernel    string               `json:"kernel"`
+	ObjType   share.ScanObjectType `json:"objType"`
+	PidHost   bool                 `json:"pidHost"`
+	ImageRepo string               `json:"k8sImage"`
 }
 
 type WalkSecretRequest struct {

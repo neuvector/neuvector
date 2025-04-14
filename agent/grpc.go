@@ -63,6 +63,7 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 	var pid int
 	var data share.ScanData
 	var pidHost bool
+	var k8sImageRepo string
 
 	gInfoRLock()
 	if req.Type == share.ScanObjectType_HOST {
@@ -78,6 +79,12 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 		if c.scanCache != nil {
 			data.Buffer = c.scanCache
 			data.Error = share.ScanErrorCode_ScanErrNone
+		}
+
+		if Host.Platform == share.PlatformKubernetes {
+			// include imageRepo
+			k8sImageRepo = c.info.Image
+			log.WithFields(log.Fields{"k8sImageRepo": k8sImageRepo}).Debug()
 		}
 	}
 	gInfoRUnlock()
@@ -96,11 +103,12 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 	global.SYS.ReCalculateMemoryMetrics(memStatsEnforcerResetMark)
 
 	taskReq := workerlet.WalkGetPackageRequest{
-		Pid:     pid,
-		Id:      req.ID,
-		Kernel:  Host.Kernel,
-		ObjType: req.Type,
-		PidHost: pidHost,
+		Pid:       pid,
+		Id:        req.ID,
+		Kernel:    Host.Kernel,
+		ObjType:   req.Type,
+		PidHost:   pidHost,
+		ImageRepo: k8sImageRepo,
 	}
 
 	bytesValue, _, err := walkerTask.Run(taskReq, req.ID)

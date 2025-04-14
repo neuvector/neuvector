@@ -92,6 +92,15 @@ type CacherData struct {
 	CurRecordSize uint64        `json:"current_record_size"`
 }
 
+const (
+	TypeK8sRepo = "k8sRepo"
+)
+
+type KubernetesResource struct {
+	ResourceType string `json:"type"`
+	Name         string `json:"name"`
+}
+
 func ScanErrorToStr(e share.ScanErrorCode) string {
 	if e >= 0 && int(e) < len(scanErrString) {
 		return scanErrString[e]
@@ -176,7 +185,8 @@ func (s *ScanUtil) readRunningPackages(pid int, prefix, kernel string, pidHost b
 	return files, hasPackage
 }
 
-func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, pid int, kernel string, pidHost bool) ([]byte, share.ScanErrorCode) {
+func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, pid int,
+	kernel, imageRepo string, pidHost bool) ([]byte, share.ScanErrorCode) {
 	files, hasPkgMgr := s.readRunningPackages(pid, "/", kernel, pidHost)
 	if len(files) == 0 && !hasPkgMgr && objType == share.ScanObjectType_HOST {
 		// In RancherOS, host os-release file is at /host/proc/1/root/usr/etc/os-release
@@ -192,6 +202,20 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 		}
 		if len(data) > 0 {
 			files[AppFileName] = data
+		}
+
+		if imageRepo != "" {
+			// include k8s image repo meta data
+			k8sResource := KubernetesResource{
+				ResourceType: TypeK8sRepo,
+				Name:         imageRepo,
+			}
+
+			if data, err := json.Marshal(&k8sResource); err == nil {
+				files[Kubernetes] = data
+			} else {
+				log.WithFields(log.Fields{"error": err}).Error()
+			}
 		}
 	}
 
