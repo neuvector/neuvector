@@ -20,6 +20,7 @@ import (
 
 const (
 	AppFileName = "apps_pkg"
+	Kubernetes  = "kubernetes"
 
 	nodeModules1 = "/usr/lib/node_modules"
 	nodeModules2 = "/usr/local/lib/node_modules"
