@@ -10,6 +10,7 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/neuvector/neuvector/agent/dp"
@@ -1047,7 +1048,10 @@ type unknown_ip_cache struct {
 	try_cnt   uint8
 }
 
-var unknown_ip_map map[unknown_ip_desc]*unknown_ip_cache = make(map[unknown_ip_desc]*unknown_ip_cache)
+var (
+	unknown_ip_map       map[unknown_ip_desc]*unknown_ip_cache = make(map[unknown_ip_desc]*unknown_ip_cache)
+	unknown_ip_map_mutex sync.RWMutex
+)
 
 const UNKN_IP_CACHE_TIMEOUT = time.Duration(time.Second * 600)
 const POL_VER_CHG_MAX = time.Duration(time.Second * 60)
@@ -1060,7 +1064,9 @@ type unknownIPEvent struct {
 }
 
 func (p *unknownIPEvent) Expire() {
+	unknown_ip_map_mutex.Lock()
 	delete(unknown_ip_map, p.desc)
+	unknown_ip_map_mutex.Unlock()
 }
 
 func add_unkn_ip_cache(uip_desc *unknown_ip_desc, polver uint16, iptype string, ext bool, aTimerWheel *utils.TimerWheel) {
@@ -1088,7 +1094,9 @@ func add_unkn_ip_cache(uip_desc *unknown_ip_desc, polver uint16, iptype string, 
 	if cache.timerTask == "" {
 		log.Error("Fail to insert unknown IP cache timer")
 	}
+	unknown_ip_map_mutex.Lock()
 	unknown_ip_map[*uip_desc] = cache
+	unknown_ip_map_mutex.Unlock()
 }
 
 func refresh_unkn_ip_cache(cache *unknown_ip_cache, pver uint16, try_cnt uint8) {
@@ -1119,7 +1127,10 @@ func policy_chk_unknown_ip(pInfo *WorkloadIPPolicyInfo, srcip, dstip net.IP, ipt
 		iptype == share.SpecInternalHostIP ||
 		iptype == share.SpecInternalTunnelIP {
 		pver := pInfo.PolVer
-		if uip_cache, exist := unknown_ip_map[uip_desc]; exist {
+		unknown_ip_map_mutex.RLock()
+		uip_cache, exist := unknown_ip_map[uip_desc]
+		unknown_ip_map_mutex.RUnlock()
+		if exist {
 			since := time.Since(uip_cache.start_hit)
 			if pver == uip_cache.polver && since < POL_VER_CHG_MAX {
 				*action = C.DP_POLICY_ACTION_OPEN
