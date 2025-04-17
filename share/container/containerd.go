@@ -10,21 +10,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd"
 	apiEvents "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/typeurl"
+	ctr "github.com/containerd/containerd/v2/client"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	log "github.com/sirupsen/logrus"
-
-	"google.golang.org/grpc"
 	criRT "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/typeurl/v2"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/system/sysinfo"
 	"github.com/neuvector/neuvector/share/utils"
+	"google.golang.org/grpc"
 )
 
 const defaultContainerdSock = "/run/containerd/containerd.sock"
@@ -40,9 +40,9 @@ type containerdDriver struct {
 	endpointHost  string
 	nodeHostname  string
 	selfID        string
-	client        *containerd.Client
+	client        *ctr.Client
 	criClient     *grpc.ClientConn
-	version       *containerd.Version
+	version       *ctr.Version
 	cancelMonitor context.CancelFunc
 	rtProcMap     utils.Set
 	snapshotter   string
@@ -57,9 +57,9 @@ func wrapIntoErrorString(err error) error {
 func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	log.WithFields(log.Fields{"endpoint": endpoint}).Debug("Connecting to containerd")
 
-	client, err := containerd.New(endpoint,
-		containerd.WithDefaultNamespace(k8sContainerdNamespace),
-		containerd.WithTimeout(clientConnectTimeout))
+	client, err := ctr.New(endpoint,
+		ctr.WithDefaultNamespace(k8sContainerdNamespace),
+		ctr.WithTimeout(clientConnectTimeout))
 	if err != nil {
 		log.WithFields(log.Fields{"error": err.Error()}).Error("")
 		return nil, wrapIntoErrorString(err)
@@ -123,9 +123,9 @@ func (d *containerdDriver) reConnect() error {
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Reconnecting ...")
 
-	client, err := containerd.New(endpoint,
-		containerd.WithDefaultNamespace(k8sContainerdNamespace),
-		containerd.WithTimeout(clientConnectTimeout))
+	client, err := ctr.New(endpoint,
+		ctr.WithDefaultNamespace(k8sContainerdNamespace),
+		ctr.WithTimeout(clientConnectTimeout))
 	if err != nil {
 		return wrapIntoErrorString(err)
 	}
@@ -186,7 +186,9 @@ func (d *containerdDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMe
 }
 
 // When a container task is killed, 'task' can still be retrieved; but when it is deleted, task will be nil
-func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container) (*containers.Container, *oci.Spec, int, *containerd.Status, int, error) {
+func (d *containerdDriver) getSpecs(ctx context.Context, c ctr.Container) (*containers.Container,
+	*oci.Spec, int, *ctr.Status, int, error) {
+
 	info, err := c.Info(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"id": c.ID(), "error": err.Error()}).Error("Failed to get container info")
@@ -212,11 +214,11 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 
 	if meta, pid, attempt, err := d.GetContainerCriSupplement(c.ID()); err == nil && meta != nil {
 		// log.WithFields(log.Fields{"meta": meta}).Info("CRI")
-		state := containerd.Stopped
+		state := ctr.Stopped
 		if meta.Running {
-			state = containerd.Running
+			state = ctr.Running
 		}
-		status := &containerd.Status{
+		status := &ctr.Status{
 			Status:     state,
 			ExitStatus: uint32(meta.ExitCode),
 			ExitTime:   meta.FinishedAt,
@@ -250,8 +252,8 @@ func (d *containerdDriver) getSpecs(ctx context.Context, c containerd.Container)
 		}
 	}
 
-	status := &containerd.Status{ // unknown
-		Status:     containerd.Stopped,
+	status := &ctr.Status{ // unknown
+		Status:     ctr.Stopped,
 		ExitStatus: 0,
 		ExitTime:   time.Time{},
 	}
@@ -372,7 +374,7 @@ func (d *containerdDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, e
 			continue
 		}
 
-		if runningOnly && (status == nil || status.Status != containerd.Running) {
+		if runningOnly && (status == nil || status.Status != ctr.Running) {
 			continue
 		}
 
@@ -418,7 +420,7 @@ func (d *containerdDriver) GetContainer(id string) (*ContainerMetaExtra, error) 
 	}
 
 	if status != nil {
-		meta.Running = (status.Status == containerd.Running)
+		meta.Running = (status.Status == ctr.Running)
 		meta.ExitCode = int(status.ExitStatus)
 		if !status.ExitTime.IsZero() {
 			meta.FinishedAt = status.ExitTime
@@ -533,40 +535,42 @@ func (d *containerdDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 	for {
 		ctx, cancel := context.WithCancel(context.Background())
 		d.cancelMonitor = cancel
-		evCh, errCh := d.client.Subscribe(ctx,
-			`topic~="/tasks/start"`,
-			`topic~="/tasks/exit"`,
-			`topic~="/containers/delete"`,
+		evCh, errCh := d.client.EventService().Subscribe(ctx,
+			fmt.Sprintf(`topic~="%s"`, runtime.TaskStartEventTopic),
+			fmt.Sprintf(`topic~="%s"`, runtime.TaskExitEventTopic),
+			fmt.Sprintf(`topic~="%s"`, runtime.TaskDeleteEventTopic),
 		)
-
 	Loop:
 		for {
 			select {
 			case ev := <-evCh:
 				if ev.Event != nil {
+					// In containerd v2, the event payload is directly in ev.Event.GetValue()
+					// and the type URL is in ev.Event.GetTypeUrl()
 					v, err := typeurl.UnmarshalAny(ev.Event)
 					if err != nil {
-						log.WithFields(log.Fields{"error": err.Error(), "event": v}).Error("Unmarshal containderd event error")
+						log.WithFields(log.Fields{"error": err, "topic": ev.Topic}).Error("Unmarshal event error")
 						break
 					}
 					switch event := v.(type) {
 					case *apiEvents.TaskStart:
 						// TaskStart{ContainerID:25d62dcf65...,Pid:10560,}
-						log.WithFields(log.Fields{"event": v}).Debug("start")
+						log.WithFields(log.Fields{"event": event}).Debug("start")
 						cb(EventContainerStart, event.ContainerID, int(event.Pid))
 					case *apiEvents.TaskExit:
 						// TaskExit{ContainerID:25d62dcf65...,ID:25d62dcf65...,Pid:10560,ExitStatus:0,ExitedAt:2018-11-01 07:40:22.252023597 +0000 UTC,}
-						log.WithFields(log.Fields{"event": v}).Debug("stop")
+						log.WithFields(log.Fields{"event": event}).Debug("stop")
 						cb(EventContainerStop, event.ContainerID, int(event.Pid))
-					case *apiEvents.ContainerDelete:
-						// ContainerDelete{ID:25d62dcf65...,}
-						log.WithFields(log.Fields{"event": v}).Debug("delete")
+					case *apiEvents.TaskDelete:
+						// TaskDelete{ID:25d62dcf65...,}
+						log.WithFields(log.Fields{"event": event}).Debug("delete")
 						cb(EventContainerDelete, event.ID, 0)
 					default:
-						log.WithFields(log.Fields{"event": v}).Debug("Unknown containderd event")
+						log.WithFields(log.Fields{"event": event, "unknown": ev.Topic}).Debug("Unknown containderd event")
 					}
 					connectErrorCnt = 0 // reset
 				}
+
 			case err := <-errCh:
 				if err != nil && err != io.EOF {
 					log.WithFields(log.Fields{"error": err.Error()}).Error("Containderd event monitor error")
