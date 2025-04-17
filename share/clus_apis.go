@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/log"
+	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
 
