@@ -228,6 +228,27 @@ func isContainerNetHostMode(info *container.ContainerMetaExtra, parent *containe
 	return false
 }
 
+// apply to POD
+func nvPod2Role(pod string) string {
+	// Assume the pod name must be of pattern, neuvector-controller-pod-xxxx or dss-controller-pod-xxxx (OEM)
+	if !strings.HasPrefix(pod, "neuvector-") && !strings.HasPrefix(pod, "dss-") {
+		return ""
+	}
+
+	role := pod
+	if index := strings.LastIndex(role, "-pod"); index != -1 {
+		role = role[:index]
+		if index = strings.Index(role, "-"); index != -1 {
+			role = role[index+1:]
+			return role
+		} else {
+			return ""
+		}
+	} else {
+		return ""
+	}
+}
+
 func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	// log.WithFields(log.Fields{"role": role, "pid": rootPid}).Debug("PROC:")
 	// 1st screening
@@ -289,14 +310,10 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 	}
 
 	// kubenetes platforms
-	if podname, ok := labels[container.KubeKeyPodName]; ok {
-		if strings.HasPrefix(info.Name, "k8s_POD") {
-			// sandbox of the agent
-			agtPodName := Agent.Labels[container.KubeKeyPodName]
-			if agtPodName == podname {
-				role := Agent.Labels[share.NeuVectorLabelRole]
-				return role, true
-			}
+	if strings.HasPrefix(info.Name, "k8s_POD") {
+		if appName, ok := labels[container.KubeKeyAppName]; ok {
+			role := nvPod2Role(appName)
+			return role, true
 		}
 	}
 	return "", false
