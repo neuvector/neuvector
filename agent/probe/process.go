@@ -2982,7 +2982,7 @@ func (p *Probe) isNVChildProcess(c *procContainer, proc *procInternal) bool {
 	bK8sProbeSituation := p.bKubePlatform && isControllerType(nvRole) && ppath == "" // a quick probe process
 	// backup lookup if we did not catch its parents
 	for i := 0; i < 8; i++ { // lookup for 8 callers
-		if global.RT.IsRuntimeProcess(filepath.Base(ppath), nil) || bRuncInit || bK8sProbeSituation {
+		if global.RT.IsRuntimeProcess(filepath.Base(ppath), nil) || bRuncInit || bK8sProbeSituation || ppid == 1 {
 			mLog.WithFields(log.Fields{"path": path, "ppath": ppath, "nvRole": nvRole, "k8s": p.bKubePlatform, "bRuncInit": bRuncInit}).Debug()
 			switch path {
 			case "/usr/bin/cat": // k8s readiness probe
