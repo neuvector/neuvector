@@ -121,7 +121,7 @@ typedef struct dp_thread_data_ {
     uint32_t conn4_map_cnt[2];
     dp_rate_limter_t conn4_rl;
 #define CONNECT_RL_DUR  2
-#define CONNECT_RL_CNT  400
+#define CONNECT_RL_CNT  800
     uint32_t conn4_map_cur;
 } dp_thread_data_t;
 
