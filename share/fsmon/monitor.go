@@ -215,10 +215,10 @@ type FileMonitorConfig struct {
 	EstRule        EstimateRuleSrcCallback
 }
 
-func NewFileWatcher(config *FileMonitorConfig, logLevel string) (*FileWatch, error) {
+func NewFileWatcher(config *FileMonitorConfig) (*FileWatch, error) {
 	// for file monitor
 	mLog.Out = os.Stdout
-	mLog.Level = share.CLUSGetLogLevel(logLevel)
+	mLog.Level = log.InfoLevel // traces only when "EnableTrace" is set
 	mLog.Formatter = &utils.LogFormatter{Module: "AGT"}
 	if config.EnableTrace {
 		mLog.SetLevel(log.DebugLevel)

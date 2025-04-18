@@ -704,7 +704,7 @@ func main() {
 		PodID:                parentAgent.ID,
 	}
 
-	if prober, err = probe.New(&probeConfig, gInfo.agentConfig.LogLevel); err != nil {
+	if prober, err = probe.New(&probeConfig); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to probe. Exit!")
 		os.Exit(-2)
 	}
@@ -723,7 +723,7 @@ func main() {
 		NVProtect:      (!*skip_nvProtect),
 	}
 
-	if fileWatcher, err = fsmon.NewFileWatcher(&fmonConfig, gInfo.agentConfig.LogLevel); err != nil {
+	if fileWatcher, err = fsmon.NewFileWatcher(&fmonConfig); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to open file monitor!")
 		os.Exit(-2)
 	}
