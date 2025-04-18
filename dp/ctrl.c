@@ -2695,7 +2695,8 @@ int dp_ctrl_connect_report(DPMsgSession *log, DPMonitorMetric *metric, int count
                 conn->EpSessIn12 = metric->EpSessIn12;
                 conn->EpByteIn12 = metric->EpByteIn12;
             }
-        } else if (dp_rate_limiter_check(rl) == 0 && (n = calloc(sizeof(*n), 1)) != NULL) {
+        } else if ((dp_rate_limiter_check(rl) == 0 || log->PolicyAction >= DP_POLICY_ACTION_VIOLATE)
+                    && (n = calloc(sizeof(*n), 1)) != NULL) {
             DPMsgConnect *conn = &n->conn;
             mac_cpy(conn->EPMAC, log->EPMAC);
             memcpy(conn->ClientIP, &key.client, 4);
