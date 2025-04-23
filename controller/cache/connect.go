@@ -734,7 +734,7 @@ func UpdatePolicyMetric() {
 }
 
 func calNetPolicyMet(conn *share.CLUSConnection) {
-	if conn.PolicyId > 0 && (conn.PolicyAction == C.DP_POLICY_ACTION_ALLOW ||
+	if conn.PolicyId > 0 && (conn.PolicyAction == C.DP_POLICY_ACTION_LEARN || conn.PolicyAction == C.DP_POLICY_ACTION_ALLOW ||
 		conn.PolicyAction == C.DP_POLICY_ACTION_VIOLATE || conn.PolicyAction == C.DP_POLICY_ACTION_DENY) {
 		cacheMutexLock()
 		defer cacheMutexUnlock()
