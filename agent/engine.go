@@ -310,10 +310,10 @@ func isNeuVectorContainer(info *container.ContainerMetaExtra) (string, bool) {
 	}
 
 	// kubenetes platforms
-	if strings.HasPrefix(info.Name, "k8s_POD") {
+	if strings.HasPrefix(info.Name, "k8s_POD_") {
 		if appName, ok := labels[container.KubeKeyAppName]; ok {
 			role := nvPod2Role(appName)
-			return role, true
+			return role, role != ""
 		}
 	}
 	return "", false
