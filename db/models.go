@@ -226,6 +226,11 @@ func CreateVulAssetDb(useLocal bool) error {
 	}
 	memoryDbHandle = db
 
+	// Refer to the official documentation for guidance on avoiding this issue:
+	// Error: database is locked
+	// https://github.com/mattn/go-sqlite3
+	memoryDbHandle.SetMaxOpenConns(1)
+
 	statements := make([]string, 0)
 
 	// create vulasset table
