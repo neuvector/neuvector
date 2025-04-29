@@ -59,7 +59,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.Filters.ScoreType = validateOrDefault(q.Filters.ScoreType, []string{"v2", "v3"}, "v3")
 	q.Filters.ViewType = validateOrDefault(q.Filters.ViewType, []string{"all", "containers", "infrastructure", "registry"}, "all")
 	q.Filters.SeverityType = validateOrDefault(q.Filters.SeverityType, []string{"all", "high", "medium", "low"}, "all")
-	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withFix", "withoutFix"}, "all")
+	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withFix", "withoutFix", "withFixAll"}, "all")
 	q.Filters.PublishedType = validateOrDefault(q.Filters.PublishedType, []string{"all", "before", "after"}, "all")
 
 	q.Filters.ServiceNameMatchType = validateOrDefault(q.Filters.ServiceNameMatchType, []string{"equals", "contains"}, "")
@@ -268,6 +268,10 @@ func batchProcessVulAsset(pool *pond.WorkerPool, mu *sync.Mutex, dbVulAssets map
 
 			if fix == "wf" {
 				dbVulAsset.F_withFix = 1
+			}
+
+			if fix == "nf" {
+				dbVulAsset.HasNonFixPackage = true
 			}
 
 			mu.Unlock()
@@ -709,6 +713,14 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 		}
 
 		if q.PackageType == "withoutFix" && vulasset.F_withFix == 0 {
+			meetCount += 1
+		}
+	}
+
+	// For 'withFixAll', all packages must have fixed versions specified.
+	if q.PackageType == "withFixAll" {
+		expectedMeetCount += 1
+		if !vulasset.HasNonFixPackage {
 			meetCount += 1
 		}
 	}
