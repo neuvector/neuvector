@@ -63,6 +63,8 @@ type DbVulAsset struct {
 	DBKey        string
 	ImpactWeight int
 	FeedRating   string
+
+	HasNonFixPackage bool
 }
 
 type DbCVESource struct {
