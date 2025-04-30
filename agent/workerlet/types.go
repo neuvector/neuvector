@@ -27,7 +27,7 @@ type WalkGetPackageRequest struct {
 	Kernel       string               `json:"kernel"`
 	ObjType      share.ScanObjectType `json:"objType"`
 	PidHost      bool                 `json:"pidHost"`
-	K8sAppString string               `json:"k8sAppRscString"`
+	K8sAppString string               `json:"K8sAppString"`
 }
 
 type WalkSecretRequest struct {
