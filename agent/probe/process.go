@@ -1768,7 +1768,12 @@ func (p *Probe) evaluateApplication(proc *procInternal, id string, bKeepAlive bo
 		return
 	}
 
+	if proc.user == "" {
+		proc.user = p.getUserName(proc.pid, proc.euid)
+	}
+
 	p.printProcReport(id, proc)
+
 	// p.evaluateRuncTrigger(id, proc)
 	riskyReported := (proc.reported & (suspicReported | profileReported)) != 0 // could be reported as profile/risky event
 
