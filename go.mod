@@ -16,7 +16,7 @@ require (
 	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
 	github.com/containerd/containerd/api v1.8.0
-	github.com/containerd/containerd/v2 v2.0.4
+	github.com/containerd/containerd/v2 v2.0.5
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v28.0.4+incompatible
