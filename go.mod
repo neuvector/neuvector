@@ -12,7 +12,7 @@ replace (
 require (
 	github.com/Microsoft/hcsshim v0.12.9 // indirect
 	github.com/aws/aws-sdk-go v1.55.7
-	github.com/beevik/etree v1.5.0
+	github.com/beevik/etree v1.5.1
 	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
 	github.com/containerd/containerd/api v1.8.0
@@ -151,7 +151,7 @@ require (
 	github.com/glebarez/go-sqlite v1.20.3 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.7 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.4 // indirect
