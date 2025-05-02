@@ -11,7 +11,7 @@ replace (
 
 require (
 	github.com/Microsoft/hcsshim v0.12.9 // indirect
-	github.com/aws/aws-sdk-go v1.55.6
+	github.com/aws/aws-sdk-go v1.55.7
 	github.com/beevik/etree v1.5.0
 	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
