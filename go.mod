@@ -19,7 +19,7 @@ require (
 	github.com/containerd/containerd/v2 v2.0.4
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v28.0.4+incompatible
+	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/fsnotify/fsnotify v1.9.0
@@ -167,6 +167,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/spdystream v0.4.0 // indirect
+	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
