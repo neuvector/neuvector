@@ -58,7 +58,7 @@ RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector
     zypper --installroot /chroot install -y consul
 RUN mv /chroot/usr/bin/consul /chroot/usr/local/bin/consul
 
-ARG OPA_VERSION=v1.2.0
+ARG OPA_VERSION=v1.4.2
 RUN curl -fL https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_${TARGETOS}_${TARGETARCH}_static -o opa \
     && cat /deps/${TARGETOS}_${TARGETARCH}/opa.checksum | sha256sum --check --status && chmod +x opa && mv opa /chroot/usr/local/bin
 
