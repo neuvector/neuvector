@@ -144,7 +144,7 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 			"registry": req.Registry, "image": getImageName(req), "error": rsr.errMsg,
 		}).Error("RPC request fail")
 	} else if result.Error != share.ScanErrorCode_ScanErrNone {
-		scanErr = NewJobError(api.RESTErrFailRepoScan, err, result.Error)
+		scanErr = NewJobError(api.RESTErrFailRepoScan, err, scanUtils.ScanErrorToStr(result.Error))
 		log.WithFields(log.Fields{
 			"registry": req.Registry, "image": getImageName(req), "error": rsr.errMsg,
 		}).Error("Failed to scan repository")
