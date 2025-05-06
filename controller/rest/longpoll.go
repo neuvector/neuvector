@@ -59,7 +59,9 @@ func NewJobError(code int, err error, detail interface{}) *JobError {
 
 func (e *JobError) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("JobError Code: %d, Error: %v", e.Code, e.Err)
+		return fmt.Sprintf("Error: %v", e.Err)
+	} else if e.Detail != nil {
+		return fmt.Sprintf("Error: %v", e.Detail)
 	}
 	return fmt.Sprintf("JobError Code: %d", e.Code)
 }
