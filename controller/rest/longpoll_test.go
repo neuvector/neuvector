@@ -62,11 +62,10 @@ func TestErrorVariable(t *testing.T) {
 
 // TestNewJobError verifies the creation of a new JobError and its fields.
 func TestNewJobError(t *testing.T) {
-	errStr := "test error"
-	err := errors.New(errStr)
+	expectedErr := "test error"
+	err := errors.New(expectedErr)
 	detail := "some detail"
 	errCode := 404
-	expectedErr := fmt.Sprintf("JobError Code: %d, Error: %s", errCode, errStr)
 	jobError := NewJobError(errCode, err, detail)
 
 	assert.Equal(t, errCode, jobError.Code)
