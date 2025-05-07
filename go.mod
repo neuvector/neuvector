@@ -2,7 +2,7 @@ module github.com/neuvector/neuvector
 
 go 1.23.0
 
-toolchain go1.24.2
+toolchain go1.24.3
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
