@@ -557,7 +557,7 @@ func isRuby(filename string) bool {
 }
 
 func isDotNet(filename string) bool {
-	return strings.HasSuffix(filename, ".deps.json")
+	return strings.HasSuffix(filename, ".App.deps.json")
 }
 
 func isWordpress(filename string) bool {
