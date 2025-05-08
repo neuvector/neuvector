@@ -15,7 +15,7 @@ require (
 	github.com/beevik/etree v1.5.1
 	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
-	github.com/containerd/containerd/api v1.8.0
+	github.com/containerd/containerd/api v1.9.0
 	github.com/containerd/containerd/v2 v2.0.5
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/docker/distribution v2.8.3+incompatible
@@ -91,7 +91,7 @@ require (
 	github.com/moby/sys/user v0.3.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/opencontainers/image-spec v1.1.0 // indirect
+	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/selinux v1.11.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
