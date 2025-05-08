@@ -106,8 +106,13 @@ type mvnDependency struct {
 }
 */
 
+type dotnetRuntimeDetail struct {
+	AssemblyVersion string `json:"assemblyVersion"`
+	FileVersion     string `json:"fileVersion"`
+}
 type dotnetDependency struct {
-	Deps map[string]string `json:"dependencies"`
+	Deps    map[string]string              `json:"dependencies"`
+	Runtime map[string]dotnetRuntimeDetail `json:"runtime"`
 }
 
 type dotnetRuntime struct {
@@ -557,7 +562,7 @@ func isRuby(filename string) bool {
 }
 
 func isDotNet(filename string) bool {
-	return strings.HasSuffix(filename, ".App.deps.json")
+	return strings.HasSuffix(filename, ".deps.json")
 }
 
 func isWordpress(filename string) bool {
@@ -733,7 +738,10 @@ func parseDotNetJsonData(filename string, fullpath string, dotnet dotnetPackage)
 
 	if targets, ok := dotnet.Targets[dotnet.Runtime.Name]; ok {
 		for target, dep := range targets {
-
+			// Skip if the target has no runtime; it means the dependency is not actually installed.
+			if dep.Runtime == nil && os.Getenv("SCAN_DOTNET_RUNTIME") == "true" {
+				continue
+			}
 			//Get dependencies of individual targets
 			for app, v := range dep.Deps {
 				key := fmt.Sprintf("%s-%s", ".NET:"+app, v)

@@ -297,6 +297,54 @@ func TestParseDotNetModuleNameVersion(t *testing.T) {
 }
 
 func TestParseDotNetPackage(t *testing.T) {
+	t.Setenv("SCAN_DOTNET_RUNTIME", "true")
+	filename := "test.deps.json"
+	fullpath := "/home/test.deps.json"
+	data := dotnetPackage{
+		Runtime: dotnetRuntime{
+			Name:      ".NETCoreApp,Version=v2.2",
+			Signature: "c10e7f708ec2454055c233c695ddc3ac682c23df",
+		},
+		Targets: map[string]map[string]dotnetDependency{
+			".NETCoreApp,Version=v2.2": {
+				"Business.ProfileService/1.0.0": dotnetDependency{
+					Deps: map[string]string{
+						"CorrelationId": "2.1.0",
+						"EasyNetQ":      "3.4.0",
+					},
+					Runtime: map[string]dotnetRuntimeDetail{
+						"runtime": {
+							AssemblyVersion: "1.0.0",
+							FileVersion:     "1.0.0",
+						},
+					},
+				},
+				"Elasticsearch.Net/6.0.0": dotnetDependency{
+					Deps: map[string]string{
+						"CorrelationId": "2.1.0",
+						"EasyNetQ":      "3.4.0",
+					},
+				},
+			},
+		},
+	}
+	expectedResults := map[string]string{
+		".NET:Business.ProfileService": "1.0.0",
+		".NET:CorrelationId":           "2.1.0",
+		".NET:EasyNetQ":                "3.4.0",
+	}
+	pkgs := parseDotNetJsonData(filename, fullpath, data)
+	assert.Equal(t, len(expectedResults), len(pkgs), "unexpected number of pkgs")
+
+	for _, pkg := range pkgs {
+		assert.Contains(t, expectedResults, pkg.ModuleName, "unexpected pkg name")
+		if version, ok := expectedResults[pkg.ModuleName]; ok {
+			assert.Equal(t, version, pkg.Version, "ModuleVersion does not match expected version")
+		}
+	}
+}
+
+func TestParseDotNetPackageWithoutScanRuntime(t *testing.T) {
 	filename := "test.deps.json"
 	fullpath := "/home/test.deps.json"
 	data := dotnetPackage{
