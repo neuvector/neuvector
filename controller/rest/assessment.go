@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/neuvector/neuvector/controller/access"
 	"io"
 	"net/http"
 	"strings"
@@ -27,7 +28,7 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
-	acc, login := getAccessControl(w, r, "")
+	acc, login := getAccessControl(w, r, access.AccessOPRead)
 	if acc == nil {
 		return
 	} else if !licenseAllowEnforce() {
