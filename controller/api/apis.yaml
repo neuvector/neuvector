@@ -298,19 +298,42 @@ paths:
     post:
       tags:
         - Admission
+      description: Testing admission control rules. The payload body is the content of a resource yaml file.
       summary: Test admission control rules
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
       consumes:
-        - application/json
+        - 'text/plain; charset=utf-8'
       parameters:
         - in: body
           name: body
-          description: Admission rule data
+          description: Resource yaml file
           required: true
           schema:
-            $ref: '#/definitions/RESTAdmissionRuleConfigData'
+            type: string
+            example: |
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: nginx-deployment
+                labels:
+                  app: nginx
+              spec:
+                replicas: 3
+                selector:
+                  matchLabels:
+                    app: nginx
+                template:
+                  metadata:
+                    labels:
+                      app: nginx
+                  spec:
+                    containers:
+                      - name: nginx
+                        image: nginx:latest
+                        ports:
+                          - containerPort: 80
       responses:
         '200':
           description: Success
