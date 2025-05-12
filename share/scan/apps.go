@@ -739,7 +739,8 @@ func parseDotNetJsonData(filename string, fullpath string, dotnet dotnetPackage)
 	if targets, ok := dotnet.Targets[dotnet.Runtime.Name]; ok {
 		for target, dep := range targets {
 			// Skip if the target has no runtime; it means the dependency is not actually installed.
-			if dep.Runtime == nil && os.Getenv("SCAN_DOTNET_RUNTIME") == "true" {
+			// if SCAN_DOTNET_RUNTIME is not set, we don't need to skip
+			if dep.Runtime == nil && os.Getenv("SCAN_DOTNET_RUNTIME") != "" {
 				continue
 			}
 			//Get dependencies of individual targets
