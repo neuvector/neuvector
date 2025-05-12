@@ -181,6 +181,17 @@ func newEnviron(env map[string]string, inherit bool) []string { //map[string]str
 	return environ
 }
 
+func (s *Session) GetPIDs() []int {
+	var pids = make([]int, 0)
+
+	for _, cmd := range s.cmds {
+		if cmd.Process != nil {
+			pids = append(pids, cmd.Process.Pid)
+		}
+	}
+	return pids
+}
+
 func (s *Session) appendCmd(cmd string, args []string, cwd Dir, env map[string]string) {
 	if s.started {
 		s.started = false
