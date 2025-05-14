@@ -522,7 +522,9 @@ static void dpi_threat_trigger_dir(uint32_t idx, dpi_packet_t *p, bool flip, con
     log_common(&log, idx);
     log.Count = htonl(count);
     log_packet_detail(&log, p, flip);
-    vsnprintf(log.Msg, sizeof(log.Msg), format, args);
+    if (format != NULL) {
+        vsnprintf(log.Msg, sizeof(log.Msg), format, args);
+    }
     store_packet(&log, p);
 
     DEBUG_LOG(DBG_LOG, p, "id=%u count=%u\n", tprop->id, count);
