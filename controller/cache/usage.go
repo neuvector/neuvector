@@ -1,10 +1,7 @@
 package cache
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"time"
 
@@ -14,23 +11,14 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 const usageReportPeriod = time.Duration(time.Hour * 12)
 const usageReportRetryWait = time.Minute
 const usageReportHistory = 180
 
-func signUsageReport(r *share.CLUSSystemUsageReport) string {
-	token := make([]byte, 4)
-	_, _ = rand.Read(token)
-	s := fmt.Sprintf("%d%s", r.ReportedAt.Unix(), base64.StdEncoding.EncodeToString(token))
-	return utils.EncryptPassword(s)
-}
-
 func writeUsageReport() error {
 	r := getUsageReport()
-	r.Signature = signUsageReport(r)
 	value, _ := json.Marshal(*r)
 	key := share.CLUSCtrlUsageReportKey(r.ReportedAt.Unix())
 

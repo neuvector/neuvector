@@ -727,7 +727,6 @@ type CLUSSyslogConfig struct {
 }
 
 type CLUSSystemUsageReport struct {
-	Signature      string    `json:"signature"`
 	ReportedAt     time.Time `json:"reported"`
 	Platform       string    `json:"platform"`
 	Hosts          int       `json:"hosts"`

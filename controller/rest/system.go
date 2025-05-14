@@ -65,7 +65,6 @@ func parseWebUrl(l string) error {
 
 func usage2REST(r *share.CLUSSystemUsageReport) *api.RESTSystemUsageReport {
 	return &api.RESTSystemUsageReport{
-		Signature:     r.Signature,
 		ReportedTS:    r.ReportedAt.Unix(),
 		ReportedAt:    api.RESTTimeString(r.ReportedAt),
 		Platform:      r.Platform,

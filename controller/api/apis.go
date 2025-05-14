@@ -1638,7 +1638,6 @@ type RESTPolicyViolationsWLData struct {
 }
 
 type RESTSystemUsageReport struct {
-	Signature      string `json:"signature"`
 	ReportedTS     int64  `json:"reported_timestamp"`
 	ReportedAt     string `json:"reported_at"`
 	Platform       string `json:"platform"`
