@@ -113,7 +113,7 @@ github.com/chai2010/gettext-go/po
 # github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0
 ## explicit
 github.com/codegangsta/inject
-# github.com/codeskyblue/go-sh v0.0.0-20200712050446-30169cf553fe
+# github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 ## explicit; go 1.12
 github.com/codeskyblue/go-sh
 # github.com/containerd/cgroups/v3 v3.0.5
