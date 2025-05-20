@@ -1707,6 +1707,15 @@ func scanEnvVarSecrets(vars map[string]string) []share.ScanSecretLog {
 	for i, l := range logs {
 		// log.WithFields(log.Fields{"desc": l.RuleDesc, "path": l.File}).Debug()
 		// cloak the secret a little bit by masking out some digits
+		if idx := strings.Index(l.Text, delim); idx >= 0 {
+			if k := l.Line[0:idx]; k != "" {
+				if _, ok := vars[k]; ok {
+					nameEqual := fmt.Sprintf("%s%s", k, delim)
+					l.Text = strings.TrimPrefix(l.Text, nameEqual)
+				}
+			}
+		}
+
 		var subject string
 		secretLength := len(l.Text)
 		if secretLength > 32 {
