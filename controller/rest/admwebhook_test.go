@@ -90,19 +90,23 @@ func TestScanEnvVarSecrets(t *testing.T) {
 	preTest()
 
 	vars := map[string]string{
-		"env1": "AIDA11ABLZS4A3QDU576",
-		"env2": "neuvector-svc-controller.neuvector",
-		"env3": "password:abcdefghijklmnop",
-		"env4": "api_token:12345abcdefghijklmnop",
+		"env1":     "AIDA11ABLZS4A3QDU576",
+		"env2":     "neuvector-svc-controller.neuvector",
+		"env3":     "password:abcdefghijklmnop",
+		"env4":     "api_token:12345abcdefghijklmnop",
+		"PASSWORD": "aB12$eF34&gH56!iJ78@kL90",
+		"API_KEY":  "aB12$eF34&gH56!iJ78@kL90",
 	}
 	expectedText := map[string]interface{}{
 		"env1=AIDA11ABLZS4A3QDU...":            nil,
 		"env3=password:abcdefghijklm...":       nil,
 		"env4=api_token:12345abcdefghijklm...": nil,
+		"PASSWORD=aB12$eF34&gH56!iJ78@k...":    nil,
+		"API_KEY=aB12$eF34&gH56!iJ78@k...":     nil,
 	}
 	scanSecretLog := scanEnvVarSecrets(vars)
-	if len(scanSecretLog) != 3 {
-		t.Errorf("Expect 3 but only %d environment variables containing secret are found", len(scanSecretLog))
+	if len(scanSecretLog) != 5 {
+		t.Errorf("Expect 5 but only %d environment variables containing secret are found", len(scanSecretLog))
 	} else {
 		for _, log := range scanSecretLog {
 			if _, ok := expectedText[log.Text]; !ok {
