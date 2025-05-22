@@ -1560,6 +1560,7 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		cacheMutexLock()
 
 		if wlCache, ok = wlCacheMap[id]; ok {
+			scanMapDelete(id) // Remove workload from scanMap
 			delete(wlCacheMap, id)
 
 			// Update parent's children list.

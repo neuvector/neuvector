@@ -368,12 +368,15 @@ func scanObject(id string) {
 }
 
 func (m CacheMethod) ScanWorkload(id string, acc *access.AccessControl) error {
-	if cache := getWorkloadCache(id); cache == nil {
+	var cache *workloadCache
+	if cache = getWorkloadCache(id); cache == nil {
 		return common.ErrObjectNotFound
 	} else if !acc.Authorize(&share.CLUSWorkloadScanDummy{Domain: cache.workload.Domain}, nil) {
 		return common.ErrObjectAccessDenied
 	}
 
+	// Ensure the workload object is in scanMap
+	scanWorkloadAdd(id, cache)
 	scanObject(id)
 	return nil
 }
@@ -797,13 +800,15 @@ func scanHostDelete(id string, param interface{}) {
 func scanAgentDelete(id string, param interface{}) {
 	// purge incomplete scanning jobs but keep completed scans
 	scanMutexLock()
+	cacheMutexRLock()
+	defer cacheMutexRUnlock()
 	defer scanMutexUnlock()
-	for task, info := range scanMap {
+
+	for workloadID, info := range scanMap {
 		if info.agentId == id {
-			if info.cveDBCreateTime == "" { // incompleted, not done yet
-				log.WithFields(log.Fields{"task": task, "info": info}).Info()
-				delete(scanMap, task)
-			}
+			log.WithFields(log.Fields{"workloadID": workloadID, "info": info}).Info()
+			delete(scanMap, workloadID)
+			delete(wlCacheMap, workloadID)
 		}
 	}
 }
