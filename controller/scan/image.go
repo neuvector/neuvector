@@ -235,7 +235,7 @@ func (r *base) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 	}
 
 	if code, err := r.rc.Alive(); err != nil {
-		if code != registry.ErrorAuthentication {
+		if code != registry.ErrorAuthentication || cfg.Username != "" {
 			return err, err.Error()
 		}
 	}
