@@ -1531,6 +1531,16 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		// reading wlCache doesn't have to be protected by cacheMutex
 		if started {
 			evhdls.Trigger(EV_WORKLOAD_START, wl.ID, wlCache)
+		} else if !stopped {
+			if wl.Running && wlCache != nil {
+				// it could reach here when a workload entry exists in wlCacheMap but not in scanMap (ex. agent resatrts)
+				workload := wlCache.workload
+				if !common.OEMIgnoreWorkload(workload) {
+					// Use DisplayName for image
+					idns := []api.RESTIDName{{Domains: []string{workload.Domain}, DisplayName: workload.Image}}
+					scanMapAdd(wl.ID, workload.AgentID, idns, share.ScanObjectType_CONTAINER)
+				}
+			}
 		}
 		if stopped {
 			evhdls.Trigger(EV_WORKLOAD_STOP, wl.ID, wlCache)
