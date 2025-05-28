@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -48,6 +49,7 @@ const scanReqTimeout = time.Second * 180
 const scannerCleanupPeriod = time.Duration(time.Minute * 1)
 const scannerClearnupTimeout = time.Second * 20
 const scannerClearnupErrorMax = 3
+const maxSizeDataPerEntry = 512 * 1024
 
 const (
 	statusScanNone = iota
@@ -725,7 +727,7 @@ func scanMapDelete(taskId string) {
 			key = share.CLUSScanDataPlatformKey(taskId)
 			skey = share.CLUSScanStatePlatformKey(taskId)
 		}
-		_ = cluster.Delete(key)
+		_ = cluster.DeleteTree(key)
 		_ = cluster.Delete(skey)
 	}
 }
@@ -803,6 +805,69 @@ func scanConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	}
 }
 
+func putGZipKVChunks(key string, data []byte) error {
+	zb := utils.GzipBytes(data)
+
+	// break it into KV chunks
+	buffer := bytes.NewBuffer(zb)
+	chunk := make([]byte, maxSizeDataPerEntry)
+	expandKey := key
+	index := 0
+	ended := false
+	for {
+		n, err := buffer.Read(chunk)
+		if err != nil {
+			if n == 0 || err == io.EOF {
+				ended = true
+			} else {
+				return err
+			}
+		}
+
+		// index=0, key=scan/data/report/host/k8s-worker2:564d66ca-7074-7a4e-c620-6af6766cd6d0
+		// index=1: key=scan/data/report/host/k8s-worker2:564d66ca-7074-7a4e-c620-6af6766cd6d0/1
+		// and so on...
+		if index > 0 {
+			expandKey = fmt.Sprintf("%s/%d", key, index)
+		}
+
+		// cctx.ScanLog.WithFields(log.Fields{"key": expandKey}).Debug()
+		if err = cluster.PutBinary(expandKey, chunk[:n]); err != nil {
+			return err
+		}
+
+		if ended {
+			break // a normal exit
+		}
+		index++
+	}
+	return nil
+}
+
+func getGZipKVChunks(key string) ([]byte, error) {
+	var combined bytes.Buffer // Create an empty buffer
+	expandKey := key
+	index := 0
+	for {
+		if index > 0 {
+			expandKey = fmt.Sprintf("%s/%d", key, index)
+		}
+
+		if value, err := cluster.Get(expandKey); err == nil {
+			combined.Write(value)
+			if uzb := utils.GunzipBytes(combined.Bytes()); uzb != nil {
+				// gunzip's CRC-32 matched, it is a complete package,
+				// skip others on possible dirty entries
+				return uzb, nil
+			}
+		} else {
+			cctx.ScanLog.WithFields(log.Fields{"error": err, "key": expandKey}).Error()
+			return nil, err
+		}
+		index++
+	}
+}
+
 func putScanReportToCluster(id string, info *scanInfo, result *share.ScanResult) error {
 	cctx.ScanLog.WithFields(log.Fields{
 		"id": id, "type": info.objType, "result": scanUtils.ScanErrorToStr(result.Error),
@@ -823,12 +888,10 @@ func putScanReportToCluster(id string, info *scanInfo, result *share.ScanResult)
 	// Write full report and a piece of state data so we only need act upon the state data change notification
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(&report); err == nil {
-		zb := utils.GzipBytes(buf.Bytes())
-		return cluster.PutBinary(key, zb)
-	} else {
+	if err := enc.Encode(&report); err != nil {
 		return err
 	}
+	return putGZipKVChunks(key, buf.Bytes())
 }
 
 func updateScanState(id string, nType share.ScanObjectType, status string) {
@@ -914,8 +977,12 @@ func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte)
 		dkey = share.CLUSScanDataPlatformKey(id)
 	}
 
-	if report := clusHelper.GetScanReport(dkey); report != nil {
-		scanDone(id, objType, report)
+	if uzb, err := getGZipKVChunks(dkey); err == nil && len(uzb) > 0 {
+		var report share.CLUSScanReport
+		dec := gob.NewDecoder(bytes.NewBuffer(uzb))
+		if err := dec.Decode(&report); err == nil {
+			scanDone(id, objType, &report)
+		}
 	}
 }
 
