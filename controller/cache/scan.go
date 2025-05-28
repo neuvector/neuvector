@@ -374,6 +374,21 @@ func (m CacheMethod) ScanWorkload(id string, acc *access.AccessControl) error {
 		return common.ErrObjectNotFound
 	} else if !acc.Authorize(&share.CLUSWorkloadScanDummy{Domain: cache.workload.Domain}, nil) {
 		return common.ErrObjectAccessDenied
+	} else {
+		addToScanMap := false
+		scanMutexRLock()
+		if _, ok := scanMap[id]; !ok {
+			addToScanMap = true
+		}
+		scanMutexRUnlock()
+		if addToScanMap && getAgentCache(cache.workload.AgentID) != nil {
+			workload := cache.workload
+			if !common.OEMIgnoreWorkload(workload) {
+				// Use DisplayName for image
+				idns := []api.RESTIDName{{Domains: []string{workload.Domain}, DisplayName: workload.Image}}
+				scanMapAdd(id, workload.AgentID, idns, share.ScanObjectType_CONTAINER)
+			}
+		}
 	}
 
 	scanObject(id)
