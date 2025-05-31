@@ -219,6 +219,7 @@ type AdmResObject struct {
 	OwnerUIDs          []string
 	Labels             map[string]string
 	Annotations        map[string]string
+	ReplicasInOwner    int32
 	AllContainers      [3][]*AdmContainerInfo // containers info in this resource object in containers, initContainers, ephemeralContainers order
 	ServiceAccountName string
 }
