@@ -132,16 +132,14 @@ func checkAggrLogsCache(alwaysFlush bool) {
 		if alog != nil {
 			if alwaysFlush || time.Now().Unix() > alog.ReportedAt.Unix() {
 				delete(aggrLogsCache, key)
-				if alog.Count > 0 {
-					// use the last log's time as the aggregated log's ReportedAt
-					alog.ReportedAt, err = time.Parse(api.RESTTimeFomat, alog.Props[nvsysadmission.AuditLogPropLastLogAt])
-					if err != nil {
-						alog.ReportedAt = time.Now().UTC()
-					}
-					delete(alog.Props, nvsysadmission.AuditLogPropLastLogAt)
-					if err := auditQueue.Append(alog); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("auditQueue.Append")
-					}
+				// use the last log's time as the aggregated log's ReportedAt
+				alog.ReportedAt, err = time.Parse(api.RESTTimeFomat, alog.Props[nvsysadmission.AuditLogPropLastLogAt])
+				if err != nil {
+					alog.ReportedAt = time.Now().UTC()
+				}
+				delete(alog.Props, nvsysadmission.AuditLogPropLastLogAt)
+				if err := auditQueue.Append(alog); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("auditQueue.Append")
 				}
 			}
 		} else {
@@ -569,26 +567,41 @@ func mergeMaps(labels1, labels2 map[string]string) map[string]string {
 }
 
 // kind, name, ns are owner's attributes
-func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, map[string]string, bool) {
+func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set, map[string]string, map[string]string, int32, bool) {
+	var replicas int32 // replicas in owner resource
 	if obj, err := global.ORCH.GetResource(kind, ns, name); err == nil {
 		var ownerReferences []metav1.OwnerReference
 		switch kind {
 		case resource.RscTypeStatefulSet:
 			// support pod -> statefulset
 			if ssObj, ok := obj.(*appsv1.StatefulSet); ok {
+				if ssObj.Spec.Replicas != nil {
+					replicas = *ssObj.Spec.Replicas
+				}
 				if len(ssObj.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(ssObj.Labels, ssObj.Spec.Template.Labels), mergeMaps(ssObj.Annotations, ssObj.Spec.Template.Annotations), true
+					return "", utils.NewSet(), mergeMaps(ssObj.Labels, ssObj.Spec.Template.Labels),
+						mergeMaps(ssObj.Annotations, ssObj.Spec.Template.Annotations), replicas, true
 				}
 			}
 		case resource.RscTypeReplicaSet:
 			// support pod -> replicaset -> deployment for now
 			if rsObj, ok := obj.(*appsv1.ReplicaSet); ok {
+				if rsObj.Spec.Replicas != nil {
+					replicas = *rsObj.Spec.Replicas
+				}
 				ownerReferences = rsObj.OwnerReferences
+				if rsObj.Spec.Replicas != nil {
+					replicas = *rsObj.Spec.Replicas
+				}
 			}
 		case resource.RscTypeDeployment:
 			if deployObj, ok := obj.(*appsv1.Deployment); ok {
+				if deployObj.Spec.Replicas != nil {
+					replicas = *deployObj.Spec.Replicas
+				}
 				if len(deployObj.OwnerReferences) == 0 {
-					return "", utils.NewSet(), mergeMaps(deployObj.Labels, deployObj.Spec.Template.Labels), mergeMaps(deployObj.Annotations, deployObj.Spec.Template.Annotations), true
+					return "", utils.NewSet(), mergeMaps(deployObj.Labels, deployObj.Spec.Template.Labels),
+						mergeMaps(deployObj.Annotations, deployObj.Spec.Template.Annotations), replicas, true
 				}
 			}
 		}
@@ -599,32 +612,34 @@ func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set,
 			if exist {
 				if len(ownerObject.OwnerUIDs) == 0 {
 					// owner is root resource (most likely deployment)
-					return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, true
+					return ownerObject.UserName, ownerObject.Groups, ownerObject.Labels, ownerObject.Annotations, replicas, true
 				} else {
 					log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns}).Info("unsupported owner resource type yet")
 				}
 			} else {
 				// trace up one layer in the owner chain
-				if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.Kind), ownerRef.Name, ns); found {
-					return userName, groups, labels, annotations, true
+				if userName, groups, labels, annotations, replicas, found :=
+					getOwnerUserGroupMetadataFromK8s(strings.ToLower(ownerRef.Kind), ownerRef.Name, ns); found {
+					return userName, groups, labels, annotations, replicas, true
 				}
 			}
 		}
-	} else {
+	} else if err != resource.ErrResourceNotSupported {
 		log.WithFields(log.Fields{"kind": kind, "name": name, "ns": ns, "error": err}).Error()
 	}
 
-	return "", utils.NewSet(), nil, nil, false
+	return "", utils.NewSet(), nil, nil, replicas, false
 }
 
-func getOwnerUserGroupMetadata(ownerUIDs []string, ownerReferences []metav1.OwnerReference, ns string) (string, utils.Set, map[string]string, map[string]string) {
+func getOwnerUserGroupMetadata(ownerUIDs []string, ownerReferences []metav1.OwnerReference, ns string) (
+	string, utils.Set, map[string]string, map[string]string, int32) {
 	for _, uid := range ownerUIDs {
 		admResCacheMutex.RLock()
 		ownerObject, exist := admResCache[uid]
 		admResCacheMutex.RUnlock()
 		if exist {
 			ownerObject.ValidUntil = time.Now().Add(time.Minute * 5).Unix()
-			userName, groups, labels, annotations := getOwnerUserGroupMetadata(ownerObject.OwnerUIDs, nil, ns)
+			userName, groups, labels, annotations, replicas := getOwnerUserGroupMetadata(ownerObject.OwnerUIDs, nil, ns)
 			if userName == "" && groups.Cardinality() == 0 {
 				userName = ownerObject.UserName
 				groups = ownerObject.Groups
@@ -635,19 +650,25 @@ func getOwnerUserGroupMetadata(ownerUIDs []string, ownerReferences []metav1.Owne
 			if len(annotations) == 0 {
 				annotations = ownerObject.Annotations
 			}
-			return userName, groups, labels, annotations
+			if replicas == 0 {
+				if _, _, _, _, r, found := getOwnerUserGroupMetadataFromK8s(
+					strings.ToLower(ownerObject.Kind), ownerObject.Name, ownerObject.Namespace); found {
+					replicas = r
+				}
+			}
+			return userName, groups, labels, annotations, replicas
 		} else {
 			// owner resource is not in cache anymore. query k8s instead
 			for _, ownerRef := range ownerReferences {
 				kind := strings.ToLower(ownerRef.Kind)
-				if userName, groups, labels, annotations, found := getOwnerUserGroupMetadataFromK8s(kind, ownerRef.Name, ns); found {
-					return userName, groups, labels, annotations
+				if userName, groups, labels, annotations, replicas, found := getOwnerUserGroupMetadataFromK8s(kind, ownerRef.Name, ns); found {
+					return userName, groups, labels, annotations, replicas
 				}
 			}
 		}
 	}
 
-	return "", utils.NewSet(), nil, nil
+	return "", utils.NewSet(), nil, nil, 0
 }
 
 func isRootOwnerCacheAvailable(ownerUIDs []string) bool {
@@ -694,7 +715,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	for _, ref := range objectMeta.OwnerReferences {
 		ownerUIDs = append(ownerUIDs, string(ref.UID))
 	}
-	userName, groups, labels, annotations := getOwnerUserGroupMetadata(ownerUIDs, objectMeta.OwnerReferences, objectMeta.Namespace)
+	userName, groups, labels, annotations, replicasInOwner := getOwnerUserGroupMetadata(ownerUIDs, objectMeta.OwnerReferences, objectMeta.Namespace)
 	if userName == "" && groups.Cardinality() == 0 && len(ownerUIDs) == 0 { // only root resource's user/group is used
 		userName = req.UserInfo.Username
 		if len(req.UserInfo.Groups) > 0 {
@@ -720,6 +741,7 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 		OwnerUIDs:          ownerUIDs,
 		Labels:             labels,
 		Annotations:        annotations,
+		ReplicasInOwner:    replicasInOwner,
 		AllContainers:      allContainers,
 		ServiceAccountName: saName,
 	}
@@ -830,70 +852,57 @@ func logUnmarshallError(kind *string, uid *types.UID, err *error) *admissionv1be
 }
 
 // returns (alog aggregated, alog to be added to auditQueue)
-//  1. The first occurrence of a 'denied' audit for a key({owner_uid}.{image}} is always added to auditQueue without aggregation
-//     Then a {key, dummy log} entry is added to aggrLogsCache so we start aggregation for the following 'denied' audits of same key({owner_uid}.{image})
-//  2. For the next 'denied' audit of the same key in 8 minutes, {key, real alog} is updated in aggrLogsCache
-//  3. For the following 'denied' audits of the same key in 8 minutes, occurrences for the same key's alog is increased(1 for each log) in aggrLogsCache
+//  1. The first occurrence of a 'denied'/'allowed' audit for a key({owner_uid}.{image}} is always added to auditQueue without aggregation
+//     Then a {key, dummy log} entry is added to aggrLogsCache so we start aggregation for the following 'denied'/'allowed' audits of same key({owner_uid}.{image})
+//  2. For the next 'denied'/'allowed' audit of the same key in 8 minutes, {key, real alog} is updated in aggrLogsCache
+//  3. For the following 'denied'/'allowed' audits of the same key in 8 minutes, occurrences for the same key's alog is increased(1 for each log) in aggrLogsCache
 //  4. In CleanupSessCfgCache(), it periodically checks if there are audit logs that have been aggregated for 8(+) minutes.
 //     If yes, add them to auditQueue and delete their entries from aggrLogsCache
 //     If it's the dummy log entry sitting in aggrLogsCache for 8(+) minutes, delete it as well.
-//  5. The next 'denied' audit for the same key starts over from step 1
-func aggregateDenyLogs(reqResult *nvsysadmission.AdmCtrlReqEvalResult, ownerUID string, alog *share.CLUSAuditLog) (bool, *share.CLUSAuditLog) {
-
-	if reqResult == nil || reqResult.CriticalAssessment == nil || reqResult.CriticalAssessment.ContainerImageInfo.Image == "" || ownerUID == "" {
+//  5. The next 'denied'/'allowed' audit for the same key starts over from step 1
+func aggregateLogs(reqResult *nvsysadmission.AdmCtrlReqEvalResult, ownerUID string, replicasInOwner int32,
+	alog *share.CLUSAuditLog) (bool, *share.CLUSAuditLog) {
+	if ownerUID == "" {
 		return false, alog
 	}
-	criticalAssessment := reqResult.CriticalAssessment
 
+	key := ownerUID
 	// aggregation is for image with the same owner resource
-	key := fmt.Sprintf("%s.%s", ownerUID, criticalAssessment.ContainerImageInfo.Image)
+	if reqResult != nil && reqResult.CriticalAssessment != nil && reqResult.CriticalAssessment.ContainerImageInfo.Image != "" {
+		key = fmt.Sprintf("%s.%s", key, reqResult.CriticalAssessment.ContainerImageInfo.Image)
+	}
 	aggrLogsCacheMutex.Lock()
 	defer aggrLogsCacheMutex.Unlock()
-	if alog == nil {
-		// alog being nil means checking if it's still aggregating for the same image/owner so that caller may not need to compose a new log
-		if cachedLog, exist := aggrLogsCache[key]; exist && cachedLog.Count > 0 {
-			// it's still aggregating for the same image/owner. increase occurrences in the log by 1
-			cachedLog.Count++
-			cachedLog.Props[nvsysadmission.AuditLogPropLastLogAt] = api.RESTTimeString(time.Now().UTC())
-			return true, nil
+	if cachedLog, exist := aggrLogsCache[key]; exist {
+		// it's still aggregating for the same image/owner. increase occurrences in the log by 1
+		cachedLog.Count++
+		cachedLog.Props[nvsysadmission.AuditLogPropLastLogAt] = api.RESTTimeString(time.Now().UTC())
+		if cachedLog.Count >= uint32(replicasInOwner) {
+			// this audit log is for the last pod resource under its owning resource that has replicas > 1. stop aggregration for the same image/owner
+			delete(aggrLogsCache, key)
+			cachedLog.ReportedAt = time.Now().UTC()
+			return false, cachedLog
 		}
-		// it's not aggregation for this image/owner yet.
-		return false, alog
-	} else {
-		if cachedLog, exist := aggrLogsCache[key]; exist {
-			if cachedLog.Count == 0 {
-				// cachedLog is a dummy entry meaning we starts aggregating audits for this image/owner now
-				alog.Props[nvsysadmission.AuditLogPropLastLogAt] = alog.Props[nvsysadmission.AuditLogPropFirstLogAt]
-				alog.ReportedAt = alog.ReportedAt.Add(aggregateInterval) // so that CleanupSessCfgCache() doesn't need to calculate the time in each loop
-				aggrLogsCache[key] = alog
-			} else {
-				// it's still aggregating for the same image/owner. increase occurrences in the log by 1
-				cachedLog.Count++
-				cachedLog.Props[nvsysadmission.AuditLogPropLastLogAt] = api.RESTTimeString(time.Now().UTC())
-			}
-			return true, nil
-		} else {
-			// it's the first non-aggregated log of a 'denied' audit for this image/owner.
-			// inform caller to add it to auditQueue & add a dummy aggregated log entry(Count: 0) so the next audit for the same image/owner will start aggregation
-			aggrLogsCache[key] = &share.CLUSAuditLog{Count: 0, ReportedAt: time.Now().Add(aggregateInterval).UTC()}
-			return false, alog
-		}
+		cachedLog.ReportedAt = alog.ReportedAt.Add(aggregateInterval) // so that checkAggrLogsCache() doesn't need to calculate the time in each loop
+		return true, nil
+	} else if replicasInOwner > 1 {
+		// this audit log is for the 1st pod resource under its owning resource that has replicas > 1
+		alog.Props[nvsysadmission.AuditLogPropLastLogAt] = alog.Props[nvsysadmission.AuditLogPropFirstLogAt]
+		alog.ReportedAt = alog.ReportedAt.Add(aggregateInterval) // so that checkAggrLogsCache() doesn't need to calculate the time in each loop
+		aggrLogsCache[key] = alog
+		return true, nil
 	}
+	// no need to do aggregation for this image/owner.
+	return false, alog
 }
 
 func cacheAdmCtrlAudit(auditId share.TLogAudit, reqResult *nvsysadmission.AdmCtrlReqEvalResult, criticalAssessment *nvsysadmission.AdmCtrlAssessResult,
-	matchedImageInfo *nvsysadmission.AdmCtrlMatchedImageInfo, admResObject *nvsysadmission.AdmResObject) error {
+	matchedImageInfo *nvsysadmission.AdmCtrlMatchedImageInfo, admResObject *nvsysadmission.AdmResObject) {
 
 	// assessResult is the container that triggers this audit event.
 	// it's possible that assessResult/matchedImageInfo is nil when no container matches any rule.
 	// any controller that handles admission control request could save result to queue
 	if auditId >= share.CLUSAuditAdmCtrlK8sReqAllowed && auditId <= share.CLUSAuditAdmCtrlK8sReqDenied {
-		if auditId == share.CLUSAuditAdmCtrlK8sReqDenied && len(admResObject.OwnerUIDs) > 0 {
-			if aggregated, _ := aggregateDenyLogs(reqResult, admResObject.OwnerUIDs[0], nil); aggregated {
-				// we increased the occurrences field in the aggregated log by 1 so we don't need to keep processing for this audit
-				return nil
-			}
-		}
 		alog := &share.CLUSAuditLog{
 			ID:         auditId,
 			Count:      1,
@@ -929,18 +938,25 @@ func cacheAdmCtrlAudit(auditId share.TLogAudit, reqResult *nvsysadmission.AdmCtr
 		props[nvsysadmission.AuditLogPropFirstLogAt] = api.RESTTimeString(alog.ReportedAt)
 		alog.Props = props
 
-		if auditId == share.CLUSAuditAdmCtrlK8sReqDenied && len(admResObject.OwnerUIDs) > 0 {
-			_, alog = aggregateDenyLogs(reqResult, admResObject.OwnerUIDs[0], alog)
+		if len(admResObject.OwnerUIDs) > 0 && admResObject.ReplicasInOwner > 1 && admResObject.Kind == k8sKindPod {
+			var aggregated bool
+			aggregated, alog = aggregateLogs(reqResult, admResObject.OwnerUIDs[0], admResObject.ReplicasInOwner, alog)
+			if aggregated {
+				// we increased the occurrences field in the aggregated log by 1 so we don't need to keep processing for this audit
+				return
+			}
 		}
 		if alog != nil {
+			var ownerUIDs string
+			if len(admResObject.OwnerUIDs) > 0 {
+				ownerUIDs = admResObject.OwnerUIDs[0]
+			}
 			if err := auditQueue.Append(alog); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("auditQueue.Append")
-				return err
+				log.WithFields(log.Fields{"ownerUIDs": ownerUIDs, "auditId": auditId, "error": err}).Error("auditQueue.Append")
+				return
 			}
 		}
 	}
-
-	return nil
 }
 
 func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globalMode string, defaultAction int, stamps *api.AdmCtlTimeStamps,
@@ -1266,12 +1282,14 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 			}
 		}
 
+		admResObjectName := admResObject.Name
+		if req.Kind.Kind == k8sKindPod && admResObject.ReplicasInOwner > 1 {
+			admResObjectName += " ..."
+		}
 		if len(violatedContainers) > 0 {
 			reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) violates Admission Control monitor-mode rule(s). %s%s",
-				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, strings.Join(violatedContainers, " "), unscannedImagesMsg)
-			if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqViolation, &reqEvalResult, nil, nil, admResObject); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
-			}
+				msgHeader, opDisplay, req.Kind.Kind, admResObjectName, strings.Join(violatedContainers, " "), unscannedImagesMsg)
+			cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqViolation, &reqEvalResult, nil, nil, admResObject)
 		}
 
 		if reqEvalResult.ReqAction != "" {
@@ -1285,10 +1303,8 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 					ruleScope = "federal "
 				}
 				reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is denied because of %sdeny rule id %d with criteria: %s.%s",
-					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, ruleScope, criticalMatch.RuleID, criticalMatch.RuleDetails, unscannedImagesMsg)
-				if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqDenied, &reqEvalResult, criticalAssessment, &criticalMatch.ImageInfo, admResObject); err != nil {
-					log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
-				}
+					msgHeader, opDisplay, req.Kind.Kind, admResObjectName, ruleScope, criticalMatch.RuleID, criticalMatch.RuleDetails, unscannedImagesMsg)
+				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqDenied, &reqEvalResult, criticalAssessment, &criticalMatch.ImageInfo, admResObject)
 			} else {
 				allowedContainers := make([]string, 0, 4) // containers that explicitly match allow rule
 				for _, assessResult := range reqEvalResult.AssessResults {
@@ -1304,22 +1320,20 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 					}
 				}
 				reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because %s.%s",
-					msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, strings.Join(allowedContainers, ", "), unscannedImagesMsg)
+					msgHeader, opDisplay, req.Kind.Kind, admResObjectName, strings.Join(allowedContainers, ", "), unscannedImagesMsg)
 				matchedImageInfo := &criticalMatch.ImageInfo
 				if reqEvalResult.ContainersInReq > 1 {
 					criticalAssessment = nil
 					matchedImageInfo = nil
 				}
-				if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, criticalAssessment, matchedImageInfo, admResObject); err != nil {
-					log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
-				}
+				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, criticalAssessment, matchedImageInfo, admResObject)
 			}
 		} else {
-			// doesn't match any rule
-			reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because it doesn't match any decisive rule.%s",
-				msgHeader, opDisplay, req.Kind.Kind, admResObject.Name, unscannedImagesMsg)
-			if err := cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, nil, nil, admResObject); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("cacheAdmCtrlAudit")
+			if len(violatedContainers) == 0 {
+				// doesn't match any rule
+				reqEvalResult.Msg = fmt.Sprintf("%s%s of Kubernetes %s resource (%s) is allowed because it doesn't match any decisive rule.%s",
+					msgHeader, opDisplay, req.Kind.Kind, admResObjectName, unscannedImagesMsg)
+				cacheAdmCtrlAudit(share.CLUSAuditAdmCtrlK8sReqAllowed, &reqEvalResult, nil, nil, admResObject)
 			}
 		}
 	}
