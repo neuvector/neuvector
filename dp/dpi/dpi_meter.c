@@ -14,7 +14,7 @@ void log_session_detail(DPMsgThreatLog *log, dpi_session_t *sess);
 
 static meter_info_t meter_info[] = {
 [DPI_METER_SYN_FLOOD] = {"syn_flood", METER_ID_SYN_FLOOD, DPI_THRT_TCP_FLOOD, true, false, true, false,
-                            3, 30, 1, 200, 200},
+                            8, 30, 5, 800, 600},
 [DPI_METER_ICMP_FLOOD] = {"icmp_flood", METER_ID_ICMP_FLOOD, DPI_THRT_ICMP_FLOOD, true, false, true, false,
                             3, 30, 1, 100, 100},
 [DPI_METER_IP_SRC_SESSION] = {"ip_src_session", METER_ID_IP_SRC_SESSION, DPI_THRT_IP_SRC_SESSION, false, false, true, true,
