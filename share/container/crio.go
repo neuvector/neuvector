@@ -605,7 +605,11 @@ func (d *crioDriver) IsDaemonProcess(proc string, cmds []string) bool {
 }
 
 func (d *crioDriver) IsRuntimeProcess(proc string, cmds []string) bool {
-	return proc == "runc" || proc == "crio" || proc == "conmon" || proc == "crio-conmon" // an OCI container runtime monitor
+	switch proc {
+	case "runc", "crio", "conmon", "crio-conmon", "crun": // an OCI container runtime monitor
+		return true
+	}
+	return false
 }
 
 func (d *crioDriver) GetParent(info *ContainerMetaExtra, pidMap map[int]string) (bool, string) {
