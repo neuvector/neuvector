@@ -590,9 +590,6 @@ func getOwnerUserGroupMetadataFromK8s(kind, name, ns string) (string, utils.Set,
 					replicas = *rsObj.Spec.Replicas
 				}
 				ownerReferences = rsObj.OwnerReferences
-				if rsObj.Spec.Replicas != nil {
-					replicas = *rsObj.Spec.Replicas
-				}
 			}
 		case resource.RscTypeDeployment:
 			if deployObj, ok := obj.(*appsv1.Deployment); ok {
