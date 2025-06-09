@@ -266,6 +266,7 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		} else {
 			restRespError(w, http.StatusInternalServerError, scanErr.Code)
 		}
+		return
 	}
 
 	if result == nil {
