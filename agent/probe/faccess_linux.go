@@ -187,11 +187,7 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 	}
 	fa.cflag = unix.FAN_OPEN_PERM
 
-	// perferable flag
-	if fa.isSupportExecPerm() {
-		log.Info("FA: Use ExecPerm")
-		fa.cflag = unix.FAN_OPEN_EXEC_PERM
-	}
+	// perferable on the unix.FAN_OPEN_EXEC_PERM but it failed to detect its availablity
 
 	go fa.monitorFilePermissionEvents()
 	return fa, true
@@ -273,19 +269,6 @@ func (fa *FileAccessCtrl) isSupportOpenPerm() bool {
 	}
 
 	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_PERM, unix.AT_FDCWD, path); err != nil && !bIgnoredErrors(err) {
-		log.WithFields(log.Fields{"error": err}).Error()
-	}
-	return true
-}
-
-func (fa *FileAccessCtrl) isSupportExecPerm() bool {
-	path := fmt.Sprintf(procRootMountPoint, 1)
-	if err := fa.fanfd.Mark(unix.FAN_MARK_ADD, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); err != nil {
-		log.WithFields(log.Fields{"error": err}).Info("FA: not supported")
-		return false
-	}
-
-	if err := fa.fanfd.Mark(unix.FAN_MARK_REMOVE, unix.FAN_OPEN_EXEC_PERM, unix.AT_FDCWD, path); err != nil && !bIgnoredErrors(err) {
 		log.WithFields(log.Fields{"error": err}).Error()
 	}
 	return true
@@ -725,6 +708,7 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 			return id, profileSetting, svcGroup, nvRole, res
 		}
 
+		res = rule_not_defined
 		if rres, ok := cRoot.whlst[path]; ok {
 			// log.WithFields(log.Fields{"rres": rres}).Debug("FA: ")
 			if rres != rule_denied {
