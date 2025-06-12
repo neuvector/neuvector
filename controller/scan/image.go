@@ -256,7 +256,14 @@ func (r *base) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, err
 		}
 	}
 
-	repos, err := r.rc.Repositories()
+	var repos []string
+	var err error
+	if strings.Contains(r.regURL, "quay.io") {
+		repos, err = r.rc.QuayRepositories(org)
+	} else {
+		repos, err = r.rc.Repositories()
+	}
+
 	if err != nil {
 		return nil, err
 	}
