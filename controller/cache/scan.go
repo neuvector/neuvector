@@ -49,7 +49,6 @@ const scanReqTimeout = time.Second * 180
 const scannerCleanupPeriod = time.Duration(time.Minute * 1)
 const scannerClearnupTimeout = time.Second * 20
 const scannerClearnupErrorMax = 3
-const maxSizeDataPerEntry = 512 * 1024
 
 const (
 	statusScanNone = iota
@@ -810,7 +809,7 @@ func putGZipKVChunks(key string, data []byte) error {
 
 	// break it into KV chunks
 	buffer := bytes.NewBuffer(zb)
-	chunk := make([]byte, maxSizeDataPerEntry)
+	chunk := make([]byte, cluster.KVValueSizeMax-1)
 	expandKey := key
 	index := 0
 	ended := false
