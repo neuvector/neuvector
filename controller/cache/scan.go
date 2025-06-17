@@ -3,7 +3,7 @@ package cache
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
@@ -1148,9 +1148,9 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 						Report:  report,
 					}
 					fedScanDataCacheMutexLock()
-					currImagesMD5, ok := fedScanResultMD5[fedRegName]
-					if !ok || currImagesMD5 == nil {
-						currImagesMD5 = make(map[string]string, 1)
+					currImagesHash, ok := fedScanResultHash[fedRegName]
+					if !ok || currImagesHash == nil {
+						currImagesHash = make(map[string]string, 1)
 					}
 					if report != nil && report.SignatureInfo != nil {
 						if report.SignatureInfo.Verifiers != nil {
@@ -1160,9 +1160,9 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 						report.SignatureInfo.VerificationError = 0
 					}
 					res, _ := json.Marshal(&scanResult)
-					md5Sum := md5.Sum(res)
-					currImagesMD5[id] = hex.EncodeToString(md5Sum[:])
-					fedScanResultMD5[fedRegName] = currImagesMD5
+					sha256Sum := sha256.Sum256(res)
+					currImagesHash[id] = hex.EncodeToString(sha256Sum[:])
+					fedScanResultHash[fedRegName] = currImagesHash
 					fedScanDataCacheMutexUnlock()
 				}
 			} else if fedRegName != "" {
@@ -1174,8 +1174,8 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 		scan.RegistryImageStateUpdate(name, id, nil, false, nil)
 		if fedRegName != "" {
 			fedScanDataCacheMutexLock()
-			if currImagesMD5, ok := fedScanResultMD5[fedRegName]; ok {
-				delete(currImagesMD5, id)
+			if currImagesHash, ok := fedScanResultHash[fedRegName]; ok {
+				delete(currImagesHash, id)
 			}
 			fedScanDataCacheMutexUnlock()
 		}
@@ -1200,7 +1200,7 @@ func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byt
 
 	case cluster.ClusterNotifyDelete:
 		fedScanDataRevsCache = share.CLUSFedScanRevisions{}
-		fedScanResultMD5 = make(map[string]map[string]string)
+		fedScanResultHash = make(map[string]map[string]string)
 	}
 }
 

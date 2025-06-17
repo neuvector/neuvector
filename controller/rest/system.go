@@ -6,7 +6,7 @@ import "C"
 import (
 	"bufio"
 	"compress/gzip"
-	"crypto/md5"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -2387,7 +2387,7 @@ func getAlertGroup(alerts []string, alertType api.AlertType, acceptedAlerts util
 
 	if len(alerts) > 0 {
 		for _, alert := range alerts {
-			b := md5.Sum([]byte(alert))
+			b := sha256.Sum256([]byte(alert))
 			key := hex.EncodeToString(b[:])
 			if !acceptedAlerts.Contains(key) {
 				alertGroup.Data = append(alertGroup.Data, &api.RESTNvAlert{
@@ -2487,7 +2487,7 @@ func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	internalCaCertFile := path.Join(cluster.InternalCertDir, cluster.InternalCACert)
 	if internalCaCertExpireAlert, err := getInternalCertExpireAlert(internalCaCertFile); err == nil && internalCaCertExpireAlert != "" {
-		b := md5.Sum([]byte(internalCaCertExpireAlert))
+		b := sha256.Sum256([]byte(internalCaCertExpireAlert))
 		key := hex.EncodeToString(b[:])
 		if !acceptedAlerts.Contains(key) {
 			certAlertGroup.Data = append(certAlertGroup.Data, &api.RESTNvAlert{
@@ -2498,7 +2498,7 @@ func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	internalCertFile := path.Join(cluster.InternalCertDir, cluster.InternalCert)
 	if internalCertExpireAlert, err := getInternalCertExpireAlert(internalCertFile); err == nil && internalCertExpireAlert != "" {
-		b := md5.Sum([]byte(internalCertExpireAlert))
+		b := sha256.Sum256([]byte(internalCertExpireAlert))
 		key := hex.EncodeToString(b[:])
 		if !acceptedAlerts.Contains(key) {
 			certAlertGroup.Data = append(certAlertGroup.Data, &api.RESTNvAlert{
@@ -3175,7 +3175,7 @@ func getFedDisconnectAlert(fedRole, id string, acc *access.AccessControl) (strin
 	} else {
 		alert = "This cluster is disconnected from primary cluster"
 	}
-	b := md5.Sum([]byte(alert))
+	b := sha256.Sum256([]byte(alert))
 	key := hex.EncodeToString(b[:])
 
 	return key, alert

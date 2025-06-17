@@ -2,7 +2,7 @@ package rest
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -3190,7 +3190,7 @@ func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resourc
 }
 
 // Process the group and network rule list get from the crd. caller must own CLUSLockPolicyKey lock
-func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string,
+func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdHash string,
 	recordList map[string]*share.CLUSCrdSecurityRule, crossCheckRecord *share.CLUSCrdSecurityRule) (string, string) {
 
 	newRecord := false
@@ -3207,7 +3207,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
-	crdRecord.CrdMD5 = crdMD5
+	crdRecord.CrdHash = crdHash
 
 	var crInfo string
 	var crWarning string
@@ -3280,7 +3280,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 }
 
 // Process the admission control rule list get from the crd. caller must own CLUSLockAdmCtrlKey lock
-func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdMD5 string) (string, string) {
+func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName, crdHash string) (string, string) {
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
 		crdRecord = &share.CLUSCrdSecurityRule{
@@ -3292,7 +3292,7 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
-	crdRecord.CrdMD5 = crdMD5
+	crdRecord.CrdHash = crdHash
 
 	var crInfo string
 	var crWarning string
@@ -3327,7 +3327,7 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 // For processing DLP sensor get from the crd, caller must own CLUSLockPolicyKey lock
 // For processing WAF sensor get from the crd, caller must own CLUSLockPolicyKey lock
 // For processing vulnerability profile get from the crd, caller must own CLUSLockVulKey lock
-func (h *nvCrdHandler) crdProcessRuleRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string, crdMD5 string) error {
+func (h *nvCrdHandler) crdProcessRuleRecord(crdCfgRet *resource.NvSecurityParse, kind, recordName string, crdHash string) error {
 	crdRecord := clusHelper.GetCrdSecurityRuleRecord(kind, recordName)
 	if crdRecord == nil {
 		crdRecord = &share.CLUSCrdSecurityRule{
@@ -3348,7 +3348,7 @@ func (h *nvCrdHandler) crdProcessRuleRecord(crdCfgRet *resource.NvSecurityParse,
 		crdRecord.Uid = h.crUid
 	}
 	crdRecord.MetadataName = h.mdName
-	crdRecord.CrdMD5 = crdMD5
+	crdRecord.CrdHash = crdHash
 
 	if !h.crossCheck && crdRecord.Uid != "" && crdRecord.Uid != h.crUid {
 		log.WithFields(log.Fields{"record_uid": crdRecord.Uid, "request_UID": h.crUid}).Error("UID mismatch")
@@ -3454,7 +3454,7 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 }
 
 // policy/admCtrl lock is acquired by caller
-func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest, kind, crdMD5 string, crdSecRule interface{},
+func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest, kind, crdHash string, crdSecRule interface{},
 	recordList map[string]*share.CLUSCrdSecurityRule) (string, string, string, int, int, bool) {
 
 	var processed bool
@@ -3524,14 +3524,14 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 			// process the parse result.
 			switch kind {
 			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-				crInfo, crWarning = h.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdMD5, recordList, nil)
+				crInfo, crWarning = h.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdHash, recordList, nil)
 			case resource.NvAdmCtrlSecurityRuleKind:
 				if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
-					crInfo, crWarning = h.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName, crdMD5)
+					crInfo, crWarning = h.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName, crdHash)
 				}
 			case resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind,
 				resource.NvVulnProfileSecurityRuleKind, resource.NvCompProfileSecurityRuleKind:
-				if err := h.crdProcessRuleRecord(crdCfgRet, kind, recordName, crdMD5); err != nil {
+				if err := h.crdProcessRuleRecord(crdCfgRet, kind, recordName, crdHash); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("crdProcessRuleRecord")
 				}
 			}
@@ -4176,54 +4176,50 @@ func (h *nvCrdHandler) crdRebuildGroupProfiles(groupName string, recordList map[
 }
 
 func (h *nvCrdHandler) getCrInfo(crdSecRule interface{}) (string, bool, error) {
-
-	var crdMD5 string
-
-	if objectMeta, ok := crdSecRule.(metav1.Object); !ok {
+	objectMeta, ok := crdSecRule.(metav1.Object)
+	if !ok {
 		return "", true, fmt.Errorf("type casting error")
-	} else {
-		h.crUid = string(objectMeta.GetUID())
-		mdBackup := metav1.ObjectMeta{
-			CreationTimestamp: objectMeta.GetCreationTimestamp(),
-			ResourceVersion:   objectMeta.GetResourceVersion(),
-			Generation:        objectMeta.GetGeneration(),
-			UID:               objectMeta.GetUID(),
-			Labels:            objectMeta.GetLabels(),
-			Annotations:       objectMeta.GetAnnotations(),
-			OwnerReferences:   objectMeta.GetOwnerReferences(),
-		}
-		// clear those variant fields in input metadata for calculating md5 of the cr.
-		objectMeta.SetCreationTimestamp(metav1.Time{})
-		objectMeta.SetResourceVersion("")
-		objectMeta.SetGeneration(0)
-		objectMeta.SetUID(types.UID(""))
-		objectMeta.SetLabels(nil)
-		objectMeta.SetAnnotations(nil)
-		objectMeta.SetOwnerReferences(nil)
-
-		h.mdName = objectMeta.GetName()
-		ruleJsonValue, _ := json.Marshal(crdSecRule)
-		crdMD5 = h.calcCrdSecRuleMD5(ruleJsonValue)
-
-		// revert those variant fields in input metadata to their original values.
-		objectMeta.SetCreationTimestamp(mdBackup.CreationTimestamp)
-		objectMeta.SetResourceVersion(mdBackup.ResourceVersion)
-		objectMeta.SetGeneration(mdBackup.Generation)
-		objectMeta.SetUID(mdBackup.UID)
-		objectMeta.SetLabels(mdBackup.Labels)
-		objectMeta.SetAnnotations(mdBackup.Annotations)
-		objectMeta.SetOwnerReferences(mdBackup.OwnerReferences)
-
-		return crdMD5, false, nil
 	}
+	h.crUid = string(objectMeta.GetUID())
+	mdBackup := metav1.ObjectMeta{
+		CreationTimestamp: objectMeta.GetCreationTimestamp(),
+		ResourceVersion:   objectMeta.GetResourceVersion(),
+		Generation:        objectMeta.GetGeneration(),
+		UID:               objectMeta.GetUID(),
+		Labels:            objectMeta.GetLabels(),
+		Annotations:       objectMeta.GetAnnotations(),
+		OwnerReferences:   objectMeta.GetOwnerReferences(),
+	}
+	// clear those variant fields in input metadata for calculating hash of the cr.
+	objectMeta.SetCreationTimestamp(metav1.Time{})
+	objectMeta.SetResourceVersion("")
+	objectMeta.SetGeneration(0)
+	objectMeta.SetUID(types.UID(""))
+	objectMeta.SetLabels(nil)
+	objectMeta.SetAnnotations(nil)
+	objectMeta.SetOwnerReferences(nil)
+
+	h.mdName = objectMeta.GetName()
+	ruleJsonValue, _ := json.Marshal(crdSecRule)
+	crdHash := h.calcCrdSecRuleHash(ruleJsonValue)
+
+	// revert those variant fields in input metadata to their original values.
+	objectMeta.SetCreationTimestamp(mdBackup.CreationTimestamp)
+	objectMeta.SetResourceVersion(mdBackup.ResourceVersion)
+	objectMeta.SetGeneration(mdBackup.Generation)
+	objectMeta.SetUID(mdBackup.UID)
+	objectMeta.SetLabels(mdBackup.Labels)
+	objectMeta.SetAnnotations(mdBackup.Annotations)
+	objectMeta.SetOwnerReferences(mdBackup.OwnerReferences)
+
+	return crdHash, false, nil
 }
 
-// calculate md5 of the crd security rule(cr resource)
-// after md5 is calculated, we need to revert those variant fields in metadata to their original values.
-func (h *nvCrdHandler) calcCrdSecRuleMD5(ruleJsonValue []byte) string {
-
-	crdMd5Temp := md5.Sum(ruleJsonValue)
-	return hex.EncodeToString(crdMd5Temp[:])
+// calculate sha256 of the crd security rule(cr resource)
+// after sha256 is calculated, we need to revert those variant fields in metadata to their original values.
+func (h *nvCrdHandler) calcCrdSecRuleHash(ruleJsonValue []byte) string {
+	crdHashTemp := sha256.Sum256(ruleJsonValue)
+	return hex.EncodeToString(crdHashTemp[:])
 }
 
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
@@ -4294,7 +4290,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 	for _, obj := range objs {
 		var skip bool
 		var crInfo string
-		var crdMd5 string
+		var crdHash string
 		var mdNameDisplay string
 		var recordName string
 
@@ -4309,7 +4305,7 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
 		}
-		if crdMd5, skip, _ = crdHandler.getCrInfo(obj); skip {
+		if crdHash, skip, _ = crdHandler.getCrInfo(obj); skip {
 			continue
 		}
 		if !crdHandler.AcquireLock(clusterLockWait) {
@@ -4330,14 +4326,14 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
 				crossCheckRecord := recordList[recordName]
 				delete(recordList, recordName)
-				crInfo, _ = crdHandler.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdMd5, recordList, crossCheckRecord)
+				crInfo, _ = crdHandler.crdGFwRuleProcessRecord(crdCfgRet, resource.NvSecurityRuleKind, recordName, crdHash, recordList, crossCheckRecord)
 			case resource.NvAdmCtrlSecurityRuleKind:
 				if crdCfgRet != nil { // for NvAdmissionControlSecurityRule resource objects with metadata name other than "local", ignore them
-					crInfo, _ = crdHandler.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName, crdMd5)
+					crInfo, _ = crdHandler.crdAdmCtrlRuleRecord(crdCfgRet, kind, recordName, crdHash)
 				}
 			case resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind,
 				resource.NvVulnProfileSecurityRuleKind, resource.NvCompProfileSecurityRuleKind:
-				if err := crdHandler.crdProcessRuleRecord(crdCfgRet, kind, recordName, crdMd5); err != nil {
+				if err := crdHandler.crdProcessRuleRecord(crdCfgRet, kind, recordName, crdHash); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error()
 				}
 			}

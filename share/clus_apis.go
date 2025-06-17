@@ -2238,7 +2238,7 @@ type CLUSCrdSecurityRule struct {
 	VulnProfile     string                 `json:"vuln_profile,omitempty"`      // vulnerability profile defined in this crd security rule
 	CompProfile     string                 `json:"comp_profile,omitempty"`      // compliance profile defined in this crd security rule
 	Uid             string                 `json:"uid"`                         // metadata.uid in admissionreview CREATE request
-	CrdMD5          string                 `json:"md5"`                         // md5 of k8s crd resource, for metadata, only include name/namespace
+	CrdHash         string                 `json:"crd_hash"`                    // hex(sha256) of k8s crd resource metadata's name/namespace only
 	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
