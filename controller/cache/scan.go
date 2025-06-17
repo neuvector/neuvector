@@ -910,8 +910,10 @@ func putGZipKVChunks(key string, data []byte) error {
 		}
 
 		// cctx.ScanLog.WithFields(log.Fields{"key": expandKey}).Debug()
-		if err = cluster.PutBinary(expandKey, chunk[:n]); err != nil {
-			return err
+		if n > 0 {
+			if err = cluster.PutBinary(expandKey, chunk[:n]); err != nil {
+				return err
+			}
 		}
 
 		if ended {
@@ -922,7 +924,7 @@ func putGZipKVChunks(key string, data []byte) error {
 	return nil
 }
 
-func getGZipKVChunks(key string) ([]byte, error) {
+func extractScanReportChunks(key, id string, objType share.ScanObjectType) {
 	var combined bytes.Buffer // Create an empty buffer
 	expandKey := key
 	index := 0
@@ -934,13 +936,19 @@ func getGZipKVChunks(key string) ([]byte, error) {
 		if value, err := cluster.Get(expandKey); err == nil {
 			combined.Write(value)
 			if uzb := utils.GunzipBytes(combined.Bytes()); uzb != nil {
-				// gunzip's CRC-32 matched, it is a complete package,
-				// skip others on possible dirty entries
-				return uzb, nil
+				// gunzip's CRC-32 matched, it is not necessarily a complete package,
+				var report share.CLUSScanReport
+				dec := gob.NewDecoder(bytes.NewBuffer(uzb))
+				if err := dec.Decode(&report); err == nil {
+					// now we are pretty sure it is a complete package,
+					// skip others on possible dirty entries
+					scanDone(id, objType, &report)
+					return
+				}
 			}
 		} else {
 			cctx.ScanLog.WithFields(log.Fields{"error": err, "key": expandKey}).Error()
-			return nil, err
+			break
 		}
 		index++
 	}
@@ -1055,13 +1063,7 @@ func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte)
 		dkey = share.CLUSScanDataPlatformKey(id)
 	}
 
-	if uzb, err := getGZipKVChunks(dkey); err == nil && len(uzb) > 0 {
-		var report share.CLUSScanReport
-		dec := gob.NewDecoder(bytes.NewBuffer(uzb))
-		if err := dec.Decode(&report); err == nil {
-			scanDone(id, objType, &report)
-		}
-	}
+	extractScanReportChunks(dkey, id, objType)
 }
 
 func registryStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
