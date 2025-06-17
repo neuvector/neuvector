@@ -151,12 +151,12 @@ type RESTK8sNvRbacStatus struct {
 }
 
 type RESTK8sNvAcceptableAlerts struct {
-	ClusterRoleErrors        map[string]string `json:"clusterrole_errors"`        // key is md5 of the English message
-	ClusterRoleBindingErrors map[string]string `json:"clusterrolebinding_errors"` // key is md5 of the English message
-	RoleErrors               map[string]string `json:"role_errors"`               // key is md5 of the English message
-	RoleBindingErrors        map[string]string `json:"rolebinding_errors"`        // key is md5 of the English message
-	NvCrdSchemaErrors        map[string]string `json:"neuvector_crd_errors"`      // key is md5 of the English message
-	OtherAlerts              map[string]string `json:"other_alerts"`              // key is md5 of the English message
+	ClusterRoleErrors        map[string]string `json:"clusterrole_errors"`        // key is hex(sha256) of the English message
+	ClusterRoleBindingErrors map[string]string `json:"clusterrolebinding_errors"` // key is hex(sha256) of the English message
+	RoleErrors               map[string]string `json:"role_errors"`               // key is hex(sha256) of the English message
+	RoleBindingErrors        map[string]string `json:"rolebinding_errors"`        // key is hex(sha256) of the English message
+	NvCrdSchemaErrors        map[string]string `json:"neuvector_crd_errors"`      // key is hex(sha256) of the English message
+	OtherAlerts              map[string]string `json:"other_alerts"`              // key is hex(sha256) of the English message
 }
 
 type RESTNvAlerts struct {
@@ -188,7 +188,7 @@ type RESTNvAlertGroup struct {
 }
 
 type RESTNvAlert struct {
-	ID      string `json:"id"` // ID is md5 of the English message
+	ID      string `json:"id"` // ID is hex(sha256) of the English message
 	Message string `json:"message"`
 }
 

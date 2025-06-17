@@ -290,7 +290,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			var crInfo, crWarning string
 			var usedTime int64
 			var processed bool
-			var crdMD5 string
+			var crdHash string
 
 			err = nil
 			kind = req.Kind.Kind
@@ -317,7 +317,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			case "CREATE", "UPDATE":
 				if crdSecRule, err = resource.CreateNvCrdObject(rscType); crdSecRule != nil {
 					if err = json.Unmarshal(req.Object.Raw, crdSecRule); err == nil {
-						crdMD5, _, err = crdHandler.getCrInfo(crdSecRule)
+						crdHash, _, err = crdHandler.getCrInfo(crdSecRule)
 						if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
 							if req.Namespace != "" {
 								// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
@@ -377,7 +377,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 				}
 
 				before := time.Now()
-				crInfo, crWarning, errMsg, errCount, cachedRecords, processed = crdHandler.crdSecRuleHandler(req, kind, crdMD5, crdSecRule, recordList)
+				crInfo, crWarning, errMsg, errCount, cachedRecords, processed = crdHandler.crdSecRuleHandler(req, kind, crdHash, crdSecRule, recordList)
 				usedTime = time.Since(before).Milliseconds()
 				crdHandler.ReleaseLock()
 

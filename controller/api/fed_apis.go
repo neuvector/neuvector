@@ -182,7 +182,7 @@ type RESTFedRulesSettings struct {
 }
 
 type RESTFedImageScanResult struct {
-	MD5     string                          `json:"md5"` // it's md5 of json.marshal(gob(regImageSummaryReport))
+	Hash    string                          `json:"hash"` // it's hex(sha256) of json.marshal(gob(regImageSummaryReport))
 	Summary *share.CLUSRegistryImageSummary `json:"summary,omitempty"`
 	Report  *share.CLUSScanReport           `json:"report,omitempty"`
 }
@@ -242,15 +242,15 @@ type RESTPollFedRulesResp struct {
 }
 
 type RESTPollFedScanDataReq struct {
-	ID            string                       `json:"id"`                        // id of joint cluster
-	Name          string                       `json:"name"`                      // name of joint cluster
-	JointTicket   string                       `json:"joint_ticket"`              // generated using joint cluster's secret
-	FedKvVersion  string                       `json:"fed_kv_version"`            // kv version in the code of joint cluster
-	RestVersion   string                       `json:"rest_version"`              // rest version in the code of joint cluster
-	RegConfigRev  uint64                       `json:"reg_config_rev"`            // revision of fed registry setting that the managed cluster remembers
-	UpToDateRegs  []string                     `json:"up_to_date_regs,omitempty"` // fed registry/repo whose images scan result in managed cluster is already up-to-date
-	ScanResultMD5 map[string]map[string]string `json:"scan_result_md5"`           // all scan result md5 of the scanned images in fed registry/repo that have different scan data revision from master (registry name : image id : scan result md5)
-	IgnoreRegs    []string                     `json:"ignore_regs,omitempty"`     // the other fed registry/repo that have different scan data revision from master
+	ID             string                       `json:"id"`                        // id of joint cluster
+	Name           string                       `json:"name"`                      // name of joint cluster
+	JointTicket    string                       `json:"joint_ticket"`              // generated using joint cluster's secret
+	FedKvVersion   string                       `json:"fed_kv_version"`            // kv version in the code of joint cluster
+	RestVersion    string                       `json:"rest_version"`              // rest version in the code of joint cluster
+	RegConfigRev   uint64                       `json:"reg_config_rev"`            // revision of fed registry setting that the managed cluster remembers
+	UpToDateRegs   []string                     `json:"up_to_date_regs,omitempty"` // fed registry/repo whose images scan result in managed cluster is already up-to-date
+	ScanResultHash map[string]map[string]string `json:"scan_result_hash"`          // all scan result hash of the scanned images in fed registry/repo that have different scan data revision from master (registry name : image id : scan result's hex(sha256))
+	IgnoreRegs     []string                     `json:"ignore_regs,omitempty"`     // the other fed registry/repo that have different scan data revision from master
 }
 
 type RESTPollFedScanDataResp struct {

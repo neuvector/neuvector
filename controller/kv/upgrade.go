@@ -1,7 +1,7 @@
 package kv
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -802,7 +802,10 @@ var phases []kvVersions = []kvVersions{
 	{"449EC339", dummyFunc},
 
 	{"D6AD17D4", CreateFedDefDlpWafRuleSensor},
-	{"G7B5S135", nil},
+
+	{"G7B5S135", dummyFunc},
+
+	{"94444768", nil},
 }
 
 func latestKVVersion() string {
@@ -1025,16 +1028,17 @@ func GetFedKvVer() string { // NV clusters with the same "fed kv version" means 
 	//return "4E4F5633" // for 4.0.2 ~ 4.2.2
 	//return "65347e39" // for 4.2.3 ~ 4.3.1, multi-webhook support
 	//return "E907B7AE" // for 4.3.2 ~ 5.0.x
-	//return "28ea479c" // for 5.1
-	return "G7B5S135" // for 6.0
+	//return "28ea479c" // for 5.1 ~ 5.4.2
+	//return "G7B5S135" // for 5.4.3 ~ 5.4.4
+	return "94444768" // for 5.4.5 ~
 }
 
 func GetRestVer() string { // NV clusters with the same "rest version" means master cluster can switch UI view to them
 	// return "E907B7AE" // for 5.0
 	// return "28ea479c" // for 5.1 ~ 5.2.x
 	// return "449EC339" // for 5.3 ~ 5.3.x
-	// return "D6AD17D4" // for 5.4
-	return "G7B5S135" // for 6.0
+	// return "D6AD17D4" // for 5.4 ~ 5.4.2
+	return "G7B5S135" // for 5.4.3 ~
 }
 
 func genFileAccessRule() {
@@ -1316,8 +1320,8 @@ func ValidateWebhookCert() {
 						}
 					}
 					if cert != nil {
-						b := md5.Sum([]byte(cert.Cert))
-						log.WithFields(log.Fields{"cn": certInfo.cn, "cert": hex.EncodeToString(b[:])}).Info("md5")
+						b := sha256.Sum256([]byte(cert.Cert))
+						log.WithFields(log.Fields{"cn": certInfo.cn, "cert": hex.EncodeToString(b[:])}).Info("sha256")
 						certInfo.verified = true
 					}
 				}

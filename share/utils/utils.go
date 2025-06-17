@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha512"
 	"crypto/tls"
@@ -37,6 +36,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/streadway/simpleuuid"
 
@@ -150,19 +150,8 @@ func GzipBytes(buf []byte) []byte {
 	return b.Bytes()
 }
 
-func GetMd5(s string) string {
-	h := md5.New()
-	h.Write([]byte(s))
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 func GetGuid() (string, error) {
-	b := make([]byte, 48)
-	if _, err := io.ReadFull(rand.Reader, b); err != nil {
-		return "", err
-	}
-
-	return GetMd5(base64.StdEncoding.EncodeToString(b)), nil
+	return strings.Replace(uuid.NewString(), "-", "", -1), nil
 }
 
 func GetTimeUUID(t time.Time) string {

@@ -2,7 +2,7 @@ package kv
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
@@ -2182,9 +2182,9 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 				if !valid {
 					return cluster.Put(key, value)
 				} else {
-					b1 := md5.Sum([]byte(cert.Cert))
-					b2 := md5.Sum([]byte(certExisting.Cert))
-					log.WithFields(log.Fields{"cn": cn, "certIn": hex.EncodeToString(b1[:]), "certExisting": hex.EncodeToString(b2[:])}).Info("md5")
+					b1 := sha256.Sum256([]byte(cert.Cert))
+					b2 := sha256.Sum256([]byte(certExisting.Cert))
+					log.WithFields(log.Fields{"cn": cn, "certIn": hex.EncodeToString(b1[:]), "certExisting": hex.EncodeToString(b2[:])}).Info("sha256")
 					err1 := os.WriteFile(keyPath, []byte(certExisting.Key), 0600)
 					err2 := os.WriteFile(certPath, []byte(certExisting.Cert), 0600)
 					if err1 == nil && err2 == nil {

@@ -2,7 +2,7 @@ package rest
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -1504,8 +1504,8 @@ func loadX509KeyPair(svcName string) (tls.Certificate, error) {
 		if cert, _, err = clusHelper.GetObjectCertRev(cn); !cert.IsEmpty() {
 			keyPEMBlock := []byte(cert.Key)
 			certPEMBlock := []byte(cert.Cert)
-			b := md5.Sum(certPEMBlock)
-			log.WithFields(log.Fields{"svcName": svcName, "cert": hex.EncodeToString(b[:])}).Info("md5")
+			b := sha256.Sum256(certPEMBlock)
+			log.WithFields(log.Fields{"svcName": svcName, "cert": hex.EncodeToString(b[:])}).Info("sha256")
 			// admission.SetCABundle(svcName, certPEMBlock) //->
 
 			return tls.X509KeyPair(certPEMBlock, keyPEMBlock)

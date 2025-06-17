@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -63,8 +63,8 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 			if len(cert.Key) > 0 && len(cert.Cert) > 0 {
 				if err := os.WriteFile(pathInfo.keyPath, []byte(cert.Key), 0600); err == nil {
 					certData := []byte(cert.Cert)
-					b := md5.Sum(certData)
-					log.WithFields(log.Fields{"svcName": pathInfo.svcName, "cert": hex.EncodeToString(b[:])}).Info("md5")
+					b := sha256.Sum256(certData)
+					log.WithFields(log.Fields{"svcName": pathInfo.svcName, "cert": hex.EncodeToString(b[:])}).Info("sha256")
 					if err = os.WriteFile(pathInfo.certPath, certData, 0600); err == nil {
 						if localDev.Host.Platform == share.PlatformKubernetes && pathInfo.svcName != share.CLUSRootCAKey {
 							// return value of ResetCABundle() tells us whether remembered cert is different from new cert

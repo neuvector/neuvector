@@ -1,7 +1,9 @@
 package cluster
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -97,6 +99,12 @@ func createPeerFileV2(cc *ClusterConfig) error {
 }
 */
 
+func genGuidFromAddr(addr string) string {
+	sha256Sum := sha256.Sum256([]byte(addr))
+	hexSha256Sum := hex.EncodeToString(sha256Sum[:])
+	return utils.GetStringUUID(hexSha256Sum[0:32])
+}
+
 func createPeerFileV3(cc *ClusterConfig) error {
 	log.WithFields(log.Fields{"peers": cc.joinAddrList}).Info()
 
@@ -109,7 +117,7 @@ func createPeerFileV3(cc *ClusterConfig) error {
 
 	peers := make([]peerInfoV3, len(cc.joinAddrList))
 	for i, addr := range cc.joinAddrList {
-		id := utils.GetStringUUID(utils.GetMd5(addr))
+		id := genGuidFromAddr(addr)
 		peers[i] = peerInfoV3{ID: id, Address: fmt.Sprintf("%s:%d", addr, cc.RPCPort), NonVoter: false}
 	}
 
@@ -312,7 +320,7 @@ func (m *consulMethod) Start(cc *ClusterConfig, eCh chan error, recover bool) {
 	}
 
 	if nodeID == "" {
-		nodeID = utils.GetStringUUID(utils.GetMd5(m.clusterIP))
+		nodeID = genGuidFromAddr(m.clusterIP)
 		log.WithFields(log.Fields{"node-id": nodeID}).Info()
 	}
 
