@@ -415,6 +415,13 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 		vendorId = "jar"
 	}
 
+	// NVSHAS-9942
+	if title == "org.elasticsearch#server" {
+		title = "elasticsearch"
+	} else if title == "Spring Boot" {
+		title = "spring-boot"
+	}
+
 	// Suppress incomplete entries as we can't use them later.
 	if title == "" || title == "jar" || version == "" {
 		return nil, errors.New("Missing title or version")
