@@ -276,6 +276,47 @@ Bundle-ActivationPolicy: lazy
 	if pkg.ModuleName != "JNA Development Team:com.sun.jna" && pkg.Version != "5.5.0" {
 		t.Errorf("Wrong jar package: %+v\n", pkg)
 	}
+
+	m = `
+Manifest-Version: 1.0
+Automatic-Module-Name: spring.boot
+Build-Jdk-Spec: 17
+Built-By: Spring
+Implementation-Title: Spring Boot
+Implementation-Version: 3.3.10
+`
+	r = strings.NewReader(m)
+	pkg, _ = parseJarManifestFile("", r)
+	if pkg.ModuleName != "jar:spring-boot" && pkg.Version != "3.3.10" {
+		t.Errorf("Wrong jar package: %+v\n", pkg)
+	}
+	m = `
+Manifest-Version: 1.0
+Multi-Release: true
+Implementation-Title: org.elasticsearch#server;6.6.1
+Implementation-Version: 6.6.1
+Built-Status: integration
+Built-By: vagrant
+Built-OS: Linux
+Build-Date: 2019-02-13T17:10:04.160291Z
+Gradle-Version: 5.1.1
+Created-By: 11+28 (Oracle Corporation)
+Build-Java-Version: 11
+Module-Source: /server
+Module-Origin: git@github.com:elastic/elasticsearch.git
+Change: 1fd8f69
+Branch: 1fd8f691bf2e467057b864eea9103a6e3345af3e
+X-Compile-Target-JDK: 1.8
+X-Compile-Source-JDK: 1.8
+X-Compile-Elasticsearch-Version: 6.6.1
+X-Compile-Lucene-Version: 7.6.0
+X-Compile-Elasticsearch-Snapshot: false
+`
+	r = strings.NewReader(m)
+	pkg, _ = parseJarManifestFile("", r)
+	if pkg.ModuleName != "jar:elasticsearch" && pkg.Version != "6.6.1" {
+		t.Errorf("Wrong jar package: %+v\n", pkg)
+	}
 }
 
 func TestParseDotNetModuleNameVersion(t *testing.T) {
