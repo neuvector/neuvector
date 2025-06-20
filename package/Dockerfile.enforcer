@@ -8,12 +8,12 @@ ARG TARGETOS
 ARG TARGETARCH
 
 RUN zypper ref && \
-    zypper install -y --no-recommends gcc13 gcc13-c++ make glibc-devel glibc-devel-static \
+    zypper install -y --no-recommends gcc14 gcc14-c++ make glibc-devel glibc-devel-static \
     automake autoconf libtool libpcap-devel pcre-devel pcre2-devel curl wget zip git \
     libnfnetlink-devel libnetfilter_queue-devel libmnl-devel liburcu-devel libjansson-devel \
     jemalloc-devel && \
-    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 10 && \
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 10
+    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 10 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 10
 
 # Install hyperscan
 RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
@@ -33,8 +33,8 @@ RUN bash package/build_enforcer.sh
 #
 # Base image
 # 
-FROM registry.suse.com/bci/bci-micro:15.6 AS micro
-FROM registry.suse.com/bci/bci-base:15.6 AS base
+FROM registry.suse.com/bci/bci-micro:15.7 AS micro
+FROM registry.suse.com/bci/bci-base:15.7 AS base
 
 ARG TARGETOS
 ARG TARGETARCH
