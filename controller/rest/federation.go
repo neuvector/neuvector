@@ -3647,6 +3647,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				}
 			} else if method == http.MethodPost {
 				exportURIs := utils.NewSetFromStringSlice([]string{
+					"/v1/file/group",
 					"/v1/file/admission",
 					"/v1/file/waf",
 					"/v1/file/dlp",
