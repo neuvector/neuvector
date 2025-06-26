@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -38,10 +39,10 @@ type jfrogDir struct {
 
 type jfrog struct {
 	base
-	mode         string
-	aql          bool
-	subdomainURL map[string]string
-	isSubdomain  bool
+	mode              string
+	aql               bool
+	subdomainURL      map[string]string
+	subdomainInRegURL string
 }
 
 type aqlFolder struct {
@@ -84,18 +85,26 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 		return nil, err
 	}
 
-	// NOTE: in subdomain mode, the filter is either * or to start with subdomain name
+	// NOTE: in subdomain mode,
+	// 1. if "{subdomain}." is not the prefix of registry url, the filter either contains "*" or must start with "{subdomain}/"
+	// 2. if "{subdomain}." is the prefix of registry url, the filter either contains "*", or can start with "{subdomain}/" or not
 	whichURL := -1
 	myRC := r.rc
 	defer func() { r.rc = myRC }()
 
 	for _, dir := range jdirs {
-		if dir.PackageType != "" && dir.PackageType != "Docker" && dir.PackageType != "docker" {
+		if dir.PackageType != "" && strings.ToLower(dir.PackageType) != "docker" {
 			continue
 		}
 
-		if org != "" && org != dir.Key {
-			continue
+		if r.subdomainInRegURL != "" {
+			if r.subdomainInRegURL != dir.Key {
+				continue
+			}
+		} else {
+			if org != "" && org != dir.Key {
+				continue
+			}
 		}
 
 		var url1, url2 string
@@ -112,22 +121,31 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 			}
 
 			smd.scanLog.WithFields(log.Fields{
-				"org": org, "subdomain": dir.Key, "type": dir.DirType, "url": dir.URL, "registry": newURL,
+				"org": org, "name": name, "subdomain": dir.Key, "type": dir.DirType, "url": dir.URL, "registry": newURL,
 			}).Debug("Get repo list ...")
 
 			r.rc = scanUtils.NewRegClient(newURL, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
 			if rps, err := r.base.GetRepoList(org, name, limit); err == nil {
 				if !strings.Contains(name, "*") {
+					if len(rps) == 0 {
+						return nil, nil
+					}
 					// although repo has no wildcard, we need wait until here so we have the correct subdomain URL
 					r.subdomainURL[dir.Key] = newURL
-					return []*share.CLUSImage{{
-						RegMod: newURL, Repo: fmt.Sprintf("%s/%s", org, name),
-					}}, nil
+					rps[0].RegMod = newURL
+					if r.subdomainInRegURL == "" && org == "" {
+						// when subdomain value is not the prefix in registry url, repo(no wildcard) must have "{subdomain}/" as prefix
+						rps[0].Repo = fmt.Sprintf("%s/%s", dir.Key, name)
+					}
+					return []*share.CLUSImage{rps[0]}, nil
 				}
 
 				for _, repo := range rps {
 					repo.RegMod = newURL
-					repo.Repo = dir.Key + "/" + repo.Repo
+					if r.subdomainInRegURL == "" {
+						// when subdomain value is not the prefix in registry url, repo(no wildcard) must have "{subdomain}/" as prefix
+						repo.Repo = dir.Key + "/" + repo.Repo
+					}
 					repos = append(repos, repo)
 				}
 
@@ -135,7 +153,7 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 				whichURL = i
 				smd.scanLog.WithFields(log.Fields{"repositories": len(rps)}).Debug()
 			} else {
-				smd.scanLog.Debug("Get subdomain repository fail")
+				smd.scanLog.WithFields(log.Fields{"newURL": newURL}).Debug("Get subdomain repository fail")
 			}
 		}
 	}
@@ -143,7 +161,7 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 }
 
 func (r *jfrog) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, error) {
-	smd.scanLog.WithFields(log.Fields{"mode": r.mode, "registry": r.base.regURL}).Debug("")
+	smd.scanLog.WithFields(log.Fields{"mode": r.mode, "registry": r.base.regURL}).Debug()
 	if r.mode == share.JFrogModePort {
 		return r.base.GetRepoList(org, name, limit)
 	}
@@ -157,17 +175,38 @@ func (r *jfrog) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, er
 
 	repos := make([]*share.CLUSImage, 0)
 	if r.mode == share.JFrogModeSubdomain {
-		if !r.isSubdomain {
+		if r.subdomainInRegURL == "" {
 			// we cannot tell the difference between the host and subdomain url
 			// a trick here to get the catalog of subdomain. host will fail, subdomain success
-			if repos, err := r.rc.Repositories(); err == nil {
-				list := make([]*share.CLUSImage, len(repos))
-				for i, repo := range repos {
-					list[i] = &share.CLUSImage{Repo: repo}
+			if _, err := r.rc.Repositories(); err == nil {
+				// when subdomain value is the prefix in registry url, like http://{subdomain}.{hostname-FQDN}/,
+				// registry filter could contain subdomain as prefix or not
+				r.subdomainInRegURL = getSubdomainFromRegURL(r.base.regURL)
+				repoPrefixToRevert := ""
+				if r.subdomainInRegURL != "" && org != "" && org != r.subdomainInRegURL {
+					// in 5.4.4(-), if registry filter is not "*", it must have prefix "{subdomain}/"
+					// so we need to make sure filter has prefix "{subdomain}/" before calling r.getSubdomainRepoList()
+					name = fmt.Sprintf("%s/%s", org, name)
+					repoPrefixToRevert = fmt.Sprintf("%s/", r.subdomainInRegURL)
+					org = r.subdomainInRegURL
 				}
-				return list, nil
+				rps, err := r.getSubdomainRepoList(jdirs, org, name, limit)
+				if repoPrefixToRevert != "" {
+					for _, repo := range rps {
+						repo.Repo = strings.TrimPrefix(repo.Repo, repoPrefixToRevert)
+					}
+				} else if r.subdomainInRegURL != "" && org != "" && org == r.subdomainInRegURL {
+					// if registry filter has non-empty org(from filter) that is equal to "{subdomain}",
+					// we need to make sure image.repo contains the prefix "{subdomain}/" as that the image is not filtered out later
+					for _, repo := range rps {
+						prefix := org + "/"
+						if !strings.HasPrefix(repo.Repo, prefix) {
+							repo.Repo = prefix + repo.Repo
+						}
+					}
+				}
+				return rps, err
 			} else {
-				r.isSubdomain = true
 				return r.getSubdomainRepoList(jdirs, org, name, limit)
 			}
 		} else {
@@ -209,6 +248,20 @@ func (r *jfrog) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, er
 	return repos, nil
 }
 
+func getSubdomainFromRegURL(regURL string) string {
+	parsedURL, err := url.Parse(regURL)
+	if err != nil {
+		return ""
+	}
+	hostname := parsedURL.Hostname()
+	if ipAddr := net.ParseIP(hostname); ipAddr == nil {
+		if a := strings.Index(hostname, "."); a > 0 {
+			return hostname[:a]
+		}
+	}
+	return ""
+}
+
 func getSubdomainFromRepo(repo string) (string, string) {
 	if a := strings.Index(repo, "/"); a > 0 {
 		return repo[:a], repo[a+1:]
@@ -218,10 +271,30 @@ func getSubdomainFromRepo(repo string) (string, string) {
 
 // GetArtifactoryTags is designed to work with a new API endpoint provided by JFrog.
 func (r *jfrog) GetArtifactoryTags(repositoryStr string, rc *scanUtils.RegClient) ([]string, error) {
+	var key string
+	var repository string
+
 	tags := make([]string, 0)
-	key, repository, found := strings.Cut(repositoryStr, "/")
-	if !found {
-		return tags, fmt.Errorf("invalid repository format: %v", repositoryStr)
+	if r.mode == share.JFrogModeSubdomain {
+		key = r.subdomainInRegURL
+		repository = repositoryStr
+		if r.subdomainInRegURL == "" {
+			found := false
+			key, repository, found = strings.Cut(repositoryStr, "/")
+			if !found {
+				return tags, fmt.Errorf("invalid repository format: %v", repositoryStr)
+			}
+		} else {
+			if sub, subRepo := getSubdomainFromRepo(repositoryStr); sub == r.subdomainInRegURL {
+				repository = subRepo
+			}
+		}
+	} else {
+		var found bool
+		key, repository, found = strings.Cut(repositoryStr, "/")
+		if !found {
+			return tags, fmt.Errorf("invalid repository format: %v", repositoryStr)
+		}
 	}
 
 	url, err := r.url("/artifactory/api/docker/%s/v2/%s/tags/list", key, repository)
@@ -231,19 +304,39 @@ func (r *jfrog) GetArtifactoryTags(repositoryStr string, rc *scanUtils.RegClient
 	return rc.FetchTagsPaginated(url, repositoryStr)
 }
 
+func (r *jfrog) getSubdomainUrlFromRepo(repo string) (string, string, error) {
+	smd.scanLog.Debug()
+
+	if r.mode != share.JFrogModeSubdomain {
+		return "", "", common.ErrUnsupported
+	}
+
+	subdomain, subrepo := getSubdomainFromRepo(repo)
+	if r.subdomainInRegURL == "" || (subdomain != "" && r.subdomainInRegURL == subdomain) {
+		repo = subrepo
+	} else if r.subdomainInRegURL != "" && (subdomain == "" || r.subdomainInRegURL != subdomain) {
+		subdomain = r.subdomainInRegURL
+	}
+	url, ok := r.subdomainURL[subdomain]
+	if !ok {
+		return "", "", fmt.Errorf("cannot find subdomain %s from repository %s", subdomain, repo)
+	}
+
+	return url, repo, nil
+}
+
 func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 	smd.scanLog.Debug()
 
 	rc := r.rc
-	if r.mode == share.JFrogModeSubdomain && r.isSubdomain {
-		sub, subRepo := getSubdomainFromRepo(repo)
-		if url, ok := r.subdomainURL[sub]; ok {
-			if r.regURL != url {
-				rc = scanUtils.NewRegClient(url, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
-			}
-		} else {
-			smd.scanLog.WithFields(log.Fields{"subdomain": sub}).Error("connot find the subdomain")
-			return nil, fmt.Errorf("cannot find subdomain from repository, subdomain=%s", sub)
+	if r.mode == share.JFrogModeSubdomain {
+		url, subRepo, err := r.getSubdomainUrlFromRepo(repo)
+		if err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error()
+			return nil, err
+		}
+		if r.regURL != url {
+			rc = scanUtils.NewRegClient(url, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
 		}
 		repo = subRepo
 	}
@@ -265,7 +358,7 @@ func (r *jfrog) GetAllImages() (map[share.CLUSImage][]string, error) {
 		return nil, common.ErrUnsupported
 	}
 
-	r.isSubdomain = true
+	r.subdomainInRegURL = ""
 
 	aqlUrl, err := r.url("artifactory/api/search/aql")
 	if err != nil {
@@ -353,14 +446,12 @@ func (r *jfrog) GetAllImages() (map[share.CLUSImage][]string, error) {
 
 func (r *jfrog) GetImageMeta(ctx context.Context, domain, repo, tag string) (*scanUtils.ImageInfo, share.ScanErrorCode) {
 	rc := r.rc
-	if r.mode == share.JFrogModeSubdomain && r.isSubdomain {
-		sub, subRepo := getSubdomainFromRepo(repo)
-		if url, ok := r.subdomainURL[sub]; ok {
-			if r.regURL != url {
-				rc = scanUtils.NewRegClient(url, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
-			}
-		} else {
-			smd.scanLog.WithFields(log.Fields{"subdomain": sub}).Error("connot find the subdomain")
+	if r.mode == share.JFrogModeSubdomain {
+		url, subRepo, err := r.getSubdomainUrlFromRepo(repo)
+		if err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error()
+		} else if r.regURL != url {
+			rc = scanUtils.NewRegClient(url, "", r.base.username, r.base.password, r.base.proxy, r.tracer)
 		}
 		repo = subRepo
 	}
@@ -370,12 +461,12 @@ func (r *jfrog) GetImageMeta(ctx context.Context, domain, repo, tag string) (*sc
 
 func (r *jfrog) ScanImage(scanner string, ctx context.Context, id, digest, repo, tag string, scanTypesRequired share.ScanTypeMap) *share.ScanResult {
 	newURL := r.regURL
-	if r.mode == share.JFrogModeSubdomain && r.isSubdomain {
-		sub, subRepo := getSubdomainFromRepo(repo)
-		if ur, ok := r.subdomainURL[sub]; ok {
-			newURL = ur
+	if r.mode == share.JFrogModeSubdomain {
+		url, subRepo, err := r.getSubdomainUrlFromRepo(repo)
+		if err != nil {
+			smd.scanLog.WithFields(log.Fields{"err": err}).Error()
 		} else {
-			smd.scanLog.WithFields(log.Fields{"subdomain": sub}).Error("connot find the subdomain")
+			newURL = url
 		}
 		repo = subRepo
 	}
