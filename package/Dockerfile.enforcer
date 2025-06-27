@@ -16,8 +16,8 @@ RUN zypper ref && \
     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 10
 
 # Install hyperscan
-RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
-    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/repodata/repomd.xml.key && \
+RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/isv:SUSE:neuvector.repo && \
+    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/repodata/repomd.xml.key && \
     zypper --non-interactive refresh && \
     zypper install -y libhs5-vectorscan5 vectorscan-devel
 
@@ -47,8 +47,8 @@ RUN zypper refresh && zypper --installroot /chroot -n in --no-recommends \
     libnetfilter_queue-devel liburcu-devel libpcap-devel pcre2-devel libjansson-devel libmnl-devel jemalloc-devel
  
 # Install yq and vectorscan
-RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/isv:SUSE:neuvector.repo && \
-    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.6/repodata/repomd.xml.key && \
+RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/isv:SUSE:neuvector.repo && \
+    rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/repodata/repomd.xml.key && \
     zypper -n refresh && \
     zypper --installroot /chroot install -y yq libhs5-vectorscan5 vectorscan-devel consul
 
