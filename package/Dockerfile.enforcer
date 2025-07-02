@@ -59,8 +59,6 @@ RUN zypper --installroot /chroot clean -a && \
 
 RUN touch /chroot/usr/local/bin/.nvcontainer && mkdir -p /chroot/etc/neuvector/certs/internal/
 
-COPY package/deps /deps/
-
 RUN cd /usr/bin/ && rm -rf basename chcon chgrp chmod chown chroot cksum dd df dircolors dirname du install install-info join locale localedef mkdir mkfifo mknod mktemp paste pathchk readlink realpath sync smidiff smidump smilink smiquery smistrip smixlate tee tiemout tload top truncate unlink watch
 
 #
