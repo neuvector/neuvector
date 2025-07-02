@@ -50,17 +50,11 @@ RUN zypper refresh && zypper --non-interactive --installroot /chroot install --n
 RUN touch /chroot/usr/local/bin/.nvcontainer
 RUN mkdir -p /chroot/etc/neuvector/certs/internal/
 
-COPY package/deps /deps/
-
 RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/isv:SUSE:neuvector.repo && \
     rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/repodata/repomd.xml.key && \
     zypper -n refresh && \
-    zypper --installroot /chroot install -y consul
-RUN mv /chroot/usr/bin/consul /chroot/usr/local/bin/consul
-
-ARG OPA_VERSION=v1.5.1
-RUN curl -fL https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_${TARGETOS}_${TARGETARCH}_static -o opa \
-    && cat /deps/${TARGETOS}_${TARGETARCH}/opa.checksum | sha256sum --check --status && chmod +x opa && mv opa /chroot/usr/local/bin
+    zypper --installroot /chroot install -y consul opa
+RUN mv /chroot/usr/bin/consul /chroot/usr/local/bin/consul && mv /chroot/usr/bin/opa /chroot/usr/local/bin/opa
 
 RUN cd /chroot/usr/bin/ && rm -rf basename chcon chgrp chmod chown chroot cksum dd df dircolors dirname du install install-info join locale localedef mkdir mkfifo mknod mktemp paste pathchk readlink realpath sync smidiff smidump smilink smiquery smistrip smixlate tee tiemout tload top truncate unlink watch
 
