@@ -22,7 +22,7 @@ groups:
           check="$id  - $description"
           file="/var/lib/kubelet/kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
               pass "      * read check_argument for $file"
@@ -50,7 +50,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -80,7 +80,7 @@ groups:
           file=""
           file="/etc/kubernetes/kubelet/kubelet-config.json"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
               pass "      * read check_argument for $file"
@@ -91,7 +91,7 @@ groups:
           else
             warn "$check"
             warn "      * kubelet configuration file, $file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod chmod 644 /proc/1/root/etc/kubernetes/kubelet/kubelet-config.json
       - id: K.3.1.4
@@ -107,8 +107,8 @@ groups:
           PCI: []
           GDPR: []
         audit: |
-          check="$id  - $description"           
-          if [ -f "$file" ]; then
+          check="$id  - $description"
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -118,7 +118,7 @@ groups:
           else
             warn "$check"
             warn "      * kubelet configuration file, $file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chown root:root /proc/1/root/etc/kubernetes/kubelet/kubelet-config.json
   - id: 3.2
@@ -160,7 +160,7 @@ groups:
           The following example is for operating systems using systemd, such as the Amazon EKS Optimised Amazon Linux or Bottlerocket AMIs, and invokes the systemctl command. If systemctl is not available then you will need to look up documentation for your chosen operating system to determine which service manager is configured:
           systemctl daemon-reload
           systemctl restart kubelet.service
-          systemctl status kubelet -l                
+          systemctl status kubelet -l
       - id: K.3.2.2
         description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
           (Automated)
@@ -221,7 +221,7 @@ groups:
               pass "      * client-ca-file: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Remediation Method 1:
           If configuring via the Kubelet config file, you first need to locate the file.
@@ -261,7 +261,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           If modifying the Kubelet config file, edit the kubelet-config.json file /etc/kubernetes/kubelet/kubelet-config.json and set the below parameter to 0
           "readOnlyPort": 0
@@ -289,7 +289,7 @@ groups:
               warn "      * streaming-connection-idle-timeout: $timeout"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           Remediation Method 1:
           If modifying the Kubelet config file, edit the kubelet-config.json file /etc/kubernetes/kubelet/kubelet-config.json and set the below parameter to a non- zero value in the format of #h#m#s
@@ -326,7 +326,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Remediation Method 1:
           If modifying the Kubelet config file, edit the kubelet-config.json file /etc/kubernetes/kubelet/kubelet-config.json and set the below parameter to true
@@ -370,7 +370,7 @@ groups:
           else
               warn "$check"
               warn "      * --event-qps is not set"
-          fi     
+          fi
         remediation: |
           If using a Kubelet config file, edit the file to set eventRecordQPS: to an appropriate level. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
           Based on your system, restart the kubelet service. For example:
@@ -395,7 +395,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi   
+          fi
         remediation: |
           Remediation Method 1:
           If modifying the Kubelet config file, edit the kubelet-config.json file /etc/kubernetes/kubelet/kubelet-config.json and set the below parameter to true
@@ -423,7 +423,7 @@ groups:
               file=$(get_argument_value "$CIS_KUBELET_CMD" '--config'|cut -d " " -f 1)
           fi
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=true/p' $file)
             if [ -z "$found" ]; then
                 warn "$check"

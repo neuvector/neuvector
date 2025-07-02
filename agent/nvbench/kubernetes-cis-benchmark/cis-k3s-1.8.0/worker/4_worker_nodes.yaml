@@ -53,7 +53,7 @@ groups:
         audit: |
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/k3s/agent/kubeproxy.kubeconfig")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -63,7 +63,7 @@ groups:
           else
             warn "$check"
             warn "      * kubeconfig file: $file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod 600 /var/lib/rancher/k3s/agent/kubeproxy.kubeconfig
       - id: K.4.1.4
@@ -79,8 +79,8 @@ groups:
           PCI: []
           GDPR: []
         audit: |
-          check="$id  - $description"           
-          if [ -f "$file" ]; then
+          check="$id  - $description"
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -90,7 +90,7 @@ groups:
           else
             warn "$check"
             warn "      * kubeconfig file: $file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chown root:root /var/lib/rancher/k3s/agent/kubeproxy.kubeconfig
           file>
@@ -110,7 +110,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/k3s/agent/kubelet.kubeconfig")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -120,7 +120,7 @@ groups:
           else
             warn "$check"
             warn "      * File: $file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod 600 /var/lib/rancher/k3s/agent/kubelet.kubeconfig
       - id: K.4.1.6
@@ -137,7 +137,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -176,7 +176,7 @@ groups:
             warn "      * File: $file not found"
           fi
         remediation: |
-          Run the following command to modify the file permissions of the --client-ca-file chmod 600 /var/lib/rancher/k3s/agent/client-ca.crt        
+          Run the following command to modify the file permissions of the --client-ca-file chmod 600 /var/lib/rancher/k3s/agent/client-ca.crt
       - id: K.4.1.8
         description: Ensure that the client certificate authorities file ownership
           is set to root:root (Manual)
@@ -262,7 +262,7 @@ groups:
           By default, K3s sets the --anonymous-auth to false. If you have set this to a different value, you should set it back to false. If using the K3s config file /etc/rancher/k3s/config.yaml, remove any lines similar to below.
           kubelet-arg:
             - "anonymous-auth=true"
-          If using the command line, edit the K3s service file and remove the below argument. --kubelet-arg="anonymous-auth=true" Based on your system, restart the k3s service. For example, systemctl daemon-reload systemctl restart k3s.service               
+          If using the command line, edit the K3s service file and remove the below argument. --kubelet-arg="anonymous-auth=true" Based on your system, restart the k3s service. For example, systemctl daemon-reload systemctl restart k3s.service
       - id: K.4.2.2
         description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
           (Automated)
@@ -308,7 +308,7 @@ groups:
               pass "      * client-ca-file: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, K3s automatically provides the client ca certificate for the Kubelet. It is generated and located at /var/lib/rancher/k3s/agent/client-ca.crt
       - id: K.4.2.4
@@ -334,7 +334,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, K3s sets the --read-only-port to 0. If you have set this to a different value, you should set it back to 0. If using the K3s config file /etc/rancher/k3s/config.yaml, remove any lines similar to below.
           kubelet-arg:
@@ -357,7 +357,7 @@ groups:
               warn "      * streaming-connection-idle-timeout: $timeout"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           If using the K3s config file /etc/rancher/k3s/config.yaml, set the following parameter to an appropriate value.
           kubelet-arg:
@@ -378,7 +378,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           If using the K3s config file /etc/rancher/k3s/config.yaml, set the following parameter.
           kubelet-arg:
@@ -394,9 +394,9 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          pass "$check"     
+          pass "$check"
         remediation: |
-          By default, K3s does set the --hostname-override argument. Per CIS guidelines, this is to comply with cloud providers that require this flag to ensure that hostname matches node names.      
+          By default, K3s does set the --hostname-override argument. Per CIS guidelines, this is to comply with cloud providers that require this flag to ensure that hostname matches node names.
       - id: K.4.2.8
         description: Ensure that the eventRecordQPS argument is set to a level which
           ensures appropriate event capture (Manual)
@@ -419,12 +419,12 @@ groups:
           else
               warn "$check"
               warn "      * --event-qps is not set"
-          fi        
+          fi
         remediation: |
           By default, K3s sets the event-qps to 0. Should you wish to change this, If using the K3s config file /etc/rancher/k3s/config.yaml, set the following parameter to an appropriate value.
           kubelet-arg:
             - "event-qps=<value>"
-          If using the command line, run K3s with --kubelet-arg="event-qps=<value>". Based on your system, restart the k3s service. For example, systemctl restart k3s.service             
+          If using the command line, run K3s with --kubelet-arg="event-qps=<value>". Based on your system, restart the k3s service. For example, systemctl restart k3s.service
       - id: K.4.2.9
         description: Ensure that the --tls-cert-file and --tls-private-key-file arguments
           are set as appropriate (Manual)
@@ -453,12 +453,12 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, K3s automatically provides the TLS certificate and private key for the Kubelet. They are generated and located at /var/lib/rancher/k3s/agent/serving-kubelet.crt and /var/lib/rancher/k3s/agent/serving-kubelet.key If for some reason you need to provide your own certificate and key, you can set the below parameters in the K3s config file /etc/rancher/k3s/config.yaml.
           kubelet-arg:
             - "tls-cert-file=<path/to/tls-cert-file>"
-            - "tls-private-key-file=<path/to/tls-private-key-file>"                
+            - "tls-private-key-file=<path/to/tls-private-key-file>"
       - id: K.4.2.10
         description: Ensure that the --rotate-certificates argument is not set to
           false (Automated)
@@ -477,7 +477,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi        
+          fi
         remediation: |
           By default, K3s does not set the --rotate-certificates argument. If you have set this flag with a value of false, you should either set it to true or completely remove the flag. If using the K3s config file /etc/rancher/k3s/config.yaml, remove any rotate-certificates parameter. If using the command line, remove the K3s flag --kubelet-arg="rotate-certificates". Based on your system, restart the k3s service. For example, systemctl restart k3s.service
       - id: K.4.2.11
@@ -505,7 +505,7 @@ groups:
               fi
           else
               warn "$check"
-          fi   
+          fi
         remediation: |
           By default, K3s does not set the RotateKubeletServerCertificate feature gate. If you have enabled this feature gate, you should remove it. If using the K3s config file /etc/rancher/k3s/config.yaml, remove any feature-gate=RotateKubeletServerCertificate parameter. If using the command line, remove the K3s flag --kubelet-arg="feature-gate=RotateKubeletServerCertificate". Based on your system, restart the k3s service. For example, systemctl restart k3s.service
       - id: K.4.2.12
@@ -556,7 +556,7 @@ groups:
           If using a K3s config file /etc/rancher/k3s/config.yaml, edit the file to set TLSCipherSuites to
           kubelet-arg:
             - "tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
-          or to a subset of these values. If using the command line, add the K3s flag --kubelet-arg="tls-cipher-suites=<same values as above>" Based on your system, restart the k3s service. For example, systemctl restart k3s.service 
+          or to a subset of these values. If using the command line, add the K3s flag --kubelet-arg="tls-cipher-suites=<same values as above>" Based on your system, restart the k3s service. For example, systemctl restart k3s.service
       - id: K.4.2.13
         description: Ensure that a limit is set on pod PIDs (Manual)
         type: worker
@@ -568,8 +568,8 @@ groups:
         audit: |
           check="$id  - $description"
           manual "$check"
-          manual "      * Review the Kubelet's start-up parameters for the value of --pod-max-pids, and check the Kubelet configuration file for the PodPidsLimit . If neither of these values is set, then there is no limit in place."   
+          manual "      * Review the Kubelet's start-up parameters for the value of --pod-max-pids, and check the Kubelet configuration file for the PodPidsLimit . If neither of these values is set, then there is no limit in place."
         remediation: |
           Decide on an appropriate level for this parameter and set it, If using a K3s config file /etc/rancher/k3s/config.yaml, edit the file to set podPidsLimit to
           kubelet-arg:
-            - "pod-max-pids=<value>"        
+            - "pod-max-pids=<value>"
