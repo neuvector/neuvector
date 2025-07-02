@@ -50,7 +50,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" -eq 00 ]; then
               pass "$check"
@@ -80,7 +80,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -108,7 +108,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" -eq 00 ]; then
               pass "$check"
@@ -138,7 +138,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -166,7 +166,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" -eq 00 ]; then
               pass "$check"
@@ -196,7 +196,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/pod-manifests/etcd.yaml")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -224,7 +224,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" -eq 00 ]; then
               pass "$check"
@@ -303,7 +303,7 @@ groups:
             count_files=$((count_files + 1))
             permissions=$(stat -c %u%g $file)
 
-            # Check if the ownership is set to root:root 
+            # Check if the ownership is set to root:root
             if [ "$permissions" != "00" ]; then
               non_compliant_files="$non_compliant_files$file ($permissions), "
             fi
@@ -341,7 +341,7 @@ groups:
           file="/var/lib/rancher/rke2/server/db/etcd"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 700 ]; then
               pass "$check"
@@ -356,7 +356,7 @@ groups:
         remediation: 'On the etcd server node, get the etcd data directory, passed
           as an argument --data-dir, from the below command: ps -ef | grep etcd Run
           the below command (based on the etcd data directory found above). For example,
-          chmod 700 /var/lib/etcd'
+          chmod 700 /var/lib/rancher/rke2/server/db/etcd'
       - id: K.1.1.12
         description: Ensure that the etcd data directory ownership is set to etcd:etcd
           (Automated)
@@ -372,7 +372,7 @@ groups:
         audit: |
           check="$id  - $description"
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %U:%G $file)
             if [ "$ownership" = "etcd:etcd" ]; then
               pass "$check"
@@ -404,7 +404,7 @@ groups:
           file="/var/lib/rancher/rke2/server/cred/admin.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -433,7 +433,7 @@ groups:
         audit: |
           check="$id  - $description"
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -464,7 +464,7 @@ groups:
           file="/var/lib/rancher/rke2/server/cred/scheduler.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -492,7 +492,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -523,7 +523,7 @@ groups:
           file="/var/lib/rancher/rke2/server/cred/controller.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -534,7 +534,7 @@ groups:
           else
             warn "$check"
             warn "      * File not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the control plane node. For example, chmod 600 /var/lib/rancher/rke2/server/cred/controller.kubeconfig
       - id: K.1.1.18
@@ -551,7 +551,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -562,7 +562,7 @@ groups:
           else
             warn "$check"
             warn "      * File not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the control plane node. For example, chown root:root /var/lib/rancher/rke2/server/cred/controller.kubeconfig
       - id: K.1.1.19
@@ -579,30 +579,22 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/server/tls/"
+          file="/var/lib/rancher/rke2/server/tls"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          files=$(find $file)
-          pass=true
-          failed_ownership=""
-          failed_file=""
-          for f in ${files}; do
-            ownership=$(stat -c %u%g $f)
-            if [ "$ownership" != "00" ]; then
-              pass=false;
-              failed_ownership=$ownership
-              failed_file=$f
-              break;
+          if [ -e "$file" ]; then
+            ownership=$(stat -c %u%g $file)
+            if [ "$ownership" -eq 00 ]; then
+              pass "$check"
+            else
+              warn "$check"
+              warn "      * Wrong ownership for $file, expected 00, but is $ownership"
             fi
-          done
-
-          if [ "$pass" = "true" ]; then
-            pass "$check"
           else
             warn "$check"
-            warn "      * Wrong ownership for $failed_file, expected root:root, but is $failed_ownership"
+            warn "      * Directory not found, $file"
           fi
         remediation: Run the below command (based on the file location on your system)
-          on the control plane node. For example, chown -R root:root /var/lib/rancher/rke2/server/tls/
+          on the control plane node. For example, chown -R root:root /var/lib/rancher/rke2/server/tls
       - id: K.1.1.20
         description: Ensure that the Kubernetes PKI certificate file permissions are
           set to 600 or more restrictive (Manual)
@@ -636,9 +628,9 @@ groups:
           else
             warn "$check"
             warn "      * Wrong permissions for $failed_file, expected 600 or less, but is $failed_perm"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
-          on the control plane node. For example, chmod -R 600 /var/lib/rancher/rke2/server/tls/*.crt
+          on the control plane node. For example, chmod -R 600 /var/lib/rancher/rke2/server/tls/*.key
       - id: K.1.1.21
         description: Ensure that the Kubernetes PKI key file permissions are set to
           600 (Automated)
@@ -659,7 +651,7 @@ groups:
           failed_file=""
           for f in ${files}; do
             permissions=$(stat -c %a $f)
-            if ! [ "$permissions" -eq 600 ]; then
+            if ! [ "$permissions" -le 600 ]; then
               pass=false;
               failed_perm=$permissions
               failed_file=$f
@@ -695,7 +687,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --anonymous-auth argument to false.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove anything similar to below.
@@ -773,7 +765,7 @@ groups:
               fi
           else
               warn "$check"
-          fi  
+          fi
         remediation: |
           By default, RKE2 automatically provides the kubelet client certificate and key.
           They are generated and located at /var/lib/rancher/rke2/server/tls/client-kube-apiserver.crt and /var/lib/rancher/rke2/server/tls/client-kube-apiserver.key
@@ -800,7 +792,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically provides the kubelet CA cert file, at /var/lib/rancher/rke2/server/tls/server-ca.crt.
           If for some reason you need to provide your own ca certificate, look at using the rke2 certificate command line tool.
@@ -825,7 +817,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 does not set the --authorization-mode to AlwaysAllow.
           If this check fails, edit RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines like below.
@@ -848,7 +840,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --authorization-mode to Node and RBAC.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml,
@@ -892,7 +884,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Follow the Kubernetes documentation and set the desired limits in a configuration file.
           Then, edit the RKE2 config file /etc/rancher/rke2/config.yaml and set the below parameters.
@@ -916,7 +908,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 does not set the --enable-admission-plugins to AlwaysAdmit.
           If this check fails, edit RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines like below.
@@ -939,7 +931,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Permissive, per CIS guidelines,
           "This setting could impact offline or isolated clusters, which have images pre-loaded and
@@ -962,7 +954,7 @@ groups:
           PCI: []
         audit: |
           check="$id  - $description"
-          pass "$check"      
+          pass "$check"
         remediation: |
           Not Applicable.
           Enabling Pod Security Policy is no longer supported on RKE2 v1.25+ and will cause applications to unexpectedly fail.
@@ -983,7 +975,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 does not set the --disable-admission-plugins to anything.
           Follow the documentation and create ServiceAccount objects as per your environment.
@@ -1051,7 +1043,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --profiling argument to false.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
@@ -1073,7 +1065,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --audit-log-path argument to /var/lib/rancher/rke2/server/logs/audit.log
           If you want to change this, edit the RKE2 config file /etc/rancher/rke2/config.yaml
@@ -1105,7 +1097,7 @@ groups:
               fi
           else
               warn "$check"
-          fi 
+          fi
         remediation: |
           By default, RKE2 sets the --audit-log-maxage argument to 30 days.
           If you want to change this, edit the RKE2 config file /etc/rancher/rke2/config.yaml
@@ -1193,7 +1185,7 @@ groups:
               pass "      * request-timeout: $requestTimeout"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Permissive, per CIS guidelines,
           "it is recommended to set this limit as appropriate and change the default limit of 60 seconds only if needed".
@@ -1219,7 +1211,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 does not set the --service-account-lookup argument.
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml and set the service-account-lookup. For example,
@@ -1248,7 +1240,7 @@ groups:
               pass "      * service-account-key-file: $file"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           RKE2 automatically generates and sets the service account key file.
           It is located at /var/lib/rancher/rke2/server/tls/service.key.
@@ -1319,7 +1311,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically generates and provides the TLS certificate and private key for the apiserver.
           They are generated and located at /var/lib/rancher/rke2/server/tls/serving-kube-apiserver.crt and /var/lib/rancher/rke2/server/tls/serving-kube-apiserver.key
@@ -1377,7 +1369,7 @@ groups:
               pass "      * etcd-cafile: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically provides the etcd certificate authority file.
           It is generated and located at /var/lib/rancher/rke2/server/tls/client-ca.crt.
@@ -1403,7 +1395,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi     
+          fi
         remediation: |
           RKE2 always is configured to encrypt secrets.
           Secrets encryption is managed with the rke2 secrets-encrypt command line tool.
@@ -1423,7 +1415,7 @@ groups:
         audit: |
           check="$id  - $description"
           if check_argument "$CIS_APISERVER_CMD" '--encryption-provider-config' >/dev/null 2>&1; then
-              encryptionConfig=$(get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config') 
+              encryptionConfig=$(get_argument_value "$CIS_APISERVER_CMD" '--encryption-provider-config')
               encryptionConfig=$(append_prefix "$CONFIG_PREFIX" "$encryptionConfig")
 
               if [ -f "$encryptionConfig" ]; then
@@ -1440,7 +1432,7 @@ groups:
           else
               warn "$check"
               warn "      * encryption-provider-config: not found"
-          fi        
+          fi
         remediation: |
           RKE2 always is configured to use the aescbc encryption provider to encrypt secrets.
           Secrets encryption is managed with the rke2 secrets-encrypt command line tool.
@@ -1469,7 +1461,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, the RKE2 kube-apiserver complies with this test. Changes to these values may cause regression, therefore ensure that all apiserver clients support the new TLS configuration before applying it in production deployments.
           If a custom TLS configuration is required, consider also creating a custom version of this rule that aligns with your requirements.
@@ -1498,7 +1490,7 @@ groups:
               pass "      * terminated-pod-gc-threshold: $threshold"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets a terminated-pod-gc-threshold of 1000.
           If you need to change this value, edit the RKE2 config file /etc/rancher/rke2/config.yaml on the control plane node
@@ -1519,7 +1511,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --profiling argument to false.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
@@ -1543,7 +1535,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --use-service-account-credentials argument to true.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
@@ -1570,7 +1562,7 @@ groups:
               pass "      * service-account-private-key-file: $keyfile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically provides the service account private key file.
           It is generated and located at /var/lib/rancher/rke2/server/tls/service.current.key.
@@ -1598,7 +1590,7 @@ groups:
               pass "      * root-ca-file: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically provides the root CA file.
           It is generated and located at /var/lib/rancher/rke2/server/tls/server-ca.crt.
@@ -1630,7 +1622,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 does not set the RotateKubeletServerCertificate feature gate.
           If you have enabled this feature gate, you should remove it.
@@ -1651,7 +1643,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --bind-address argument to 127.0.0.1
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
@@ -1674,7 +1666,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --profiling argument to false.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.
@@ -1694,7 +1686,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --bind-address argument to 127.0.0.1
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines like below.

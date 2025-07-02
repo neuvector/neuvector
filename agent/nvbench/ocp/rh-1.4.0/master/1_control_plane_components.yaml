@@ -52,7 +52,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -80,7 +80,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -110,7 +110,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-controller-manager-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -138,7 +138,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -168,7 +168,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/kube-scheduler-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -196,7 +196,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -226,7 +226,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/manifests/etcd-pod.yaml"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -372,7 +372,7 @@ groups:
           check="$id  - $description"
           file="/var/lib/etcd"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -d "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 700 ]; then
               pass "$check"
             else
@@ -398,7 +398,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %U:%G $file)" = "etcd:etcd" ]; then
               pass "$check"
             else
@@ -427,7 +427,7 @@ groups:
           file="/etc/kubernetes/kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -457,7 +457,7 @@ groups:
           check="$id  - $description"
           file="/etc/kubernetes/kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -569,7 +569,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi   
+          fi
         remediation: |
           There is no remediation for updating the permissions of the kubeconfig file. The file is owned by an OpenShift operator and any changes to the file will result in a degraded cluster state.
           Please do not attempt to remediate the permissions of this file.
@@ -604,7 +604,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi      
+          fi
         remediation: No remediation required; file permissions are managed by the
           operator.
       - id: K.1.1.19
@@ -699,7 +699,7 @@ groups:
           else
             warn "$check"
             warn "     * $cert_path doesn't exist."
-          fi   
+          fi
         remediation: No remediation required; file permissions are managed by the
           operator.
       - id: K.1.1.21
@@ -772,7 +772,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi       
+          fi
         remediation: None. The default configuration should not be modified.
       - id: K.1.2.2
         description: Ensure that the --basic-auth-file argument is not set (Manual)
@@ -916,7 +916,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi   
+          fi
         remediation: No remediation is required. OpenShift platform components use
           X.509 certificates for authentication. OpenShift manages the CAs and certificates
           for platform components. This is not configurable.
@@ -942,7 +942,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi     
+          fi
         remediation: None. RBAC is always on and the OpenShift API server does not
           use the values assigned to the flag authorization-mode.
       - id: K.1.2.8
@@ -1056,7 +1056,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi     
+          fi
         remediation: None
       - id: K.1.2.13
         description: Ensure that the admission control plugin NamespaceLifecycle is
@@ -1078,7 +1078,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi 
+          fi
         remediation: None
       - id: K.1.2.14
         description: Ensure that the admission control plugin SecurityContextConstraint
@@ -1169,7 +1169,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi      
+          fi
         remediation: None
       - id: K.1.2.18
         description: Ensure that the --secure-port argument is not set to 0 (Manual)
@@ -1196,7 +1196,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi     
+          fi
         remediation: None
       - id: K.1.2.19
         description: Ensure that the healthz endpoint is protected by RBAC (Manual)
@@ -1281,7 +1281,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi   
+          fi
         remediation: None
       - id: K.1.2.23
         description: Ensure that the maximumFileSizeMegabytes argument is set to 100
@@ -1421,7 +1421,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi 
+          fi
         remediation: None
       - id: K.1.2.29
         description: Ensure that the --client-ca-file argument is set as appropriate
@@ -1465,7 +1465,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi     
+          fi
         remediation: None
       - id: K.1.2.31
         description: Ensure that encryption providers are appropriately configured
@@ -1601,7 +1601,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi    
+          fi
         remediation: None
       - id: K.1.3.4
         description: Ensure that the --root-ca-file argument is set as appropriate
@@ -1623,7 +1623,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi      
+          fi
         remediation: None
       - id: K.1.3.5
         description: Ensure that the --bind-address argument is set to 127.0.0.1 (Manual)
@@ -1648,7 +1648,7 @@ groups:
             pass "$check"
           else
             warn "$check"
-          fi 
+          fi
         remediation: None
   - id: 1.4
     title: 1.4 - Scheduler
@@ -1710,5 +1710,5 @@ groups:
           manual "     * Login$CLUSTER_ADMIN_TOKEN' -k"
           manual "     * Verify metrics output is returned. Unset environment variables used in the test and delete the test service account:"
           manual "     * unset CLUSTER_ADMIN_TOKEN POD PORT SA_TOKEN POD_IP"
-          manual "     * oc delete sa permission-test-sa"   
+          manual "     * oc delete sa permission-test-sa"
         remediation: None
