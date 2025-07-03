@@ -13,7 +13,7 @@ void log_session_flags(DPMsgThreatLog *log, dpi_session_t *sess);
 void log_session_detail(DPMsgThreatLog *log, dpi_session_t *sess);
 
 static meter_info_t meter_info[] = {
-[DPI_METER_SYN_FLOOD] = {"syn_flood", METER_ID_SYN_FLOOD, DPI_THRT_TCP_FLOOD, true, false, true, false,
+[DPI_METER_SYN_FLOOD] = {"syn_flood", METER_ID_SYN_FLOOD, DPI_THRT_TCP_FLOOD, true, false, true, true,
                             8, 30, 5, 800, 600},
 [DPI_METER_ICMP_FLOOD] = {"icmp_flood", METER_ID_ICMP_FLOOD, DPI_THRT_ICMP_FLOOD, true, false, true, false,
                             3, 30, 1, 100, 100},
@@ -265,8 +265,19 @@ int dpi_meter_synflood_inc(dpi_packet_t *p)
     if (!dpi_threat_status(log_id)) return DPI_METER_ACTION_NONE;
     if (!(p->flags & DPI_PKT_FLAG_INGRESS)) return DPI_METER_ACTION_NONE;
 
-    bool fire = false, create = false;
-    dpi_meter_t *m = meter_inc(DPI_METER_SYN_FLOOD, p->ep_mac, NULL, p->eth_type == ETH_P_IP, &fire, &create);
+    bool ipv4 = false, fire = false, create = false;
+    uint8_t *peer_ip;
+
+    if (likely(p->eth_type == ETH_P_IP)) {
+        struct iphdr *iph = (struct iphdr *)(p->pkt + p->l3);
+        ipv4 = true;
+        peer_ip = (uint8_t *)&iph->saddr;
+    } else {
+        struct ip6_hdr *ip6h = (struct ip6_hdr *)(p->pkt + p->l3);
+        peer_ip = (uint8_t *)&ip6h->ip6_src;
+    }
+
+    dpi_meter_t *m = meter_inc(DPI_METER_SYN_FLOOD, p->ep_mac, peer_ip, ipv4, &fire, &create);
     if (likely(m != NULL)) {
         if (unlikely(create || fire)) {
             DPMsgThreatLog *log = &m->log;
