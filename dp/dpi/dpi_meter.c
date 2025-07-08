@@ -293,7 +293,7 @@ int dpi_meter_synflood_inc(dpi_packet_t *p)
 
             if (!p->ep->tap) {
                 if (th_snap.tick - m->last_log >= info->log_timeout && m->log_count > 0) {
-                    dpi_ddos_log(info->log_id, m, "TCP SYN Packet rate %u(pps) exceeds the shreshold %u(pps)", m->last_count, info->lower_limit);
+                    dpi_ddos_log(info->log_id, m, "TCP SYN Packet rate %u(pps) exceeds the threshold %u(pps)", m->last_count, info->lower_limit);
                     m->last_log = th_snap.tick;
                     m->log_count = 0;
                 }
