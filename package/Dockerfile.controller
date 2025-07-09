@@ -1,7 +1,7 @@
 #
 # Builder
 #
-FROM registry.suse.com/bci/golang:1.24 AS builder
+FROM registry.suse.com/bci/golang:1.24@sha256:484d0349323d87f1f83239d2533de4048549f28aa0a38929a2000b765b1f104a AS builder
 
 ARG VERSION
 
