@@ -45,9 +45,22 @@ jobs:
           secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials username | PRIME_REGISTRY_USERNAME ;
           secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials password | PRIME_REGISTRY_PASSWORD
     - name: Parse target tag
+      id: parse_tag_step
       run: |
         TARGET=${{ github.ref_name }}
         echo "TAG=${TARGET#v}" >> $GITHUB_ENV
+
+        PARSED_TAG="" # Initialize as empty
+
+        if [[ "$TARGET" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          PARSED_TAG="${TARGET#v}"
+          echo "Tag '$PARSED_TAG' successfully validated as '$PARSED_TAG'."
+        else
+          echo "Tag '$PARSED_TAG' does NOT match the required 'vX.Y.Z' format. Skipping."
+        fi
+
+        echo "tag_value=$PARSED_TAG" >> $GITHUB_OUTPUT
+
     - name: Get controller
       env:
         GH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
@@ -93,3 +106,54 @@ jobs:
         prime-repo: rancher
         prime-username: ${{ env.PRIME_REGISTRY_USERNAME }}
         prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
+    outputs:
+      parsed_tag: ${{ steps.parse_tag_step.outputs.tag_value }}
+
+  update-upgrade-responder:
+      needs: publish
+      runs-on: ubuntu-latest
+      permissions:
+        contents: write
+        pull-requests: write
+      env:
+        TAG_FROM_PUBLISH: ${{ needs.publish.outputs.parsed_tag }}
+        COMMIT_MESSAGE: "chore: update upgrade-responder.json"
+        BRANCH_NAME_PREFIX: "auto-update/upgrade-responder-"
+        GIT_PATH_EXTERNAL_PROD: "external-production/"
+      if: ${{ needs.parse_tag.outputs.parsed_tag != '' }} 
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
+        
+        - name: Creating upgrade-responder file
+          run: |
+            python -c '
+            import json, os
+            from datetime import datetime, timezone
+            tag_value = os.environ.get("TAG_FROM_PUBLISH", "unknown")
+            current_date = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+            data = {"Versions": [{"Name": f"v{tag_value}", "ReleaseDate": current_date, "Tags": ["latest", tag_value]}]}
+            with open(".github/upgrade-responder.json", "w") as f: json.dump(data, f, indent=2); f.write("\n")
+            '
+        
+        - name: Set git config
+          run: |
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+        - name: Commit and push changes to neuvector
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            BRANCH_NAME="${BRANCH_NAME_PREFIX}-$(date +%Y%m%d%H%M%S)"
+            echo "Creating and pushing branch: $BRANCH_NAME"
+            git checkout -b "$BRANCH_NAME"
+            git add .github/upgrade-responder.json
+            git commit -m  "${COMMIT_MESSAGE}"
+            git push origin "$BRANCH_NAME"
+            gh pr create --base main --head "$BRANCH_NAME" --title "Automated: Update upgrade-responder.json to $TAG_FROM_PUBLISH" --body "This PR updates the \`upgrade-responder.json\` file with the version \`$TAG_FROM_PUBLISH\`, generated automatically by GitHub Actions."
+
