@@ -601,6 +601,7 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			_ = clusHelper.DeleteWafGroup(txn, name)
 		}
 		_ = clusHelper.DeleteCustomCheckConfig(txn, name)
+		dispatchHelper.GroupDeleted(name, txn)
 		_, err = txn.Apply()
 		txn.Close()
 

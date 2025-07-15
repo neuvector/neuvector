@@ -19,6 +19,7 @@ import (
 // (5) CustomGroupDelete: remove entries in the group2nodes
 // (6) PutProfile: dispatch "kv put" operatios, based on group2nodes
 // (7) IsGroupAdded: a reference for outsiders (performance)
+// (8) GroupDeleted: remove no-more-refereced group from the node
 
 // Two major types of "profile" groups in the dispatcher
 // (1) Service groups: learned containers/pods (from workloads); like: nodes, fed.nodes, nv.pods
@@ -32,6 +33,7 @@ type DispatcherHelper interface {
 	CustomGroupDelete(group string, bLeader bool)
 	PutProfile(group, subkey, mode string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error
 	IsGroupAdded(group string) bool
+	GroupDeleted(group string, txn *cluster.ClusterTransact)
 }
 
 // a simple mapping to speed up process
@@ -575,6 +577,18 @@ func (dpt *kvDispatcher) IsGroupAdded(group string) bool {
 	defer dpt.unlockR()
 	_, ok := dpt.group2nodes[group]
 	return ok
+}
+
+func (dpt *kvDispatcher) GroupDeleted(group string, txn *cluster.ClusterTransact) {
+	dpt.lock()
+	defer dpt.unlock()
+
+	if nodes, ok := dpt.group2nodes[group]; ok {
+		removes := nodes.Clone()
+		for n := range removes.Iter() {
+			dpt.removeProfileKeys(n.(string), group, txn)
+		}
+	}
 }
 
 // /////////////////////////////////////////////
