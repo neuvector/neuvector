@@ -920,6 +920,7 @@ func Encrypt(encryptionKey, text []byte) ([]byte, error) {
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, err
 	}
+	//nolint:staticcheck // SA1019
 	cfb := cipher.NewCFBEncrypter(block, iv)
 	cfb.XORKeyStream(ciphertext[aes.BlockSize:], text)
 	return ciphertext, nil
@@ -943,6 +944,7 @@ func Decrypt(encryptionKey, text []byte) ([]byte, error) {
 	}
 	iv := text[:aes.BlockSize]
 	text = text[aes.BlockSize:]
+	//nolint:staticcheck // SA1019
 	cfb := cipher.NewCFBDecrypter(block, iv)
 	cfb.XORKeyStream(text, text)
 	return text, nil
