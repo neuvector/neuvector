@@ -2452,6 +2452,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 		}
 	}
 
+	//	proc.action = pp.Action
 	// NVSHAS-7501 - Adding check for our mode.
 	// If we are in protect mode, we should ignore the reported flag to determine the next actions.
 	// We don't need to report the violations more often, but we should make sure that if we
@@ -2512,14 +2513,6 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				p.killProcess(proc.pid)
 				proc.action = pp.Action
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied and killed")
-			}
-		}
-	} else {
-		if proc.action == share.PolicyActionViolate || proc.action == share.PolicyActionDeny { // negative parent action
-			if proc.action != pp.Action {
-				proc.reported |= profileReported
-				pp.Action = proc.action
-				go p.sendProcessIncident(false, id, pp.Uuid, svcGroup, derivedGroup, proc)
 			}
 		}
 	}
