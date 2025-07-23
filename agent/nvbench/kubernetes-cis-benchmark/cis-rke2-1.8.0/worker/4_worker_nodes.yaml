@@ -58,7 +58,7 @@ groups:
           check="$id  - $description"
           file="/var/lib/rancher/rke2/agent/kubeproxy.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -69,7 +69,7 @@ groups:
           else
             warn "$check"
             warn "      * kubeconfig file not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod 600 /var/lib/rancher/rke2/agent/kubeproxy.kubeconfig
       - id: K.4.1.4
@@ -85,8 +85,8 @@ groups:
           PCI: []
           GDPR: []
         audit: |
-          check="$id  - $description"           
-          if [ -f "$file" ]; then
+          check="$id  - $description"
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -97,7 +97,7 @@ groups:
           else
             warn "$check"
             warn "      * kubeconfig file not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chown root:root /var/lib/rancher/rke2/agent/kubeproxy.kubeconfig
       - id: K.4.1.5
@@ -117,7 +117,7 @@ groups:
           file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -128,7 +128,7 @@ groups:
           else
             warn "$check"
             warn "      * File not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod 600 /var/lib/rancher/rke2/agent/kubelet.kubeconfig
       - id: K.4.1.6
@@ -145,7 +145,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -174,7 +174,8 @@ groups:
         audit: |
           check="$id  - $description"
           file="/var/lib/rancher/rke2/agent/client-ca.crt"
-          if [ -f "$file" ]; then
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -206,7 +207,7 @@ groups:
           if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
             file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
             file=$(append_prefix "$CONFIG_PREFIX" "$file")
-            if [ -f "$file" ]; then
+            if [ -e "$file" ]; then
               ownership=$(stat -c %u%g $file)
               if [ "$ownership" = "00" ]; then
                 pass "$check"
@@ -222,7 +223,7 @@ groups:
           else
             warn "$check"
             warn "      * --client-ca-file not set"
-          fi 
+          fi
         remediation: Run the following command to modify the ownership of the --client-ca-file.
           chown root:root <filename>
       - id: K.4.1.9
@@ -240,7 +241,7 @@ groups:
         audit: |
           check="$id  - $description"
           pass "$check"
-        remediation: |          
+        remediation: |
           Not Applicable.
           The kubelet is managed by the RKE2 process. There is no kubelet config file, all configuration is passed in as arguments at runtime.
       - id: K.4.1.10
@@ -288,7 +289,7 @@ groups:
           kubelet-arg:
             - "anonymous-auth=true"
           Based on your system, restart the RKE2 service. For example,
-          systemctl restart rke2-server.service         
+          systemctl restart rke2-server.service
       - id: K.4.2.2
         description: Ensure that the --authorization-mode argument is not set to AlwaysAllow
           (Automated)
@@ -336,7 +337,7 @@ groups:
               pass "      * client-ca-file: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically provides the client ca certificate for the Kubelet.
           It is generated and located at /var/lib/rancher/rke2/agent/client-ca.crt
@@ -363,7 +364,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 sets the --read-only-port to 0. If you have set this to a different value, you
           should set it back to 0. Edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any lines similar to below.
@@ -388,7 +389,7 @@ groups:
               warn "      * streaming-connection-idle-timeout: $timeout"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
           kubelet-arg:
@@ -410,7 +411,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter.
           kubelet-arg:
@@ -432,7 +433,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: |
           Not Applicable.
           By default, RKE2 does set the --hostname-override argument. Per CIS guidelines, this is to comply
@@ -459,7 +460,7 @@ groups:
           else
               warn "$check"
               warn "      * --event-qps is not set"
-          fi        
+          fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
           kubelet-arg:
@@ -494,14 +495,14 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 automatically provides the TLS certificate and private key for the Kubelet.
           They are generated and located at /var/lib/rancher/rke2/agent/serving-kubelet.crt and /var/lib/rancher/rke2/agent/serving-kubelet.key
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml and remove any lines similar to below.
           kubelet-arg:
             - "tls-cert-file=<path/to/tls-cert-file>"
-            - "tls-private-key-file=<path/to/tls-private-key-file>"            
+            - "tls-private-key-file=<path/to/tls-private-key-file>"
       - id: K.4.2.10
         description: Ensure that the --rotate-certificates argument is not set to
           false (Automated)
@@ -520,7 +521,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi        
+          fi
         remediation: |
           By default, RKE2 does not set the --rotate-certificates argument.
           If this check fails, edit the RKE2 config file /etc/rancher/rke2/config.yaml, remove any rotate-certificates parameter.
@@ -604,7 +605,7 @@ groups:
             - "tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
           or to a subset of these values.
           Based on your system, restart the RKE2 service. For example,
-          systemctl restart rke2-server.service     
+          systemctl restart rke2-server.service
       - id: K.4.2.13
         description: Ensure that a limit is set on pod PIDs (Manual)
         type: worker
@@ -616,7 +617,7 @@ groups:
         audit: |
           check="$id  - $description"
           manual "$check"
-          manual "      * Review the Kubelet's start-up parameters for the value of --pod-max-pids, and check the Kubelet configuration file for the PodPidsLimit . If neither of these values is set, then there is no limit in place."   
+          manual "      * Review the Kubelet's start-up parameters for the value of --pod-max-pids, and check the Kubelet configuration file for the PodPidsLimit . If neither of these values is set, then there is no limit in place."
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
           kubelet-arg:

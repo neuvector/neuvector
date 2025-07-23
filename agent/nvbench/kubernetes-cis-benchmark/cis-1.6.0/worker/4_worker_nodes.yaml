@@ -23,7 +23,7 @@ groups:
           file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -52,7 +52,7 @@ groups:
           check="$id  - $description"
           file="/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -83,7 +83,7 @@ groups:
               file=$(get_argument_value "$CIS_PROXY_CMD" '--kubeconfig'|cut -d " " -f 1)
           fi
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -93,7 +93,7 @@ groups:
           else
             info "$check"
             info "      * kubeconfig file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod 600 <proxy kubeconfig file
       - id: K.4.1.4
@@ -114,8 +114,8 @@ groups:
           if check_argument "$CIS_PROXY_CMD" '--kubeconfig' >/dev/null 2>&1; then
               file=$(get_argument_value "$CIS_PROXY_CMD" '--kubeconfig'|cut -d " " -f 1)
           fi
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")              
-          if [ -f "$file" ]; then
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -125,7 +125,7 @@ groups:
           else
             info "$check"
             info "      * kubeconfig file not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chown root:root <proxy kubeconfig
           file>
@@ -149,7 +149,7 @@ groups:
           fi
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             if [ "$(stat -c %a $file)" -eq 644 -o "$(stat -c %a $file)" -eq 600 -o "$(stat -c %a $file)" -eq 400 ]; then
               pass "$check"
             else
@@ -159,7 +159,7 @@ groups:
           else
             info "$check"
             info "      * File not found"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the each worker node. For example, chmod 644 /etc/kubernetes/kubelet.conf
       - id: K.4.1.6
@@ -181,8 +181,8 @@ groups:
               file=$(get_argument_value "$CIS_KUBELET_CMD" '--kubeconfig'|cut -d " " -f 1)
           fi
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
-                     
-          if [ -f "$file" ]; then
+
+          if [ -e "$file" ]; then
             if [ "$(stat -c %u%g $file)" -eq 00 ]; then
               pass "$check"
             else
@@ -251,7 +251,7 @@ groups:
           else
             info "$check"
             info "      * --client-ca-file not set"
-          fi 
+          fi
         remediation: Run the following command to modify the ownership of the --client-ca-file.
           chown root:root <filename>
       - id: K.4.1.9
@@ -387,7 +387,7 @@ groups:
               pass "      * client-ca-file: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'If using a Kubelet config file, edit the file to set authentication:
           x509: clientCAFile to the location of the client CA file. If using command
           line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
@@ -418,7 +418,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'If using a Kubelet config file, edit the file to set readOnlyPort
           to 0. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
           on each worker node and set the below parameter in KUBELET_SYSTEM_PODS_ARGS
@@ -441,7 +441,7 @@ groups:
               warn "      * streaming-connection-idle-timeout: $timeout"
           else
               pass "$check"
-          fi        
+          fi
         remediation: 'If using a Kubelet config file, edit the file to set streamingConnectionIdleTimeout
           to a value other than 0. If using command line arguments, edit the kubelet
           service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each
@@ -489,7 +489,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'If using a Kubelet config file, edit the file to set makeIPTablesUtilChains:
           true. If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
           on each worker node and remove the --make-iptables-util-chains argument
@@ -510,7 +510,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: 'Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
           on each worker node and remove the --hostname-override argument from the
           KUBELET_SYSTEM_PODS_ARGS variable. Based on your system, restart the kubelet
@@ -537,7 +537,7 @@ groups:
           else
               warn "$check"
               warn "      * --event-qps is not set"
-          fi      
+          fi
         remediation: 'If using a Kubelet config file, edit the file to set eventRecordQPS:
           to an appropriate level. If using command line arguments, edit the kubelet
           service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each
@@ -572,7 +572,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'If using a Kubelet config file, edit the file to set tlsCertFile
           to the location of the certificate file to use to identify this Kubelet,
           and tlsPrivateKeyFile to the location of the corresponding private key file.
@@ -599,7 +599,7 @@ groups:
             warn "$check"
           else
             pass "$check"
-          fi        
+          fi
         remediation: 'If using a Kubelet config file, edit the file to add the line
           rotateCertificates: true or remove it altogether to use the default value.
           If using command line arguments, edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
@@ -682,9 +682,9 @@ groups:
           fi
         remediation: |-
           If using a Kubelet config file, edit the file to set TLSCipherSuites: to TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 ,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 ,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
-          ,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256 or to a subset of these values.   
-          If using executable arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the --tls-cipher-suites parameter as follows, or to a subset of these values.                 
+          ,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256 or to a subset of these values.
+          If using executable arguments, edit the kubelet service file /etc/kubernetes/kubelet.conf on each worker node and set the --tls-cipher-suites parameter as follows, or to a subset of these values.
           --tls-ciphe-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256
           Based on your system, restart the kubelet service. For example:
-          systemctl daemon-reload 
-          systemctl restart kubelet.service     
+          systemctl daemon-reload
+          systemctl restart kubelet.service
