@@ -24,9 +24,10 @@ func automode_init(ctx *Context) {
 }
 
 func automode_d2m_test_func(group string) (bool, error) {
+	_, theGroup := atmoHelper.GetTheGroupType(group)
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
-	if cache, ok := groupCacheMap[group]; ok {
+	if cache, ok := groupCacheMap[theGroup]; ok {
 		// member count > 0
 		return (cache.members.Cardinality() > 0), nil
 	}
@@ -110,12 +111,11 @@ func automode_m2p_test_func(group string, probeDuration int64) (bool, error) {
 }
 
 func automode_test_func(mover int, group string, probeDuration time.Duration) (bool, error) {
-	_, theGroup := atmoHelper.GetTheGroupType(group)
 	switch mover {
 	case atmo.Discover2Monitor:
-		return automode_d2m_test_func(theGroup)
+		return automode_d2m_test_func(group)
 	case atmo.Monitor2Protect:
-		return automode_m2p_test_func(theGroup, int64(probeDuration.Seconds()))
+		return automode_m2p_test_func(group, int64(probeDuration.Seconds()))
 	}
 	return false, common.ErrUnsupported
 }
