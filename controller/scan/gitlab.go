@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,6 +17,7 @@ import (
 
 const gitTimeout = 20 * time.Second
 const apiVersion = "api/v4"
+const noNextPageURL = ""
 
 type gitlab struct {
 	base
@@ -110,118 +112,234 @@ func (r *gitlab) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 	return nil, ""
 }
 
-func (r *gitlab) getData(ur string) ([]byte, error) {
+func (r *gitlab) getData(ur string) ([]byte, string, error) {
 	request, _ := http.NewRequest("GET", ur, nil)
 	request.Header.Add("PRIVATE-TOKEN", r.privateToken)
 	resp, err := r.gitlabClient.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, noNextPageURL, err
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, noNextPageURL, err
 	}
-	return data, nil
+	nextURL := noNextPageURL
+	// support query with pagination
+outerLoop:
+	for _, h := range []string{"Link", "link"} {
+		if links := resp.Header.Get(h); links != "" {
+			// example of Link header: <http://.....>; rel="next", <http://.....>; rel="first", <http://.....>; rel="last"
+			for _, pair := range strings.Split(links, ",") {
+				pair = strings.TrimSpace(pair)
+				if ss := strings.Split(pair, ";"); len(ss) == 2 {
+					relStr := strings.TrimSpace(ss[1])
+					if relStr == `rel="next"` {
+						nextURL = strings.TrimSpace(ss[0])
+						nextURL = strings.Trim(nextURL, "<>")
+						break outerLoop
+					}
+				}
+			}
+		}
+	}
+
+	if links := resp.Header.Get("Link"); links != "" {
+		// example of Link header: <http://.....>; rel="next", <http://.....>; rel="first", <http://.....>; rel="last"
+		for _, pair := range strings.Split(links, ",") {
+			pair = strings.TrimSpace(pair)
+			if ss := strings.Split(pair, ";"); len(ss) == 2 {
+				relStr := strings.TrimSpace(ss[1])
+				if relStr == `rel="next"` {
+					nextURL = strings.TrimSpace(ss[0])
+					nextURL = strings.Trim(nextURL, "<>")
+					break
+				}
+			}
+		}
+	}
+	if len(data) == 0 {
+		data = []byte("[]")
+	}
+	return data, nextURL, nil
 }
 
 func (r *gitlab) getUsers() ([]gitUser, error) {
 	var all []gitUser
 
 	ur := r.gitUrl("/users")
-	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
-	data, err := r.getData(ur)
-	if err != nil {
-		return nil, err
+	for {
+		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+		data, nextURL, err := r.getData(ur)
+		if err == nil {
+			var users []gitUser
+			if err = json.Unmarshal(data, &users); err == nil {
+				if len(users) == 0 {
+					nextURL = noNextPageURL
+				} else {
+					all = append(all, users...)
+				}
+			}
+		}
+		if nextURL == noNextPageURL {
+			if len(all) > 0 {
+				err = nil
+			}
+			return all, err
+		}
+		ur = nextURL
 	}
-	err = json.Unmarshal(data, &all)
-	if err != nil {
-		return nil, err
-	}
-
-	return all, nil
 }
 
 func (r *gitlab) getGroups() ([]gitGroup, error) {
 	var all []gitGroup
 
 	ur := r.gitUrl("/groups")
-	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
-	data, err := r.getData(ur)
-	if err != nil {
-		return nil, err
+	for {
+		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+		data, nextURL, err := r.getData(ur)
+		if err == nil {
+			var groups []gitGroup
+			if err = json.Unmarshal(data, &groups); err == nil {
+				if len(groups) == 0 {
+					nextURL = noNextPageURL
+				} else {
+					all = append(all, groups...)
+				}
+			}
+		}
+		if nextURL == noNextPageURL {
+			if len(all) > 0 {
+				err = nil
+			}
+			return all, err
+		}
+		ur = nextURL
 	}
-	err = json.Unmarshal(data, &all)
-	if err != nil {
-		return nil, err
-	}
-
-	return all, nil
 }
 
 func (r *gitlab) getProjects() ([]gitProject, error) {
 	var all []gitProject
-	var projects []gitProject
 	var e1, e2, e3 error
 
 	ur := r.gitUrl("/projects")
-	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
-	if data, err := r.getData(ur); err == nil {
-		e1 = json.Unmarshal(data, &all)
-	} else {
-		e1 = err
+	for {
+		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+		data, nextURL, err := r.getData(ur)
+		if err == nil {
+			var projects []gitProject
+			if err = json.Unmarshal(data, &projects); err == nil {
+				if len(projects) == 0 {
+					nextURL = noNextPageURL
+				} else {
+					all = append(all, projects...)
+				}
+			}
+		}
+		if nextURL == noNextPageURL {
+			if len(all) == 0 && err != nil {
+				e1 = err
+			}
+			break
+		}
+		ur = nextURL
 	}
 
 	// get user projects
-	if users, err := r.getUsers(); err == nil {
+	if users, err := r.getUsers(); len(users) > 0 {
 		for _, user := range users {
 			ur = r.gitUrl("/users/%d/projects", user.ID)
-			smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
-			if data, err := r.getData(ur); err == nil {
-				if err = json.Unmarshal(data, &projects); err == nil {
-					all = append(all, projects...)
+			for {
+				smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+				data, nextURL, err := r.getData(ur)
+				if err == nil {
+					var projects []gitProject
+					if err = json.Unmarshal(data, &projects); err == nil {
+						if len(projects) == 0 {
+							nextURL = noNextPageURL
+						} else {
+							all = append(all, projects...)
+						}
+					}
 				}
+				if nextURL == noNextPageURL {
+					if len(all) == 0 && err != nil {
+						e2 = err
+					}
+					break
+				}
+				ur = nextURL
 			}
 		}
-	} else {
+	} else if err != nil {
 		e2 = err
 	}
 	ur = r.gitUrl("/users/%s/projects", r.username)
-	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
-	if data, err := r.getData(ur); err == nil {
-		if err = json.Unmarshal(data, &projects); err == nil {
-			all = append(all, projects...)
-		}
-	} else {
-		e2 = err
-	}
-
-	// get group projects
-	if groups, err := r.getGroups(); err == nil {
-		for _, group := range groups {
-			ur = r.gitUrl("/groups/%d/projects?include_subgroups=true", group.ID)
-			smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
-			if data, err := r.getData(ur); err == nil {
-				if err = json.Unmarshal(data, &projects); err == nil {
+	for {
+		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+		data, nextURL, err := r.getData(ur)
+		if err == nil {
+			var projects []gitProject
+			if err = json.Unmarshal(data, &projects); err == nil {
+				if len(projects) == 0 {
+					nextURL = noNextPageURL
+				} else {
 					all = append(all, projects...)
 				}
 			}
 		}
-	} else {
+		if nextURL == noNextPageURL {
+			if len(all) == 0 && err != nil {
+				e2 = err
+			}
+			break
+		}
+		ur = nextURL
+	}
+
+	// get group projects
+	if groups, err := r.getGroups(); len(groups) > 0 {
+		for _, group := range groups {
+			ur = r.gitUrl("/groups/%d/projects?include_subgroups=true", group.ID)
+			for {
+				smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+				data, nextURL, err := r.getData(ur)
+				if err == nil {
+					var projects []gitProject
+					if err = json.Unmarshal(data, &projects); err == nil {
+						if len(projects) == 0 {
+							nextURL = noNextPageURL
+						} else {
+							all = append(all, projects...)
+						}
+					}
+				}
+				if nextURL == noNextPageURL {
+					if len(all) == 0 && err != nil {
+						e3 = err
+					}
+					break
+				}
+				ur = nextURL
+			}
+		}
+	} else if err != nil {
 		e3 = err
 	}
 
-	if len(all) == 0 && e1 != nil {
-		return nil, e1
-	} else if len(all) == 0 && e2 != nil {
-		return nil, e2
-	} else if len(all) == 0 && e3 != nil {
-		return nil, e3
+	if len(all) == 0 {
+		if e1 != nil {
+			return nil, e1
+		} else if e2 != nil {
+			return nil, e2
+		} else if e3 != nil {
+			return nil, e3
+		}
 	}
 
 	// remove duplication
 	ids := utils.NewSet()
-	projects = make([]gitProject, 0)
+	projects := make([]gitProject, 0)
 	for _, p := range all {
 		if !ids.Contains(p.ID) {
 			ids.Add(p.ID)
@@ -232,35 +350,57 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 }
 
 func (r *gitlab) getRepos(id int) ([]gitRepository, error) {
-	ur := r.gitUrl("/projects/%d/registry/repositories", id)
-	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
+	var all []gitRepository
 
-	data, err := r.getData(ur)
-	if err != nil {
-		return nil, err
+	ur := r.gitUrl("/projects/%d/registry/repositories", id)
+	for {
+		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+		data, nextURL, err := r.getData(ur)
+		if err == nil {
+			var repos []gitRepository
+			if err = json.Unmarshal(data, &repos); err == nil {
+				if len(repos) == 0 {
+					nextURL = noNextPageURL
+				} else {
+					all = append(all, repos...)
+				}
+			}
+		}
+		if nextURL == noNextPageURL {
+			if len(all) > 0 {
+				err = nil
+			}
+			return all, err
+		}
+		ur = nextURL
 	}
-	var repos []gitRepository
-	err = json.Unmarshal(data, &repos)
-	if err != nil {
-		return nil, err
-	}
-	return repos, nil
 }
 
 func (r *gitlab) getTags(id, repo int) ([]gitTag, error) {
-	ur := r.gitUrl("/projects/%d/registry/repositories/%d/tags", id, repo)
-	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
+	var all []gitTag
 
-	data, err := r.getData(ur)
-	if err != nil {
-		return nil, err
+	ur := r.gitUrl("/projects/%d/registry/repositories/%d/tags", id, repo)
+	for {
+		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
+		data, nextURL, err := r.getData(ur)
+		if err == nil {
+			var tags []gitTag
+			if err = json.Unmarshal(data, &tags); err == nil {
+				if len(tags) == 0 {
+					nextURL = noNextPageURL
+				} else {
+					all = append(all, tags...)
+				}
+			}
+		}
+		if nextURL == noNextPageURL {
+			if len(all) > 0 {
+				err = nil
+			}
+			return all, err
+		}
+		ur = nextURL
 	}
-	var tags []gitTag
-	err = json.Unmarshal(data, &tags)
-	if err != nil {
-		return nil, err
-	}
-	return tags, nil
 }
 
 func (r *gitlab) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, error) {
