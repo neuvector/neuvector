@@ -186,7 +186,7 @@ func (r *gitlab) getGroups() ([]gitGroup, error) {
 }
 
 func (r *gitlab) getProjectResources(ur string, all []gitProject) ([]gitProject, error) {
-	var e error
+	var getProjResourceErr error
 
 	for {
 		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
@@ -203,14 +203,14 @@ func (r *gitlab) getProjectResources(ur string, all []gitProject) ([]gitProject,
 		}
 		if nextURL == noNextPageURL {
 			if len(all) == 0 && err != nil {
-				e = err
+				getProjResourceErr = err
 			}
 			break
 		}
 		ur = nextURL
 	}
 
-	return all, e
+	return all, getProjResourceErr
 }
 
 func (r *gitlab) getProjects() ([]gitProject, error) {
