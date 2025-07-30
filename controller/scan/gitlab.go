@@ -143,41 +143,25 @@ outerLoop:
 			}
 		}
 	}
-
-	if links := resp.Header.Get("Link"); links != "" {
-		// example of Link header: <http://.....>; rel="next", <http://.....>; rel="first", <http://.....>; rel="last"
-		for _, pair := range strings.Split(links, ",") {
-			pair = strings.TrimSpace(pair)
-			if ss := strings.Split(pair, ";"); len(ss) == 2 {
-				relStr := strings.TrimSpace(ss[1])
-				if relStr == `rel="next"` {
-					nextURL = strings.TrimSpace(ss[0])
-					nextURL = strings.Trim(nextURL, "<>")
-					break
-				}
-			}
-		}
-	}
 	if len(data) == 0 {
 		data = []byte("[]")
 	}
 	return data, nextURL, nil
 }
 
-func (r *gitlab) getUsers() ([]gitUser, error) {
-	var all []gitUser
+func getResources[V gitUser | gitGroup | gitRepository | gitTag](r *gitlab, ur string) ([]V, error) {
+	var all []V
 
-	ur := r.gitUrl("/users")
 	for {
 		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
 		data, nextURL, err := r.getData(ur)
 		if err == nil {
-			var users []gitUser
-			if err = json.Unmarshal(data, &users); err == nil {
-				if len(users) == 0 {
+			var resources []V
+			if err = json.Unmarshal(data, &resources); err == nil {
+				if len(resources) == 0 {
 					nextURL = noNextPageURL
 				} else {
-					all = append(all, users...)
+					all = append(all, resources...)
 				}
 			}
 		}
@@ -189,40 +173,21 @@ func (r *gitlab) getUsers() ([]gitUser, error) {
 		}
 		ur = nextURL
 	}
+}
+
+func (r *gitlab) getUsers() ([]gitUser, error) {
+	ur := r.gitUrl("/users")
+	return getResources[gitUser](r, ur)
 }
 
 func (r *gitlab) getGroups() ([]gitGroup, error) {
-	var all []gitGroup
-
 	ur := r.gitUrl("/groups")
-	for {
-		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
-		data, nextURL, err := r.getData(ur)
-		if err == nil {
-			var groups []gitGroup
-			if err = json.Unmarshal(data, &groups); err == nil {
-				if len(groups) == 0 {
-					nextURL = noNextPageURL
-				} else {
-					all = append(all, groups...)
-				}
-			}
-		}
-		if nextURL == noNextPageURL {
-			if len(all) > 0 {
-				err = nil
-			}
-			return all, err
-		}
-		ur = nextURL
-	}
+	return getResources[gitGroup](r, ur)
 }
 
-func (r *gitlab) getProjects() ([]gitProject, error) {
-	var all []gitProject
-	var e1, e2, e3 error
+func (r *gitlab) getProjectResources(ur string, all []gitProject) ([]gitProject, error) {
+	var e error
 
-	ur := r.gitUrl("/projects")
 	for {
 		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
 		data, nextURL, err := r.getData(ur)
@@ -238,102 +203,61 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 		}
 		if nextURL == noNextPageURL {
 			if len(all) == 0 && err != nil {
-				e1 = err
+				e = err
 			}
 			break
 		}
 		ur = nextURL
+	}
+
+	return all, e
+}
+
+func (r *gitlab) getProjects() ([]gitProject, error) {
+	var all []gitProject
+	var projectErr, userProjectErr, groupProjectErr error
+	var err error
+
+	ur := r.gitUrl("/projects")
+	if all, err = r.getProjectResources(ur, all); err != nil {
+		projectErr = err
 	}
 
 	// get user projects
 	if users, err := r.getUsers(); len(users) > 0 {
 		for _, user := range users {
 			ur = r.gitUrl("/users/%d/projects", user.ID)
-			for {
-				smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
-				data, nextURL, err := r.getData(ur)
-				if err == nil {
-					var projects []gitProject
-					if err = json.Unmarshal(data, &projects); err == nil {
-						if len(projects) == 0 {
-							nextURL = noNextPageURL
-						} else {
-							all = append(all, projects...)
-						}
-					}
-				}
-				if nextURL == noNextPageURL {
-					if len(all) == 0 && err != nil {
-						e2 = err
-					}
-					break
-				}
-				ur = nextURL
+			if all, err = r.getProjectResources(ur, all); err != nil {
+				userProjectErr = err
 			}
 		}
 	} else if err != nil {
-		e2 = err
+		userProjectErr = err
 	}
 	ur = r.gitUrl("/users/%s/projects", r.username)
-	for {
-		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
-		data, nextURL, err := r.getData(ur)
-		if err == nil {
-			var projects []gitProject
-			if err = json.Unmarshal(data, &projects); err == nil {
-				if len(projects) == 0 {
-					nextURL = noNextPageURL
-				} else {
-					all = append(all, projects...)
-				}
-			}
-		}
-		if nextURL == noNextPageURL {
-			if len(all) == 0 && err != nil {
-				e2 = err
-			}
-			break
-		}
-		ur = nextURL
+	if all, err = r.getProjectResources(ur, all); err != nil {
+		userProjectErr = err
 	}
 
 	// get group projects
 	if groups, err := r.getGroups(); len(groups) > 0 {
 		for _, group := range groups {
 			ur = r.gitUrl("/groups/%d/projects?include_subgroups=true", group.ID)
-			for {
-				smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
-				data, nextURL, err := r.getData(ur)
-				if err == nil {
-					var projects []gitProject
-					if err = json.Unmarshal(data, &projects); err == nil {
-						if len(projects) == 0 {
-							nextURL = noNextPageURL
-						} else {
-							all = append(all, projects...)
-						}
-					}
-				}
-				if nextURL == noNextPageURL {
-					if len(all) == 0 && err != nil {
-						e3 = err
-					}
-					break
-				}
-				ur = nextURL
+			if all, err = r.getProjectResources(ur, all); err != nil {
+				groupProjectErr = err
 			}
 		}
 	} else if err != nil {
-		e3 = err
+		groupProjectErr = err
 	}
 
 	if len(all) == 0 {
-		if e1 != nil {
-			return nil, e1
-		} else if e2 != nil {
-			return nil, e2
-		} else if e3 != nil {
-			return nil, e3
+		if projectErr != nil {
+			return nil, projectErr
+		} else if userProjectErr != nil {
+			return nil, userProjectErr
+		} else if groupProjectErr != nil {
+			return nil, groupProjectErr
 		}
 	}
 
@@ -350,57 +274,13 @@ func (r *gitlab) getProjects() ([]gitProject, error) {
 }
 
 func (r *gitlab) getRepos(id int) ([]gitRepository, error) {
-	var all []gitRepository
-
 	ur := r.gitUrl("/projects/%d/registry/repositories", id)
-	for {
-		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
-		data, nextURL, err := r.getData(ur)
-		if err == nil {
-			var repos []gitRepository
-			if err = json.Unmarshal(data, &repos); err == nil {
-				if len(repos) == 0 {
-					nextURL = noNextPageURL
-				} else {
-					all = append(all, repos...)
-				}
-			}
-		}
-		if nextURL == noNextPageURL {
-			if len(all) > 0 {
-				err = nil
-			}
-			return all, err
-		}
-		ur = nextURL
-	}
+	return getResources[gitRepository](r, ur)
 }
 
 func (r *gitlab) getTags(id, repo int) ([]gitTag, error) {
-	var all []gitTag
-
 	ur := r.gitUrl("/projects/%d/registry/repositories/%d/tags", id, repo)
-	for {
-		smd.scanLog.WithFields(log.Fields{"url": ur}).Debug()
-		data, nextURL, err := r.getData(ur)
-		if err == nil {
-			var tags []gitTag
-			if err = json.Unmarshal(data, &tags); err == nil {
-				if len(tags) == 0 {
-					nextURL = noNextPageURL
-				} else {
-					all = append(all, tags...)
-				}
-			}
-		}
-		if nextURL == noNextPageURL {
-			if len(all) > 0 {
-				err = nil
-			}
-			return all, err
-		}
-		ur = nextURL
-	}
+	return getResources[gitTag](r, ur)
 }
 
 func (r *gitlab) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, error) {
