@@ -137,7 +137,9 @@ outerLoop:
 					if relStr == `rel="next"` {
 						nextURL = strings.TrimSpace(ss[0])
 						nextURL = strings.Trim(nextURL, "<>")
-						break outerLoop
+						if nextURL != noNextPageURL {
+							break outerLoop
+						}
 					}
 				}
 			}
