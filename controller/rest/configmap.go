@@ -969,7 +969,7 @@ func waitForFedRoleChange(roleExpected string) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-func handlefedcfg(yaml_data []byte) (string, error) {
+func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 	json_data, err1 := yaml.YAMLToJSON(yaml_data)
 	if err1 != nil {
 		log.WithFields(log.Fields{"error": err1}).Error("fed config to json convert error")
@@ -997,6 +997,22 @@ func handlefedcfg(yaml_data []byte) (string, error) {
 
 	membership := clusHelper.GetFedMembership()
 	fedSettings := clusHelper.GetFedSettings()
+
+	if !isLead {
+		if rconf.ManagedRestInfo != nil {
+			// to be a managed cluster
+			return "", nil
+		}
+		for i := 0; i < 3; i++ {
+			log.WithFields(log.Fields{"fedRole": membership.FedRole, "i": i}).Info()
+			if membership.FedRole == api.FedRoleMaster {
+				_fixedJoinToken = rconf.JoinToken
+				return "", nil
+			}
+			time.Sleep(10 * time.Second)
+			membership = clusHelper.GetFedMembership()
+		}
+	}
 
 	var lock cluster.LockInterface
 	if lock, err = lockClusKey(nil, share.CLUSLockFedKey); err != nil {
@@ -1188,14 +1204,14 @@ func handlefedcfg(yaml_data []byte) (string, error) {
 	return msg, err
 }
 
-func loadFedInitCfg() {
+func loadFedInitCfg(isLead bool) {
 	log.Info()
 
 	var errMsg string
 	if _, err := os.Stat(fedconfigmap); err == nil {
 		configMapType := "fed"
 		if yaml_data, err := os.ReadFile(fedconfigmap); err == nil {
-			msg, err := handlefedcfg(yaml_data)
+			msg, err := handlefedcfg(yaml_data, isLead)
 			if err == nil {
 				k8sResourceLog(share.CLUSEvInitCfgMapDone, msg, nil)
 			} else {

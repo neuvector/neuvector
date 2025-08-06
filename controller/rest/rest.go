@@ -1956,8 +1956,8 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 
 	log.WithFields(log.Fields{"port": _restPort}).Info("Start REST server")
 
-	if isNewCluster && isLead {
-		go loadFedInitCfg()
+	if isNewCluster {
+		go loadFedInitCfg(isLead)
 	}
 
 	addr := fmt.Sprintf(":%d", _restPort)
