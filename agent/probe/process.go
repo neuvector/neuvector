@@ -2515,6 +2515,15 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("PROC: Denied and killed")
 			}
 		}
+	} else {
+		if mode == share.PolicyModeLearn &&
+			(proc.action == share.PolicyActionViolate || proc.action == share.PolicyActionDeny) { // negative parent action
+			if proc.action != pp.Action {
+				proc.reported |= profileReported
+				pp.Action = proc.action
+				go p.sendProcessIncident(false, id, pp.Uuid, svcGroup, derivedGroup, proc)
+			}
+		}
 	}
 
 	// multiple learn process event are okay because they are merged at controllers.
@@ -3153,10 +3162,9 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		}
 	} // bFromPmon
 
-	bCanBeLearned := true
 	bRuncChild := false
 	if ppe.Action != share.PolicyActionViolate && (p.bK8sGroupWithProbe(svcGroup) || len(c.healthCheck) > 0) && c.nvRole == "" {
-		// allowing "kubctl exec ...", adpot the binary path to resolve the name
+		// allowing "kubctl exec ...", adopt the binary path to resolve the name
 		bRuncChild = global.RT.IsRuntimeProcess(proc.pname, nil)
 		if !bRuncChild {
 			pid := proc.pid
@@ -3228,10 +3236,6 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				bPass = false
 				ppe.Action = negativeResByMode(mode)
 				ppe.Uuid = share.CLUSReservedUuidAnchorMode
-			} else if !bCanBeLearned {
-				// allowed but will not be learned
-				ppe.Action = share.PolicyActionAllow
-				mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "svcGroup": svcGroup}).Debug()
 			}
 		case share.PolicyActionAllow, share.PolicyActionViolate:
 			if ppe.Action == share.PolicyActionViolate {
