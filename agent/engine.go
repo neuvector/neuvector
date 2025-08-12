@@ -2540,7 +2540,14 @@ func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 	doneLink := make(chan struct{})
 	defer close(doneLink)
 
-	if err = netlink.LinkSubscribe(chLink, doneLink); err != nil {
+	linkOptions := netlink.LinkSubscribeOptions{
+		ListExisting: false,
+		ErrorCallback: func(err error) {
+			log.WithFields(log.Fields{"error": err, "type": "link"}).Error("Link subscription error")
+		},
+	}
+
+	if err = netlink.LinkSubscribeWithOptions(chLink, doneLink, linkOptions); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Link change subscription failed")
 	}
 
@@ -2548,7 +2555,14 @@ func intfHostMonitorLoop(hid string, stopCh chan struct{}) {
 	doneAddr := make(chan struct{})
 	defer close(doneAddr)
 
-	if err = netlink.AddrSubscribe(chAddr, doneAddr); err != nil {
+	addrOptions := netlink.AddrSubscribeOptions{
+		ListExisting: false,
+		ErrorCallback: func(err error) {
+			log.WithFields(log.Fields{"error": err, "type": "addr"}).Error("Address subscription error")
+		},
+	}
+
+	if err = netlink.AddrSubscribeWithOptions(chAddr, doneAddr, addrOptions); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Address change subscription failed")
 	}
 
