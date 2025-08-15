@@ -3,6 +3,7 @@ package resource
 import (
 	//	"github.com/neuvector/k8s"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,6 +39,13 @@ const NvAdmCtrlSecurityRulePlural = "nvadmissioncontrolsecurityrules"
 const NvAdmCtrlSecurityRuleKind = "NvAdmissionControlSecurityRule"
 const NvAdmCtrlSecurityRuleListKind = "NvAdmissionControlSecurityRuleList"
 const NvAdmCtrlSecurityRuleSingular = "nvadmissioncontrolsecurityrule"
+
+const NvResponseSecurityRuleName = "nvresponserulesecurityrules.neuvector.com"
+const NvResponseSecurityRuleVersion = "v1"
+const NvResponseSecurityRulePlural = "nvresponserulesecurityrules"
+const NvResponseSecurityRuleKind = "NvResponseRuleSecurityRule"
+const NvResponseSecurityRuleListKind = "NvResponseRuleSecurityRuleList"
+const NvResponseSecurityRuleSingular = "nvresponserulesecurityrule"
 
 const NvDlpSecurityRuleName = "nvdlpsecurityrules.neuvector.com"
 const NvDlpSecurityRuleVersion = "v1"
@@ -105,10 +113,12 @@ type NvSecurityParse struct {
 	FileProfileCfg    *api.RESTFileMonitorProfile
 	GroupCfgs         []api.RESTCrdGroupConfig
 	RuleCfgs          []api.RESTPolicyRuleConfig
+	GroupResponseCfg  []*NvCrdResponseRule       // response rules for specific group
 	DlpGroupCfg       *api.RESTCrdDlpGroupConfig // per-group's dlp sensor configuration
 	WafGroupCfg       *api.RESTCrdWafGroupConfig // per-group's waf sensor configuration
 	AdmCtrlCfg        *NvCrdAdmCtrlConfig
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
+	ResponseCfg       *NvCrdResponseRule             // response rules for all groups
 	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
 	VulnProfileCfg    *NvCrdVulnProfileConfig        // vulerability profile defined by this crd object
@@ -168,6 +178,7 @@ type NvSecurityRuleSpec struct {
 	FileRule       []NvSecurityFileRule      `json:"file"`
 	DlpGroup       *NvSecurityDlpGroup       `json:"dlp,omitempty"` // per-group's dlp sensor mapping data
 	WafGroup       *NvSecurityWafGroup       `json:"waf,omitempty"` // per-group's waf sensor mapping data
+	ResponseRule   []*NvCrdResponseRule      `json:"response"`      // response rules for the group
 }
 
 type NvSecurityRulePartial struct {
@@ -299,6 +310,37 @@ type NvAdmCtrlSecurityRuleList struct {
 	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items            []NvAdmCtrlSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
 	XXX_unrecognized []byte                  `json:"-"`
+}
+
+type NvCrdResponseRule struct {
+	PolicyName string                     `json:"policy_name"`
+	Event      string                     `json:"event"`
+	Group      string                     `json:"group,omitempty"`
+	Actions    []string                   `json:"actions"` // share.EventActionQuarantine / share.EventActionSuppressLog / share.EventActionWebhook
+	Comment    string                     `json:"comment,omitempty"`
+	Disable    bool                       `json:"disable,omitempty"`
+	Webhooks   []string                   `json:"webhooks,omitempty"`
+	Conditions []share.CLUSEventCondition `json:"conditions,omitempty"`
+	CfgType    string                     `json:"cfg_type,omitempty"` //CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
+}
+
+type NvSecurityResponseSpec struct {
+	Rule NvCrdResponseRule `json:"rule"`
+}
+
+// for non-group-dependent response rule
+type NvResponseSecurityRule struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvSecurityResponseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// for non-group-dependent response rules
+type NvResponseSecurityRuleList struct {
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvResponseSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte                   `json:"-"`
 }
 
 // DLP

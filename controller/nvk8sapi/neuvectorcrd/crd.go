@@ -49,6 +49,9 @@ func (b *nvCrdSchmaBuilder) Init() {
 		share.DlpPatternContextURI, share.DlpPatternContextHEAD, share.DlpPatternContextBODY, share.DlpPatternContextPACKET,
 		share.CriteriaOpRegex, share.CriteriaOpNotRegex, share.DlpRuleKeyPattern,
 		share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers,
+		share.EventEvent, share.EventRuntime, share.EventCVEReport, share.EventCompliance, share.EventAdmCtrl,
+		share.EventActionQuarantine, share.EventActionSuppressLog, share.EventActionWebhook,
+		share.DefaultPolicyName,
 	}
 	b.enumMap = make(map[string][]byte, len(enums))
 	for _, k := range enums {
@@ -262,6 +265,176 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdPolicyV1B1Schema(owner string) apie
 	return schema
 }
 
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdResponseRuleV1Schema(owner string) *apiextv1.JSONSchemaProps {
+	events := []apiextv1.JSON{
+		{Raw: b.enumMap[share.EventEvent]},
+		{Raw: b.enumMap[share.EventRuntime]},
+		{Raw: b.enumMap[share.EventCVEReport]},
+		{Raw: b.enumMap[share.EventCompliance]},
+	}
+	if owner != "response" {
+		events = append(events, apiextv1.JSON{Raw: b.enumMap[share.EventAdmCtrl]})
+	}
+	var minItems int64 = 1
+	schema := &apiextv1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
+		Required: []string{"policy_name", "event", "actions"},
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"policy_name": {
+				Type: b.schemaTypeString,
+				Enum: []apiextv1.JSON{{Raw: b.enumMap[share.DefaultPolicyName]}},
+			},
+			"event": {
+				Type: b.schemaTypeString,
+				Enum: events,
+			},
+			"comment": {
+				Type: b.schemaTypeString,
+			},
+			"conditions": {
+				Type: b.schemaTypeArray,
+				Items: &apiextv1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
+						Required: []string{"type", "value"},
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"type": {
+								Type: b.schemaTypeString,
+							},
+							"value": {
+								Type: b.schemaTypeString,
+							},
+						},
+					},
+				},
+			},
+			"actions": {
+				Type: b.schemaTypeArray,
+				Items: &apiextv1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeString,
+						Enum: []apiextv1.JSON{
+							{Raw: b.enumMap[share.EventActionQuarantine]},
+							{Raw: b.enumMap[share.EventActionSuppressLog]},
+							{Raw: b.enumMap[share.EventActionWebhook]},
+						},
+					},
+				},
+				MinItems: &minItems,
+			},
+			"webhooks": {
+				Type: b.schemaTypeArray,
+				Items: &apiextv1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1.JSONSchemaProps{
+						Type: b.schemaTypeString,
+					},
+				},
+			},
+			"disable": {
+				Type: b.schemaTypeBoolean,
+			},
+		},
+	}
+
+	return schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdResponseV1Schema(owner string) apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeArray,
+		Items: &apiextv1.JSONSchemaPropsOrArray{
+			Schema: b.buildNvSeurityCrdResponseRuleV1Schema(owner),
+		},
+	}
+
+	return schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdResponseRuleV1B1Schema(owner string) *apiextv1b1.JSONSchemaProps {
+	events := []apiextv1b1.JSON{
+		{Raw: b.enumMap[share.EventEvent]},
+		{Raw: b.enumMap[share.EventRuntime]},
+		{Raw: b.enumMap[share.EventCVEReport]},
+		{Raw: b.enumMap[share.EventCompliance]},
+	}
+	if owner != "response" {
+		events = append(events, apiextv1b1.JSON{Raw: b.enumMap[share.EventAdmCtrl]})
+	}
+	var minItems int64 = 1
+	schema := &apiextv1b1.JSONSchemaProps{
+		Type:     b.schemaTypeObject,
+		Required: []string{"policy_name", "event", "actions"},
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"policy_name": {
+				Type: b.schemaTypeString,
+				Enum: []apiextv1b1.JSON{{Raw: b.enumMap[share.DefaultPolicyName]}},
+			},
+			"event": {
+				Type: b.schemaTypeString,
+				Enum: events,
+			},
+			"comment": {
+				Type: b.schemaTypeString,
+			},
+			"conditions": {
+				Type: b.schemaTypeArray,
+				Items: &apiextv1b1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1b1.JSONSchemaProps{
+						Type:     b.schemaTypeObject,
+						Required: []string{"type", "value"},
+						Properties: map[string]apiextv1b1.JSONSchemaProps{
+							"type": {
+								Type: b.schemaTypeString,
+							},
+							"value": {
+								Type: b.schemaTypeString,
+							},
+						},
+					},
+				},
+			},
+			"actions": {
+				Type: b.schemaTypeArray,
+				Items: &apiextv1b1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeString,
+						Enum: []apiextv1b1.JSON{
+							{Raw: b.enumMap[share.EventActionQuarantine]},
+							{Raw: b.enumMap[share.EventActionSuppressLog]},
+							{Raw: b.enumMap[share.EventActionWebhook]},
+						},
+					},
+				},
+				MinItems: &minItems,
+			},
+			"webhooks": {
+				Type: b.schemaTypeArray,
+				Items: &apiextv1b1.JSONSchemaPropsOrArray{
+					Schema: &apiextv1b1.JSONSchemaProps{
+						Type: b.schemaTypeString,
+					},
+				},
+			},
+			"disable": {
+				Type: b.schemaTypeBoolean,
+			},
+		},
+	}
+
+	return schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvSeurityCrdResponseV1B1Schema(owner string) apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeArray,
+		Items: &apiextv1b1.JSONSchemaPropsOrArray{
+			Schema: b.buildNvSeurityCrdResponseRuleV1B1Schema(owner),
+		},
+	}
+
+	return schema
+}
+
 func (b *nvCrdSchmaBuilder) buildNvSeurityCrdDlpWafV1B1Schema() apiextv1b1.JSONSchemaProps {
 	schema := apiextv1b1.JSONSchemaProps{
 		Type: b.schemaTypeObject,
@@ -354,8 +527,9 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1Schema() *apiextv1.JSONSc
 							"selector": b.buildNvSeurityCrdSelectorV1Schema("target"),
 						},
 					},
-					"ingress": b.buildNvSeurityCrdPolicyV1Schema("ingress"),
-					"egress":  b.buildNvSeurityCrdPolicyV1Schema("egress"),
+					"ingress":  b.buildNvSeurityCrdPolicyV1Schema("ingress"),
+					"egress":   b.buildNvSeurityCrdPolicyV1Schema("egress"),
+					"response": b.buildNvSeurityCrdResponseV1Schema("response"),
 					"process": {
 						Type: b.schemaTypeArray,
 						Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -481,8 +655,9 @@ func (b *nvCrdSchmaBuilder) buildNvSeurityCrdNwPolicyV1B1Schema() *apiextv1b1.JS
 							"selector": b.buildNvSeurityCrdSelectorV1B1Schema("target"),
 						},
 					},
-					"ingress": b.buildNvSeurityCrdPolicyV1B1Schema("ingress"),
-					"egress":  b.buildNvSeurityCrdPolicyV1B1Schema("egress"),
+					"ingress":  b.buildNvSeurityCrdPolicyV1B1Schema("ingress"),
+					"egress":   b.buildNvSeurityCrdPolicyV1B1Schema("egress"),
+					"response": b.buildNvSeurityCrdResponseV1B1Schema("response"),
 					"process": {
 						Type: b.schemaTypeArray,
 						Items: &apiextv1b1.JSONSchemaPropsOrArray{
@@ -855,6 +1030,38 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 							},
 						},
 					},
+				},
+			},
+		},
+	}
+	return &schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdResponseV1Schema() *apiextv1.JSONSchemaProps {
+	schema := apiextv1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1.JSONSchemaProps{
+			"spec": {
+				Type:     b.schemaTypeObject,
+				Required: []string{"rule"},
+				Properties: map[string]apiextv1.JSONSchemaProps{
+					"rule": *b.buildNvSeurityCrdResponseRuleV1Schema(""),
+				},
+			},
+		},
+	}
+	return &schema
+}
+
+func (b *nvCrdSchmaBuilder) buildNvSecurityCrdResponseV1B1Schema() *apiextv1b1.JSONSchemaProps {
+	schema := apiextv1b1.JSONSchemaProps{
+		Type: b.schemaTypeObject,
+		Properties: map[string]apiextv1b1.JSONSchemaProps{
+			"spec": {
+				Type:     b.schemaTypeObject,
+				Required: []string{"rule"},
+				Properties: map[string]apiextv1b1.JSONSchemaProps{
+					"rule": *b.buildNvSeurityCrdResponseRuleV1B1Schema(""),
 				},
 			},
 		},
@@ -1366,6 +1573,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 		v1.Schema.OpenAPIV3Schema = b.buildNvCrdGroupDefinitionV1Schema()
 	case resource.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1Schema()
+	case resource.NvResponseSecurityRuleName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdResponseV1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1Schema()
 	case resource.NvVulnProfileSecurityRuleName:
@@ -1393,6 +1602,8 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 		v1.Schema.OpenAPIV3Schema = b.buildNvCrdGroupDefinitionV1B1Schema()
 	case resource.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1B1Schema()
+	case resource.NvResponseSecurityRuleName:
+		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdResponseV1B1Schema()
 	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1B1Schema()
 	case resource.NvVulnProfileSecurityRuleName:
@@ -1709,6 +1920,19 @@ func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []str
 			SpecNamesListKind: resource.NvAdmCtrlSecurityRuleListKind,
 			LockKey:           share.CLUSLockAdmCtrlKey,
 			KvCrdKind:         resource.NvAdmCtrlSecurityRuleKind,
+		},
+		{
+			RscType:           resource.RscTypeCrdResponseSecurityRule,
+			MetaName:          resource.NvResponseSecurityRuleName,
+			SpecScope:         resource.NvClusterSecurityRuleScope,
+			SpecGroup:         common.OEMClusterSecurityRuleGroup,
+			SpecVersion:       resource.NvResponseSecurityRuleVersion,
+			SpecNamesPlural:   resource.NvResponseSecurityRulePlural,
+			SpecNamesKind:     resource.NvResponseSecurityRuleKind,
+			SpecNamesSingular: resource.NvResponseSecurityRuleSingular,
+			SpecNamesListKind: resource.NvResponseSecurityRuleListKind,
+			LockKey:           share.CLUSLockPolicyKey,
+			KvCrdKind:         resource.NvResponseSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdDlpSecurityRule,

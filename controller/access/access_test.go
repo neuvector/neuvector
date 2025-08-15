@@ -1416,6 +1416,8 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/file/dlp/config",
 			"v1/file/waf",
 			"v1/file/waf/config",
+			"v1/file/response/rule",
+			"v1/file/response/rule/config",
 			"v1/system/request",
 			"v1/sniffer",
 			"v1/file/group/config", // for providing similar function as crd import but do not rely on crd webhook

@@ -1212,6 +1212,7 @@ const (
 	ruleTypeVulProf  = "vulProf"
 )
 
+// network policy calls common.GetAvailablePolicyID() instead
 func getAvailableRuleID(ruleType string, ids utils.Set, cfgType share.TCfgType) uint32 {
 	var id, max uint32
 	var idMax, idMin uint32
@@ -1225,6 +1226,8 @@ func getAvailableRuleID(ruleType string, ids utils.Set, cfgType share.TCfgType) 
 		idMax = api.StartingFedAdmRespRuleID
 		if ruleType == ruleTypeAdmCtrl {
 			idMin = uint32(api.StartingLocalAdmCtrlRuleID)
+		} else if ruleType == ruleTypeRespRule {
+			idMin = uint32(api.StartingLocalResponseRuleID)
 		} else if ruleType == ruleTypeVulProf {
 			idMin = uint32(api.StartingLocalVulProfRuleID)
 		} else {
@@ -1641,6 +1644,8 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.POST("/v1/file/group/config", handlerGroupCfgImport)                    // for providing similar function as crd import but do not rely on crd webhook. supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/admission", handlerAdmCtrlExport)                        // supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/admission/config", handlerAdmCtrlImport)                 // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
+	r.POST("/v1/file/response/rule", handlerResponseRuleExport)               // supported 'scope' query parameter values: "local"(default).
+	r.POST("/v1/file/response/rule/config", handlerResponseRuleImport)        // for providing similar function as crd import but do not rely on crd webhook. it's for replacement only if header "X-Import-Overwrite" is specified
 	r.POST("/v1/file/dlp", handlerDlpExport)                                  // supported 'scope' query parameter values: "local"(default).
 	r.POST("/v1/file/dlp/config", handlerDlpImport)                           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
 	r.POST("/v1/file/waf", handlerWafExport)                                  // supported 'scope' query parameter values: "local"(default).

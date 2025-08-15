@@ -2832,6 +2832,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			CallerFullname: login.fullname,
 			CallerRemote:   login.remote,
 			CallerID:       login.id,
+			Overwrite:      r.Header.Get("X-Import-Overwrite"),
 		}
 		if err := clusHelper.PutImportTask(&importTask); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
@@ -2899,6 +2900,12 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 						log.WithFields(log.Fields{"error": err}).Error("importAdmCtrl")
 					}
 				}()
+			case share.IMPORT_TYPE_RESPONSE:
+				go func() {
+					if err := importResponse(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importResponse")
+					}
+				}()
 			case share.IMPORT_TYPE_DLP:
 				go func() {
 					if err := importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
@@ -2963,6 +2970,8 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		msgToken = "group policy"
 	case share.IMPORT_TYPE_ADMCTRL:
 		msgToken = "admission control configurations"
+	case share.IMPORT_TYPE_RESPONSE:
+		msgToken = "response rules"
 	case share.IMPORT_TYPE_DLP:
 		msgToken = "DLP configurations"
 	case share.IMPORT_TYPE_WAF:
@@ -3013,6 +3022,8 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 		msgToken = "group policy"
 	case share.IMPORT_TYPE_ADMCTRL:
 		msgToken = "admission control configurations/rules"
+	case share.IMPORT_TYPE_RESPONSE:
+		msgToken = "response rules"
 	case share.IMPORT_TYPE_DLP:
 		msgToken = "DLP rules"
 	case share.IMPORT_TYPE_WAF:
@@ -3069,6 +3080,12 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 				SpecNamesKind: resource.NvAdmCtrlSecurityRuleKind,
 				LockKey:       share.CLUSLockAdmCtrlKey,
 				KvCrdKind:     resource.NvAdmCtrlSecurityRuleKind,
+			},
+			{
+				RscType:       resource.RscTypeCrdResponseSecurityRule,
+				SpecNamesKind: resource.NvResponseSecurityRuleKind,
+				LockKey:       share.CLUSLockPolicyKey,
+				KvCrdKind:     resource.NvResponseSecurityRuleKind,
 			},
 			{
 				RscType:       resource.RscTypeCrdDlpSecurityRule,

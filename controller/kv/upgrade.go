@@ -1038,7 +1038,8 @@ func GetRestVer() string { // NV clusters with the same "rest version" means mas
 	// return "28ea479c" // for 5.1 ~ 5.2.x
 	// return "449EC339" // for 5.3 ~ 5.3.x
 	// return "D6AD17D4" // for 5.4 ~ 5.4.2
-	return "G7B5S135" // for 5.4.3 ~
+	// return "G7B5S135" // for 5.4.3 ~ 5.4.5
+	return "94444768" // for 5.4.6 ~
 }
 
 func genFileAccessRule() {

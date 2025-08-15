@@ -1248,6 +1248,59 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/file/response/rule:
+    post:
+      tags:
+        - File
+      summary: Export non-group-dependent response rules as a yaml format. The exported yaml file can be imported by CRD or REST API to update the response rules.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      parameters:
+        - in: query
+          name: scope
+          type: string
+          required: false
+          enum:
+            - local
+          description: "It exports the non-group-dependent response rules when the scope is local."
+        - in: body
+          name: body
+          description: Non-group-dependent response rules yaml file
+          required: true
+          schema:
+            $ref: '#/definitions/RESTResponseRulesExport'
+      responses:
+        '200':
+          description: Success. Get a yaml file.
+  /v1/file/response/rule/config:
+    post:
+      tags:
+        - File
+      description: Importing non-group-dependent response rules. The payload body is the content of the response rules yaml file.
+      summary: import non-group-dependent response rules
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - 'application/json'
+        - 'text/plain; charset=utf-8'
+      parameters:
+        - in: header
+          name: X-Transaction-ID
+          required: false
+          type: string
+        - in: body
+          name: body
+          description: response rules yaml file
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
   /v1/file/config:
     get:
       tags:
@@ -9018,6 +9071,17 @@ definitions:
     properties:
       insert:
         $ref: '#/definitions/RESTResponseRuleInsert'
+  RESTResponseRulesExport:
+    type: object
+    properties:
+      ids:
+        type: array
+        items:
+          type: integer
+          format: uint32
+          example: 12
+      remote_export_options:
+        $ref: '#/definitions/RESTRemoteExportOptions'
   RESTRolePermission:
     type: object
     required:
