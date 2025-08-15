@@ -1,22 +1,30 @@
 package rest
 
 import (
+	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
@@ -277,7 +285,7 @@ func isValidAction(act string) bool {
 	return true
 }
 
-func validateResponseRule(r *api.RESTResponseRule, acc *access.AccessControl) error {
+func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *access.AccessControl) error {
 	if r.Event == "" {
 		return fmt.Errorf("Missing event for response rule")
 	}
@@ -370,22 +378,39 @@ func validateResponseRule(r *api.RESTResponseRule, acc *access.AccessControl) er
 		}
 	}
 
-	if r.Group != "" {
-		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
-		if grp == nil {
-			return fmt.Errorf("Group %s is not found", r.Group)
-		} else {
-			if r.Group == api.LearnedExternal || r.Group == api.AllHostGroup {
-				// containers/external/nodes are allowed for fed response rules
-			} else if (r.CfgType == api.CfgTypeFederal && grp.CfgType != share.FederalCfg) ||
-				(r.CfgType != api.CfgTypeFederal && grp.CfgType == share.FederalCfg) {
-				return fmt.Errorf("Rule cannot be applied to group %s", r.Group)
-			}
-		}
-	} else if (r.CfgType == api.CfgTypeFederal && !acc.IsFedAdmin()) ||
+	if (r.CfgType == api.CfgTypeFederal && !acc.IsFedAdmin()) ||
 		(r.CfgType != api.CfgTypeFederal && !acc.HasGlobalPermissions(share.PERMS_RUNTIME_POLICIES, share.PERMS_RUNTIME_POLICIES)) {
 		return common.ErrObjectAccessDenied
 	}
+
+	var grpCfgType share.TCfgType
+	if r.Group != "" {
+		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
+		if grpMustExist && grp == nil {
+			return fmt.Errorf("Group %s is not found", r.Group)
+		} else if grp != nil {
+			grpCfgType = grp.CfgType
+		} else {
+			grpCfgType = cfgTypeMapping[r.CfgType]
+		}
+	}
+
+	supportedGroups := utils.NewSetFromStringSlice([]string{api.LearnedExternal})
+	switch grpCfgType {
+	case share.FederalCfg:
+		supportedGroups.Add(api.FederalGroupPrefix + api.AllHostGroup)
+		supportedGroups.Add(api.FederalGroupPrefix + api.AllContainerGroup)
+	default:
+		supportedGroups.Add(api.AllHostGroup)
+		supportedGroups.Add(api.AllContainerGroup)
+	}
+	if supportedGroups.Contains(r.Group) {
+		// fed.nodes/fed.containers/containers/external/nodes are allowed for fed response rules
+	} else if (r.CfgType == api.CfgTypeFederal && grpCfgType != share.FederalCfg) ||
+		(r.CfgType != api.CfgTypeFederal && grpCfgType == share.FederalCfg) {
+		return fmt.Errorf("Rule cannot be applied to group %s", r.Group)
+	}
+
 	return nil
 }
 
@@ -569,25 +594,28 @@ func deleteResponseRules(policyName string, txn *cluster.ClusterTransact, dels u
 	}
 }
 
-func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Request, insert *api.RESTResponseRuleInsert, acc *access.AccessControl) error {
+func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RESTResponseRuleInsert,
+	lockAcquired, grpMustExist bool, acc *access.AccessControl) ([]uint32, error) {
 	log.Debug("")
 
-	// Acquire locks
-	plock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
-	if err != nil {
-		e := "Failed to acquire cluster policy lock"
-		log.WithFields(log.Fields{"error": err}).Error(e)
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, e)
-		return err
+	if !lockAcquired {
+		// Acquire locks
+		plock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+		if err != nil {
+			e := "Failed to acquire cluster policy lock"
+			log.WithFields(log.Fields{"error": err}).Error(e)
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, e)
+			return nil, err
+		}
+		defer clusHelper.ReleaseLock(plock)
 	}
-	defer clusHelper.ReleaseLock(plock)
 
 	slock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
 	if err != nil {
 		e := "Failed to acquire cluster server lock"
 		log.WithFields(log.Fields{"error": err}).Error(e)
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, e)
-		return err
+		return nil, err
 	}
 	defer clusHelper.ReleaseLock(slock)
 	// --
@@ -604,21 +632,26 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf("%s", e)
+		return nil, fmt.Errorf("%s", e)
 	}
 
 	var cfgType share.TCfgType = share.UserCreated
 	if policyName == share.FedPolicyName {
 		cfgType = share.FederalCfg
+	} else {
+		if insert != nil && len(insert.Rules) > 0 {
+			cfgType = cfgTypeMapping[insert.Rules[0].CfgType]
+		}
 	}
 
+	idAdded := make([]uint32, 0, len(insert.Rules))
 	newRules := make([]*share.CLUSResponseRule, len(insert.Rules))
 	for i, rr := range insert.Rules {
 		if ids.Contains(rr.ID) {
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-			return fmt.Errorf("%s", e)
+			return nil, fmt.Errorf("%s", e)
 		}
 
 		if rr.ID == api.PolicyAutoID {
@@ -627,14 +660,15 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 				err := errors.New("Failed to locate available rule ID")
 				log.WithFields(log.Fields{"id": rr.ID}).Error(err)
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
-				return err
+				return nil, err
 			}
 		}
+		idAdded = append(idAdded, rr.ID)
 
-		if err := validateResponseRule(rr, acc); err != nil {
+		if err := validateResponseRule(rr, grpMustExist, acc); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("")
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
-			return err
+			return nil, err
 		} else {
 			cr := responseRule2Cluster(rr)
 			ids.Add(cr.ID)
@@ -667,21 +701,21 @@ func insertResponseRule(policyName string, w http.ResponseWriter, r *http.Reques
 	if lastError != nil {
 		log.WithFields(log.Fields{"error": lastError}).Error("")
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return lastError
+		return nil, lastError
 	}
 
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return err
+		return nil, err
 	} else if !ok {
 		err = errors.New("Atomic write failed")
 		log.Error(err.Error())
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return idAdded, nil
 }
 
 func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -720,7 +754,7 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 		} else {
 			policyName = share.DefaultPolicyName
 		}
-		err = insertResponseRule(policyName, w, r, rconf.Insert, acc)
+		_, err = insertResponseRule(policyName, w, rconf.Insert, false, true, acc)
 		if err == nil {
 			if policyName == share.FedPolicyName {
 				updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)
@@ -820,7 +854,7 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	rr := cacher.ResponseRule2REST(cconf)
-	if err := validateResponseRule(rr, acc); err != nil {
+	if err := validateResponseRule(rr, true, acc); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
@@ -855,6 +889,13 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 	rule, err := cacher.GetResponseRule(policyName, uint32(id), acc)
 	if rule == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
+		return
+	}
+
+	if rule.CfgType == api.CfgTypeGround {
+		e := "Rule created by CRD cannot be deleted"
+		log.WithFields(log.Fields{"id": rule.ID}).Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 		return
 	}
 
@@ -996,4 +1037,320 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 		updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)
 	}
 	restRespSuccess(w, r, nil, acc, login, nil, "Delete all response rules")
+}
+
+func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	// allow export no matter it's k8s env or not
+	acc, login := getAccessControl(w, r, access.AccessOPRead)
+	if acc == nil {
+		return
+	}
+
+	var rconf api.RESTResponseRulesExport
+	body, _ := io.ReadAll(r.Body)
+	err := json.Unmarshal(body, &rconf)
+	if err != nil || len(rconf.IDs) == 0 {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	apiVersion := resource.NvResponseSecurityRuleVersion
+	resp := resource.NvResponseSecurityRuleList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       resource.NvListKind,
+			APIVersion: apiVersion,
+		},
+	}
+
+	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
+	if err != nil {
+		e := "Failed to acquire cluster lock"
+		log.WithFields(log.Fields{"error": err}).Error(e)
+		return
+	}
+	defer clusHelper.ReleaseLock(lock)
+
+	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, resource.NvResponseSecurityRuleVersion)
+	for _, id := range rconf.IDs {
+		// export response rules
+		responseRules, err := exportResponseRules("", id, acc)
+		if err != nil {
+			e := fmt.Sprintf("Failed to export response rule %v", id)
+			log.WithFields(log.Fields{"err": err}).Error(e)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return
+		}
+		if len(responseRules) == 0 || responseRules[0] == nil {
+			continue
+		}
+		responseRule := responseRules[0]
+		crName, err := genResponseRuleCrName(id, *responseRule)
+		if err != nil {
+			log.WithFields(log.Fields{"id": id, "err": err}).Error()
+			continue
+		}
+		respTemp := resource.NvResponseSecurityRule{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: apiversion,
+				Kind:       resource.NvResponseSecurityRuleKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: crName,
+			},
+			Spec: resource.NvSecurityResponseSpec{
+				Rule: *responseRule,
+			},
+		}
+		resp.Items = append(resp.Items, respTemp)
+	}
+
+	doExport("cfgResponseRulesExport.yaml", "response rules", rconf.RemoteExportOptions, resp, w, r, acc, login)
+}
+
+func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	tid := r.Header.Get("X-Transaction-ID")
+	_importHandler(w, r, tid, share.IMPORT_TYPE_RESPONSE, share.PREFIX_IMPORT_RESPONSE, acc, login)
+}
+
+func genResponseRuleCrName(id uint32, crdRule resource.NvCrdResponseRule) (string, error) {
+	rMini := api.RESTResponseRule{
+		ID:         id,
+		Event:      crdRule.Event,
+		Conditions: crdRule.Conditions,
+		Actions:    crdRule.Actions,
+		Webhooks:   crdRule.Webhooks,
+	}
+	jsonData, err := json.Marshal(&rMini)
+	if err != nil {
+		return "", err
+	}
+	b := sha256.Sum256(jsonData)
+
+	return fmt.Sprintf("%s--%s", crdRule.Event, hex.EncodeToString(b[:])), nil
+}
+
+func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]*resource.NvCrdResponseRule, error) {
+	if id != 0 {
+		// export a specific response rule
+		r, err := cacher.GetResponseRule(share.DefaultPolicyName, id, acc)
+		if err != nil {
+			return nil, err
+		}
+		if gName != r.Group {
+			if gName == "" {
+				// ignore per-group's response rules when exporting global response rules because
+				//  response rules for a specific group must be exported with group by POST("/v1/file/group")
+				return nil, nil
+			}
+			return nil, fmt.Errorf("response rule %d is for group <%s>", id, r.Group)
+		}
+		crdRule := &resource.NvCrdResponseRule{
+			PolicyName: share.DefaultPolicyName,
+			Event:      r.Event,
+			Actions:    r.Actions,
+			Comment:    r.Comment,
+			Disable:    r.Disable,
+			Webhooks:   r.Webhooks,
+			Conditions: r.Conditions,
+		}
+		return []*resource.NvCrdResponseRule{crdRule}, nil
+	}
+	if gName != "" {
+		var rules []*resource.NvCrdResponseRule
+		// export all response rules that are for the group
+		allRules := cacher.GetAllResponseRules(share.ScopeLocal, acc)
+		for _, r := range allRules {
+			if r.Group == gName {
+				crdRule := &resource.NvCrdResponseRule{
+					PolicyName: share.DefaultPolicyName,
+					Event:      r.Event,
+					Actions:    r.Actions,
+					Comment:    r.Comment,
+					Disable:    r.Disable,
+					Webhooks:   r.Webhooks,
+					Conditions: r.Conditions,
+				}
+				rules = append(rules, crdRule)
+			}
+		}
+		return rules, nil
+	}
+
+	return nil, nil
+}
+
+func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule, error) {
+
+	importDataStr := string(importData)
+	yamlParts := strings.Split(importDataStr, "\n---\n")
+
+	// check whether it's Windows format
+	if len(yamlParts) == 1 && strings.Contains(importDataStr, "\r\n") {
+		yamlParts = strings.Split(importDataStr, "\r\n---\r\n")
+	}
+
+	var err error
+	var nvSecRules []resource.NvResponseSecurityRule
+
+	for i, yamlPart := range yamlParts {
+		var sb strings.Builder
+		scanner := bufio.NewScanner(strings.NewReader(yamlPart))
+		for scanner.Scan() {
+			line := scanner.Text()
+			lineTrimmed := strings.TrimSpace(line)
+			if len(lineTrimmed) == 0 || lineTrimmed[0] == byte('#') {
+				continue
+			} else {
+				sb.WriteString(line)
+				sb.WriteString("\n")
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("error reading YAML part %d: %s", i, err)
+		}
+		yamlPart = sb.String()
+		sb.Reset()
+		if len(yamlPart) == 0 {
+			continue
+		}
+
+		var jsonData []byte
+		if jsonData, err = yaml.YAMLToJSON([]byte(yamlPart)); err == nil {
+			var nvCrList resource.NvCrList
+			if err = json.Unmarshal(jsonData, &nvCrList); err == nil {
+				if nvCrList.Kind == "List" {
+					if len(nvCrList.Items) > 0 {
+						nvCr := nvCrList.Items[0]
+						if nvCr.Kind == resource.NvResponseSecurityRuleListKind || nvCr.Kind == resource.NvResponseSecurityRuleKind {
+							var nvSecRuleList resource.NvResponseSecurityRuleList
+							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
+								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
+							}
+						} else {
+							err = fmt.Errorf("kind: %s", nvCr.Kind)
+						}
+					}
+				} else {
+					if nvCrList.Kind == resource.NvResponseSecurityRuleListKind || nvCrList.Kind == resource.NvResponseSecurityRuleKind {
+						var nvSecRule resource.NvResponseSecurityRule
+						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
+							nvSecRules = append(nvSecRules, nvSecRule)
+						}
+					} else {
+						err = fmt.Errorf("kind: %s", nvCrList.Kind)
+					}
+				}
+			}
+		}
+		if err != nil {
+			err = fmt.Errorf("Invalid yaml(%d): %s", i, err.Error())
+			break
+		}
+	}
+
+	if err == nil {
+		if err == nil {
+			for _, r := range nvSecRules {
+				if r.APIVersion != "neuvector.com/v1" ||
+					(r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
+					err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
+					break
+				}
+			}
+		}
+	}
+
+	if err != nil {
+		nvSecRules = nil
+	}
+
+	return nvSecRules, err
+}
+
+func importResponse(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
+	log.Debug()
+	defer os.Remove(importTask.TempFilename)
+
+	var secRules []resource.NvResponseSecurityRule
+	json_data, err := os.ReadFile(importTask.TempFilename)
+	if err == nil {
+		secRules, err = parseResponseYamlFile(json_data)
+	}
+	if err != nil {
+		msg := "Failed to read/parse the imported file"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
+		return nil
+	} else if len(secRules) == 0 {
+		log.Info("no security rule in yaml")
+		postImportOp(nil, importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
+		return nil
+	}
+
+	var inc float32
+	var progress float32 // progress percentage
+
+	inc = 90.0 / float32(3)
+	parsedResponseCfgs := make([]*resource.NvCrdResponseRule, 0, len(secRules))
+	progress = 6
+
+	importTask.Percentage = int(progress)
+	importTask.Status = share.IMPORT_RUNNING
+	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+	var crdHandler nvCrdHandler
+	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
+	if crdHandler.AcquireLock(clusterLockWait) {
+		defer crdHandler.ReleaseLock()
+
+		// [1] parse all non-group-dependent response security rules in the yaml file
+		for _, secRule := range secRules {
+			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdResponseContent(&secRule, share.ReviewTypeImportResponse, share.ReviewTypeDisplayResponse)
+			if errCount > 0 {
+				err = fmt.Errorf("%s", errMsg)
+				break
+			} else {
+				parsedResponseCfgs = append(parsedResponseCfgs, parsedCfg.ResponseCfg)
+			}
+		}
+		if err != nil {
+			postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
+			return nil
+		}
+
+		if importTask.Overwrite == "1" {
+			kv.DeleteResponseRuleByGroup("")
+		}
+
+		progress += inc
+		importTask.Percentage = int(progress)
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+		if len(parsedResponseCfgs) > 0 {
+			var cacheRecord share.CLUSCrdSecurityRule
+			// [4] import all security rules defined in the yaml file
+			err := crdHandler.crdHandleResponseRule(scope, parsedResponseCfgs, &cacheRecord, share.ReviewTypeImportResponse)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+			}
+		}
+		importTask.Percentage = 90
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	}
+
+	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
+
+	return nil
 }

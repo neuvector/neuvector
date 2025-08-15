@@ -115,6 +115,10 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 					LockKey:   share.CLUSLockAdmCtrlKey,
 					KvCrdKind: resource.NvAdmCtrlSecurityRuleKind,
 				},
+				resource.NvResponseSecurityRuleName: {
+					LockKey:   share.CLUSLockPolicyKey,
+					KvCrdKind: resource.NvResponseSecurityRuleKind,
+				},
 				resource.NvDlpSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
 					KvCrdKind: resource.NvDlpSecurityRuleKind,
@@ -207,6 +211,7 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 		resource.RscTypeCrdClusterSecurityRule,
 		resource.RscTypeCrdGroupDefinition,
 		resource.RscTypeCrdAdmCtrlSecurityRule,
+		resource.RscTypeCrdResponseSecurityRule,
 		resource.RscTypeCrdDlpSecurityRule,
 		resource.RscTypeCrdWafSecurityRule,
 		resource.RscTypeCrdVulnProfile,

@@ -82,40 +82,42 @@ const (
 )
 
 const (
-	nvOperatorsRole             = "neuvector-binding-co"
-	nvOperatorsRoleBinding      = nvOperatorsRole
-	NvAppRole                   = "neuvector-binding-app"
-	nvAppRoleBinding            = NvAppRole
-	NvRbacRole                  = "neuvector-binding-rbac"
-	nvRbacRoleBinding           = NvRbacRole
-	NvAdmCtrlRole               = "neuvector-binding-admission"
-	nvAdmCtrlRoleBinding        = NvAdmCtrlRole
-	nvCrdRole                   = "neuvector-binding-customresourcedefinition"
-	nvCrdRoleBinding            = nvCrdRole
-	nvCrdSecRuleRole            = "neuvector-binding-nvsecurityrules"
-	nvCrdSecRoleBinding         = nvCrdSecRuleRole
-	nvCrdGrpDefRole             = "neuvector-binding-nvgroupdefinitions"
-	nvCrdGrpDefRoleBinding      = nvCrdGrpDefRole
-	nvCrdAdmCtrlRole            = "neuvector-binding-nvadmissioncontrolsecurityrules"
-	nvCrdAdmCtrlRoleBinding     = nvCrdAdmCtrlRole
-	nvCrdDlpRole                = "neuvector-binding-nvdlpsecurityrules"
-	nvCrdDlpRoleBinding         = nvCrdDlpRole
-	nvCrdWafRole                = "neuvector-binding-nvwafsecurityrules"
-	nvCrdWafRoleBinding         = nvCrdWafRole
-	nvCrdVulnProfileRole        = "neuvector-binding-nvvulnerabilityprofiles"
-	nvCrdVulnProfileRoleBinding = nvCrdVulnProfileRole
-	nvCrdCompProfileRole        = "neuvector-binding-nvcomplianceprofiles"
-	nvCrdCompProfileRoleBinding = nvCrdCompProfileRole
-	NvScannerRole               = "neuvector-binding-scanner"
-	NvScannerRoleBinding        = NvScannerRole
-	NvSecretRole                = "neuvector-binding-secret"
-	nvSecretRoleBinding         = NvSecretRole
-	NvAdminRoleBinding          = "neuvector-admin"
-	nvViewRoleBinding           = "neuvector-binding-view"
-	NvJobCreationRole           = "neuvector-binding-job-creation"
-	NvJobCreationRoleBinding    = NvJobCreationRole
-	NvCertUpgraderRole          = "neuvector-binding-cert-upgrader"
-	NvCertUpgraderRoleBinding   = NvCertUpgraderRole
+	nvOperatorsRole              = "neuvector-binding-co"
+	nvOperatorsRoleBinding       = nvOperatorsRole
+	NvAppRole                    = "neuvector-binding-app"
+	nvAppRoleBinding             = NvAppRole
+	NvRbacRole                   = "neuvector-binding-rbac"
+	nvRbacRoleBinding            = NvRbacRole
+	NvAdmCtrlRole                = "neuvector-binding-admission"
+	nvAdmCtrlRoleBinding         = NvAdmCtrlRole
+	nvCrdRole                    = "neuvector-binding-customresourcedefinition"
+	nvCrdRoleBinding             = nvCrdRole
+	nvCrdSecRuleRole             = "neuvector-binding-nvsecurityrules"
+	nvCrdSecRoleBinding          = nvCrdSecRuleRole
+	nvCrdGrpDefRole              = "neuvector-binding-nvgroupdefinitions"
+	nvCrdGrpDefRoleBinding       = nvCrdGrpDefRole
+	nvCrdAdmCtrlRole             = "neuvector-binding-nvadmissioncontrolsecurityrules"
+	nvCrdAdmCtrlRoleBinding      = nvCrdAdmCtrlRole
+	nvCrdResponseRuleRole        = "neuvector-binding-nvresponserulesecurityrules"
+	nvCrdResponseRuleRoleBinding = nvCrdResponseRuleRole
+	nvCrdDlpRole                 = "neuvector-binding-nvdlpsecurityrules"
+	nvCrdDlpRoleBinding          = nvCrdDlpRole
+	nvCrdWafRole                 = "neuvector-binding-nvwafsecurityrules"
+	nvCrdWafRoleBinding          = nvCrdWafRole
+	nvCrdVulnProfileRole         = "neuvector-binding-nvvulnerabilityprofiles"
+	nvCrdVulnProfileRoleBinding  = nvCrdVulnProfileRole
+	nvCrdCompProfileRole         = "neuvector-binding-nvcomplianceprofiles"
+	nvCrdCompProfileRoleBinding  = nvCrdCompProfileRole
+	NvScannerRole                = "neuvector-binding-scanner"
+	NvScannerRoleBinding         = NvScannerRole
+	NvSecretRole                 = "neuvector-binding-secret"
+	nvSecretRoleBinding          = NvSecretRole
+	NvAdminRoleBinding           = "neuvector-admin"
+	nvViewRoleBinding            = "neuvector-binding-view"
+	NvJobCreationRole            = "neuvector-binding-job-creation"
+	NvJobCreationRoleBinding     = NvJobCreationRole
+	NvCertUpgraderRole           = "neuvector-binding-cert-upgrader"
+	NvCertUpgraderRoleBinding    = NvCertUpgraderRole
 )
 
 const (
@@ -288,8 +290,9 @@ var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 	},
 }
 
-var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule,
-	RscTypeCrdWafSecurityRule, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeCrdGroupDefinition)
+var crdResForAllOpSet = utils.NewSet(RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule,
+	RscTypeCrdResponseSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule, RscTypeCrdVulnProfile,
+	RscTypeCrdCompProfile, RscTypeCrdGroupDefinition)
 var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
 	{
 		ApiGroups:  allApiGroups,
@@ -603,6 +606,18 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				func() metav1.Object { return new(NvAdmCtrlSecurityRule) },
 				func() metav1.ListInterface { return new(NvAdmCtrlSecurityRuleList) },
 				xlateCrdAdmCtrlRule,
+				nil,
+			},
+		},
+	},
+	RscTypeCrdResponseSecurityRule: {
+		apiGroup: constApiGroupNV,
+		makers: []*resourceMaker{
+			{
+				"v1",
+				func() metav1.Object { return new(NvResponseSecurityRule) },
+				func() metav1.ListInterface { return new(NvResponseSecurityRuleList) },
+				xlateCrdResponseRule,
 				nil,
 			},
 		},
@@ -1121,6 +1136,14 @@ func xlateCrdAdmCtrlRule(obj metav1.Object) (string, interface{}) {
 	return "", nil
 }
 
+func xlateCrdResponseRule(obj metav1.Object) (string, interface{}) {
+	if o, ok := obj.(*NvResponseSecurityRule); ok {
+		return string(obj.GetUID()), o
+	}
+
+	return "", nil
+}
+
 func xlateCrdDlpSecurityRule(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*NvDlpSecurityRule); ok {
 		return string(obj.GetUID()), o
@@ -1323,6 +1346,9 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		case RscTypeCrdAdmCtrlSecurityRule:
 			k8s.Register("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRule{})
 			k8s.RegisterList("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRuleList{})
+		case RscTypeCrdResponseSecurityRule:
+			k8s.Register("neuvector.com", "v1", NvResponseSecurityRulePlural, false, &NvResponseSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", NvResponseSecurityRulePlural, false, &NvResponseSecurityRuleList{})
 		case RscTypeCrdDlpSecurityRule:
 			k8s.Register("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRule{})
 			k8s.RegisterList("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRuleList{})
@@ -1651,7 +1677,8 @@ func (d *kubernetes) GetResource(rt, namespace, name string) (interface{}, error
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeNamespace, RscTypeService, K8sRscTypeClusRole, K8sRscTypeClusRoleBinding, k8sRscTypeRole, k8sRscTypeRoleBinding, RscTypeValidatingWebhookConfiguration,
-		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
+		RscTypeCrd, RscTypeConfigMap, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule, RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdResponseSecurityRule,
+		RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
 		RscTypeDeployment, RscTypeReplicaSet, RscTypeStatefulSet, RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeSecret, RscTypePersistentVolumeClaim,
 		RscTypeCrdGroupDefinition:
 		return d.getResource(rt, namespace, name)
@@ -1782,8 +1809,8 @@ func (d *kubernetes) DeleteResource(rt string, res interface{}) error {
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
 	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdSecurityRule, RscTypeCrdClusterSecurityRule,
-		RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule, RscTypeCrdNvCspUsage,
-		RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeCrdGroupDefinition:
+		RscTypeCrdAdmCtrlSecurityRule, RscTypeCrdResponseSecurityRule, RscTypeCrdDlpSecurityRule, RscTypeCrdWafSecurityRule,
+		RscTypeCrdNvCspUsage, RscTypeCrdVulnProfile, RscTypeCrdCompProfile, RscTypeCrdGroupDefinition:
 		return d.deleteResource(rt, res)
 	}
 	return ErrResourceNotSupported

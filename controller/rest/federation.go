@@ -3492,6 +3492,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				"/v1/file/admission",
 				"/v1/file/waf",
 				"/v1/file/dlp",
+				"/v1/file/response/rule",
 				"/v1/file/compliance/profile",
 				"/v1/file/vulnerability/profile",
 				"/v1/vulasset",

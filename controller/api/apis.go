@@ -549,6 +549,11 @@ type RESTAdmCtrlRulesExport struct {
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
+type RESTResponseRulesExport struct {
+	IDs                 []uint32                 `json:"ids"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
+}
+
 type RESTWafSensorExport struct {
 	Names               []string                 `json:"names"`
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
@@ -3552,6 +3557,7 @@ type RESTRegistryImageSummaryData struct {
 
 // Admission control
 const StartingLocalAdmCtrlRuleID = 1000
+const StartingLocalResponseRuleID = 8
 const StartingLocalVulProfRuleID = 1000
 const StartingFedAdmRespRuleID = 100000
 const MaxFedAdmRespRuleID = 110000

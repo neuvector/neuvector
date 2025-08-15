@@ -232,6 +232,16 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 			},
 		},
 	},
+	nvCrdResponseRuleRole: {
+		name: nvCrdResponseRuleRole,
+		rules: []*k8sRbacRoleRuleInfo{
+			{
+				apiGroup:  constApiGroupNV,
+				resources: utils.NewSet(RscTypeCrdResponseSecurityRule),
+				verbs:     crdPolicyRoleVerbs,
+			},
+		},
+	},
 	nvCrdDlpRole: {
 		name: nvCrdDlpRole,
 		rules: []*k8sRbacRoleRuleInfo{

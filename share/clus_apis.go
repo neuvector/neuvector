@@ -2219,6 +2219,11 @@ type CLUSCrdCompProfile struct {
 	Name string `json:"name"`
 }
 
+type CLUSCrdResponseRules struct {
+	IDs        []uint32 `json:"ids"`
+	PolicyName string   `json:"policy_name"`
+}
+
 type CLUSCrdSecurityRule struct {
 	Name            string                 `json:"name"` // crd record name in the format {crd kind}-{ns}-{metadata.name}
 	MetadataName    string                 `json:"metadata_name"`
@@ -2233,6 +2238,7 @@ type CLUSCrdSecurityRule struct {
 	DlpGroupSensors []string               `json:"dlp_group_sensors,omitempty"` // dlp sensors associated with the target group
 	WafGroupSensors []string               `json:"waf_group_sensors,omitempty"` // waf sensors associated with the target group
 	AdmCtrlRules    map[string]uint32      `json:"admctrl_rules,omitempty"`     // map key is the generated name of admission control rule, valud is assigned rule id
+	ResponseRules   *CLUSCrdResponseRules  `json:"response_rule,omitempty"`     // response rule defined in this crd security rule
 	DlpSensor       string                 `json:"dlp_sensor,omitempty"`        // dlp sensor defined in this crd security rule
 	WafSensor       string                 `json:"waf_sensor,omitempty"`        // waf sensor defined in this crd security rule
 	VulnProfile     string                 `json:"vuln_profile,omitempty"`      // vulnerability profile defined in this crd security rule
@@ -2943,6 +2949,7 @@ const (
 	PREFIX_IMPORT_CONFIG       = "import_"
 	PREFIX_IMPORT_GROUP_POLICY = "group_import_"
 	PREFIX_IMPORT_ADMCTRL      = "admctrl_import_"
+	PREFIX_IMPORT_RESPONSE     = "response_import_"
 	PREFIX_IMPORT_DLP          = "dlp_import_"
 	PREFIX_IMPORT_WAF          = "waf_import_"
 	PREFIX_IMPORT_VULN_PROFILE = "vul_profile_import_" // for vulnerability profile
@@ -2953,6 +2960,7 @@ const (
 	IMPORT_TYPE_CONFIG       = ""
 	IMPORT_TYPE_GROUP_POLICY = "group"
 	IMPORT_TYPE_ADMCTRL      = "admctrl"
+	IMPORT_TYPE_RESPONSE     = "response"
 	IMPORT_TYPE_DLP          = "dlp"
 	IMPORT_TYPE_WAF          = "waf"
 	IMPORT_TYPE_VULN_PROFILE = "vuln_profile" // for vulnerability profile
@@ -2978,6 +2986,7 @@ type CLUSImportTask struct {
 	CallerFullname string    `json:"caller_fullname"`
 	CallerRemote   string    `json:"caller_remote"`
 	CallerID       string    `json:"caller_id"`
+	Overwrite      string    `json:"overwrite"`
 }
 
 func CLUSNodeProfileStoreKey(nodeID string) string {
@@ -3010,6 +3019,7 @@ const (
 	ReviewTypeCRD               = iota + 1
 	ReviewTypeImportGroup       // interactive import
 	ReviewTypeImportAdmCtrl     // interactive import
+	ReviewTypeImportResponse    // interactive import
 	ReviewTypeImportDLP         // interactive import
 	ReviewTypeImportWAF         // interactive import
 	ReviewTypeImportVulnProfile // interactive import vulnerability profile
@@ -3018,12 +3028,13 @@ const (
 
 const (
 	ReviewTypeDisplayCRD         = "CRD"
-	ReviewTypeDisplayGroup       = "Group Policy"                     // interactive import
-	ReviewTypeDisplayAdmission   = "Admission Control Configurations" // interactive import
-	ReviewTypeDisplayDLP         = "DLP Configurations"               // interactive import
-	ReviewTypeDisplayWAF         = "WAF Configurations"               // interactive import
-	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"            // interactive import
-	ReviewTypeDisplayCompProfile = "Compliance Profile"               // interactive import
+	ReviewTypeDisplayGroup       = "Group Policy"                       // interactive import
+	ReviewTypeDisplayAdmission   = "Admission Control Configurations"   // interactive import
+	ReviewTypeDisplayResponse    = "Non-group-dependent response rules" // interactive import
+	ReviewTypeDisplayDLP         = "DLP Configurations"                 // interactive import
+	ReviewTypeDisplayWAF         = "WAF Configurations"                 // interactive import
+	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"              // interactive import
+	ReviewTypeDisplayCompProfile = "Compliance Profile"                 // interactive import
 )
 
 // Telemetry (upgrade responder)

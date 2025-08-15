@@ -2047,7 +2047,10 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 				importTask.Percentage = int(progress)
 				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
-				// [4]: import network policy rules/process profile/file access rules/group policy mode
+				// [4] delete all response rules of all the target groups (not all referenced groups)
+				kv.DeleteResponseRuleByGroups(targetGroups)
+
+				// [5]: import network policy rules/process profile/file access rules/group policy mode/response rules
 				for i, grpCfgRet := range parsedGrpCfg {
 					var crdRecord share.CLUSCrdSecurityRule // leverage CLUSCrdSecurityRule but we don't save it in kv
 					var policyMode string
@@ -2069,8 +2072,16 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						}
 					}
 
-					//  do same job as crdHandleNetworkRules(crdCfgRet.RuleCfgs, crdRecord)
+					// do same job as crdHandleNetworkRules(crdCfgRet.RuleCfgs, crdRecord)
 					importGroupNetworkRules(grpCfgRet.RuleCfgs)
+
+					if len(grpCfgRet.GroupResponseCfg) > 0 {
+						//  import response rules for this group
+						grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+							grpCfgRet.TargetName: grpCfgRet.GroupResponseCfg,
+						}
+						_, _ = crdHandler.crdHandleGroupResponseRules(scope, grpResponseCfg, share.UserCreated)
+					}
 
 					if crdRecord.ProfileName != "" && utils.HasGroupProfiles(crdRecord.ProfileName) {
 						secRuleName := fmt.Sprintf("group-import-%d", i)
@@ -2089,9 +2100,9 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 						}
 
 						txn := cluster.Transact()
-						// [4]: import dlp group data
+						// [5-4]: import dlp group data
 						crdHandler.crdHandleDlpGroup(txn, grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
-						// [5]: import waf group data
+						// [5-5]: import waf group data
 						crdHandler.crdHandleWafGroup(txn, grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
 						if ok, err := txn.Apply(); err != nil || !ok {
 							log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")

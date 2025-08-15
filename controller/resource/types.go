@@ -36,6 +36,7 @@ const (
 	RscTypeCrdClusterSecurityRule         = "nvclustersecurityrules"
 	RscTypeCrdGroupDefinition             = "nvgroupdefinitions"
 	RscTypeCrdAdmCtrlSecurityRule         = "nvadmissioncontrolsecurityrules"
+	RscTypeCrdResponseSecurityRule        = "nvresponserulesecurityrules"
 	RscTypeCrdDlpSecurityRule             = "nvdlpsecurityrules"
 	RscTypeCrdWafSecurityRule             = "nvwafsecurityrules"
 	RscTypeCrdNvCspUsage                  = "cspadapterusagerecords" // case sensitive
