@@ -50,7 +50,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -80,7 +80,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-controller-manager.yaml")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -108,7 +108,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -138,7 +138,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/kube-scheduler.yaml")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -166,7 +166,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -196,7 +196,7 @@ groups:
           check="$id  - $description"
           file=$(append_prefix "$CONFIG_PREFIX" "/etc/kubernetes/manifests/etcd.yaml")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -224,7 +224,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -303,7 +303,7 @@ groups:
             count_files=$((count_files + 1))
             permissions=$(stat -c %u%g $file)
 
-            # Check if the ownership is set to root:root 
+            # Check if the ownership is set to root:root
             if [ "$permissions" != "00" ]; then
               non_compliant_files="$non_compliant_files$file ($permissions), "
             fi
@@ -344,7 +344,7 @@ groups:
           fi
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 700 ]; then
               pass "$check"
@@ -374,7 +374,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %U:%G $file)
             if [ "$ownership" = "etcd:etcd" ]; then
               pass "$check"
@@ -406,7 +406,7 @@ groups:
           file="/etc/kubernetes/admin.conf"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -434,7 +434,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -465,7 +465,7 @@ groups:
           file="/etc/kubernetes/scheduler.conf"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -493,7 +493,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -524,7 +524,7 @@ groups:
           file="/etc/kubernetes/controller-manager.conf"
           file=$(append_prefix "$CONFIG_PREFIX" "$file")
 
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             permissions=$(stat -c %a $file)
             if [ "$permissions" -le 600 ]; then
               pass "$check"
@@ -535,7 +535,7 @@ groups:
           else
             warn "$check"
             warn "      * File not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the master node. For example, chmod 600 /etc/kubernetes/controller-manager.conf
       - id: K.1.1.18
@@ -552,7 +552,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -f "$file" ]; then
+          if [ -e "$file" ]; then
             ownership=$(stat -c %u%g $file)
             if [ "$ownership" = "00" ]; then
               pass "$check"
@@ -563,7 +563,7 @@ groups:
           else
             warn "$check"
             warn "      * File not found, $file"
-          fi        
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the master node. For example, chown root:root /etc/kubernetes/controller-manager.conf
       - id: K.1.1.19
@@ -638,7 +638,7 @@ groups:
           else
               warn "$check"
               warn "      * Wrong permissions for $failed_file, expected 600 or less, but is $failed_perm"
-          fi       
+          fi
         remediation: Run the below command (based on the file location on your system)
           on the master node. For example, chmod -R 600 /etc/kubernetes/pki/*.crt
       - id: K.1.1.21
@@ -698,7 +698,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the below parameter. --anonymous-auth=false
       - id: K.1.2.2
@@ -768,7 +768,7 @@ groups:
               fi
           else
               warn "$check"
-          fi  
+          fi
         remediation: Follow the Kubernetes documentation and set up the TLS connection
           between the apiserver and kubelets. Then, edit API server pod specification
           file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
@@ -792,7 +792,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Follow the Kubernetes documentation and setup the TLS connection
           between the apiserver and kubelets. Then, edit the API server pod specification
           file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
@@ -816,7 +816,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --authorization-mode parameter to values
           other than AlwaysAllow . One such example could be as below. --authorization-mode=RBAC
@@ -837,7 +837,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --authorization-mode parameter to a value
           that includes Node . --authorization-mode=Node,RBAC
@@ -879,7 +879,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Follow the Kubernetes documentation and set the desired limits
           in a configuration file. Then, edit the API server pod specification file
           /etc/kubernetes/manifests/kube-apiserver.yaml and set the below parameters.  --enable-admission-plugins=...,EventRateLimit,...
@@ -901,7 +901,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and either remove the --enable-admission-plugins parameter,
           or set it to a value that does not include AlwaysAdmit.
@@ -922,7 +922,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --enable-admission-plugins parameter to include
           AlwaysPullImages.  --enable-admission-plugins=...,AlwaysPullImages,...
@@ -947,7 +947,7 @@ groups:
             else
               warn "$check"
             fi
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --enable-admission-plugins parameter to include
           SecurityContextDeny, unless PodSecurityPolicy is already in place.  --enable-admission-plugins=...,SecurityContextDeny,...
@@ -968,7 +968,7 @@ groups:
               warn "$check"
           else
               pass "$check"
-          fi        
+          fi
         remediation: Follow the documentation and create ServiceAccount objects as
           per your environment. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and ensure that the --disable-admission-plugins parameter
@@ -1030,7 +1030,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the below parameter. --profiling=false
       - id: K.1.2.17
@@ -1049,7 +1049,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --audit-log-path parameter to a suitable
           path and file where you would like audit logs to be written, for example:
@@ -1078,7 +1078,7 @@ groups:
               fi
           else
               warn "$check"
-          fi 
+          fi
         remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --audit-log-maxage parameter to 30 or as
           an appropriate number of days: --audit-log-maxage=30'
@@ -1155,7 +1155,7 @@ groups:
               pass "      * request-timeout: $requestTimeout"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           and set the below parameter as appropriate and if needed. For example, --request-timeout=300s
       - id: K.1.2.22
@@ -1176,7 +1176,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the below parameter. --service-account-lookup=true
       - id: K.1.2.23
@@ -1200,7 +1200,7 @@ groups:
               pass "      * service-account-key-file: $file"
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --service-account-key-file parameter to the
           public key file for service accounts: --service-account-key-file=<filename>'
@@ -1266,7 +1266,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: Follow the Kubernetes documentation and set up the TLS connection
           on the apiserver. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the TLS certificate and private key file parameters.
@@ -1317,7 +1317,7 @@ groups:
               pass "      * etcd-cafile: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Follow the Kubernetes documentation and set up the TLS connection
           between the apiserver and etcd. Then, edit the API server pod specification
           file /etc/kubernetes/manifests/kube-apiserver.yaml on the master node and
@@ -1340,7 +1340,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi     
+          fi
         remediation: 'Follow the Kubernetes documentation and configure a EncryptionConfig
           file. Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
           on the master node and set the --encryption-provider-config parameter to
@@ -1372,7 +1372,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: Follow the Kubernetes documentation and configure a EncryptionConfig
           file. In this file, choose aescbc, kms or secretbox as the encryption provider.
       - id: K.1.2.30
@@ -1399,7 +1399,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: |
           Edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml on the Control Plane node and set the below parameter.
           --tls-cipher-suites=TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384,
@@ -1437,7 +1437,7 @@ groups:
               pass "      * terminated-pod-gc-threshold: $threshold"
           else
               warn "$check"
-          fi        
+          fi
         remediation: 'Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node and set the --terminated-pod-gc-threshold to an appropriate
           threshold, for example: --terminated-pod-gc-threshold=10'
@@ -1455,7 +1455,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node and set the below parameter. --profiling=false
       - id: K.1.3.3
@@ -1476,7 +1476,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node to set the below parameter. --use-service-account-credentials=true
       - id: K.1.3.4
@@ -1500,7 +1500,7 @@ groups:
               pass "      * service-account-private-key-file: $keyfile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node and set the --service-account-privat-key-file parameter
           to the private key file for service accounts. --service-account-private-key-file=<filename>
@@ -1525,7 +1525,7 @@ groups:
               pass "      * root-ca-file: $cafile"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node and set the --root-ca-file parameter to the certificate
           bundle file`. --root-ca-file=<path/to/file>
@@ -1553,7 +1553,7 @@ groups:
               fi
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node and set the --feature-gates parameter to include RotateKubeletServerCertificate=true.
           --feature-gates=RotateKubeletServerCertificate=true
@@ -1571,7 +1571,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Controller Manager pod specification file /etc/kubernetes/manifests/kube-controller-manager.yaml
           on the master node and ensure the correct value for the --bind-address parameter.
   - id: 1.4
@@ -1591,7 +1591,7 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml
           file on the master node and set the below parameter. --profiling=false
       - id: K.1.4.2
@@ -1608,6 +1608,6 @@ groups:
               pass "$check"
           else
               warn "$check"
-          fi        
+          fi
         remediation: Edit the Scheduler pod specification file /etc/kubernetes/manifests/kube-scheduler.yaml
           on the master node and ensure the correct value for the --bind-address parameter
