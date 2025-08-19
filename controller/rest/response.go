@@ -1263,8 +1263,7 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 	if err == nil {
 		if err == nil {
 			for _, r := range nvSecRules {
-				if r.APIVersion != "neuvector.com/v1" ||
-					(r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
+				if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvResponseSecurityRuleKind {
 					err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
 					break
 				}
@@ -1339,7 +1338,9 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
 		if len(parsedResponseCfgs) > 0 {
-			var cacheRecord share.CLUSCrdSecurityRule
+			cacheRecord := share.CLUSCrdSecurityRule{
+				ResponseRules: &share.CLUSCrdResponseRules{},
+			}
 			// [4] import all security rules defined in the yaml file
 			err := crdHandler.crdHandleResponseRule(scope, parsedResponseCfgs, &cacheRecord, share.ReviewTypeImportResponse)
 			if err != nil {
