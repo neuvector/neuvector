@@ -201,8 +201,8 @@ func (h *nvCrdHandler) crdDelAll(k8sKind, kvCrdKind string, recordList map[strin
 			h.crdDeleteResponseRules(record.ResponseRules)
 			h.crdDeleteRecord(k8sKind, recordName)
 		case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-			//h.crdDeleteResponseRules(record.ResponseRules) //=> done in crdHandleGroupRecordDel() -> crdDeleteGroup() -> kv.DeleteResponseRuleByGroups() ?
 			h.crdDeleteNetworkRules(record.Rules)
+			h.crdDeleteResponseRules(record.ResponseRules)
 			h.crdHandleGroupRecordDel(record, record.Groups, false, recordList)
 			h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, record.ProfileName, recordList)
 		case resource.NvDlpSecurityRuleKind:
@@ -551,7 +551,7 @@ func (h *nvCrdHandler) crdDeleteAdmCtrlRules() {
 }
 
 func (h *nvCrdHandler) crdDeleteResponseRules(responseRules *share.CLUSCrdResponseRules) {
-	if responseRules == nil {
+	if responseRules == nil || len(responseRules.IDs) == 0 {
 		return
 	}
 	policyName := responseRules.PolicyName
@@ -2443,6 +2443,8 @@ func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail re
 func (h *nvCrdHandler) validateCrdResponseRule(idx int, gName string, rule resource.NvCrdResponseRule, acc *access.AccessControl) (string, int) {
 	if gName != rule.Group {
 		return fmt.Sprintf("wrong group %s", rule.Group), 1
+	} else if len(rule.Conditions) == 0 {
+		return " validate error: no criteria", 1
 	}
 	rr := api.RESTResponseRule{
 		Event:      rule.Event,
@@ -2459,7 +2461,7 @@ func (h *nvCrdHandler) validateCrdResponseRule(idx int, gName string, rule resou
 	}
 
 	if err := validateResponseRule(&rr, false, acc); err != nil {
-		e := fmt.Sprintf(" response rule %d validate error: %s \n", idx, err.Error())
+		e := fmt.Sprintf(" validate error: %s \n", err.Error())
 		log.WithFields(log.Fields{"error": err}).Error(e)
 		return e, 1
 	}
@@ -3785,7 +3787,7 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 				h.crdDeleteRecord(req.Kind.Kind, recordName)
 			case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
 				h.crdDeleteNetworkRules(crdRecord.Rules)
-				//h.crdDeleteResponseRules(crdRecord.ResponseRules) //=> done in crdHandleGroupRecordDel() -> crdDeleteGroup() -> kv.DeleteResponseRuleByGroups() ?
+				h.crdDeleteResponseRules(crdRecord.ResponseRules)
 				recordsCount = len(recordList)
 				h.crdHandleGroupRecordDel(crdRecord, crdRecord.Groups, false, recordList)
 				h.crdDeleteRecordEx(resource.NvSecurityRuleKind, recordName, crdRecord.ProfileName, recordList)
@@ -4606,13 +4608,11 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		}
 		crdCfgRet, errCount, errMsg, _ := crdHandler.parseCrdContent(kind, obj, recordList)
 		if errCount > 0 {
-			if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
-				log.WithFields(log.Fields{"error": errMsg, "name": mdNameDisplay}).Error()
-				e := fmt.Sprintf("%s deleted due to error: %s", mdNameDisplay, errMsg)
-				deleted = append(deleted, e)
-				if err := global.ORCH.DeleteResource(rscType, obj); err != nil {
-					log.WithFields(log.Fields{"rscType": rscType, "name": mdNameDisplay, "err": err}).Error()
-				}
+			log.WithFields(log.Fields{"error": errMsg, "name": mdNameDisplay}).Error()
+			e := fmt.Sprintf("%s deleted due to error: %s", mdNameDisplay, errMsg)
+			deleted = append(deleted, e)
+			if err := global.ORCH.DeleteResource(rscType, obj); err != nil {
+				log.WithFields(log.Fields{"rscType": rscType, "name": mdNameDisplay, "err": err}).Error()
 			}
 		} else {
 			switch kind {
