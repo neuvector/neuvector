@@ -2474,10 +2474,12 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func handlerTestJointInternal(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleNone {
-		restRespSuccess(w, r, nil, nil, nil, nil, "")
+		var resp api.RESTFedPingResp
+		restRespSuccess(w, r, &resp, nil, nil, nil, "")
 	} else {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 	}
