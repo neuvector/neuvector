@@ -371,7 +371,7 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 	if k8sPlatform {
 		var errs []string
 		k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
-		if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false); len(errs) == 0 {
+		if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false, true); len(errs) == 0 {
 			errs, _ = resource.VerifyNvRbacRoleBindings(k8sClusterRoles, false, true)
 		}
 		if len(errs) > 0 {
@@ -444,7 +444,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 
 	var errs []string
 	k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
-	if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false); len(errs) == 0 {
+	if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false, true); len(errs) == 0 {
 		errs, _ = resource.VerifyNvRbacRoleBindings(k8sClusterRoles, false, true)
 	}
 	if len(errs) > 0 {
@@ -1380,7 +1380,7 @@ func handlerGetAdmissionTest(w http.ResponseWriter, r *http.Request, ps httprout
 
 	var errs []string
 	k8sClusterRoles := []string{resource.NvRbacRole, resource.NvAdmCtrlRole, resource.NvAppRole}
-	if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false); len(errs) == 0 {
+	if errs, _ = resource.VerifyNvRbacRoles(k8sClusterRoles, false, true); len(errs) == 0 {
 		errs, _ = resource.VerifyNvRbacRoleBindings(k8sClusterRoles, false, true)
 	}
 	if len(errs) > 0 {

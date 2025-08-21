@@ -3,6 +3,7 @@ package rest
 import (
 	"crypto/rsa"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -619,8 +620,29 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 				}
 
 				// check password
-				hash := utils.HashPassword(parts[1])
-				if hash != apikeyAccount.SecretKeyHash {
+				var err error
+				var hash string
+				if ss := strings.Split(apikeyAccount.SecretKeyHash, "-"); len(ss) == 3 {
+					// new format salted hash
+					var salt []byte
+					if salt, err = hex.DecodeString(ss[1]); err == nil {
+						hash, err = common.HashPassword(parts[1], salt)
+					}
+				} else {
+					hash = utils.HashPassword(parts[1])
+					if hash == apikeyAccount.SecretKeyHash {
+						apikeyAccount.SecretKeyHash, err = common.HashPassword(parts[1], nil)
+						if lock, err := lockClusKey(nil, share.CLUSLockApikeyKey); err == nil {
+							if err := clusHelper.CreateApikey(apikeyAccount, false); err != nil {
+								log.WithFields(log.Fields{"apikey": apikeyAccount.Name, "error": err}).Error("Failed to update")
+							} else {
+								hash = apikeyAccount.SecretKeyHash
+							}
+							clusHelper.ReleaseLock(lock)
+						}
+					}
+				}
+				if err != nil || hash != apikeyAccount.SecretKeyHash {
 					return nil, userInvalidRequest, rsessToken
 				}
 
@@ -638,7 +660,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 				}
 				roles[access.AccessDomainGlobal] = apikeyAccount.Role
 
-				_, _, err := access.GetUserPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains, share.NvPermissions{}, nil)
+				_, _, err = access.GetUserPermissions(apikeyAccount.Role, apikeyAccount.RoleDomains, share.NvPermissions{}, nil)
 				if err != nil {
 					return nil, userInvalidRequest, rsessToken
 				}
@@ -1077,12 +1099,12 @@ func _kickLoginSessions(user *share.CLUSUser) { // `user == nil` means kick all 
 	}
 }
 
-func _kickLoginSessionByToken(tokenHash string) {
+func _kickLoginSessionByToken(token string) {
 	userMutex.Lock()
 	defer userMutex.Unlock()
 
 	for _, login := range loginSessions {
-		if tokenHash == utils.HashPassword(login.token) {
+		if token == login.token {
 			login._logout()
 			break
 		}
@@ -1973,6 +1995,27 @@ type tLocalPwdAuthResult struct {
 	pwdProfileBasic       api.RESTPwdProfileBasic
 }
 
+// retrieve salt from currUserPwdHash and generate hash of userPwd
+func getExpectedPwdHash(userName, userPwd, currUserPwdHash string) (string, error) {
+	var hashExpected string
+
+	if common.IsSaltedPasswordHash(currUserPwdHash) {
+		if ss := strings.Split(currUserPwdHash, "-"); len(ss) == 3 {
+			if salt, err := hex.DecodeString(ss[1]); err == nil {
+				var err error
+				if hashExpected, err = common.HashPassword(userPwd, salt); err != nil {
+					log.WithFields(log.Fields{"err": err, "user": userName}).Error()
+					return "", err
+				}
+			}
+		}
+	} else {
+		hashExpected = utils.HashPassword(userPwd)
+	}
+
+	return hashExpected, nil
+}
+
 func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*share.CLUSUser, tLocalPwdAuthResult, error) {
 	var user *share.CLUSUser
 	var result tLocalPwdAuthResult
@@ -2028,8 +2071,8 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 		}
 
 		// Validate password
-		hash := utils.HashPassword(pw.Password)
-		if hash != user.PasswordHash {
+		hashExpected, err := getExpectedPwdHash(pw.Username, pw.Password, user.PasswordHash)
+		if err != nil || hashExpected != user.PasswordHash {
 			if pwdProfile.EnableBlockAfterFailedLogin {
 				user.FailedLoginCount++
 				if int(user.FailedLoginCount) >= pwdProfile.BlockAfterFailedCount {
@@ -2044,6 +2087,17 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 			}
 			return nil, result, errors.New("Wrong password")
 		} else {
+			if !common.IsSaltedPasswordHash(user.PasswordHash) {
+				// if user's password hash is without-salt version, re-hash to salt version
+				newSaltedPwdHash, err := common.HashPassword(pw.Password, nil)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "user": pw.Username}).Error("re-hash failed")
+					return nil, result, err
+				} else {
+					user.PasswordHash = newSaltedPwdHash
+				}
+			}
+
 			if pwdProfile.EnablePwdExpiration && pwdProfile.PwdExpireAfterDays > 0 && !user.PwdResetTime.IsZero() {
 				pwdValidUnit := _pwdValidUnit
 				if user.Fullname == common.DefaultAdminUser {
@@ -2060,7 +2114,12 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 				if pw.NewPassword == nil {
 					return user, result, nil
 				}
-				if weak, pwdHistoryToKeep, pwdProfileBasic, e := isWeakPassword(*pw.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
+				newSaltedPwdHash, err := common.HashPassword(*pw.NewPassword, nil)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "user": pw.Username}).Error("re-hash failed")
+					return nil, result, err
+				}
+				if weak, pwdHistoryToKeep, pwdProfileBasic, e := isWeakPassword(*pw.NewPassword, newSaltedPwdHash, user.PasswordHash, user.PwdHashHistory, nil); weak {
 					log.WithFields(log.Fields{"create": pw.Username}).Error(e)
 					result.newPwdWeak = true
 					result.newPwdError = e
@@ -2070,12 +2129,12 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 					if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
 						user.PwdHashHistory = nil
 					} else {
-						user.PwdHashHistory = append(user.PwdHashHistory, user.PasswordHash)
+						user.PwdHashHistory = append(user.PwdHashHistory, hashExpected)
 						if i := len(user.PwdHashHistory) - pwdHistoryToKeep; i >= 0 { // len(user.PwdHashHistory) + 1(current password hash) should be <= pwdHistoryToKeep
 							user.PwdHashHistory = user.PwdHashHistory[i+1:]
 						}
 					}
-					user.PasswordHash = utils.HashPassword(*pw.NewPassword)
+					user.PasswordHash = newSaltedPwdHash
 					user.PwdResetTime = time.Now().UTC()
 					user.ResetPwdInNextLogin = false
 					user.UseBootstrapPwd = false
@@ -2125,26 +2184,31 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 	acc := access.NewAdminAccessControl()
 	// Retrieve user from the cluster
 	user, _, _ = clusHelper.GetUserRev(userName, acc)
-	if user == nil && userName == common.ReservedFedUser {
-		secret, _ := utils.GetGuid()
-		// hidden fed user for POST("/v1/fed_auth") request on worker clusters
-		u := share.CLUSUser{
-			Fullname:     userName,
-			Username:     userName,
-			PasswordHash: utils.HashPassword(secret),
-			Domain:       "",
-			Role:         api.UserRoleAdmin, // HiddenFedUser is admin role
-			Timeout:      common.DefIdleTimeoutInternal,
-			RoleDomains:  make(map[string][]string),
-			Locale:       common.OEMDefaultUserLocale,
-			PwdResetTime: time.Now().UTC(),
+	if userName == common.ReservedFedUser {
+		if user == nil {
+			newSaltedPwdHash, err := common.HashPassword(secret, nil)
+			if err != nil {
+				return nil, nil, err
+			}
+			// hidden fed user for POST("/v1/fed_auth") request on worker clusters
+			u := share.CLUSUser{
+				Fullname:     userName,
+				Username:     userName,
+				PasswordHash: newSaltedPwdHash,
+				Domain:       "",
+				Role:         api.UserRoleAdmin, // HiddenFedUser is admin role
+				Timeout:      common.DefIdleTimeoutInternal,
+				RoleDomains:  make(map[string][]string),
+				Locale:       common.OEMDefaultUserLocale,
+				PwdResetTime: time.Now().UTC(),
+			}
+			value, _ := json.Marshal(u)
+			key := share.CLUSUserKey(userName)
+			if err := cluster.PutIfNotExist(key, value, false); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
+			}
+			user, _, _ = clusHelper.GetUserRev(userName, acc)
 		}
-		value, _ := json.Marshal(u)
-		key := share.CLUSUserKey(userName)
-		if err := cluster.PutIfNotExist(key, value, false); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
-		}
-		user, _, _ = clusHelper.GetUserRev(userName, acc)
 	}
 	if user == nil || user.Server != "" {
 		return nil, nil, errors.New("User not found")
@@ -2271,8 +2335,10 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		}
 		if role == api.UserRoleAdmin || role == api.UserRoleFedAdmin {
 			if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll); u != nil {
-				if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
-					defaultPW = true
+				if !common.IsSaltedPasswordHash(u.PasswordHash) {
+					if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
+						defaultPW = true
+					}
 				}
 			}
 		}
