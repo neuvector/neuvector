@@ -958,14 +958,18 @@ func main() {
 
 	// Load config from ConfigMap
 	defAdminLoaded := rest.LoadInitCfg(Ctrler.Leader, dev.Host.Platform)
+	log.WithFields(log.Fields{"defAdminRestored": defAdminRestored, "defAdminLoaded": defAdminLoaded}).Info()
 	if !defAdminRestored && !defAdminLoaded {
-		// if platform == share.PlatformKubernetes && Ctrler.Leader && isNewCluster && !*noDefAdmin {
-		if platform == share.PlatformKubernetes && Ctrler.Leader && !*noDefAdmin {
-			if bootstrapPwd := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
-				acc := access.NewFedAdminAccessControl()
-				user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
-				if user != nil {
-					user.PasswordHash = utils.HashPassword(bootstrapPwd)
+		if platform == share.PlatformKubernetes && Ctrler.Leader && (isNewCluster || emptyKvFound) && !*noDefAdmin {
+			acc := access.NewFedAdminAccessControl()
+			user, rev, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+			if bootstrapPwd, err2 := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
+				if user != nil && user.PasswordHash == "" {
+					user.PasswordHash, err = common.HashPassword(bootstrapPwd, nil)
+					if err != nil {
+						log.WithFields(log.Fields{"err": err}).Error("hash generation for default admin user failed")
+						os.Exit(-2)
+					}
 					user.ResetPwdInNextLogin = true
 					user.UseBootstrapPwd = true
 					user.PwdResetTime = time.Now().UTC()
@@ -974,6 +978,23 @@ func main() {
 				if err != nil {
 					log.WithFields(log.Fields{"err": err}).Error()
 				}
+			} else if user != nil {
+				defPwdHash := utils.HashPassword(common.DefaultAdminPass)
+				if user.PasswordHash == defPwdHash {
+					// if something is wrong when generating the bootstrap password, the default admin password is still used.
+					// we log an error and make controller fail close.
+					log.WithFields(log.Fields{"err2": err2, "err": err}).Error("invalid password for default admin user")
+					os.Exit(-2)
+				}
+			}
+		}
+	}
+
+	if !*noDefAdmin {
+		if user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, access.NewFedAdminAccessControl()); user != nil {
+			if user.PasswordHash == "" {
+				log.Error("invalid password hash for default admin user")
+				os.Exit(-2)
 			}
 		}
 	}

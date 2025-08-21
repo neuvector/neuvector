@@ -82,20 +82,22 @@ func (a *mockRemoteAuth) OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RE
 }
 
 func makeLocalUser(username, password, role string) *share.CLUSUser {
+	saltedPwdHash, _ := common.HashPassword(password, nil)
 	return &share.CLUSUser{
 		Fullname:     username,
 		Username:     username,
-		PasswordHash: utils.HashPassword(password),
+		PasswordHash: saltedPwdHash,
 		Role:         role,
 		Timeout:      common.DefaultIdleTimeout,
 	}
 }
 
 func makeLocalUserWithRole(username, password, role string, roleDomains map[string][]string) *share.CLUSUser {
+	saltedPwdHash, _ := common.HashPassword(password, nil)
 	return &share.CLUSUser{
 		Fullname:     username,
 		Username:     username,
-		PasswordHash: utils.HashPassword(password),
+		PasswordHash: saltedPwdHash,
 		Role:         role,
 		Timeout:      common.DefaultIdleTimeout,
 		RoleDomains:  roleDomains,

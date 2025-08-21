@@ -38,16 +38,29 @@ const (
 
 func createDefaultAdminUser() {
 	// Default admin user
+	resetPwdInNextLogin := false
+	useBootstrapPwd := false
+	pwd := common.DefaultAdminPass
+	if orchPlatform == share.PlatformKubernetes {
+		if bootstrapPwd, _ := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
+			pwd = bootstrapPwd
+			resetPwdInNextLogin = true
+			useBootstrapPwd = true
+		}
+	}
+	saltedPwdHash, _ := common.HashPassword(pwd, nil)
 	admin := share.CLUSUser{
-		Fullname:     common.DefaultAdminUser,
-		Username:     common.DefaultAdminUser,
-		PasswordHash: utils.HashPassword(common.DefaultAdminPass),
-		Domain:       "",
-		Role:         api.UserRoleAdmin,
-		Timeout:      common.DefaultIdleTimeout,
-		RoleDomains:  make(map[string][]string),
-		Locale:       common.OEMDefaultUserLocale,
-		PwdResetTime: time.Now().UTC(),
+		Fullname:            common.DefaultAdminUser,
+		Username:            common.DefaultAdminUser,
+		PasswordHash:        saltedPwdHash,
+		ResetPwdInNextLogin: resetPwdInNextLogin,
+		UseBootstrapPwd:     useBootstrapPwd,
+		Domain:              "",
+		Role:                api.UserRoleAdmin,
+		Timeout:             common.DefaultIdleTimeout,
+		RoleDomains:         make(map[string][]string),
+		Locale:              common.OEMDefaultUserLocale,
+		PwdResetTime:        time.Now().UTC(),
 	}
 	value, _ := json.Marshal(admin)
 	key := share.CLUSUserKey(common.DefaultAdminUser)
