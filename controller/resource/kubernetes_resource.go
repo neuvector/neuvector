@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -82,42 +83,44 @@ const (
 )
 
 const (
-	nvOperatorsRole              = "neuvector-binding-co"
-	nvOperatorsRoleBinding       = nvOperatorsRole
-	NvAppRole                    = "neuvector-binding-app"
-	nvAppRoleBinding             = NvAppRole
-	NvRbacRole                   = "neuvector-binding-rbac"
-	nvRbacRoleBinding            = NvRbacRole
-	NvAdmCtrlRole                = "neuvector-binding-admission"
-	nvAdmCtrlRoleBinding         = NvAdmCtrlRole
-	nvCrdRole                    = "neuvector-binding-customresourcedefinition"
-	nvCrdRoleBinding             = nvCrdRole
-	nvCrdSecRuleRole             = "neuvector-binding-nvsecurityrules"
-	nvCrdSecRoleBinding          = nvCrdSecRuleRole
-	nvCrdGrpDefRole              = "neuvector-binding-nvgroupdefinitions"
-	nvCrdGrpDefRoleBinding       = nvCrdGrpDefRole
-	nvCrdAdmCtrlRole             = "neuvector-binding-nvadmissioncontrolsecurityrules"
-	nvCrdAdmCtrlRoleBinding      = nvCrdAdmCtrlRole
-	nvCrdResponseRuleRole        = "neuvector-binding-nvresponserulesecurityrules"
-	nvCrdResponseRuleRoleBinding = nvCrdResponseRuleRole
-	nvCrdDlpRole                 = "neuvector-binding-nvdlpsecurityrules"
-	nvCrdDlpRoleBinding          = nvCrdDlpRole
-	nvCrdWafRole                 = "neuvector-binding-nvwafsecurityrules"
-	nvCrdWafRoleBinding          = nvCrdWafRole
-	nvCrdVulnProfileRole         = "neuvector-binding-nvvulnerabilityprofiles"
-	nvCrdVulnProfileRoleBinding  = nvCrdVulnProfileRole
-	nvCrdCompProfileRole         = "neuvector-binding-nvcomplianceprofiles"
-	nvCrdCompProfileRoleBinding  = nvCrdCompProfileRole
-	NvScannerRole                = "neuvector-binding-scanner"
-	NvScannerRoleBinding         = NvScannerRole
-	NvSecretRole                 = "neuvector-binding-secret"
-	nvSecretRoleBinding          = NvSecretRole
-	NvAdminRoleBinding           = "neuvector-admin"
-	nvViewRoleBinding            = "neuvector-binding-view"
-	NvJobCreationRole            = "neuvector-binding-job-creation"
-	NvJobCreationRoleBinding     = NvJobCreationRole
-	NvCertUpgraderRole           = "neuvector-binding-cert-upgrader"
-	NvCertUpgraderRoleBinding    = NvCertUpgraderRole
+	nvOperatorsRole               = "neuvector-binding-co"
+	nvOperatorsRoleBinding        = nvOperatorsRole
+	NvAppRole                     = "neuvector-binding-app"
+	nvAppRoleBinding              = NvAppRole
+	NvRbacRole                    = "neuvector-binding-rbac"
+	nvRbacRoleBinding             = NvRbacRole
+	NvAdmCtrlRole                 = "neuvector-binding-admission"
+	nvAdmCtrlRoleBinding          = NvAdmCtrlRole
+	nvCrdRole                     = "neuvector-binding-customresourcedefinition"
+	nvCrdRoleBinding              = nvCrdRole
+	nvCrdSecRuleRole              = "neuvector-binding-nvsecurityrules"
+	nvCrdSecRoleBinding           = nvCrdSecRuleRole
+	nvCrdGrpDefRole               = "neuvector-binding-nvgroupdefinitions"
+	nvCrdGrpDefRoleBinding        = nvCrdGrpDefRole
+	nvCrdAdmCtrlRole              = "neuvector-binding-nvadmissioncontrolsecurityrules"
+	nvCrdAdmCtrlRoleBinding       = nvCrdAdmCtrlRole
+	nvCrdResponseRuleRole         = "neuvector-binding-nvresponserulesecurityrules"
+	nvCrdResponseRuleRoleBinding  = nvCrdResponseRuleRole
+	nvCrdDlpRole                  = "neuvector-binding-nvdlpsecurityrules"
+	nvCrdDlpRoleBinding           = nvCrdDlpRole
+	nvCrdWafRole                  = "neuvector-binding-nvwafsecurityrules"
+	nvCrdWafRoleBinding           = nvCrdWafRole
+	nvCrdVulnProfileRole          = "neuvector-binding-nvvulnerabilityprofiles"
+	nvCrdVulnProfileRoleBinding   = nvCrdVulnProfileRole
+	nvCrdCompProfileRole          = "neuvector-binding-nvcomplianceprofiles"
+	nvCrdCompProfileRoleBinding   = nvCrdCompProfileRole
+	NvScannerRole                 = "neuvector-binding-scanner"
+	NvScannerRoleBinding          = NvScannerRole
+	NvSecretRole                  = "neuvector-binding-secret"
+	nvSecretRoleBinding           = NvSecretRole
+	NvSecretControllerRole        = "neuvector-binding-secret-controller"
+	nvSecretControllerRoleBinding = NvSecretControllerRole
+	NvAdminRoleBinding            = "neuvector-admin"
+	nvViewRoleBinding             = "neuvector-binding-view"
+	NvJobCreationRole             = "neuvector-binding-job-creation"
+	NvJobCreationRoleBinding      = NvJobCreationRole
+	NvCertUpgraderRole            = "neuvector-binding-cert-upgrader"
+	NvCertUpgraderRoleBinding     = NvCertUpgraderRole
 )
 
 const (
@@ -128,6 +131,11 @@ const (
 const (
 	nvCspUsageRole        = "neuvector-binding-csp-usages"
 	nvCspUsageRoleBinding = nvCspUsageRole
+
+	nvBootstrapSecret = "neuvector-bootstrap-secret"
+
+	secretKeyResetByNV         = "resetByNV"
+	secretKeyBootstrapPassword = "bootstrapPassword"
 )
 
 const (
@@ -235,8 +243,6 @@ type NvAdmRegRuleSetting struct {
 type NvQueryK8sVerFunc func()
 
 type NvVerifyK8sNsFunc func(admCtrlEnabled bool, nsName string, nsLabels map[string]string)
-
-//----------------------------------------------------------
 
 var NvAdmSvcName = "neuvector-svc-admission-webhook"
 var NvCrdSvcName = "neuvector-svc-crd-webhook"
@@ -1722,7 +1728,7 @@ func (d *kubernetes) getResource(rt, namespace, name string) (interface{}, error
 func (d *kubernetes) AddResource(rt string, res interface{}) error {
 	switch rt {
 	//case RscTypeMutatingWebhookConfiguration:
-	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdNvCspUsage:
+	case RscTypeValidatingWebhookConfiguration, RscTypeCrd, RscTypeCrdNvCspUsage, RscTypeSecret:
 		return d.addResource(rt, res)
 	}
 	return ErrResourceNotSupported
@@ -1769,6 +1775,11 @@ func (d *kubernetes) UpdateResource(rt string, res interface{}) error {
 	case RscTypeDeployment:
 		deploy := res.(*appsv1.Deployment)
 		if deploy != nil && deploy.Namespace == NvAdmSvcNamespace {
+			return d.updateResource(rt, res)
+		}
+	case RscTypeSecret:
+		secret := res.(*corev1.Secret)
+		if secret != nil && secret.Namespace == NvAdmSvcNamespace {
 			return d.updateResource(rt, res)
 		}
 	//case RscTypeMutatingWebhookConfiguration:
@@ -2224,32 +2235,98 @@ func getNeuvectorSvcAccount() {
 	secretSubjectsWanted[1] = ctrlerSubjectWanted
 	secretSubjectsWanted[2] = scannerSubjectWanted
 	secretSubjectsWanted[3] = regAdapterSubjectWanted
+
+	secretControllerSubjectsWanted[0] = ctrlerSubjectWanted
 }
 
 func xlatePersistentVolumeClaim(obj metav1.Object) (string, interface{}) {
 	return "", nil
 }
 
-func RetrieveBootstrapPassword() string {
-	var bootstrapPwd string
-
-	obj, err := global.ORCH.GetResource(RscTypeSecret, NvAdmSvcNamespace, "neuvector-bootstrap-secret")
+func retrieveSecretData(secretName, key string) ([]byte, bool, error) {
+	var objSecret *corev1.Secret
+	var foundSecret bool
+	obj, err := global.ORCH.GetResource(RscTypeSecret, NvAdmSvcNamespace, secretName)
 	if obj != nil && err == nil {
-		if s, ok := obj.(*corev1.Secret); ok {
-			if s.Data != nil {
-				if v, ok := s.Data["bootstrapPassword"]; ok {
-					bootstrapPwd = string(v)
+		objSecret, foundSecret = obj.(*corev1.Secret)
+		if foundSecret && objSecret != nil {
+			if objSecret.Data != nil {
+				if v, ok := objSecret.Data[key]; ok {
+					return v, foundSecret, nil
 				}
 			}
 		} else {
-			err = fmt.Errorf("type conversion failed")
+			err = errors.New("type conversion failed")
 		}
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error()
+		log.WithFields(log.Fields{"err": err, "secretName": secretName}).Error()
 	}
 
-	return bootstrapPwd
+	return nil, foundSecret, err
+}
+
+func GenRandomString(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVXYZ0123456789!@$%^&*+#"
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+		return "", err
+	}
+	for i := range length {
+		bytes[i] = charset[int(bytes[i])%len(charset)]
+	}
+	return string(bytes), nil
+}
+
+func RetrieveBootstrapPassword() (string, error) {
+	data, foundSecret, err := retrieveSecretData(nvBootstrapSecret, secretKeyBootstrapPassword)
+	if err == nil && len(data) > 0 {
+		return string(data), nil
+	}
+	if (err == nil && len(data) == 0) || strings.Index(err.Error(), "Failure 404 ") > 0 {
+		randomPass, err := GenRandomString(16)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error()
+			return "", err
+		}
+		objSecret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      nvBootstrapSecret,
+				Namespace: NvAdmSvcNamespace,
+			},
+			Data: map[string][]byte{
+				secretKeyBootstrapPassword: []byte(randomPass),
+				secretKeyResetByNV:         []byte("true"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		obj, err := global.ORCH.GetResource(RscTypeDeployment, NvAdmSvcNamespace, "neuvector-controller-pod")
+		if err == nil {
+			if deployObj, ok := obj.(*appsv1.Deployment); ok {
+				objSecret.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       deployObj.ObjectMeta.Name,
+						UID:        deployObj.ObjectMeta.UID,
+					},
+				}
+			}
+		}
+		if !foundSecret {
+			err = global.ORCH.AddResource(RscTypeSecret, &objSecret)
+		} else {
+			err = global.ORCH.UpdateResource(RscTypeSecret, &objSecret)
+		}
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "foundSecret": foundSecret}).Error()
+		}
+		return randomPass, nil
+	}
+
+	return "", err
 }
 
 func GetNvControllerPodsNumber() {

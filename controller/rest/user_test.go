@@ -1,14 +1,16 @@
 package rest
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 func TestUserCreateDelete(t *testing.T) {
@@ -174,8 +176,15 @@ func TestUserConfigKick(t *testing.T) {
 	if cuser1 == nil {
 		t.Fatalf("Failed to locate user user1 in cluster")
 	}
-	if cuser1.Fullname != "user1" || cuser1.PasswordHash != utils.HashPassword(pass1New) {
-		t.Errorf("Incorrect user in cluster: user=%v", *cuser1)
+	if ss := strings.Split(cuser1.PasswordHash, "-"); len(ss) == 3 {
+		if salt, err := hex.DecodeString(ss[1]); err == nil {
+			saltedPwdHash, err := common.HashPassword(pass1New, salt)
+			if cuser1.Fullname != "user1" || err != nil || saltedPwdHash != cuser1.PasswordHash {
+				t.Errorf("Incorrect user in cluster: user=%v (expected hash=%v)", *cuser1, saltedPwdHash)
+			}
+		} else {
+			t.Errorf("Incorrect user in cluster: user=%v", *cuser1)
+		}
 	}
 
 	// Check if user is kicked
@@ -327,8 +336,15 @@ func TestUserConfigNegative(t *testing.T) {
 	if cuser2 == nil {
 		t.Fatalf("Failed to locate user user2 in cluster")
 	}
-	if cuser2.Fullname != "user2" || cuser2.PasswordHash != utils.HashPassword("222222") {
-		t.Errorf("Incorrect user in cluster: user=%v", *cuser2)
+	if ss := strings.Split(cuser2.PasswordHash, "-"); len(ss) == 3 {
+		if salt, err := hex.DecodeString(ss[1]); err == nil {
+			saltedPwdHash, err := common.HashPassword(pass2, salt)
+			if cuser2.Fullname != "user2" || err != nil || saltedPwdHash != cuser2.PasswordHash {
+				t.Errorf("Incorrect user in cluster: user=%v (expected hash=%v)", *cuser2, saltedPwdHash)
+			}
+		} else {
+			t.Errorf("Incorrect user in cluster: user=%v", *cuser2)
+		}
 	}
 
 	logout(token1)

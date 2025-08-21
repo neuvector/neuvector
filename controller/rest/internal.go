@@ -81,14 +81,19 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		}
 
 		retry := 0
+		secret, _ := utils.GetGuid()
+		newSaltedPwdHash, err := common.HashPassword(secret, nil)
+		if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
+			return
+		}
 		for retry < retryClusterMax {
 			user, rev, _ := clusHelper.GetUserRev(userName, access.NewReaderAccessControl())
 			if user == nil && userName == common.ReservedNvSystemUser {
-				secret, _ := utils.GetGuid()
 				u := share.CLUSUser{
 					Fullname:     common.ReservedNvSystemUser,
 					Username:     common.ReservedNvSystemUser,
-					PasswordHash: utils.HashPassword(secret),
+					PasswordHash: newSaltedPwdHash,
 					Domain:       "",
 					Role:         api.UserRoleNone,
 					Timeout:      common.DefIdleTimeoutInternal,

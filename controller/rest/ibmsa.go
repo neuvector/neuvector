@@ -320,10 +320,15 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 	user, _, _ := clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
 	if user == nil {
 		secret, _ := utils.GetGuid()
+		newSaltedPwdHash, err := common.HashPassword(secret, nil)
+		if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
+			return
+		}
 		u := share.CLUSUser{
 			Fullname:     common.ReservedUserNameIBMSA,
 			Username:     common.ReservedUserNameIBMSA,
-			PasswordHash: utils.HashPassword(secret),
+			PasswordHash: newSaltedPwdHash,
 			Domain:       "",
 			Role:         api.UserRoleIBMSA,
 			Timeout:      common.DefIdleTimeoutInternal,
