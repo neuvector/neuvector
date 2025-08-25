@@ -58,6 +58,11 @@ type Config struct {
 	TimeoutSec  uint       // in seconds
 }
 
+// SecretPatternConfig is a configuration from user's configuration
+type SecretPatternConfig struct {
+	PatternList []string `json:"pattern_list"`
+}
+
 // TBD: suggestion examples, needs more specific recommdation on the exposed secrets
 const (
 	msgCloak       = "Please cloak your password and secret key"

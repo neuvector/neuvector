@@ -37,6 +37,7 @@ type ProbeConfig struct {
 	WalkHelper           *workerlet.Tasker
 	SelfID               string
 	PodID                string
+	ShowAllCmds          bool
 }
 
 const (

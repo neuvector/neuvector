@@ -102,6 +102,7 @@ type Probe struct {
 	fsnCtr              *FileNotificationCtr // anchor profile helper
 	exitProcSlices      []*procDelayExit
 	IsNvProtectAlerted  bool
+	showAllCmds         bool
 }
 
 func (p *Probe) cbOpenNetlinkSockets(param interface{}) {
@@ -319,6 +320,7 @@ func New(pc *ProbeConfig) (*Probe, error) {
 		pMsgAggregates: make(map[string]*probeMsgAggregate),
 		selfID:         pc.SelfID,
 		podID:          pc.PodID,
+		showAllCmds:    pc.ShowAllCmds,
 	}
 
 	// for process

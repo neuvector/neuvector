@@ -153,7 +153,11 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 			}
 		}
 	default:
-		k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res}).Debug("Event received")
+		logFields := log.Fields{"event": event, "type": rt}
+		if rt != resource.RscTypeConfigMap {
+			logFields["object"] = res
+		}
+		k8sResLog.WithFields(logFields).Debug("Event received")
 		if event == resource.WatchEventDelete {
 			// Force new resource to nil to indicate the deletion
 			ev := resource.Event{ResourceType: rt, Event: event, ResourceOld: old, ResourceNew: nil}
@@ -196,7 +200,7 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 	}
 
 	rscTypes := []string{resource.RscTypeCrd, resource.RscTypeService, resource.RscTypePod, resource.RscTypeRBAC,
-		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim}
+		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim, resource.RscTypeConfigMap}
 	for _, r := range rscTypes {
 		if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, nil); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("StartWatchResource")
