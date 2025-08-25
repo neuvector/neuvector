@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
@@ -27,6 +29,7 @@ import (
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/global"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -166,6 +169,11 @@ var cachedSpecialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share
 var effectiveSpecialSubnets map[string]share.CLUSSpecSubnet = make(map[string]share.CLUSSpecSubnet)
 var wlEphemeral []*workloadEphemeral
 var nodePodSAMap map[string]map[string]string = make(map[string]map[string]string) // key is node name, value is map[workload id]{service account of the pod}
+
+const (
+	customRulesConfigmap = "neuvector-custom-rules"
+	secretPatternsKey    = "secret-patterns.yaml"
+)
 
 type Context struct {
 	k8sVersion               string
@@ -2047,6 +2055,42 @@ func startWorkerThread(ctx *Context) {
 						o = ev.ResourceOld.(*resource.AdmissionWebhookConfiguration)
 					}
 					refreshK8sAdminWebhookStateCache(o, n)
+				case resource.RscTypeConfigMap:
+					if !isLeader() {
+						break
+					}
+					var n, o *resource.ConfigMap
+					if ev.ResourceNew != nil {
+						n = ev.ResourceNew.(*resource.ConfigMap)
+					}
+					if ev.ResourceOld != nil {
+						o = ev.ResourceOld.(*resource.ConfigMap)
+					}
+					if (n != nil && (n.Domain != resource.NvAdmSvcNamespace || n.Name != customRulesConfigmap)) ||
+						(o != nil && (o.Domain != resource.NvAdmSvcNamespace || o.Name != customRulesConfigmap)) {
+						break
+					}
+					log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Info()
+					if o != nil && n == nil { // delete
+						_ = cluster.Put(share.CLUSConfigSecretPatternsKey, []byte("{}"))
+					} else if n != nil && n.Data != nil {
+						if v, ok := n.Data[secretPatternsKey]; ok {
+							if json_data, err := yaml.YAMLToJSON([]byte(v)); err == nil {
+								var config secrets.SecretPatternConfig
+								if err := yaml.Unmarshal(json_data, &config); err == nil {
+									if data, err := json.Marshal(&config); err == nil {
+										_ = cluster.Put(share.CLUSConfigSecretPatternsKey, data)
+									} else {
+										log.WithFields(log.Fields{"error": err}).Error("marshal failed")
+									}
+								} else {
+									log.WithFields(log.Fields{"error": err}).Error("unmarshal failed")
+								}
+							} else {
+								log.WithFields(log.Fields{"error": err}).Error("yaml to json convert error")
+							}
+						}
+					}
 				}
 			}
 		}

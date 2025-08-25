@@ -1,11 +1,14 @@
 package probe
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/osutil"
+	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -113,7 +117,47 @@ var kubeProcs map[string]int = map[string]int{
 	"k3s":            1, // check if in k3s env
 }
 
-//var linuxShells utils.Set = utils.NewSet("sh", "dash", "bash", "rbash")
+var secretMutex sync.RWMutex
+var customSecretRegexps []*regexp.Regexp
+
+func SetCustomSecretPatterns(data []byte) {
+	var config secrets.SecretPatternConfig
+	err := json.Unmarshal(data, &config)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("invalid secret pattern config")
+		return
+	}
+
+	newPatterns := utils.NewSetFromStringSlice(config.PatternList)
+	oldPatterns := utils.NewSet()
+
+	secretMutex.RLock()
+	for _, regexp := range customSecretRegexps {
+		oldPatterns.Add(regexp.String())
+	}
+	secretMutex.RUnlock()
+
+	toKeep := newPatterns.Intersect(oldPatterns)
+	toAdd := newPatterns.Difference(oldPatterns)
+	newRegexps := make([]*regexp.Regexp, 0, toKeep.Cardinality()+toAdd.Cardinality())
+	for add := range toAdd.Iter() {
+		re, err := regexp.Compile(add.(string))
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error()
+			continue
+		}
+		newRegexps = append(newRegexps, re)
+	}
+
+	secretMutex.Lock()
+	for _, regexp := range customSecretRegexps {
+		if toKeep.Contains(regexp.String()) {
+			newRegexps = append(newRegexps, regexp)
+		}
+	}
+	customSecretRegexps = newRegexps
+	secretMutex.Unlock()
+}
 
 // Can be called with process that has exited
 func (p *Probe) proc2CLUS(proc *procInternal) *share.CLUSProcess {
@@ -1968,7 +2012,45 @@ func (p *Probe) inspectNewProcesses(bInit bool) {
 	}
 }
 
+var (
+	commonSecretMatchRE = regexp.MustCompile(`(?i)(password|passwd|pwd|key|token)`)
+)
+
+func redactedSensitiveString(cmds []string) ([]string, bool) {
+	if len(cmds) == 0 {
+		return cmds, false
+	}
+
+	var envVars string
+	for i, cmd := range cmds {
+		envVars += fmt.Sprintf("env%d = %v\n", i, cmd)
+	}
+
+	// common patterns
+	if commonSecretMatchRE.MatchString(envVars) {
+		return []string{share.MaskSensitiveData}, true
+	}
+
+	matched := false
+	secretMutex.RLock()
+	for _, re := range customSecretRegexps {
+		if re.MatchString(envVars) {
+			matched = true
+			break
+		}
+	}
+	secretMutex.RUnlock()
+	if matched {
+		return []string{share.MaskSensitiveData}, true
+	}
+
+	return cmds, false
+}
+
 func (p *Probe) makeProcessReport(id string, proc *procInternal, msg string, conn *osutil.Connection, ingress bool, group, ruleID string) *ProbeProcess {
+	if !p.showAllCmds {
+		proc.cmds, _ = redactedSensitiveString(proc.cmds)
+	}
 	s := &ProbeProcess{
 		ID:          id,
 		Cmds:        proc.cmds,

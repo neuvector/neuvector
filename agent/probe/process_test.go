@@ -1,12 +1,14 @@
 package probe
 
 import (
+	"encoding/json"
 	"io"
 	"testing"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/scan/secrets"
 	"github.com/neuvector/neuvector/share/utils"
 )
 
@@ -233,4 +235,106 @@ func TestAzureCniCmd(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRedactedCmds(t *testing.T) {
+	tests := []struct {
+		cmds             []string
+		want             bool
+		byCommonPatterns bool
+	}{
+		{
+			cmds:             []string{"set", "PASSWORD=", "abcdefghijklmnop", "more commands"},
+			want:             true,
+			byCommonPatterns: true,
+		},
+		{
+			cmds:             []string{"set", "DBMPassWORD:abcdefghijklmnop", "more commands"},
+			want:             true,
+			byCommonPatterns: true,
+		},
+		{
+			cmds:             []string{"set", "DBM", "mysecretdb", "more commands"},
+			want:             false,
+			byCommonPatterns: false,
+		},
+		{
+			cmds:             []string{"api_token:12345abcdefghijklmnop", "set", "apiToken"},
+			want:             true,
+			byCommonPatterns: true,
+		},
+		{
+			cmds:             []string{"-key=", "AIDA11ABLZS4A3QDU576", "set", "AWSapi"},
+			want:             true,
+			byCommonPatterns: true,
+		},
+		{
+			cmds:             []string{"-key=", "AIDA1111222233334444", "set", "AWSapi", "Entropy too low"},
+			want:             true,
+			byCommonPatterns: true,
+		},
+		{
+			cmds:             []string{"-pass=", "AIDA1111222233334444", "set", "AWSapi", "Entropy too low"},
+			want:             false,
+			byCommonPatterns: false,
+		},
+	}
+
+	for i, tt := range tests {
+		res, byCommonPatterns := redactedSensitiveString(tt.cmds)
+		if tt.want {
+			if res[0] != share.MaskSensitiveData {
+				t.Errorf("[%d] Error: should detect: %v\n", i, tt.cmds)
+			} else if tt.byCommonPatterns != byCommonPatterns {
+				t.Errorf("[%d] Error: should detect byCommonPatterns: %v\n", i, byCommonPatterns)
+			}
+		} else {
+			if res[0] == share.MaskSensitiveData {
+				t.Errorf("[%d] Error: should not detect: %v\n", i, tt.cmds)
+			}
+		}
+	}
+}
+
+func setAndCompareCustomSecretPatterns(t *testing.T, idx int, config secrets.SecretPatternConfig) {
+	data, err := json.Marshal(&config)
+	if err != nil {
+		t.Errorf("[%d] Error: json.Marshal: %v\n", idx, err)
+	}
+	SetCustomSecretPatterns(data)
+
+	expectedRegexpsLen := utils.NewSetFromStringSlice(config.PatternList).Cardinality()
+	if len(customSecretRegexps) != expectedRegexpsLen {
+		t.Errorf("[%d] Error: Expect len=%d but get %d\n", idx, expectedRegexpsLen, len(customSecretRegexps))
+	}
+	for _, p := range config.PatternList {
+		found := false
+		for _, regexp := range customSecretRegexps {
+			if regexp.String() == p {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("[%d] Error: regexp for expr %s not found\n", idx, p)
+		}
+	}
+}
+
+func TestSetCustomSecretPatterns(t *testing.T) {
+	config := secrets.SecretPatternConfig{
+		PatternList: []string{"abc", "def"},
+	}
+
+	setAndCompareCustomSecretPatterns(t, 1, config)
+
+	config2 := secrets.SecretPatternConfig{
+		PatternList: []string{"123", "abc", "xyz"},
+	}
+	setAndCompareCustomSecretPatterns(t, 2, config2)
+
+	config3 := secrets.SecretPatternConfig{
+		PatternList: []string{"123", "abc", "xyz", "456", "456", "456", "456", "a-123", "123"},
+	}
+	setAndCompareCustomSecretPatterns(t, 3, config3)
 }
