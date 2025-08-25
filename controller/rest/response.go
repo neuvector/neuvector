@@ -40,7 +40,7 @@ func getResPolicyName(w http.ResponseWriter, id string) (int, string, error) {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return 0, "", common.ErrObjectNotFound
 	}
-	if idNum > api.StartingFedAdmRespRuleID {
+	if idNum > api.StartingFedAdmRespRuleID && idNum < api.MaxFedAdmRespRuleID {
 		return idNum, share.FedPolicyName, nil
 	} else {
 		return idNum, share.DefaultPolicyName, nil
@@ -237,7 +237,7 @@ func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTRespon
 }
 
 func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -378,11 +378,6 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 		}
 	}
 
-	if (r.CfgType == api.CfgTypeFederal && !acc.IsFedAdmin()) ||
-		(r.CfgType != api.CfgTypeFederal && !acc.HasGlobalPermissions(share.PERMS_RUNTIME_POLICIES, share.PERMS_RUNTIME_POLICIES)) {
-		return common.ErrObjectAccessDenied
-	}
-
 	var grpCfgType share.TCfgType
 	if r.Group != "" {
 		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
@@ -483,7 +478,7 @@ func replaceFedResponseRules(rulesNew map[uint32]*share.CLUSResponseRule, rhsNew
 }
 
 func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -530,7 +525,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 }
 
 func handlerResponseRuleShow(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -558,7 +553,7 @@ func handlerResponseRuleShow(w http.ResponseWriter, r *http.Request, ps httprout
 
 // this API doesn't support multi-clusters(fed)
 func handlerResponseRuleShowWorkload(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -596,7 +591,7 @@ func deleteResponseRules(policyName string, txn *cluster.ClusterTransact, dels u
 
 func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RESTResponseRuleInsert,
 	lockAcquired, grpMustExist bool, acc *access.AccessControl) ([]uint32, error) {
-	log.Debug("")
+	log.Debug()
 
 	if !lockAcquired {
 		// Acquire locks
@@ -666,7 +661,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 		idAdded = append(idAdded, rr.ID)
 
 		if err := validateResponseRule(rr, grpMustExist, acc); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("")
+			log.WithFields(log.Fields{"error": err}).Error()
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return nil, err
 		} else {
@@ -699,13 +694,13 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 	}
 
 	if lastError != nil {
-		log.WithFields(log.Fields{"error": lastError}).Error("")
+		log.WithFields(log.Fields{"error": lastError}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return nil, lastError
 	}
 
 	if ok, err := txn.Apply(); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return nil, err
 	} else if !ok {
@@ -719,11 +714,14 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 }
 
 func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
+		return
+	} else if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
 		return
 	}
 
@@ -765,11 +763,14 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
+		return
+	} else if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
 		return
 	}
 
@@ -855,12 +856,12 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 
 	rr := cacher.ResponseRule2REST(cconf)
 	if err := validateResponseRule(rr, true, acc); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
 	} else {
 		if err := clusHelper.PutResponseRule(policyName, cconf); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("")
+			log.WithFields(log.Fields{"error": err}).Error()
 			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 			return
 		}
@@ -873,7 +874,7 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -932,7 +933,7 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 	defer txn.Close()
 
 	if err := clusHelper.PutResponseRuleListTxn(policyName, txn, crhs); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
 	}
@@ -940,7 +941,7 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 	dels := utils.NewSet(uint32(id))
 	deleteResponseRules(policyName, txn, dels)
 	if ok, err := txn.Apply(); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
 	} else if !ok {
@@ -957,7 +958,7 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
 	acc, login := getAccessControl(w, r, "")
@@ -1016,14 +1017,14 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 	defer txn.Close()
 
 	if err := clusHelper.PutResponseRuleListTxn(policyName, txn, keeps); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
 	}
 	deleteResponseRules(policyName, txn, dels)
 
 	if ok, err := txn.Apply(); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
 	} else if !ok {
