@@ -70,6 +70,7 @@ const (
 	CFGEndpointWafRule              = "waf_rule"
 	CFGEndpointWafGroup             = "waf_group"
 	CFGEndpointScript               = "script"
+	CFGEndpointCustomRule           = "custom_rule"
 	CFGEndpointCloud                = "cloud"
 	CFGEndpointCompliance           = "compliance"
 	CFGEndpointVulnerability        = "vulnerability"
@@ -101,6 +102,7 @@ const CLUSConfigDlpGroupStore string = CLUSConfigStore + CFGEndpointDlpGroup + "
 const CLUSConfigWafRuleStore string = CLUSConfigStore + CFGEndpointWafRule + "/"
 const CLUSConfigWafGroupStore string = CLUSConfigStore + CFGEndpointWafGroup + "/"
 const CLUSConfigScriptStore string = CLUSConfigStore + CFGEndpointScript + "/"
+const CLUSConfigCustomRuleStore string = CLUSConfigStore + CFGEndpointCustomRule + "/"
 const CLUSConfigCloudStore string = CLUSConfigStore + CFGEndpointCloud + "/"
 const CLUSConfigComplianceStore string = CLUSConfigStore + CFGEndpointCompliance + "/"
 const CLUSConfigVulnerabilityStore string = CLUSConfigStore + CFGEndpointVulnerability + "/"
@@ -172,6 +174,8 @@ const CLUSCtrlVerKey string = CLUSStateStore + "ctrl_ver"
 const CLUSKvRestoreKey string = CLUSStateStore + "kv_restore"
 const CLUSExpiredTokenStore string = CLUSStateStore + "expired_token/"
 const CLUSImportStore string = CLUSStateStore + "import/"
+
+const CLUSConfigSecretPatternsKey string = CLUSConfigCustomRuleStore + "secret_patterns"
 
 func CLUSExpiredTokenKey(token string) string {
 	return fmt.Sprintf("%s%s", CLUSExpiredTokenStore, token)
@@ -2849,6 +2853,8 @@ const (
 	SecretProgram    string = "program"    // in specific program files
 	SecretRegular    string = "regular"    // in other regular files
 )
+
+const MaskSensitiveData string = "<redacted>"
 
 // CLUSSecretLog provides reports at scanner/enforcer layer
 type CLUSSecretLog struct {

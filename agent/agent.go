@@ -294,6 +294,7 @@ func main() {
 	policy_puller := flag.Int("policy_puller", 0, "set policy pulling period")
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
+	show_all_cmds := flag.Bool("show_all_cmds", false, "Show all commands in the report")
 	flag.Parse()
 
 	// default log_level is LogLevel_Info
@@ -376,6 +377,10 @@ func main() {
 	if *custom_check_control == share.CustomCheckControl_Loose || *custom_check_control == share.CustomCheckControl_Strict {
 		agentEnv.customBenchmark = true
 		log.Info("Enable custom benchmark")
+	}
+
+	if *show_all_cmds {
+		log.Info("Show all commands in the report")
 	}
 
 	if *join != "" {
@@ -702,6 +707,7 @@ func main() {
 		WalkHelper:           walkerTask,
 		SelfID:               Agent.ID,
 		PodID:                parentAgent.ID,
+		ShowAllCmds:          *show_all_cmds,
 	}
 
 	if prober, err = probe.New(&probeConfig); err != nil {
