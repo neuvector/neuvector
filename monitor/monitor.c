@@ -60,6 +60,7 @@
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 #define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
 #define ENV_SET_CUSTOM_BENCH   "CUSTOM_CHECK_CONTROL"
+#define ENV_SHOW_ALL_CMD       "SHOW_ALL_COMMAND"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -498,16 +499,16 @@ static pid_t fork_exec(int i)
         if ((stale_scan_job_cleanup_interval_hour = getenv(ENV_STALE_SCAN_JOB_CLEANUP_INTERVAL_HOUR)) != NULL) {
             args[a++] = "-stale_scan_job_cleanup_interval_hour";
             args[a++] = stale_scan_job_cleanup_interval_hour;
-        }        
+        }
         if ((repo_scan_long_poll_timeout = getenv(ENV_REPO_SCAN_LONG_POLL_TIMEOUT)) != NULL) {
             args[a++] = "-repo_scan_long_poll_timeout";
             args[a++] = repo_scan_long_poll_timeout;
-        }    
+        }
         if ((scanner_lb_max = getenv(ENV_SCANNER_LB_MAX)) != NULL) {
             args[a++] = "-scanner_lb_max";
             args[a++] = scanner_lb_max;
         }
-        
+
         //  debug("Start %s, pid=%d\n", g_procs[i].name, g_procs[i].pid);
         args[a] = NULL;
         break;
@@ -598,6 +599,9 @@ static pid_t fork_exec(int i)
         if ((custom_check_control = getenv(ENV_SET_CUSTOM_BENCH)) != NULL) {
             args[a++] = "-cbench";
             args[a++] = custom_check_control;
+        }
+        if (getenv(ENV_SHOW_ALL_CMD)) {
+            args[a++] = "-show-all-cmd";
         }
         args[a] = NULL;
         break;
