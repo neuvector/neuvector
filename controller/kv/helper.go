@@ -114,7 +114,7 @@ type ClusterHelper interface {
 	DeleteUser(fullname string) error
 
 	GetApikeyRev(name string, acc *access.AccessControl) (*share.CLUSApikey, uint64, error)
-	CreateApikey(apikey *share.CLUSApikey) error
+	CreateApikey(apikey *share.CLUSApikey, create bool) error
 	GetAllApikeysNoAuth() map[string]*share.CLUSApikey
 	DeleteApikey(name string) error
 
@@ -3362,14 +3362,18 @@ func (m clusterHelper) GetApikeyRev(name string, acc *access.AccessControl) (*sh
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m clusterHelper) CreateApikey(apikey *share.CLUSApikey) error {
+func (m clusterHelper) CreateApikey(apikey *share.CLUSApikey, create bool) error {
 	key := share.CLUSApikeyKey(url.QueryEscape(apikey.Name))
 	value, err := json.Marshal(apikey)
 	if err != nil {
 		return err
 	}
 	// secret_key is already hashed
-	return cluster.PutIfNotExist(key, value, false)
+	if create {
+		return cluster.PutIfNotExist(key, value, false)
+	} else {
+		return cluster.Put(key, value)
+	}
 }
 
 // caller needs to decide whether to authorize accessing each returned apikey object

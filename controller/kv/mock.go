@@ -547,7 +547,7 @@ func (m *MockCluster) GetAllApikeysNoAuth() map[string]*share.CLUSApikey {
 	return m.apikeysCluster
 }
 
-func (m *MockCluster) CreateApikey(apikey *share.CLUSApikey) error {
+func (m *MockCluster) CreateApikey(apikey *share.CLUSApikey, create bool) error {
 	clone := *apikey
 	m.apikeysCluster[apikey.Name] = &clone
 	return nil

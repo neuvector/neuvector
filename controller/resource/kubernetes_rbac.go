@@ -144,6 +144,7 @@ var certUpgraderSubjectWanted string = "cert-upgrader"
 var ctrlerSubjectsWanted []string = []string{"controller"}
 var scannerSubjectsWanted []string = []string{"updater", "controller"}
 var secretSubjectsWanted []string = []string{"enforcer", "controller", "scanner", "registry-adapter"}
+var secretControllerSubjectsWanted []string = []string{"controller"}
 var enforcerSubjectsWanted []string = []string{"enforcer", "controller"}
 var jobCreationSubjectsWanted []string = []string{"controller"}
 var certUpgraderSubjectsWanted []string = []string{"cert-upgrader"}
@@ -304,6 +305,17 @@ var rbacRolesWanted map[string]*k8sRbacRoleInfo = map[string]*k8sRbacRoleInfo{ /
 			},
 		},
 	},
+	NvSecretControllerRole: {
+		name:      NvSecretControllerRole,
+		namespace: constNvNamespace,
+		rules: []*k8sRbacRoleRuleInfo{
+			{
+				apiGroup:  "",
+				resources: utils.NewSet(k8sResSecrets),
+				verbs:     utils.NewSet("create", "patch", "update"),
+			},
+		},
+	},
 	NvJobCreationRole: {
 		name:      NvJobCreationRole,
 		namespace: constNvNamespace,
@@ -414,6 +426,11 @@ var rbacRoleBindingsWanted map[string]*k8sRbacBindingInfo = map[string]*k8sRbacB
 		namespace: constNvNamespace,
 		subjects:  secretSubjectsWanted,
 		rbacRole:  rbacRolesWanted[NvSecretRole],
+	},
+	nvSecretControllerRoleBinding: {
+		namespace: constNvNamespace,
+		subjects:  secretControllerSubjectsWanted,
+		rbacRole:  rbacRolesWanted[NvSecretControllerRole],
 	},
 	NvJobCreationRoleBinding: {
 		namespace: constNvNamespace,
@@ -1175,7 +1192,7 @@ func (d *kubernetes) cbResourceRole(rt string, event string, res interface{}, ol
 				}
 			}
 			if checkRBAC {
-				if errs, _ := VerifyNvRbacRoles([]string{n.name}, false); len(errs) > 0 {
+				if errs, _ := VerifyNvRbacRoles([]string{n.name}, false, true); len(errs) > 0 {
 					log.Warn(errs[0])
 					cacheRbacEvent(d.flavor, errs[0], false)
 				}
@@ -1724,7 +1741,7 @@ func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
 
 // https://kubernetes.io/docs/reference/using-api/deprecation-guide/
 // The rbac.authorization.k8s.io/v1beta1 API version of ClusterRole, ClusterRoleBinding, Role, and RoleBinding is no longer served as of v1.22.
-func VerifyNvRbacRoles(roleNames []string, existOnly bool) ([]string, bool) { // returns (error string slice, is 403 error)
+func VerifyNvRbacRoles(roleNames []string, existOnly, logging bool) ([]string, bool) { // returns (error string slice, is 403 error)
 	var k8sRbac403 bool
 	errors := make([]string, 0, len(roleNames))
 	for _, roleName := range roleNames {
@@ -1769,12 +1786,16 @@ func VerifyNvRbacRoles(roleNames []string, existOnly bool) ([]string, bool) { //
 					err = fmt.Errorf(`Cannot find Kubernetes %s "%s"(%s).`, rbacRoleDesc, roleName, err.Error())
 				}
 				if err != nil {
-					log.WithFields(log.Fields{"type": rbacRoleDesc, "name": roleName, "error": err}).Error()
+					if logging {
+						log.WithFields(log.Fields{"type": rbacRoleDesc, "name": roleName, "error": err}).Error()
+					}
 					k8sRbac403 = strings.Contains(err.Error(), " 403 ")
 					if k8sRbac403 {
 						err = fmt.Errorf(`Kubernetes clusterrolebinding "%s" is required to grant the permissions defined in clusterrole "%s" to service account %s:%s.`,
 							nvRbacRoleBinding, NvRbacRole, NvAdmSvcNamespace, ctrlerSubjectWanted)
-						log.WithFields(log.Fields{"error": err}).Error()
+						if logging {
+							log.WithFields(log.Fields{"error": err}).Error()
+						}
 						errors = append(errors, err.Error())
 						break
 					} else if !strings.Contains(err.Error(), " 404 ") {
@@ -2017,7 +2038,7 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 					clusterRoleBindingErrors = errs
 				}
 			}
-			if errs, k8sRbac403 := VerifyNvRbacRoles([]string{NvScannerRole}, existOnly); len(errs) > 0 {
+			if errs, k8sRbac403 := VerifyNvRbacRoles([]string{NvScannerRole}, existOnly, true); len(errs) > 0 {
 				if !k8sRbac403 {
 					roleErrors = errs
 				} else if len(clusterRoleBindingErrors) == 0 {
@@ -2050,9 +2071,9 @@ func VerifyNvK8sRBAC(flavor, csp string, existOnly bool) ([]string, []string, []
 		}
 	}
 
-	if errs, k8sRbac403 = VerifyNvRbacRoles(k8sClusterRoles, existOnly); !k8sRbac403 {
+	if errs, k8sRbac403 = VerifyNvRbacRoles(k8sClusterRoles, existOnly, true); !k8sRbac403 {
 		clusterRoleErrors = append(clusterRoleErrors, errs...)
-		if errs, k8sRbac403 = VerifyNvRbacRoles(k8sRoles, existOnly); !k8sRbac403 {
+		if errs, k8sRbac403 = VerifyNvRbacRoles(k8sRoles, existOnly, true); !k8sRbac403 {
 			roleErrors = append(roleErrors, errs...)
 			if errs, k8sRbac403 = VerifyNvRbacRoleBindings(k8sClusterRoleBindings, existOnly, true); !k8sRbac403 {
 				clusterRoleBindingErrors = append(clusterRoleBindingErrors, errs...)

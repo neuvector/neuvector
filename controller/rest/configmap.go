@@ -419,7 +419,7 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 		return
 	}
 
-	if user.PasswordHash != utils.HashPassword(common.DefaultAdminPass) {
+	if common.IsSaltedPasswordHash(user.PasswordHash) || user.PasswordHash != utils.HashPassword(common.DefaultAdminPass) {
 		e := "already updated"
 		log.WithFields(log.Fields{"Password of": common.DefaultAdminUser}).Error(e)
 		return
@@ -478,36 +478,44 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 		}
 	}
 
+	newSaltedPwdHash, err := common.HashPassword(ruser.Password, nil)
+	if err != nil {
+		log.WithFields(log.Fields{"update password of": common.DefaultAdminUser, "error": err}).Error()
+		return
+	}
 	if profile.EnablePwdHistory && profile.PwdHistoryCount > 0 {
-		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, utils.HashPassword(common.DefaultAdminPass), nil, &profile); weak {
-			log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(e)
+		var weak bool
+		var pwdHistoryToKeep int
+		var errStr string
+
+		weak, pwdHistoryToKeep, _, errStr = isWeakPassword(ruser.Password, newSaltedPwdHash, user.PasswordHash, nil, &profile)
+		if weak {
+			log.WithFields(log.Fields{"update password of": common.DefaultAdminUser}).Error(errStr)
 			return
+		}
+		foundInHistory := false
+		if newSaltedPwdHash == user.PasswordHash {
+			foundInHistory = true
 		} else {
-			foundInHistory := false
-			newPwdHash := utils.HashPassword(ruser.Password)
-			if newPwdHash == user.PasswordHash {
-				foundInHistory = true
-			} else {
-				for _, oldHash := range user.PwdHashHistory {
-					if newPwdHash == oldHash {
-						foundInHistory = true
-						break
-					}
+			for _, oldHash := range user.PwdHashHistory {
+				if newSaltedPwdHash == oldHash {
+					foundInHistory = true
+					break
 				}
 			}
-			if !foundInHistory {
-				if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
-					user.PwdHashHistory = nil
-				} else {
-					user.PwdHashHistory = append(user.PwdHashHistory, user.PasswordHash)
-					if i := len(user.PwdHashHistory) - pwdHistoryToKeep; i >= 0 { // len(user.PwdHashHistory) + 1(current password hash) should be <= pwdHistoryToKeep
-						user.PwdHashHistory = user.PwdHashHistory[i+1:]
-					}
+		}
+		if !foundInHistory {
+			if pwdHistoryToKeep <= 1 { // because user.PasswordHash remembers one password hash
+				user.PwdHashHistory = nil
+			} else {
+				user.PwdHashHistory = append(user.PwdHashHistory, user.PasswordHash)
+				if i := len(user.PwdHashHistory) - pwdHistoryToKeep; i >= 0 { // len(user.PwdHashHistory) + 1(current password hash) should be <= pwdHistoryToKeep
+					user.PwdHashHistory = user.PwdHashHistory[i+1:]
 				}
 			}
 		}
 	}
-	user.PasswordHash = utils.HashPassword(ruser.Password)
+	user.PasswordHash = newSaltedPwdHash
 	user.PwdResetTime = time.Now().UTC()
 
 	if ruser.Timeout == 0 {
@@ -730,10 +738,18 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 			user = &userdata
 			newuser = true
 		} else {
+			user.ResetPwdInNextLogin = false
+			user.UseBootstrapPwd = false
 			newuser = false
 		}
 
-		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, user.PasswordHash, user.PwdHashHistory, profile); weak {
+		newSaltedPwdHash, err := common.HashPassword(ruser.Password, nil)
+		if err != nil {
+			log.WithFields(log.Fields{"create": ruser.Fullname}).Error(err)
+			badPwdUsers = append(badPwdUsers, username)
+			continue
+		}
+		if weak, pwdHistoryToKeep, _, e := isWeakPassword(ruser.Password, newSaltedPwdHash, user.PasswordHash, user.PwdHashHistory, profile); weak {
 			log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
 			badPwdUsers = append(badPwdUsers, username)
 			continue
@@ -746,11 +762,11 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 					user.PwdHashHistory = user.PwdHashHistory[i+1:]
 				}
 			}
-			user.PasswordHash = utils.HashPassword(ruser.Password)
-			user.FailedLoginCount = 0
-			user.BlockLoginSince = time.Time{}
-			user.PwdResetTime = time.Now().UTC()
 		}
+		user.PasswordHash = newSaltedPwdHash
+		user.FailedLoginCount = 0
+		user.BlockLoginSince = time.Time{}
+		user.PwdResetTime = time.Now().UTC()
 
 		if ruser.EMail != "" {
 			user.EMail = ruser.EMail

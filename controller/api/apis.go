@@ -70,6 +70,7 @@ const RESTErrRancherUnauthorized int = 51
 const RESTErrRemoteExportFail int = 52
 const RESTErrInvalidQueryToken int = 53
 const RESTErrPollJobNotFoundError int = 54
+const RESTErrServerError int = 55
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"

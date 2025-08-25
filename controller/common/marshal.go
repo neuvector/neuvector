@@ -1,7 +1,11 @@
 package common
 
 import (
+	"crypto/pbkdf2"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -27,10 +31,46 @@ const (
 	cloakDecrypt = "decrypt"
 )
 
+const (
+	saltSize = 16
+
+	keyLength = 32
+	keyIter   = 600000
+
+	saltedHashPrefix = "s-"
+)
+
 type EmptyMarshaller struct{}
 type MaskMarshaller struct{}
 type EncryptMarshaller struct{}
 type DecryptUnmarshaller struct{}
+
+func HashPassword(password string, salt []byte) (string, error) {
+	if len(salt) == 0 {
+		salt = make([]byte, saltSize) // http://www.ietf.org/rfc/rfc2898.txt
+		if _, err := rand.Read(salt); err != nil {
+			return "", fmt.Errorf("failed to generate salt: %w", err)
+		}
+	}
+
+	hashedPassword, err := pbkdf2.Key(sha256.New, password, salt, keyIter, keyLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate hash: %w", err)
+	}
+
+	cipherBundle := fmt.Sprintf("%s%s-%s",
+		saltedHashPrefix, hex.EncodeToString(salt), hex.EncodeToString(hashedPassword))
+
+	return cipherBundle, nil
+}
+
+func IsSaltedPasswordHash(hash string) bool {
+	if strings.HasPrefix(hash, saltedHashPrefix) {
+		return len(strings.Split(hash, "-")) == 3
+	}
+
+	return false
+}
 
 func (m EmptyMarshaller) Marshal(data interface{}) ([]byte, error) {
 	if u, err := marshal(emptyMask, data); err != nil {

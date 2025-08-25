@@ -20,6 +20,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/utils"
@@ -28,7 +29,8 @@ import (
 var TESTApikeySpecifiedCretionTime bool
 
 // return (isWeak, pwdHistoryToKeep, profileBasic, message)
-func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string, useProfile *share.CLUSPwdProfile) (bool, int, api.RESTPwdProfileBasic, string) {
+func isWeakPassword(newPwd, newSaltedPwdHash, currPwdHash string, pwdHashHistory []string, useProfile *share.CLUSPwdProfile) (
+	bool, int, api.RESTPwdProfileBasic, string) {
 	var upperCount, lowerCount, digitCount, specialCount int
 	var profileBasic api.RESTPwdProfileBasic
 	var profile share.CLUSPwdProfile
@@ -68,8 +70,7 @@ func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string, useProfile 
 		}
 
 		if pwdHistoryCount > 0 {
-			newPwdHash := utils.HashPassword(newPwd)
-			if pwdHash != "" && newPwdHash == pwdHash {
+			if currPwdHash != "" && newSaltedPwdHash == currPwdHash {
 				return true, pwdHistoryCount, profileBasic, "Password has been used before"
 			} else if len(pwdHashHistory) > 0 {
 				idx := 0
@@ -77,7 +78,7 @@ func isWeakPassword(newPwd, pwdHash string, pwdHashHistory []string, useProfile 
 					idx = i + 1 // because user.PasswordHash remembers one password hash
 				}
 				for i := idx; i < len(pwdHashHistory); i++ {
-					if newPwdHash == pwdHashHistory[i] {
+					if newSaltedPwdHash == pwdHashHistory[i] {
 						return true, pwdHistoryCount, profileBasic, "Password has been used before"
 					}
 				}
@@ -130,6 +131,13 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
+	newSaltedPwdHash, err := common.HashPassword(ruser.Password, nil)
+	if err != nil {
+		log.WithFields(log.Fields{"login": login.fullname, "create": ruser.Fullname}).Error(err)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
+		return
+	}
+
 	// 1. Only fedAdmin can create users with fedAdmin/fedReader role (on master cluster)
 	// 2. For every domain that a namespace user is in, the creater must have PERM_AUTHORIZATION(modify) permission in the domain
 	user := share.CLUSUser{
@@ -161,12 +169,12 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Check weak password
-	if weak, _, profileBasic, e := isWeakPassword(ruser.Password, "", nil, nil); weak {
+	if weak, _, profileBasic, e := isWeakPassword(ruser.Password, newSaltedPwdHash, "", nil, nil); weak {
 		log.WithFields(log.Fields{"login": login.fullname, "create": ruser.Fullname}).Error(e)
 		restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, e, profileBasic)
 		return
 	} else {
-		user.PasswordHash = utils.HashPassword(ruser.Password)
+		user.PasswordHash = newSaltedPwdHash
 		user.FailedLoginCount = 0
 		user.BlockLoginSince = time.Time{}
 		user.PwdResetTime = time.Now().UTC()
@@ -215,8 +223,13 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 func user2REST(user *share.CLUSUser, acc *access.AccessControl) *api.RESTUser {
 	var defaultPW bool
-	if user.Fullname == common.DefaultAdminUser && user.PasswordHash == utils.HashPassword(common.DefaultAdminPass) {
-		defaultPW = true
+	if user.Fullname == common.DefaultAdminUser {
+		if !common.IsSaltedPasswordHash(user.PasswordHash) {
+			defPwdHash := utils.HashPassword(common.DefaultAdminPass)
+			if user.PasswordHash == defPwdHash {
+				defaultPW = true
+			}
+		}
 	}
 
 	userRest := &api.RESTUser{
@@ -633,14 +646,21 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 				return
 			}
 
-			if user.PasswordHash != utils.HashPassword(*ruser.Password) {
+			oldHashExpected, err := getExpectedPwdHash(ruser.Fullname, *ruser.Password, user.PasswordHash)
+			if err != nil || user.PasswordHash != oldHashExpected {
 				e := "Current password doesn't match."
 				log.WithFields(log.Fields{"user": fullname}).Error(e)
 				restRespErrorMessage(w, http.StatusForbidden, api.RESTErrOpNotAllowed, e)
 				return
 			}
 
-			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
+			newSaltedPwdHash, err := common.HashPassword(*ruser.NewPassword, nil)
+			if err != nil {
+				log.WithFields(log.Fields{"create": ruser.Fullname}).Error(err)
+				restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
+				return
+			}
+			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, newSaltedPwdHash, user.PasswordHash, user.PwdHashHistory, nil); weak {
 				log.WithFields(log.Fields{"create": ruser.Fullname}).Error(e)
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, e, profileBasic)
 				return
@@ -653,7 +673,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 						user.PwdHashHistory = user.PwdHashHistory[i+1:]
 					}
 				}
-				user.PasswordHash = utils.HashPassword(*ruser.NewPassword)
+				user.PasswordHash = newSaltedPwdHash
 				user.PwdResetTime = time.Now().UTC()
 			}
 			kick = true
@@ -819,6 +839,13 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
+	newSaltedPwdHash, err := common.HashPassword(*rconf.Config.NewPassword, nil)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "fullname": fullname}).Error()
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
+		return
+	}
+
 	var lock cluster.LockInterface
 	if lock, err = lockClusKey(w, share.CLUSLockUserKey); err != nil {
 		return
@@ -874,7 +901,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 				return
 			}
 
-			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, user.PasswordHash, user.PwdHashHistory, nil); weak {
+			if weak, pwdHistoryToKeep, profileBasic, e := isWeakPassword(*ruser.NewPassword, newSaltedPwdHash, user.PasswordHash, user.PwdHashHistory, nil); weak {
 				log.WithFields(log.Fields{"user": fullname}).Error(e)
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, e, profileBasic)
 				return
@@ -887,7 +914,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 						user.PwdHashHistory = user.PwdHashHistory[i+1:]
 					}
 				}
-				user.PasswordHash = utils.HashPassword(*ruser.NewPassword)
+				user.PasswordHash = newSaltedPwdHash
 				user.PwdResetTime = time.Now().UTC()
 				if ruser.ForceResetPwd {
 					user.FailedLoginCount = 0
@@ -1335,21 +1362,28 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	// 2. For every domain that a namespace user is in, the creater must have PERM_AUTHORIZATION(modify) permission in the domain
 
 	// Generate secret key
-	tmpGuid, _ := utils.GetGuid()
-	secretKey := utils.EncryptPassword(tmpGuid)
-
-	apikey := share.CLUSApikey{
-		ExpirationType:   rapikey.ExpirationType,
-		ExpirationHours:  rapikey.ExpirationHours,
-		Name:             rapikey.Name,
-		Description:      rapikey.Description,
-		Role:             rapikey.Role,
-		RoleDomains:      rapikey.RoleDomains,
-		Locale:           common.OEMDefaultUserLocale,
-		CreatedTimestamp: time.Now().UTC().Unix(),
-		CreatedByEntity:  login.fullname,
-		SecretKeyHash:    utils.HashPassword(secretKey),
+	var apikey share.CLUSApikey
+	secretKey, err := resource.GenRandomString(64)
+	if err == nil {
+		apikey = share.CLUSApikey{
+			ExpirationType:   rapikey.ExpirationType,
+			ExpirationHours:  rapikey.ExpirationHours,
+			Name:             rapikey.Name,
+			Description:      rapikey.Description,
+			Role:             rapikey.Role,
+			RoleDomains:      rapikey.RoleDomains,
+			Locale:           common.OEMDefaultUserLocale,
+			CreatedTimestamp: time.Now().UTC().Unix(),
+			CreatedByEntity:  login.fullname,
+		}
+		apikey.SecretKeyHash, err = common.HashPassword(secretKey, nil)
 	}
+	if err != nil {
+		log.WithFields(log.Fields{"login": login.fullname, "apikey": rapikey.Name, "error": err}).Error()
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
+		return
+	}
+
 	if !acc.AuthorizeOwn(&apikey, nil) {
 		log.WithFields(log.Fields{"login": login.fullname, "apikey": rapikey.Name}).Error(common.ErrObjectAccessDenied.Error())
 		restRespAccessDenied(w, login)
@@ -1413,7 +1447,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if err := clusHelper.CreateApikey(&apikey); err != nil {
+	if err := clusHelper.CreateApikey(&apikey, true); err != nil {
 		e := "Failed to write to the cluster"
 		log.WithFields(log.Fields{"error": err}).Error(e)
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, e)

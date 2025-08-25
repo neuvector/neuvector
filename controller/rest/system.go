@@ -1805,7 +1805,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 							errs, _ := resource.VerifyNvRbacRoleBindings([]string{resource.NvAdminRoleBinding}, false, true)
 							if len(errs) > 0 {
 								errs, _ = resource.VerifyNvRbacRoleBindings([]string{resource.NvScannerRoleBinding}, false, true)
-								errs2, _ := resource.VerifyNvRbacRoles([]string{resource.NvScannerRole}, false)
+								errs2, _ := resource.VerifyNvRbacRoles([]string{resource.NvScannerRole}, false, true)
 								errs = append(errs, errs2...)
 							}
 							if len(errs) > 0 {
@@ -2800,7 +2800,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				if importType == share.IMPORT_TYPE_CONFIG {
 					if importTask.Status == share.IMPORT_DONE {
 						if r, ok := login.domainRoles[access.AccessDomainGlobal]; ok && r == api.UserRoleImportStatus && len(login.domainRoles) == 1 {
-							_kickLoginSessionByToken(utils.HashPassword(login.token))
+							_kickLoginSessionByToken(login.token)
 						}
 					}
 				}
