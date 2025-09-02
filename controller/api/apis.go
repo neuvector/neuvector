@@ -1842,44 +1842,45 @@ const (
 )
 
 type RESTSystemConfigConfig struct {
-	NewServicePolicyMode      *string                          `json:"new_service_policy_mode,omitempty"`
-	NewServiceProfileMode     *string                          `json:"new_service_profile_mode,omitempty"`
-	NewServiceProfileBaseline *string                          `json:"new_service_profile_baseline,omitempty"`
-	UnusedGroupAging          *uint8                           `json:"unused_group_aging,omitempty"`
-	SyslogServer              *string                          `json:"syslog_ip,omitempty"`
-	SyslogIPProto             *uint8                           `json:"syslog_ip_proto,omitempty"`
-	SyslogPort                *uint16                          `json:"syslog_port,omitempty"`
-	SyslogLevel               *string                          `json:"syslog_level,omitempty"`
-	SyslogEnable              *bool                            `json:"syslog_status,omitempty"`
-	SyslogCategories          *[]string                        `json:"syslog_categories,omitempty"`
-	SyslogInJSON              *bool                            `json:"syslog_in_json,omitempty"`
-	SyslogServerCert          *string                          `json:"syslog_server_cert,omitempty"`
-	SingleCVEPerSyslog        *bool                            `json:"single_cve_per_syslog,omitempty"`
-	SyslogCVEInLayers         *bool                            `json:"syslog_cve_in_layers,omitempty"`
-	OutputEventToLogs         *bool                            `json:"output_event_to_logs,omitempty"`
-	AuthOrder                 *[]string                        `json:"auth_order,omitempty"`
-	AuthByPlatform            *bool                            `json:"auth_by_platform,omitempty"`
-	RancherEP                 *string                          `json:"rancher_ep,omitempty"`
-	WebhookEnable             *bool                            `json:"webhook_status,omitempty"` // deprecated, kept for backward-compatibility, skip docs
-	WebhookUrl                *string                          `json:"webhook_url,omitempty"`    // deprecated, kept for backward-compatibility, skip docs
-	Webhooks                  *[]*RESTWebhook                  `json:"webhooks,omitempty"`
-	ClusterName               *string                          `json:"cluster_name,omitempty"`
-	ControllerDebug           *[]string                        `json:"controller_debug,omitempty"`
-	MonitorServiceMesh        *bool                            `json:"monitor_service_mesh,omitempty"`
-	RegistryHttpProxyEnable   *bool                            `json:"registry_http_proxy_status,omitempty"`
-	RegistryHttpsProxyEnable  *bool                            `json:"registry_https_proxy_status,omitempty"`
-	RegistryHttpProxy         *RESTProxy                       `json:"registry_http_proxy,omitempty"`
-	RegistryHttpsProxy        *RESTProxy                       `json:"registry_https_proxy,omitempty"`
-	RegistryHttpProxyCfg      *RESTProxyConfig                 `json:"registry_http_proxy_cfg,omitempty"`
-	RegistryHttpsProxyCfg     *RESTProxyConfig                 `json:"registry_https_proxy_cfg,omitempty"`
-	IBMSAEpEnabled            *bool                            `json:"ibmsa_ep_enabled,omitempty"`
-	IBMSAEpDashboardURL       *string                          `json:"ibmsa_ep_dashboard_url,omitempty"`
-	XffEnabled                *bool                            `json:"xff_enabled,omitempty"`
-	ScannerAutoscale          *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
-	NoTelemetryReport         *bool                            `json:"no_telemetry_report,omitempty"`
-	RemoteRepositories        *[]RESTRemoteRepository          `json:"remote_repositories,omitempty"`
-	EnableTLSVerification     *bool                            `json:"enable_tls_verification,omitempty"`
-	GlobalCaCerts             *[]string                        `json:"cacerts,omitempty"`
+	NewServicePolicyMode       *string                          `json:"new_service_policy_mode,omitempty"`
+	NewServiceProfileMode      *string                          `json:"new_service_profile_mode,omitempty"`
+	NewServiceProfileBaseline  *string                          `json:"new_service_profile_baseline,omitempty"`
+	UnusedGroupAging           *uint8                           `json:"unused_group_aging,omitempty"`
+	SyslogServer               *string                          `json:"syslog_ip,omitempty"`
+	SyslogIPProto              *uint8                           `json:"syslog_ip_proto,omitempty"`
+	SyslogPort                 *uint16                          `json:"syslog_port,omitempty"`
+	SyslogLevel                *string                          `json:"syslog_level,omitempty"`
+	SyslogEnable               *bool                            `json:"syslog_status,omitempty"`
+	SyslogCategories           *[]string                        `json:"syslog_categories,omitempty"`
+	SyslogInJSON               *bool                            `json:"syslog_in_json,omitempty"`
+	SyslogServerCert           *string                          `json:"syslog_server_cert,omitempty"`
+	SingleCVEPerSyslog         *bool                            `json:"single_cve_per_syslog,omitempty"`
+	SyslogCVEInLayers          *bool                            `json:"syslog_cve_in_layers,omitempty"`
+	OutputEventToLogs          *bool                            `json:"output_event_to_logs,omitempty"`
+	AuthOrder                  *[]string                        `json:"auth_order,omitempty"`
+	AuthByPlatform             *bool                            `json:"auth_by_platform,omitempty"`
+	RancherEP                  *string                          `json:"rancher_ep,omitempty"`
+	WebhookEnable              *bool                            `json:"webhook_status,omitempty"` // deprecated, kept for backward-compatibility, skip docs
+	WebhookUrl                 *string                          `json:"webhook_url,omitempty"`    // deprecated, kept for backward-compatibility, skip docs
+	Webhooks                   *[]*RESTWebhook                  `json:"webhooks,omitempty"`
+	ClusterName                *string                          `json:"cluster_name,omitempty"`
+	ControllerDebug            *[]string                        `json:"controller_debug,omitempty"`
+	MonitorServiceMesh         *bool                            `json:"monitor_service_mesh,omitempty"`
+	RegistryHttpProxyEnable    *bool                            `json:"registry_http_proxy_status,omitempty"`
+	RegistryHttpsProxyEnable   *bool                            `json:"registry_https_proxy_status,omitempty"`
+	RegistryHttpProxy          *RESTProxy                       `json:"registry_http_proxy,omitempty"`
+	RegistryHttpsProxy         *RESTProxy                       `json:"registry_https_proxy,omitempty"`
+	RegistryHttpProxyCfg       *RESTProxyConfig                 `json:"registry_http_proxy_cfg,omitempty"`
+	RegistryHttpsProxyCfg      *RESTProxyConfig                 `json:"registry_https_proxy_cfg,omitempty"`
+	IBMSAEpEnabled             *bool                            `json:"ibmsa_ep_enabled,omitempty"`
+	IBMSAEpDashboardURL        *string                          `json:"ibmsa_ep_dashboard_url,omitempty"`
+	XffEnabled                 *bool                            `json:"xff_enabled,omitempty"`
+	ScannerAutoscale           *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale,omitempty"`
+	NoTelemetryReport          *bool                            `json:"no_telemetry_report,omitempty"`
+	RemoteRepositories         *[]RESTRemoteRepository          `json:"remote_repositories,omitempty"`
+	EnableTLSVerification      *bool                            `json:"enable_tls_verification,omitempty"`
+	GlobalCaCerts              *[]string                        `json:"cacerts,omitempty"`
+	AllowNsUserExportNetPolicy *bool                            `json:"allow_ns_user_export_net_policy,omitempty"`
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
 }
 
@@ -1961,12 +1962,13 @@ type RESTSystemConfigTlsCfg struct {
 
 type RESTSystemConfigMiscCfgV2 struct {
 	// InternalSubnets      *[]string `json:"configured_internal_subnets,omitempty"`
-	UnusedGroupAging   *uint8    `json:"unused_group_aging,omitempty"`
-	ClusterName        *string   `json:"cluster_name,omitempty"`
-	ControllerDebug    *[]string `json:"controller_debug,omitempty"`
-	MonitorServiceMesh *bool     `json:"monitor_service_mesh,omitempty"`
-	XffEnabled         *bool     `json:"xff_enabled,omitempty"`
-	NoTelemetryReport  *bool     `json:"no_telemetry_report,omitempty"`
+	UnusedGroupAging           *uint8    `json:"unused_group_aging,omitempty"`
+	ClusterName                *string   `json:"cluster_name,omitempty"`
+	ControllerDebug            *[]string `json:"controller_debug,omitempty"`
+	MonitorServiceMesh         *bool     `json:"monitor_service_mesh,omitempty"`
+	XffEnabled                 *bool     `json:"xff_enabled,omitempty"`
+	NoTelemetryReport          *bool     `json:"no_telemetry_report,omitempty"`
+	AllowNsUserExportNetPolicy *bool     `json:"allow_ns_user_export_net_policy,omitempty"`
 }
 
 type RESTSystemConfigIBMSAVCfg2 struct {
@@ -2011,52 +2013,53 @@ type RESTProxyConfig struct {
 
 // If more log servers needed, they can be defined as servers.
 type RESTSystemConfig struct {
-	NewServicePolicyMode      string                    `json:"new_service_policy_mode"`
-	NewServiceProfileMode     string                    `json:"new_service_profile_mode"`
-	NewServiceProfileBaseline string                    `json:"new_service_profile_baseline"`
-	UnusedGroupAging          uint8                     `json:"unused_group_aging"`
-	SyslogServer              string                    `json:"syslog_ip"`
-	SyslogIPProto             uint8                     `json:"syslog_ip_proto"`
-	SyslogPort                uint16                    `json:"syslog_port"`
-	SyslogLevel               string                    `json:"syslog_level"`
-	SyslogEnable              bool                      `json:"syslog_status"`
-	SyslogCategories          []string                  `json:"syslog_categories"`
-	SyslogInJSON              bool                      `json:"syslog_in_json"`
-	SyslogServerCert          string                    `json:"syslog_server_cert"`
-	SingleCVEPerSyslog        bool                      `json:"single_cve_per_syslog"`
-	SyslogCVEInLayers         bool                      `json:"syslog_cve_in_layers"`
-	OutputEventToLogs         bool                      `json:"output_event_to_logs"`
-	AuthOrder                 []string                  `json:"auth_order"`
-	AuthByPlatform            bool                      `json:"auth_by_platform"`
-	RancherEP                 string                    `json:"rancher_ep"`
-	InternalSubnets           []string                  `json:"configured_internal_subnets,omitempty"`
-	Webhooks                  []RESTWebhook             `json:"webhooks"`
-	ClusterName               string                    `json:"cluster_name"`
-	ControllerDebug           []string                  `json:"controller_debug"`
-	MonitorServiceMesh        bool                      `json:"monitor_service_mesh"`
-	RegistryHttpProxyEnable   bool                      `json:"registry_http_proxy_status"`
-	RegistryHttpsProxyEnable  bool                      `json:"registry_https_proxy_status"`
-	RegistryHttpProxy         RESTProxy                 `json:"registry_http_proxy"`
-	RegistryHttpsProxy        RESTProxy                 `json:"registry_https_proxy"`
-	IBMSAEpEnabled            bool                      `json:"ibmsa_ep_enabled"`
-	IBMSAEpStart              uint32                    `json:"ibmsa_ep_start"`
-	IBMSAEpDashboardURL       string                    `json:"ibmsa_ep_dashboard_url"`
-	IBMSAEpConnectedAt        string                    `json:"ibmsa_ep_connected_at"`
-	XffEnabled                bool                      `json:"xff_enabled"`
-	NetServiceStatus          bool                      `json:"net_service_status"`
-	NetServicePolicyMode      string                    `json:"net_service_policy_mode"`
-	DisableNetPolicy          bool                      `json:"disable_net_policy"`
-	DetectUnmanagedWl         bool                      `json:"detect_unmanaged_wl"`
-	ModeAutoD2M               bool                      `json:"mode_auto_d2m"`
-	ModeAutoD2MDuration       int64                     `json:"mode_auto_d2m_duration"`
-	ModeAutoM2P               bool                      `json:"mode_auto_m2p"`
-	ModeAutoM2PDuration       int64                     `json:"mode_auto_m2p_duration"`
-	ScannerAutoscale          RESTSystemConfigAutoscale `json:"scanner_autoscale"`
-	NoTelemetryReport         bool                      `json:"no_telemetry_report"`
-	CspType                   string                    `json:"csp_type"`
-	RemoteRepositories        []RESTRemoteRepository    `json:"remote_repositories"`
-	EnableTLSVerification     bool                      `json:"enable_tls_verification"`
-	GlobalCaCerts             []string                  `json:"cacerts"`
+	NewServicePolicyMode       string                    `json:"new_service_policy_mode"`
+	NewServiceProfileMode      string                    `json:"new_service_profile_mode"`
+	NewServiceProfileBaseline  string                    `json:"new_service_profile_baseline"`
+	UnusedGroupAging           uint8                     `json:"unused_group_aging"`
+	SyslogServer               string                    `json:"syslog_ip"`
+	SyslogIPProto              uint8                     `json:"syslog_ip_proto"`
+	SyslogPort                 uint16                    `json:"syslog_port"`
+	SyslogLevel                string                    `json:"syslog_level"`
+	SyslogEnable               bool                      `json:"syslog_status"`
+	SyslogCategories           []string                  `json:"syslog_categories"`
+	SyslogInJSON               bool                      `json:"syslog_in_json"`
+	SyslogServerCert           string                    `json:"syslog_server_cert"`
+	SingleCVEPerSyslog         bool                      `json:"single_cve_per_syslog"`
+	SyslogCVEInLayers          bool                      `json:"syslog_cve_in_layers"`
+	OutputEventToLogs          bool                      `json:"output_event_to_logs"`
+	AuthOrder                  []string                  `json:"auth_order"`
+	AuthByPlatform             bool                      `json:"auth_by_platform"`
+	RancherEP                  string                    `json:"rancher_ep"`
+	InternalSubnets            []string                  `json:"configured_internal_subnets,omitempty"`
+	Webhooks                   []RESTWebhook             `json:"webhooks"`
+	ClusterName                string                    `json:"cluster_name"`
+	ControllerDebug            []string                  `json:"controller_debug"`
+	MonitorServiceMesh         bool                      `json:"monitor_service_mesh"`
+	RegistryHttpProxyEnable    bool                      `json:"registry_http_proxy_status"`
+	RegistryHttpsProxyEnable   bool                      `json:"registry_https_proxy_status"`
+	RegistryHttpProxy          RESTProxy                 `json:"registry_http_proxy"`
+	RegistryHttpsProxy         RESTProxy                 `json:"registry_https_proxy"`
+	IBMSAEpEnabled             bool                      `json:"ibmsa_ep_enabled"`
+	IBMSAEpStart               uint32                    `json:"ibmsa_ep_start"`
+	IBMSAEpDashboardURL        string                    `json:"ibmsa_ep_dashboard_url"`
+	IBMSAEpConnectedAt         string                    `json:"ibmsa_ep_connected_at"`
+	XffEnabled                 bool                      `json:"xff_enabled"`
+	NetServiceStatus           bool                      `json:"net_service_status"`
+	NetServicePolicyMode       string                    `json:"net_service_policy_mode"`
+	DisableNetPolicy           bool                      `json:"disable_net_policy"`
+	DetectUnmanagedWl          bool                      `json:"detect_unmanaged_wl"`
+	ModeAutoD2M                bool                      `json:"mode_auto_d2m"`
+	ModeAutoD2MDuration        int64                     `json:"mode_auto_d2m_duration"`
+	ModeAutoM2P                bool                      `json:"mode_auto_m2p"`
+	ModeAutoM2PDuration        int64                     `json:"mode_auto_m2p_duration"`
+	ScannerAutoscale           RESTSystemConfigAutoscale `json:"scanner_autoscale"`
+	NoTelemetryReport          bool                      `json:"no_telemetry_report"`
+	CspType                    string                    `json:"csp_type"`
+	RemoteRepositories         []RESTRemoteRepository    `json:"remote_repositories"`
+	EnableTLSVerification      bool                      `json:"enable_tls_verification"`
+	GlobalCaCerts              []string                  `json:"cacerts"`
+	AllowNsUserExportNetPolicy bool                      `json:"allow_ns_user_export_net_policy"`
 }
 
 type RESTSystemConfigData struct {
@@ -2091,14 +2094,15 @@ type RESTSystemConfigAuthV2 struct {
 }
 
 type RESTSystemConfigMiscV2 struct {
-	InternalSubnets    []string `json:"configured_internal_subnets,omitempty"`
-	UnusedGroupAging   uint8    `json:"unused_group_aging"`
-	ClusterName        string   `json:"cluster_name"`
-	ControllerDebug    []string `json:"controller_debug"`
-	MonitorServiceMesh bool     `json:"monitor_service_mesh"`
-	XffEnabled         bool     `json:"xff_enabled"`
-	NoTelemetryReport  bool     `json:"no_telemetry_report"`
-	CspType            string   `json:"csp_type"` // billing csp type (local or master cluster)
+	InternalSubnets            []string `json:"configured_internal_subnets,omitempty"`
+	UnusedGroupAging           uint8    `json:"unused_group_aging"`
+	ClusterName                string   `json:"cluster_name"`
+	ControllerDebug            []string `json:"controller_debug"`
+	MonitorServiceMesh         bool     `json:"monitor_service_mesh"`
+	XffEnabled                 bool     `json:"xff_enabled"`
+	NoTelemetryReport          bool     `json:"no_telemetry_report"`
+	AllowNsUserExportNetPolicy bool     `json:"allow_ns_user_export_net_policy"`
+	CspType                    string   `json:"csp_type"` // billing csp type (local or master cluster)
 }
 
 // for scanner autoscaling
