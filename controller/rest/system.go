@@ -538,14 +538,15 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						RancherEP:      rconf.RancherEP,
 					},
 					Misc: api.RESTSystemConfigMiscV2{
-						InternalSubnets:    rconf.InternalSubnets,
-						UnusedGroupAging:   rconf.UnusedGroupAging,
-						ClusterName:        rconf.ClusterName,
-						ControllerDebug:    rconf.ControllerDebug,
-						MonitorServiceMesh: rconf.MonitorServiceMesh,
-						XffEnabled:         rconf.XffEnabled,
-						NoTelemetryReport:  rconf.NoTelemetryReport,
-						CspType:            rconf.CspType,
+						InternalSubnets:            rconf.InternalSubnets,
+						UnusedGroupAging:           rconf.UnusedGroupAging,
+						ClusterName:                rconf.ClusterName,
+						ControllerDebug:            rconf.ControllerDebug,
+						MonitorServiceMesh:         rconf.MonitorServiceMesh,
+						XffEnabled:                 rconf.XffEnabled,
+						NoTelemetryReport:          rconf.NoTelemetryReport,
+						AllowNsUserExportNetPolicy: rconf.AllowNsUserExportNetPolicy,
+						CspType:                    rconf.CspType,
 					},
 					Webhooks:           rconf.Webhooks,
 					RemoteRepositories: rconf.RemoteRepositories,
@@ -1858,6 +1859,10 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				}
 				cconf.GlobalCaCerts = *rc.GlobalCaCerts
 			}
+
+			if rc.AllowNsUserExportNetPolicy != nil {
+				cconf.AllowNsUserExportNetPolicy = *rc.AllowNsUserExportNetPolicy
+			}
 		} else if scope == share.ScopeFed && rconf.FedConfig != nil {
 			// webhook for fed system config
 			if rconf.FedConfig.Webhooks != nil {
@@ -1965,6 +1970,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 				config.MonitorServiceMesh = configV2.MiscCfg.MonitorServiceMesh
 				config.XffEnabled = configV2.MiscCfg.XffEnabled
 				config.NoTelemetryReport = configV2.MiscCfg.NoTelemetryReport
+				config.AllowNsUserExportNetPolicy = configV2.MiscCfg.AllowNsUserExportNetPolicy
 			}
 
 			if configV2.TlsCfg != nil {

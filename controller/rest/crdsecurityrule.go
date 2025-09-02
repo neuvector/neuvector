@@ -3826,7 +3826,8 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 	return crInfo, crWarning, errMsg, errCount, recordsCount, processed
 }
 
-func isExportSkipGroupName(name string, acc *access.AccessControl) (bool, *api.RESTGroup) {
+// alwaysAllowNsUser: true means "allow a namespace user to export all network policies of a group that the user has read permission"
+func isExportSkipGroupName(name, owner string, alwaysAllowNsUser bool, acc *access.AccessControl) (bool, *api.RESTGroup) {
 	// allow group with prefix "nv.ip."
 	if strings.HasPrefix(name, api.LearnedHostPrefix) || strings.HasPrefix(name, api.FederalGroupPrefix) {
 		return true, nil
@@ -3836,7 +3837,12 @@ func isExportSkipGroupName(name string, acc *access.AccessControl) (bool, *api.R
 		}
 		return false, nil
 	} else {
-		group, _ := cacher.GetGroup(name, "", false, acc)
+		group, err := cacher.GetGroup(name, "", false, acc)
+		if group == nil {
+			if owner != "target" && err == common.ErrObjectAccessDenied && alwaysAllowNsUser {
+				group, _ = cacher.GetGroup(name, "", false, access.NewReaderAccessControl())
+			}
+		}
 		if group == nil {
 			return true, nil
 		}
@@ -3844,8 +3850,8 @@ func isExportSkipGroupName(name string, acc *access.AccessControl) (bool, *api.R
 	}
 }
 
-func exportAttachRule(rule *api.RESTPolicyRule, useFrom bool, acc *access.AccessControl, cnt int,
-	useNameReferral bool) (*resource.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
+func exportAttachRule(rule *api.RESTPolicyRule, owner string, acc *access.AccessControl, cnt int,
+	useNameReferral, alwaysAllowNsUser bool) (*resource.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
 
 	var detail resource.NvSecurityRuleDetail
 	var group *api.RESTGroup
@@ -3856,8 +3862,8 @@ func exportAttachRule(rule *api.RESTPolicyRule, useFrom bool, acc *access.Access
 	detail.Action = rule.Action
 	detail.Priority = rule.Priority
 
-	if useFrom {
-		if skip, group = isExportSkipGroupName(rule.From, acc); skip {
+	if owner == "ingress" {
+		if skip, group = isExportSkipGroupName(rule.From, owner, alwaysAllowNsUser, acc); skip {
 			e := "Skip special group export"
 			log.WithFields(log.Fields{"name": rule.From}).Error(e)
 			return nil, nvGroupDefCfg
@@ -3866,12 +3872,11 @@ func exportAttachRule(rule *api.RESTPolicyRule, useFrom bool, acc *access.Access
 		detail.Selector.Name = rule.From
 		nvGroupDefCfg.Name = rule.From
 	} else {
-		if skip, group = isExportSkipGroupName(rule.To, acc); skip {
+		if skip, group = isExportSkipGroupName(rule.To, owner, alwaysAllowNsUser, acc); skip {
 			e := "Skip special group export"
 			log.WithFields(log.Fields{"name": rule.To}).Error(e)
 			return nil, nvGroupDefCfg
 		}
-
 		detail.Name = fmt.Sprintf("%s-egress-%d", rule.To, cnt)
 		detail.Selector.Name = rule.To
 		nvGroupDefCfg.Name = rule.To
@@ -3912,6 +3917,12 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	// alwaysAllowNsUser: true means "allow a namespace user to export all network policies of a group that the user has read"
+	alwaysAllowNsUser := false
+	if cacheCfg := cacher.GetSystemConfig(access.NewReaderAccessControl()); cacheCfg != nil {
+		alwaysAllowNsUser = cacheCfg.AllowNsUserExportNetPolicy
+	}
+
 	apiVersion := resource.NvSecurityRuleVersion
 	resp := resource.NvSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
@@ -3936,7 +3947,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	for _, gname := range rconf.Groups {
 
-		if skip, group = isExportSkipGroupName(gname, acc); skip {
+		if skip, group = isExportSkipGroupName(gname, "target", false, acc); skip {
 			e := "Skip special group export"
 			log.WithFields(log.Fields{"name": gname}).Error(e)
 			continue
@@ -4067,13 +4078,13 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				var detail *resource.NvSecurityRuleDetail
 				var nvGroupDefCfg resource.NvGroupDefCfg
 				if rule.To == gname {
-					detail, nvGroupDefCfg = exportAttachRule(rule, true, acc, inCount, rconf.UseNameReferral)
+					detail, nvGroupDefCfg = exportAttachRule(rule, "ingress", acc, inCount, rconf.UseNameReferral, alwaysAllowNsUser)
 					if detail != nil {
 						resptmp.Spec.IngressRule = append(resptmp.Spec.IngressRule, *detail)
 						inCount = inCount + 1
 					}
 				} else {
-					detail, nvGroupDefCfg = exportAttachRule(rule, false, acc, eCount, rconf.UseNameReferral)
+					detail, nvGroupDefCfg = exportAttachRule(rule, "egress", acc, eCount, rconf.UseNameReferral, alwaysAllowNsUser)
 					if detail != nil {
 						resptmp.Spec.EgressRule = append(resptmp.Spec.EgressRule, *detail)
 						eCount = eCount + 1
