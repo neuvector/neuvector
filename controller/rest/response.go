@@ -737,8 +737,14 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 
 	if rconf.Insert != nil && len(rconf.Insert.Rules) > 0 {
 		firstCfgType := rconf.Insert.Rules[0].CfgType
+		if firstCfgType == "" {
+			firstCfgType = api.CfgTypeUserCreated
+		}
 		for _, r := range rconf.Insert.Rules {
 			if r != nil {
+				if r.CfgType == "" {
+					r.CfgType = api.CfgTypeUserCreated
+				}
 				if r.CfgType != firstCfgType {
 					log.Error("Request error: rules in different cfgType")
 					restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

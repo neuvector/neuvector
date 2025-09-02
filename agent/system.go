@@ -16,6 +16,7 @@ import (
 
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/policy"
+	"github.com/neuvector/neuvector/agent/probe"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/container"
@@ -1469,4 +1470,14 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			}
 		}
 	}
+}
+
+func customRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
+	if key != share.CLUSConfigSecretPatternsKey {
+		return
+	}
+	if nType == cluster.ClusterNotifyDelete {
+		value = []byte("{}")
+	}
+	probe.SetCustomSecretPatterns(value)
 }
