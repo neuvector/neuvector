@@ -811,6 +811,9 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1Schema() *apiextv1.JSONSc
 									"comment": {
 										Type: b.schemaTypeString,
 									},
+									"conversion_id_ref": {
+										Type: b.schemaTypeInteger,
+									},
 									"disabled": {
 										Type: b.schemaTypeBoolean,
 									},
@@ -949,6 +952,9 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdAdmCtrlV1B1Schema() *apiextv1b1.JS
 									},
 									"comment": {
 										Type: b.schemaTypeString,
+									},
+									"conversion_id_ref": {
+										Type: b.schemaTypeInteger,
 									},
 									"disabled": {
 										Type: b.schemaTypeBoolean,
