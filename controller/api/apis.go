@@ -9,6 +9,7 @@ import (
 const RESTTokenHeader string = "X-Auth-Token"
 const RESTNvPageHeader string = "X-Nv-Page"
 const RESTRancherTokenHeader string = "X-R-Sess"
+const RESTRancherSSOHeader string = "X-R-SSO"
 const RESTMaskedValue string = "The value is masked"
 const RESTAPIKeyHeader string = "X-Auth-Apikey"
 

@@ -841,7 +841,8 @@ type CLUSSystemConfigAutoscale struct {
 }
 
 type CLUSEULA struct {
-	Accepted bool `json:"accepted"`
+	Accepted      bool `json:"accepted"`
+	AcceptedBySSO bool `json:"accepted_by_sso"`
 }
 
 type NvFedPermissions struct {
