@@ -1496,6 +1496,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			if rule.Critical {
 				ruleItem.ID = &rule.ID
 			}
+			ruleItem.ConversionIdRef = &rule.ID
 			ruleItem.Disabled = &rule.Disable
 			if *ruleItem.Action == actionDeny {
 				ruleItem.RuleMode = &rule.RuleMode
