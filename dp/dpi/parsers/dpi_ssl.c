@@ -246,51 +246,79 @@ int ssl_parse_handshake_v3(dpi_packet_t *p, ssl_wing_t *w, uint8_t *ptr, ssl_rec
     return FORMAT_MATCH;
 }
 
+static inline int safe_advance(uint8_t **tptr, uint8_t *end, size_t step) {
+    if (*tptr + step > end) {
+        return -1;
+    }
+    *tptr += step;
+    return 0;
+}
+
 void ssl_get_sni_v3(dpi_packet_t *p, uint8_t *ptr, ssl_record_t *rec)
 {
     uint8_t *tptr = ptr;
     uint8_t *end = tptr + rec->len;
     dpi_session_t *s = p->session;
-
     uint16_t len = 0;
-    tptr += 6;//handshake type(1) + length(3) + version(2)
-    tptr += 32;//random(32)
-    len = (uint16_t)(*(uint8_t *)(tptr));//session id
-    //DEBUG_LOG(DBG_PARSER, p, "session id length %hu\n", len);
-    tptr += 1;
-    tptr += len;
-    len = GET_BIG_INT16(tptr);//cipher suite
-    //DEBUG_LOG(DBG_PARSER, p, "cipher suite length %hu\n", len);
-    tptr += 2;
-    tptr += len;
-    len = (uint16_t)(*(uint8_t *)(tptr));//compression method
-    //DEBUG_LOG(DBG_PARSER, p, "compression method length %hu\n", len);
-    tptr += 1;
-    tptr += len;
-    len = GET_BIG_INT16(tptr);//extension length
-    //DEBUG_LOG(DBG_PARSER, p, "extension length %hu\n", len);
-    tptr += 2;
+
+    // handshake(1) + length(3) + version(2)
+    if (safe_advance(&tptr, end, 6)) return;
+    // random(32)
+    if (safe_advance(&tptr, end, 32)) return;
+
+    // session id length
+    if (tptr + 1 > end) return;
+    len = (uint16_t)(*(uint8_t *)(tptr));
+    if (safe_advance(&tptr, end, 1)) return;
+    if (safe_advance(&tptr, end, len)) return;
+
+    // cipher suite length
+    if (tptr + 2 > end) return;
+    len = GET_BIG_INT16(tptr);
+    if (safe_advance(&tptr, end, 2)) return;
+    if (safe_advance(&tptr, end, len)) return;
+
+    // compression methods
+    if (tptr + 1 > end) return;
+    len =(uint16_t)(*(uint8_t *)(tptr));
+    if (safe_advance(&tptr, end, 1)) return;
+    if (safe_advance(&tptr, end, len)) return;
+
+    // extensions length
+    if (tptr + 2 > end) return;
+    len = GET_BIG_INT16(tptr);
+    if (safe_advance(&tptr, end, 2)) return;
+
     if ((tptr + len) != end) {
         DEBUG_LOG(DBG_PARSER, p, "Mismatch length!\n");
         return;
     }
-    uint16_t ext_type = 1;
-    uint16_t ext_len;
+
     while (tptr < end) {
-        ext_type = GET_BIG_INT16(tptr);
+        if (tptr + 4 > end) return;
+        uint16_t ext_type = GET_BIG_INT16(tptr);
         tptr += 2;
-        ext_len = GET_BIG_INT16(tptr);
+        uint16_t ext_len = GET_BIG_INT16(tptr);
         tptr += 2;
-        if(ext_type == 0)
-        {
+
+        if (tptr + ext_len > end) return;
+
+        if (ext_type == 0) {
+            // SNI
+            if (ext_len < 5) return; // minimum size check
+            if (tptr + 3 > end) return;
             tptr += 3;
+
+            if (tptr + 2 > end) return;
             uint16_t namelen = GET_BIG_INT16(tptr);
             tptr += 2;
-            //DEBUG_LOG(DBG_PARSER, p, "ssl: snilen(%hu), sniname(%s)\n", namelen,(char *)tptr);
-            int size = min(namelen+1, sizeof(s->vhost));
-            strncpy((char *)s->vhost, (char *)tptr, size-1);
-            s->vhost[size-1] = '\0';
-            s->vhlen = size-1;
+
+            if (tptr + namelen > end) return;
+
+            int size = min(namelen + 1, sizeof(s->vhost));
+            strncpy((char *)s->vhost, (char *)tptr, size - 1);
+            s->vhost[size - 1] = '\0';
+            s->vhlen = size - 1;
             break;
         } else {
             tptr += ext_len;
