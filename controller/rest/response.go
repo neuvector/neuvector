@@ -378,15 +378,13 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 		}
 	}
 
-	var grpCfgType share.TCfgType
+	grpCfgType := cfgTypeMapping[r.CfgType]
 	if r.Group != "" {
 		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
 		if grpMustExist && grp == nil {
 			return fmt.Errorf("Group %s is not found", r.Group)
 		} else if grp != nil {
 			grpCfgType = grp.CfgType
-		} else {
-			grpCfgType = cfgTypeMapping[r.CfgType]
 		}
 	}
 
