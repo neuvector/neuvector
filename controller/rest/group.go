@@ -666,7 +666,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	if k8sPlatform && cg.CfgType != share.FederalCfg {
 		if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, rg.Name); err == nil {
-			if o, ok := obj.(*resource.NvGroupDefinition); ok {
+			if o, ok := obj.(*api.NvGroupDefinition); ok {
 				if !common.SameGroupCriteria(*rg.Criteria, o.Spec.Selector.Criteria, false) {
 					e := fmt.Sprintf("NvGroupDefinition CR %s with different criteria exists in k8s", rg.Name)
 					log.WithFields(log.Fields{"criteria": *rg.Criteria, "cr": o.Spec.Selector}).Error(e)
@@ -827,7 +827,7 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	if k8sPlatform && cg.CfgType != share.FederalCfg {
 		if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, rg.Name); err == nil {
-			if o, ok := obj.(*resource.NvGroupDefinition); ok {
+			if o, ok := obj.(*api.NvGroupDefinition); ok {
 				if !common.SameGroupCriteria(*rg.Criteria, o.Spec.Selector.Criteria, false) || cg.Comment != o.Spec.Selector.Comment {
 					e := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", rg.Name)
 					log.WithFields(log.Fields{"criteria": *rg.Criteria, "comment": cg.Comment, "cr": o.Spec.Selector}).Error(e)
@@ -1829,7 +1829,7 @@ func handlerGetGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprou
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get import status")
 }
 
-func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resource.NvGroupDefinition, error) {
+func parseGroupYamlFile(importData []byte) ([]api.NvSecurityRule, []api.NvGroupDefinition, error) {
 
 	importDataStr := string(importData)
 	yamlParts := strings.Split(importDataStr, "\n---\n")
@@ -1840,8 +1840,8 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 	}
 
 	var err error
-	var nvGrpDefs []resource.NvGroupDefinition
-	var nvSecRules []resource.NvSecurityRule
+	var nvGrpDefs []api.NvGroupDefinition
+	var nvSecRules []api.NvSecurityRule
 
 	for i, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -1867,18 +1867,18 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 
 		var jsonData []byte
 		if jsonData, err = yaml.YAMLToJSON([]byte(yamlPart)); err == nil {
-			var nvCrList resource.NvCrList
+			var nvCrList api.NvCrList
 			if err = json.Unmarshal(jsonData, &nvCrList); err == nil {
 				if nvCrList.Kind == "List" {
 					if len(nvCrList.Items) > 0 {
 						nvCr := nvCrList.Items[0]
-						if nvCr.Kind == resource.NvGroupDefKind {
-							var nvGrpDefList resource.NvGroupDefinitionList
+						if nvCr.Kind == api.NvGroupDefKind {
+							var nvGrpDefList api.NvGroupDefinitionList
 							if err = json.Unmarshal(jsonData, &nvGrpDefList); err == nil {
 								nvGrpDefs = append(nvGrpDefs, nvGrpDefList.Items...)
 							}
-						} else if nvCr.Kind == resource.NvClusterSecurityRuleKind || nvCr.Kind == resource.NvSecurityRuleKind {
-							var nvSecRuleList resource.NvSecurityRuleList
+						} else if nvCr.Kind == api.NvClusterSecurityRuleKind || nvCr.Kind == api.NvSecurityRuleKind {
+							var nvSecRuleList api.NvSecurityRuleList
 							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
 								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
 							}
@@ -1887,13 +1887,13 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 						}
 					}
 				} else {
-					if nvCrList.Kind == resource.NvGroupDefKind {
-						var nvGrpDef resource.NvGroupDefinition
+					if nvCrList.Kind == api.NvGroupDefKind {
+						var nvGrpDef api.NvGroupDefinition
 						if err = json.Unmarshal(jsonData, &nvGrpDef); err == nil {
 							nvGrpDefs = append(nvGrpDefs, nvGrpDef)
 						}
-					} else if nvCrList.Kind == resource.NvClusterSecurityRuleKind || nvCrList.Kind == resource.NvSecurityRuleKind {
-						var nvSecRule resource.NvSecurityRule
+					} else if nvCrList.Kind == api.NvClusterSecurityRuleKind || nvCrList.Kind == api.NvSecurityRuleKind {
+						var nvSecRule api.NvSecurityRule
 						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
 							nvSecRules = append(nvSecRules, nvSecRule)
 						}
@@ -1911,7 +1911,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 
 	if err == nil {
 		for _, r := range nvGrpDefs {
-			if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvGroupDefKind {
+			if r.APIVersion != "neuvector.com/v1" || r.Kind != api.NvGroupDefKind {
 				err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
 				break
 			}
@@ -1919,7 +1919,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 		if err == nil {
 			for _, r := range nvSecRules {
 				if r.APIVersion != "neuvector.com/v1" ||
-					(r.Kind != resource.NvSecurityRuleKind && r.Kind != resource.NvClusterSecurityRuleKind) {
+					(r.Kind != api.NvSecurityRuleKind && r.Kind != api.NvClusterSecurityRuleKind) {
 					err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
 					break
 				}
@@ -1940,8 +1940,8 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	var secRules []resource.NvSecurityRule
-	var nvGrpDefs []resource.NvGroupDefinition
+	var secRules []api.NvSecurityRule
+	var nvGrpDefs []api.NvGroupDefinition
 	importData, err := os.ReadFile(importTask.TempFilename)
 	if err == nil {
 		secRules, nvGrpDefs, err = parseGroupYamlFile(importData)
@@ -1961,8 +1961,8 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	var progress float32 // progress percentage
 
 	inc = 90.0 / float32(3+2*len(secRules))
-	parsedGrpCfg := make([]*resource.NvSecurityParse, 0, len(secRules))
-	parsedGrpDefs := make(map[string]*resource.NvSecurityParse, len(nvGrpDefs))
+	parsedGrpCfg := make([]*api.NvSecurityParse, 0, len(secRules))
+	parsedGrpDefs := make(map[string]*api.NvSecurityParse, len(nvGrpDefs))
 	progress = 6
 
 	importTask.Percentage = int(progress)
@@ -2077,7 +2077,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 					if len(grpCfgRet.GroupResponseCfg) > 0 {
 						//  import response rules for this group
-						grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+						grpResponseCfg := map[string][]*api.NvCrdResponseRule{
 							grpCfgRet.TargetName: grpCfgRet.GroupResponseCfg,
 						}
 						_, _ = crdHandler.crdHandleGroupResponseRules(scope, grpResponseCfg, share.UserCreated)

@@ -1,13 +1,11 @@
-package resource
+package api
 
 import (
 	//	"github.com/neuvector/k8s"
-	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const constApiGroupNV = "neuvector.com"
 const NvCrdV1 = "v1"
 
 const NvSecurityRuleName = "nvsecurityrules.neuvector.com"
@@ -83,13 +81,13 @@ const NvCspUsageListKind = "CspAdapterUsageRecordList"
 const NvCspUsageSingular = "cspadapterusagerecord"
 
 type NvCrdAdmCtrlRule struct {
-	ID         uint32                      `json:"id"`        // only set for default rules
-	RuleType   string                      `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
-	RuleMode   string                      `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Comment    string                      `json:"comment"`
-	Criteria   []*api.RESTAdmRuleCriterion `json:"criteria,omitempty"`
-	Disabled   bool                        `json:"disabled"`
-	Containers uint8                       `json:"containers,omitempty"`
+	ID         uint32                  `json:"id"`        // only set for default rules
+	RuleType   string                  `json:"rule_type"` // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
+	RuleMode   string                  `json:"rule_mode"` // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Comment    string                  `json:"comment"`
+	Criteria   []*RESTAdmRuleCriterion `json:"criteria,omitempty"`
+	Disabled   bool                    `json:"disabled"`
+	Containers uint8                   `json:"containers,omitempty"`
 }
 
 type NvCrdAdmCtrlConfig struct {
@@ -99,45 +97,45 @@ type NvCrdAdmCtrlConfig struct {
 }
 
 type NvCrdVulnProfileConfig struct {
-	Profile *api.RESTVulnerabilityProfileConfig `json:"profile"`
+	Profile *RESTVulnerabilityProfileConfig `json:"profile"`
 }
 
 type NvCrdCompProfileConfig struct {
-	Templates *api.RESTComplianceProfileConfig `json:"profile"`
+	Templates *RESTComplianceProfileConfig `json:"profile"`
 }
 
 type NvSecurityParse struct {
 	TargetName        string
-	PolicyModeCfg     *api.RESTServiceConfig
-	ProcessProfileCfg *api.RESTProcessProfile
-	FileProfileCfg    *api.RESTFileMonitorProfile
-	GroupCfgs         []api.RESTCrdGroupConfig
-	RuleCfgs          []api.RESTPolicyRuleConfig
-	GroupResponseCfg  []*NvCrdResponseRule       // response rules for specific group
-	DlpGroupCfg       *api.RESTCrdDlpGroupConfig // per-group's dlp sensor configuration
-	WafGroupCfg       *api.RESTCrdWafGroupConfig // per-group's waf sensor configuration
+	PolicyModeCfg     *RESTServiceConfig
+	ProcessProfileCfg *RESTProcessProfile
+	FileProfileCfg    *RESTFileMonitorProfile
+	GroupCfgs         []RESTCrdGroupConfig
+	RuleCfgs          []RESTPolicyRuleConfig
+	GroupResponseCfg  []*NvCrdResponseRule   // response rules for specific group
+	DlpGroupCfg       *RESTCrdDlpGroupConfig // per-group's dlp sensor configuration
+	WafGroupCfg       *RESTCrdWafGroupConfig // per-group's waf sensor configuration
 	AdmCtrlCfg        *NvCrdAdmCtrlConfig
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
 	ResponseCfg       *NvCrdResponseRule             // response rules for all groups
-	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
-	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
+	DlpSensorCfg      *RESTDlpSensorConfig           // dlp sensor defined by this crd object
+	WafSensorCfg      *RESTWafSensorConfig           // waf sensor defined by this crd object
 	VulnProfileCfg    *NvCrdVulnProfileConfig        // vulerability profile defined by this crd object
 	CompProfileCfg    *NvCrdCompProfileConfig        // compliance profile defined by this crd object
 	Uid               string                         // Metadata.Uid from AdmissionReview request
 }
 
 type NvSecurityTarget struct {
-	PolicyMode *string                `json:"policymode,omitempty"`
-	Selector   api.RESTCrdGroupConfig `json:"selector"`
+	PolicyMode *string            `json:"policymode,omitempty"`
+	Selector   RESTCrdGroupConfig `json:"selector"`
 }
 
 type NvSecurityRuleDetail struct {
-	Selector     api.RESTCrdGroupConfig `json:"selector"`
-	Applications []string               `json:"applications"`
-	Ports        string                 `json:"ports"`
-	Action       string                 `json:"action"`
-	Name         string                 `json:"name"`
-	Priority     uint32                 `json:"priority"`
+	Selector     RESTCrdGroupConfig `json:"selector"`
+	Applications []string           `json:"applications"`
+	Ports        string             `json:"ports"`
+	Action       string             `json:"action"`
+	Name         string             `json:"name"`
+	Priority     uint32             `json:"priority"`
 }
 
 type NvSecurityProcessProfile struct {
@@ -160,13 +158,13 @@ type NvSecurityFileRule struct {
 }
 
 type NvSecurityDlpGroup struct {
-	Status   bool                         `json:"status"`
-	Settings []api.RESTCrdDlpGroupSetting `json:"settings"`
+	Status   bool                     `json:"status"`
+	Settings []RESTCrdDlpGroupSetting `json:"settings"`
 }
 
 type NvSecurityWafGroup struct {
-	Status   bool                         `json:"status"`
-	Settings []api.RESTCrdWafGroupSetting `json:"settings"`
+	Status   bool                     `json:"status"`
+	Settings []RESTCrdWafGroupSetting `json:"settings"`
 }
 
 type NvSecurityRuleSpec struct {
@@ -214,9 +212,9 @@ type NvClusterSecurityRuleList struct {
 }
 
 type NvGroupDefCfg struct {
-	Name     string                  `json:"name"`
-	Comment  string                  `json:"comment"`
-	Criteria []api.RESTCriteriaEntry `json:"criteria,omitempty"`
+	Name     string              `json:"name"`
+	Comment  string              `json:"comment"`
+	Criteria []RESTCriteriaEntry `json:"criteria,omitempty"`
 }
 
 type NvGroupDefinitionSpec struct {
@@ -267,14 +265,14 @@ type NvSecurityAdmCtrlConfig struct {
 }
 
 type NvSecurityAdmCtrlRule struct {
-	ID              *uint32                     `json:"id,omitempty" yaml:"id,omitempty"`
-	ConversionIdRef *uint32                     `json:"conversion_id_ref,omitempty" yaml:"conversion_id_ref,omitempty"` // for KW conversion tool only. ignored in NV rest/crd import
-	Action          *string                     `json:"action,omitempty" yaml:"action,omitempty"`                       // api.ValidatingAllowRuleType / api.ValidatingDenyRuleType
-	RuleMode        *string                     `json:"rule_mode,omitempty" yaml:"rule_mode,omitempty"`                 // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Comment         *string                     `json:"comment,omitempty" yaml:"comment,omitempty"`
-	Disabled        *bool                       `json:"disabled,omitempty" yaml:"disabled,omitempty"`
-	Containers      []string                    `json:"containers,omitempty" yaml:"containers,omitempty"`
-	Criteria        []*api.RESTAdmRuleCriterion `json:"criteria,omitempty" yaml:"criteria,omitempty"`
+	ID              *uint32                 `json:"id,omitempty" yaml:"id,omitempty"`
+	ConversionIdRef *uint32                 `json:"conversion_id_ref,omitempty" yaml:"conversion_id_ref,omitempty"` // for KW conversion tool only. ignored in NV rest/crd import
+	Action          *string                 `json:"action,omitempty" yaml:"action,omitempty"`                       // ValidatingAllowRuleType / ValidatingDenyRuleType
+	RuleMode        *string                 `json:"rule_mode,omitempty" yaml:"rule_mode,omitempty"`                 // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
+	Comment         *string                 `json:"comment,omitempty" yaml:"comment,omitempty"`
+	Disabled        *bool                   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
+	Containers      []string                `json:"containers,omitempty" yaml:"containers,omitempty"`
+	Criteria        []*RESTAdmRuleCriterion `json:"criteria,omitempty" yaml:"criteria,omitempty"`
 }
 
 type NvSecurityAdmCtrlRules struct {
@@ -346,8 +344,8 @@ type NvResponseSecurityRuleList struct {
 
 // DLP
 type NvSecurityDlpRule struct {
-	Name     *string                    `json:"name"`
-	Patterns []api.RESTDlpCriteriaEntry `json:"patterns"`
+	Name     *string                `json:"name"`
+	Patterns []RESTDlpCriteriaEntry `json:"patterns"`
 }
 
 type NvSecurityDlpSensor struct {
@@ -375,8 +373,8 @@ type NvDlpSecurityRuleList struct {
 
 // WAF
 type NvSecurityWafRule struct {
-	Name     *string                    `json:"name"`
-	Patterns []api.RESTWafCriteriaEntry `json:"patterns"`
+	Name     *string                `json:"name"`
+	Patterns []RESTWafCriteriaEntry `json:"patterns"`
 }
 
 type NvSecurityWafSensor struct {
@@ -434,8 +432,8 @@ type NvVulnProfileSecurityRuleList struct {
 
 // compliance profile
 type NvSecurityCompTemplates struct {
-	DisableSystem bool                              `json:"disable_system"`
-	Entries       []*api.RESTComplianceProfileEntry `json:"entries"`
+	DisableSystem bool                          `json:"disable_system"`
+	Entries       []*RESTComplianceProfileEntry `json:"entries"`
 }
 
 type NvSecurityCompProfileSpec struct {

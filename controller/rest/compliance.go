@@ -484,9 +484,9 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 		rconf.Names = []string{share.DefaultComplianceProfileName}
 	}
 
-	apiVersion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvCompProfileSecurityRuleVersion)
-	kind := resource.NvCompProfileSecurityRuleKind
-	resp := resource.NvCompProfileSecurityRuleList{
+	apiVersion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, api.NvCompProfileSecurityRuleVersion)
+	kind := api.NvCompProfileSecurityRuleKind
+	resp := api.NvCompProfileSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: apiVersion,
 			Kind:       resource.NvListKind,
@@ -525,7 +525,7 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 			return entries[s].TestNum < entries[t].TestNum
 		})
 
-		resptmp := resource.NvCompProfileSecurityRule{
+		resptmp := api.NvCompProfileSecurityRule{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: apiVersion,
 				Kind:       kind,
@@ -533,8 +533,8 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: resource.NvSecurityCompProfileSpec{
-				Templates: &resource.NvSecurityCompTemplates{
+			Spec: api.NvSecurityCompProfileSpec{
+				Templates: &api.NvSecurityCompTemplates{
 					DisableSystem: profile.DisableSystem,
 					Entries:       entries,
 				},
@@ -571,9 +571,9 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	defer os.Remove(importTask.TempFilename)
 
 	json_data, _ := os.ReadFile(importTask.TempFilename)
-	var secRuleList resource.NvCompProfileSecurityRuleList
-	var secRule resource.NvCompProfileSecurityRule
-	var secRules []resource.NvCompProfileSecurityRule = []resource.NvCompProfileSecurityRule{}
+	var secRuleList api.NvCompProfileSecurityRuleList
+	var secRule api.NvCompProfileSecurityRule
+	var secRules []api.NvCompProfileSecurityRule = []api.NvCompProfileSecurityRule{}
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
@@ -584,7 +584,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvCompProfileSecurityRuleKind {
+		if r.APIVersion != "neuvector.com/v1" || r.Kind != api.NvCompProfileSecurityRuleKind {
 			invalidCrdKind = true
 			break
 		}
@@ -600,7 +600,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	var progress float32 // progress percentage
 
 	inc = 90.0 / float32(2+2*len(secRules))
-	cmpProfilesCfg := make([]*resource.NvSecurityParse, 0, len(secRules))
+	cmpProfilesCfg := make([]*api.NvSecurityParse, 0, len(secRules))
 	progress = 6
 
 	importTask.Percentage = int(progress)

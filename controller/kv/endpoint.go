@@ -485,7 +485,7 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 			if nvJsonUnmarshal(key, []byte(value), &g) == nil {
 				if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, g.Name); err == nil {
 					// check whether there is an nvgroupdefinitions CR with different criteria/comment in k8s
-					if o, ok := obj.(*resource.NvGroupDefinition); ok {
+					if o, ok := obj.(*api.NvGroupDefinition); ok {
 						rc := make([]api.RESTCriteriaEntry, 0, len(g.Criteria))
 						for _, c := range g.Criteria {
 							rc = append(rc, api.RESTCriteriaEntry{Key: c.Key, Value: c.Value, Op: c.Op})

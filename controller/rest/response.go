@@ -1063,8 +1063,8 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	apiVersion := resource.NvResponseSecurityRuleVersion
-	resp := resource.NvResponseSecurityRuleList{
+	apiVersion := api.NvResponseSecurityRuleVersion
+	resp := api.NvResponseSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       resource.NvListKind,
 			APIVersion: apiVersion,
@@ -1079,7 +1079,7 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, resource.NvResponseSecurityRuleVersion)
+	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, api.NvResponseSecurityRuleVersion)
 	for _, id := range rconf.IDs {
 		// export response rules
 		responseRules, err := exportResponseRules("", id, acc)
@@ -1098,15 +1098,15 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 			log.WithFields(log.Fields{"id": id, "err": err}).Error()
 			continue
 		}
-		respTemp := resource.NvResponseSecurityRule{
+		respTemp := api.NvResponseSecurityRule{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: apiversion,
-				Kind:       resource.NvResponseSecurityRuleKind,
+				Kind:       api.NvResponseSecurityRuleKind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: crName,
 			},
-			Spec: resource.NvSecurityResponseSpec{
+			Spec: api.NvSecurityResponseSpec{
 				Rule: *responseRule,
 			},
 		}
@@ -1129,7 +1129,7 @@ func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httpro
 	_importHandler(w, r, tid, share.IMPORT_TYPE_RESPONSE, share.PREFIX_IMPORT_RESPONSE, acc, login)
 }
 
-func genResponseRuleCrName(id uint32, crdRule resource.NvCrdResponseRule) (string, error) {
+func genResponseRuleCrName(id uint32, crdRule api.NvCrdResponseRule) (string, error) {
 	rMini := api.RESTResponseRule{
 		ID:         id,
 		Event:      crdRule.Event,
@@ -1146,7 +1146,7 @@ func genResponseRuleCrName(id uint32, crdRule resource.NvCrdResponseRule) (strin
 	return fmt.Sprintf("%s--%s", crdRule.Event, hex.EncodeToString(b[:])), nil
 }
 
-func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]*resource.NvCrdResponseRule, error) {
+func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]*api.NvCrdResponseRule, error) {
 	if id != 0 {
 		// export a specific response rule
 		r, err := cacher.GetResponseRule(share.DefaultPolicyName, id, acc)
@@ -1161,7 +1161,7 @@ func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]
 			}
 			return nil, fmt.Errorf("response rule %d is for group <%s>", id, r.Group)
 		}
-		crdRule := &resource.NvCrdResponseRule{
+		crdRule := &api.NvCrdResponseRule{
 			PolicyName: share.DefaultPolicyName,
 			Event:      r.Event,
 			Actions:    r.Actions,
@@ -1170,15 +1170,15 @@ func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]
 			Webhooks:   r.Webhooks,
 			Conditions: r.Conditions,
 		}
-		return []*resource.NvCrdResponseRule{crdRule}, nil
+		return []*api.NvCrdResponseRule{crdRule}, nil
 	}
 	if gName != "" {
-		var rules []*resource.NvCrdResponseRule
+		var rules []*api.NvCrdResponseRule
 		// export all response rules that are for the group
 		allRules := cacher.GetAllResponseRules(share.ScopeLocal, acc)
 		for _, r := range allRules {
 			if r.Group == gName {
-				crdRule := &resource.NvCrdResponseRule{
+				crdRule := &api.NvCrdResponseRule{
 					PolicyName: share.DefaultPolicyName,
 					Event:      r.Event,
 					Actions:    r.Actions,
@@ -1196,8 +1196,7 @@ func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]
 	return nil, nil
 }
 
-func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule, error) {
-
+func parseResponseYamlFile(importData []byte) ([]api.NvResponseSecurityRule, error) {
 	importDataStr := string(importData)
 	yamlParts := strings.Split(importDataStr, "\n---\n")
 
@@ -1207,7 +1206,7 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 	}
 
 	var err error
-	var nvSecRules []resource.NvResponseSecurityRule
+	var nvSecRules []api.NvResponseSecurityRule
 
 	for i, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -1233,13 +1232,13 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 
 		var jsonData []byte
 		if jsonData, err = yaml.YAMLToJSON([]byte(yamlPart)); err == nil {
-			var nvCrList resource.NvCrList
+			var nvCrList api.NvCrList
 			if err = json.Unmarshal(jsonData, &nvCrList); err == nil {
 				if nvCrList.Kind == "List" {
 					if len(nvCrList.Items) > 0 {
 						nvCr := nvCrList.Items[0]
-						if nvCr.Kind == resource.NvResponseSecurityRuleListKind || nvCr.Kind == resource.NvResponseSecurityRuleKind {
-							var nvSecRuleList resource.NvResponseSecurityRuleList
+						if nvCr.Kind == api.NvResponseSecurityRuleListKind || nvCr.Kind == api.NvResponseSecurityRuleKind {
+							var nvSecRuleList api.NvResponseSecurityRuleList
 							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
 								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
 							}
@@ -1248,8 +1247,8 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 						}
 					}
 				} else {
-					if nvCrList.Kind == resource.NvResponseSecurityRuleListKind || nvCrList.Kind == resource.NvResponseSecurityRuleKind {
-						var nvSecRule resource.NvResponseSecurityRule
+					if nvCrList.Kind == api.NvResponseSecurityRuleListKind || nvCrList.Kind == api.NvResponseSecurityRuleKind {
+						var nvSecRule api.NvResponseSecurityRule
 						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
 							nvSecRules = append(nvSecRules, nvSecRule)
 						}
@@ -1268,7 +1267,7 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 	if err == nil {
 		if err == nil {
 			for _, r := range nvSecRules {
-				if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvResponseSecurityRuleKind {
+				if r.APIVersion != "neuvector.com/v1" || r.Kind != api.NvResponseSecurityRuleKind {
 					err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
 					break
 				}
@@ -1287,7 +1286,7 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	var secRules []resource.NvResponseSecurityRule
+	var secRules []api.NvResponseSecurityRule
 	json_data, err := os.ReadFile(importTask.TempFilename)
 	if err == nil {
 		secRules, err = parseResponseYamlFile(json_data)
@@ -1307,7 +1306,7 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 	var progress float32 // progress percentage
 
 	inc = 90.0 / float32(3)
-	parsedResponseCfgs := make([]*resource.NvCrdResponseRule, 0, len(secRules))
+	parsedResponseCfgs := make([]*api.NvCrdResponseRule, 0, len(secRules))
 	progress = 6
 
 	importTask.Percentage = int(progress)

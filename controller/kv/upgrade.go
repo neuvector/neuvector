@@ -524,7 +524,7 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 						}
 					}
 				}
-			} else if config == share.CFGEndpointCrd && scope == resource.NvSecurityRuleKind {
+			} else if config == share.CFGEndpointCrd && scope == api.NvSecurityRuleKind {
 				var cfg share.CLUSCrdSecurityRule
 				_ = nvJsonUnmarshal(key, value, &cfg)
 				if upd, wrt := upgradeCrdSecurityRule(&cfg); upd {

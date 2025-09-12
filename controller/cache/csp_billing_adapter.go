@@ -122,7 +122,7 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 	baseProduct := fmt.Sprintf("cpe:/o:suse:neuvector:%s", nvSemanticVersion)
 	t := time.Now().Format("2006-01-02T15:04:05.000000-07:00")
 	if obj, err = global.ORCH.GetResource(resource.RscTypeCrdNvCspUsage, "", rscName); err == nil {
-		if crCspUsage, ok := obj.(*resource.NvCspUsage); ok {
+		if crCspUsage, ok := obj.(*api.NvCspUsage); ok {
 			crCspUsage.ManagedNodeCount = totalNodes
 			crCspUsage.ReportingTime = t
 			crCspUsage.BaseProduct = baseProduct
@@ -132,9 +132,9 @@ func ConfigCspUsages(addOnly, forceConfig bool, fedRole, masterClusterID string)
 		}
 	} else if strings.Contains(err.Error(), " 404 ") {
 		if addOnly {
-			kind := resource.NvCspUsageKind
+			kind := api.NvCspUsageKind
 			apiVersion := "susecloud.net/v1"
-			crCspUsage := &resource.NvCspUsage{
+			crCspUsage := &api.NvCspUsage{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       kind,
 					APIVersion: apiVersion,

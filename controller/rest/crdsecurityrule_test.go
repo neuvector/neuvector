@@ -24,7 +24,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 	var raw_string, err string
 	var raw []byte
 	var errCount int
-	var gfwrule resource.NvSecurityRule
+	var gfwrule api.NvSecurityRule
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -236,7 +236,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 					t.Errorf("[admission rules: %d] yaml error\n %v", idx, err)
 				}
 			} else {
-				var admCtrlSecRule resource.NvAdmCtrlSecurityRule
+				var admCtrlSecRule api.NvAdmCtrlSecurityRule
 				if err = json.Unmarshal(json_data, &admCtrlSecRule); err != nil {
 					if errCountExpected[idx] == 0 {
 						t.Errorf("[admission rules: %d] unmarshal error\n %v", idx, err)
@@ -272,7 +272,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 			if err != nil {
 				t.Errorf("[admission config: %d] yaml error\n %v", idx, err)
 			} else {
-				var admCtrlSecRule resource.NvAdmCtrlSecurityRule
+				var admCtrlSecRule api.NvAdmCtrlSecurityRule
 				if err = json.Unmarshal(json_data, &admCtrlSecRule); err != nil {
 					if errCountExpected[idx] == 0 {
 						t.Errorf("[admission config: %d] unmarshal error\n %v", idx, err)
@@ -296,7 +296,7 @@ func TestParseCrdSecurityRuleGroupReferral(t *testing.T) {
 	var raw_string, err string
 	var raw []byte
 	var errCount int
-	var gfwrule resource.NvSecurityRule
+	var gfwrule api.NvSecurityRule
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -511,7 +511,7 @@ func (d *mockK8s) GetResource(rt, namespace, name string) (interface{}, error) {
 func (d *mockK8s) AddResource(rt string, res interface{}) error {
 	switch rt {
 	case resource.RscTypeCrdGroupDefinition:
-		if obj := res.(*resource.NvGroupDefinition); obj != nil {
+		if obj := res.(*api.NvGroupDefinition); obj != nil {
 			if nsToNameToObjs := d.crCache[rt]; nsToNameToObjs != nil {
 				if nameToObjs := nsToNameToObjs[obj.Namespace]; nameToObjs != nil {
 					nameToObjs[obj.Name] = res
@@ -526,7 +526,7 @@ func (d *mockK8s) AddResource(rt string, res interface{}) error {
 func (d *mockK8s) UpdateResource(rt string, res interface{}) error {
 	switch rt {
 	case resource.RscTypeCrdGroupDefinition:
-		if obj := res.(*resource.NvGroupDefinition); obj != nil {
+		if obj := res.(*api.NvGroupDefinition); obj != nil {
 			if nsToNameToObjs := d.crCache[rt]; nsToNameToObjs != nil {
 				if nameToObjs := nsToNameToObjs[obj.Namespace]; nameToObjs != nil {
 					nameToObjs[obj.Name] = res
@@ -542,7 +542,7 @@ func (d *mockK8s) UpdateResource(rt string, res interface{}) error {
 func (d *mockK8s) DeleteResource(rt string, res interface{}) error {
 	switch rt {
 	case resource.RscTypeCrdGroupDefinition:
-		if obj := res.(*resource.NvGroupDefinition); obj != nil {
+		if obj := res.(*api.NvGroupDefinition); obj != nil {
 			if nsToNameToObjs := d.crCache[rt]; nsToNameToObjs != nil {
 				if nameToObjs := nsToNameToObjs[obj.Namespace]; nameToObjs != nil {
 					if _, ok := nameToObjs[obj.Name]; ok {
@@ -682,7 +682,7 @@ metadata: {}
 					"CRD Rule format error: Group nv.ip.kubernetes.default(in definition) validate error. Details: Learned group domain does not match between name and criteria(key: domain, value: default2)",
 				}
 				for i := range nvGrpDefs {
-					_, errCount, errMsg, _ := crdHandler.parseCrdContent(resource.NvGroupDefKind, &nvGrpDefs[i], nil)
+					_, errCount, errMsg, _ := crdHandler.parseCrdContent(api.NvGroupDefKind, &nvGrpDefs[i], nil)
 					if errCount != expectedErrCount[i] || errMsg != expectedErrMsg[i] {
 						t.Errorf("[1-%d] parseCrdContent(NvGroupDefKind): Incorrect parsing result", i)
 						t.Logf("  Expect %d errors, msg: %s\n", expectedErrCount[i], expectedErrMsg[i])
@@ -866,7 +866,7 @@ metadata: {}
 				t.Logf("  Actual %d items\n", len(nvGrpDefs))
 			} else {
 				for i := range nvGrpDefs {
-					_, errCount, errMsg, _ := crdHandler.parseCrdContent(resource.NvGroupDefKind, &nvGrpDefs[i], nil)
+					_, errCount, errMsg, _ := crdHandler.parseCrdContent(api.NvGroupDefKind, &nvGrpDefs[i], nil)
 					if errCount > 0 && !strings.HasSuffix(errMsg, " is not found") {
 						t.Errorf("[2-%d] parseCrdContent(NvGroupDefKind) error\n %v", i, errMsg)
 					} else {
@@ -905,7 +905,7 @@ metadata: {}
 				}
 
 				for i := range secRules {
-					crdCfgRet, errCount, errMsg, _ := crdHandler.parseCrdContent(resource.NvSecurityRuleKind, &secRules[i], nil)
+					crdCfgRet, errCount, errMsg, _ := crdHandler.parseCrdContent(api.NvSecurityRuleKind, &secRules[i], nil)
 					if errCount > 0 {
 						t.Errorf("[2-%d] parseCrdContent(NvSecurityRuleKind) error\n %v", i, errMsg)
 					} else {
@@ -994,7 +994,7 @@ metadata: {}
 					"CRD Rule format error: Group g-2(in nvgroupdefinitions CR) has different criteria from existing group",
 				}
 				for i := range secRules {
-					_, errCount, errMsg, _ := crdHandler.parseCrdContent(resource.NvSecurityRuleKind, &secRules[i], nil)
+					_, errCount, errMsg, _ := crdHandler.parseCrdContent(api.NvSecurityRuleKind, &secRules[i], nil)
 					if errCount != expectedErrorCount[i] || errMsg != expectedErrorMsg[i] {
 						t.Errorf("[3-%d] parseCrdContent(NvSecurityRuleKind): Incorrect parsing result", i)
 						t.Logf("  Expect %d errors, msg: %s\n", expectedErrorCount[i], expectedErrorMsg[i])
@@ -1111,7 +1111,7 @@ metadata: {}
 				for i := range nvGrpDefs {
 					expectedErrCount := []int{1, 0}
 					expectedErrMsg := []string{"CRD file format error:  mismatched name in selector and metadata g-1", ""}
-					_, errCount, errMsg, _ := crdHandler2.parseCrdContent(resource.NvGroupDefKind, &nvGrpDefs[i], nil)
+					_, errCount, errMsg, _ := crdHandler2.parseCrdContent(api.NvGroupDefKind, &nvGrpDefs[i], nil)
 					if errCount != expectedErrCount[i] || errMsg != expectedErrMsg[i] {
 						t.Errorf("[5-%d] parseCrdContent(NvGroupDefKind): Incorrect parsing result", i)
 						t.Logf("  Expect %d errors, msg: %s\n", expectedErrCount[i], expectedErrMsg[i])
@@ -1178,7 +1178,7 @@ metadata: {}
 				for i := range nvGrpDefs {
 					expectedErrCount := []int{1}
 					expectedErrMsg := []string{"CRD Rule format error: NvGroupDefinition CR g-1 with different criteria exists in k8s"}
-					_, errCount, errMsg, _ := crdHandler2.parseCrdContent(resource.NvGroupDefKind, &nvGrpDefs[i], nil)
+					_, errCount, errMsg, _ := crdHandler2.parseCrdContent(api.NvGroupDefKind, &nvGrpDefs[i], nil)
 					if errCount != expectedErrCount[i] || errMsg != expectedErrMsg[i] {
 						t.Errorf("[6-%d] parseCrdContent(NvGroupDefKind): Incorrect parsing result", i)
 						t.Logf("  Expect %d errors, msg: %s\n", expectedErrCount[i], expectedErrMsg[i])
@@ -1222,7 +1222,7 @@ metadata: {}
 				t.Logf("  Expect 1 items\n")
 				t.Logf("  Actual %d items\n", len(secRules))
 			} else {
-				crdCfgRet, errCount, errMsg, _ := crdHandler2.parseCrdContent(resource.NvSecurityRuleKind, &secRules[0], nil)
+				crdCfgRet, errCount, errMsg, _ := crdHandler2.parseCrdContent(api.NvSecurityRuleKind, &secRules[0], nil)
 				if errCount > 0 {
 					t.Errorf("[7] parseCrdContent(NvSecurityRuleKind): Incorrect parsing result")
 					t.Logf("  Expect 0 errors\n")
@@ -1234,7 +1234,7 @@ metadata: {}
 				} else {
 					// if no parsing error, simulating reading CR from k8s
 					if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, "g-1"); err == nil {
-						if o, ok := obj.(*resource.NvGroupDefinition); ok {
+						if o, ok := obj.(*api.NvGroupDefinition); ok {
 							// expectedCriteria := api.RESTCriteriaEntry{Key: "container", Op: "=", Value: "myServer12"}
 							if crdCfgRet.GroupCfgs[0].Comment != o.Spec.Selector.Comment ||
 								!common.SameGroupCriteria(crdCfgRet.GroupCfgs[0].Criteria, o.Spec.Selector.Criteria, false) ||
@@ -1302,7 +1302,7 @@ metadata: {}
 				t.Logf("  Expect 1 items\n")
 				t.Logf("  Actual %d items\n", len(secRules))
 			} else {
-				_, errCount, errMsg, _ := crdHandler2.parseCrdContent(resource.NvSecurityRuleKind, &secRules[0], nil)
+				_, errCount, errMsg, _ := crdHandler2.parseCrdContent(api.NvSecurityRuleKind, &secRules[0], nil)
 				if errCount == 0 {
 					t.Errorf("[8] parseCrdContent(NvSecurityRuleKind): Incorrect parsing result")
 					t.Logf("  Expect 1 errors\n")
@@ -1357,10 +1357,10 @@ spec:
 `)
 
 		{
-			apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvGroupDefVersion)
-			nvGrpDefItem := resource.NvGroupDefinition{
+			apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, api.NvGroupDefVersion)
+			nvGrpDefItem := api.NvGroupDefinition{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       resource.NvGroupDefKind,
+					Kind:       api.NvGroupDefKind,
 					APIVersion: apiversion,
 				},
 				ObjectMeta: metav1.ObjectMeta{
@@ -1377,14 +1377,14 @@ spec:
 		if secRules, nvGrpDefs, err := parseGroupYamlFile(raw_string); err != nil {
 			t.Errorf("[9] parseGroupYamlFile failed: %s. Expect success", err)
 		} else {
-			parsedGrpDefs := make(map[string]*resource.NvSecurityParse)
+			parsedGrpDefs := make(map[string]*api.NvSecurityParse)
 			if len(nvGrpDefs) != 1 {
 				t.Errorf("[9] parseGroupYamlFile: Incorrect number of valid NvGroupDefinition yaml docs.")
 				t.Logf("  Expect 1 items\n")
 				t.Logf("  Actual %d items\n", len(nvGrpDefs))
 			} else {
 				for i := range nvGrpDefs {
-					//_, errCount, errMsg, _ := crdHandler2.parseCrdContent(resource.NvGroupDefKind, &nvGrpDefs[i], nil)
+					//_, errCount, errMsg, _ := crdHandler2.parseCrdContent(api.NvGroupDefKind, &nvGrpDefs[i], nil)
 					grpDefRet, errCount, errMsg := crdHandler2.parseCurCrdGrpDefContent(&nvGrpDefs[i], share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup)
 					expectedErrCount := 1
 					expectedMsg := "Group Policy Rule format error: Group g-1(in definition) has different criteria from existing group"
@@ -1404,7 +1404,7 @@ spec:
 				t.Logf("  Expect 1 items\n")
 				t.Logf("  Actual %d items\n", len(secRules))
 			} else {
-				_, errCount, errMsg, _ := crdHandler2.parseCrdContent(resource.NvSecurityRuleKind, &secRules[0], nil)
+				_, errCount, errMsg, _ := crdHandler2.parseCrdContent(api.NvSecurityRuleKind, &secRules[0], nil)
 				if errCount == 0 {
 					expectedErrCount := 1
 					expectedMsg := "CRD Rule format error: NvGroupDefinition of referred group g-1 is not found"

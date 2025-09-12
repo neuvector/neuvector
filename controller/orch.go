@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/neuvector/k8s"
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/share"
@@ -103,37 +104,37 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 		if event == resource.WatchEventDelete {
 			k8sResLog.WithFields(log.Fields{"event": event, "type": rt, "object": res, "old object": old}).Debug("Event received")
 			nvCrdInfo := map[string]*resource.NvCrdInfo{
-				resource.NvSecurityRuleName: {
+				api.NvSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
-					KvCrdKind: resource.NvSecurityRuleKind,
+					KvCrdKind: api.NvSecurityRuleKind,
 				},
-				resource.NvClusterSecurityRuleName: {
+				api.NvClusterSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
-					KvCrdKind: resource.NvSecurityRuleKind,
+					KvCrdKind: api.NvSecurityRuleKind,
 				},
-				resource.NvAdmCtrlSecurityRuleName: {
+				api.NvAdmCtrlSecurityRuleName: {
 					LockKey:   share.CLUSLockAdmCtrlKey,
-					KvCrdKind: resource.NvAdmCtrlSecurityRuleKind,
+					KvCrdKind: api.NvAdmCtrlSecurityRuleKind,
 				},
-				resource.NvResponseSecurityRuleName: {
+				api.NvResponseSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
-					KvCrdKind: resource.NvResponseSecurityRuleKind,
+					KvCrdKind: api.NvResponseSecurityRuleKind,
 				},
-				resource.NvDlpSecurityRuleName: {
+				api.NvDlpSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
-					KvCrdKind: resource.NvDlpSecurityRuleKind,
+					KvCrdKind: api.NvDlpSecurityRuleKind,
 				},
-				resource.NvWafSecurityRuleName: {
+				api.NvWafSecurityRuleName: {
 					LockKey:   share.CLUSLockPolicyKey,
-					KvCrdKind: resource.NvWafSecurityRuleKind,
+					KvCrdKind: api.NvWafSecurityRuleKind,
 				},
-				resource.NvVulnProfileSecurityRuleName: {
+				api.NvVulnProfileSecurityRuleName: {
 					LockKey:   share.CLUSLockVulnKey,
-					KvCrdKind: resource.NvVulnProfileSecurityRuleKind,
+					KvCrdKind: api.NvVulnProfileSecurityRuleKind,
 				},
-				resource.NvCompProfileSecurityRuleName: {
+				api.NvCompProfileSecurityRuleName: {
 					LockKey:   share.CLUSLockCompKey,
-					KvCrdKind: resource.NvCompProfileSecurityRuleKind,
+					KvCrdKind: api.NvCompProfileSecurityRuleKind,
 				},
 			}
 			var name string

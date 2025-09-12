@@ -1423,10 +1423,10 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, resource.NvAdmCtrlSecurityRuleVersion)
+	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, api.NvAdmCtrlSecurityRuleVersion)
 	metadatadName := share.ScopeLocal
-	kind := resource.NvAdmCtrlSecurityRuleKind
-	resp := resource.NvAdmCtrlSecurityRule{
+	kind := api.NvAdmCtrlSecurityRuleKind
+	resp := api.NvAdmCtrlSecurityRule{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: apiversion,
 			Kind:       kind,
@@ -1434,7 +1434,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		ObjectMeta: metav1.ObjectMeta{
 			Name: metadatadName,
 		},
-		Spec: resource.NvSecurityAdmCtrlSpec{},
+		Spec: api.NvSecurityAdmCtrlSpec{},
 	}
 
 	enable := false
@@ -1452,7 +1452,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			mode = *state.Mode
 			admClientMode = *state.AdmClientMode
 		}
-		resp.Spec.Config = &resource.NvSecurityAdmCtrlConfig{
+		resp.Spec.Config = &api.NvSecurityAdmCtrlConfig{
 			Enable:        &enable,
 			Mode:          &mode,
 			AdmClientMode: &admClientMode,
@@ -1467,12 +1467,12 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		}
 		defer clusHelper.ReleaseLock(lock)
 
-		var admissionRules []*resource.NvSecurityAdmCtrlRule
+		var admissionRules []*api.NvSecurityAdmCtrlRule
 		actionAllow := api.ValidatingAllowRuleType
 		actionDeny := api.ValidatingDenyRuleType
 		// export selected admission control rules
 		var ids utils.Set = utils.NewSet()
-		admissionRules = make([]*resource.NvSecurityAdmCtrlRule, 0, len(rconf.IDs))
+		admissionRules = make([]*api.NvSecurityAdmCtrlRule, 0, len(rconf.IDs))
 		for _, id := range rconf.IDs {
 			if ids.Contains(id) {
 				continue
@@ -1489,7 +1489,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			if rule.RuleType == api.ValidatingExceptRuleType || rule.RuleType == share.FedAdmCtrlExceptRulesType {
 				action = &actionAllow
 			}
-			ruleItem := resource.NvSecurityAdmCtrlRule{
+			ruleItem := api.NvSecurityAdmCtrlRule{
 				Action:   action,
 				Criteria: rule.Criteria,
 			}
@@ -1539,8 +1539,8 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 	defer os.Remove(importTask.TempFilename)
 
 	json_data, _ := os.ReadFile(importTask.TempFilename)
-	var secRule resource.NvAdmCtrlSecurityRule
-	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
+	var secRule api.NvAdmCtrlSecurityRule
+	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != api.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
 		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)

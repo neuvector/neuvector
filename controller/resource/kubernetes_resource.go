@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/access"
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
@@ -43,6 +44,7 @@ import (
 const kubeWatchRetry = time.Second * 5
 
 const (
+	constApiGroupNV               = "neuvector.com"
 	k8sAllApiGroup                = "*"
 	k8sAdmApiGroup                = "admissionregistration.k8s.io"
 	k8sCrdApiGroup                = "apiextensions.k8s.io"
@@ -572,8 +574,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvSecurityRule) },
-				func() metav1.ListInterface { return new(NvSecurityRuleList) },
+				func() metav1.Object { return new(api.NvSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvSecurityRuleList) },
 				xlateCrdNvSecurityRule,
 				nil,
 			},
@@ -585,8 +587,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvClusterSecurityRule) },
-				func() metav1.ListInterface { return new(NvClusterSecurityRuleList) },
+				func() metav1.Object { return new(api.NvClusterSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvClusterSecurityRuleList) },
 				xlateCrdNvClusterSecurityRule,
 				nil,
 			},
@@ -597,8 +599,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvGroupDefinition) },
-				func() metav1.ListInterface { return new(NvGroupDefinitionList) },
+				func() metav1.Object { return new(api.NvGroupDefinition) },
+				func() metav1.ListInterface { return new(api.NvGroupDefinitionList) },
 				xlateCrdNvGroupDefinition,
 				nil,
 			},
@@ -609,8 +611,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvAdmCtrlSecurityRule) },
-				func() metav1.ListInterface { return new(NvAdmCtrlSecurityRuleList) },
+				func() metav1.Object { return new(api.NvAdmCtrlSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvAdmCtrlSecurityRuleList) },
 				xlateCrdAdmCtrlRule,
 				nil,
 			},
@@ -621,8 +623,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvResponseSecurityRule) },
-				func() metav1.ListInterface { return new(NvResponseSecurityRuleList) },
+				func() metav1.Object { return new(api.NvResponseSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvResponseSecurityRuleList) },
 				xlateCrdResponseRule,
 				nil,
 			},
@@ -633,8 +635,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvDlpSecurityRule) },
-				func() metav1.ListInterface { return new(NvDlpSecurityRuleList) },
+				func() metav1.Object { return new(api.NvDlpSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvDlpSecurityRuleList) },
 				xlateCrdDlpSecurityRule,
 				nil,
 			},
@@ -645,8 +647,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvWafSecurityRule) },
-				func() metav1.ListInterface { return new(NvWafSecurityRuleList) },
+				func() metav1.Object { return new(api.NvWafSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvWafSecurityRuleList) },
 				xlateCrdWafSecurityRule,
 				nil,
 			},
@@ -657,8 +659,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvVulnProfileSecurityRule) },
-				func() metav1.ListInterface { return new(NvVulnProfileSecurityRuleList) },
+				func() metav1.Object { return new(api.NvVulnProfileSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvVulnProfileSecurityRuleList) },
 				xlateCrdVulnProfile,
 				nil,
 			},
@@ -669,8 +671,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvCompProfileSecurityRule) },
-				func() metav1.ListInterface { return new(NvCompProfileSecurityRuleList) },
+				func() metav1.Object { return new(api.NvCompProfileSecurityRule) },
+				func() metav1.ListInterface { return new(api.NvCompProfileSecurityRuleList) },
 				xlateCrdCompProfile,
 				nil,
 			},
@@ -681,8 +683,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvCspUsage) },
-				func() metav1.ListInterface { return new(NvCspUsageList) },
+				func() metav1.Object { return new(api.NvCspUsage) },
+				func() metav1.ListInterface { return new(api.NvCspUsageList) },
 				xlateCrdCspUsage,
 				nil,
 			},
@@ -1111,7 +1113,7 @@ func xlateCrd(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvSecurityRule); ok {
+	if o, ok := obj.(*api.NvSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1119,7 +1121,7 @@ func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvClusterSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvClusterSecurityRule); ok {
+	if o, ok := obj.(*api.NvClusterSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1127,7 +1129,7 @@ func xlateCrdNvClusterSecurityRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvGroupDefinition(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvGroupDefinition); ok {
+	if o, ok := obj.(*api.NvGroupDefinition); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1135,7 +1137,7 @@ func xlateCrdNvGroupDefinition(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdAdmCtrlRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvAdmCtrlSecurityRule); ok {
+	if o, ok := obj.(*api.NvAdmCtrlSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1143,7 +1145,7 @@ func xlateCrdAdmCtrlRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdResponseRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvResponseSecurityRule); ok {
+	if o, ok := obj.(*api.NvResponseSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1151,7 +1153,7 @@ func xlateCrdResponseRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdDlpSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvDlpSecurityRule); ok {
+	if o, ok := obj.(*api.NvDlpSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1159,7 +1161,7 @@ func xlateCrdDlpSecurityRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdWafSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvWafSecurityRule); ok {
+	if o, ok := obj.(*api.NvWafSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1167,7 +1169,7 @@ func xlateCrdWafSecurityRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdVulnProfile(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvVulnProfileSecurityRule); ok {
+	if o, ok := obj.(*api.NvVulnProfileSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1175,7 +1177,7 @@ func xlateCrdVulnProfile(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdCompProfile(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvCompProfileSecurityRule); ok {
+	if o, ok := obj.(*api.NvCompProfileSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1183,7 +1185,7 @@ func xlateCrdCompProfile(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdCspUsage(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvCspUsage); ok {
+	if o, ok := obj.(*api.NvCspUsage); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1341,35 +1343,35 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		d.lock.Lock()
 		switch rt {
 		case RscTypeCrdSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvSecurityRulePlural, true, &api.NvSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvSecurityRulePlural, true, &api.NvSecurityRuleList{})
 		case RscTypeCrdClusterSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvClusterSecurityRulePlural, false, &api.NvClusterSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvClusterSecurityRulePlural, false, &api.NvClusterSecurityRuleList{})
 		case RscTypeCrdGroupDefinition:
-			k8s.Register("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinition{})
-			k8s.RegisterList("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinitionList{})
+			k8s.Register("neuvector.com", "v1", api.NvGroupDefPlural, true, &api.NvGroupDefinition{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvGroupDefPlural, true, &api.NvGroupDefinitionList{})
 		case RscTypeCrdAdmCtrlSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvAdmCtrlSecurityRulePlural, false, &NvAdmCtrlSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvAdmCtrlSecurityRulePlural, false, &api.NvAdmCtrlSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvAdmCtrlSecurityRulePlural, false, &api.NvAdmCtrlSecurityRuleList{})
 		case RscTypeCrdResponseSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvResponseSecurityRulePlural, false, &NvResponseSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvResponseSecurityRulePlural, false, &NvResponseSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvResponseSecurityRulePlural, false, &api.NvResponseSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvResponseSecurityRulePlural, false, &api.NvResponseSecurityRuleList{})
 		case RscTypeCrdDlpSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvDlpSecurityRulePlural, false, &NvDlpSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvDlpSecurityRulePlural, false, &api.NvDlpSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvDlpSecurityRulePlural, false, &api.NvDlpSecurityRuleList{})
 		case RscTypeCrdWafSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvWafSecurityRulePlural, false, &NvWafSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvWafSecurityRulePlural, false, &api.NvWafSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvWafSecurityRulePlural, false, &api.NvWafSecurityRuleList{})
 		case RscTypeCrdVulnProfile:
-			k8s.Register("neuvector.com", "v1", NvVulnProfileSecurityRulePlural, false, &NvVulnProfileSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvVulnProfileSecurityRulePlural, false, &NvVulnProfileSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvVulnProfileSecurityRulePlural, false, &api.NvVulnProfileSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvVulnProfileSecurityRulePlural, false, &api.NvVulnProfileSecurityRuleList{})
 		case RscTypeCrdCompProfile:
-			k8s.Register("neuvector.com", "v1", NvCompProfileSecurityRulePlural, false, &NvCompProfileSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvCompProfileSecurityRulePlural, false, &NvCompProfileSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", api.NvCompProfileSecurityRulePlural, false, &api.NvCompProfileSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", api.NvCompProfileSecurityRulePlural, false, &api.NvCompProfileSecurityRuleList{})
 		case RscTypeCrdNvCspUsage:
-			k8s.Register("susecloud.net", "v1", NvCspUsagePlural, false, &NvCspUsage{})
-			k8s.RegisterList("susecloud.net", "v1", NvCspUsagePlural, false, &NvCspUsageList{})
+			k8s.Register("susecloud.net", "v1", api.NvCspUsagePlural, false, &api.NvCspUsage{})
+			k8s.RegisterList("susecloud.net", "v1", api.NvCspUsagePlural, false, &api.NvCspUsageList{})
 		default:
 			err = ErrResourceNotSupported
 		}

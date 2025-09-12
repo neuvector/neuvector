@@ -1104,13 +1104,13 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		return
 	}
 
-	apiVersion := resource.NvSecurityRuleVersion
-	resp := resource.NvWafSecurityRuleList{
+	apiVersion := api.NvSecurityRuleVersion
+	resp := api.NvWafSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       resource.NvListKind,
 			APIVersion: apiVersion,
 		},
-		Items: make([]resource.NvWafSecurityRule, 0, len(rconf.Names)),
+		Items: make([]api.NvWafSecurityRule, 0, len(rconf.Names)),
 	}
 
 	// export waf sensors
@@ -1120,7 +1120,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvWafSecurityRuleVersion)
+	apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, api.NvWafSecurityRuleVersion)
 	defSensor := clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
 	// export selected waf sensors
 	for _, name := range rconf.Names {
@@ -1135,7 +1135,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			continue
 		}
 
-		ruleList := make([]*resource.NvSecurityWafRule, 0, len(sensor.RuleListNames))
+		ruleList := make([]*api.NvSecurityWafRule, 0, len(sensor.RuleListNames))
 		for rName := range sensor.RuleListNames {
 			if r, ok := defSensor.RuleList[rName]; ok {
 				patterns := make([]api.RESTWafCriteriaEntry, len(r.Patterns))
@@ -1149,7 +1149,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				}
 				if ss := strings.Split(rName, common.WAFRuleTag); len(ss) > 1 {
 					r.Name = ss[1] // use simple name for exported sensor's rules
-					rule := &resource.NvSecurityWafRule{
+					rule := &api.NvSecurityWafRule{
 						Name:     &r.Name,
 						Patterns: patterns,
 					}
@@ -1157,8 +1157,8 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				}
 			}
 		}
-		kind := resource.NvWafSecurityRuleKind
-		resptmp := resource.NvWafSecurityRule{
+		kind := api.NvWafSecurityRuleKind
+		resptmp := api.NvWafSecurityRule{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       kind,
 				APIVersion: apiversion,
@@ -1166,8 +1166,8 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			ObjectMeta: metav1.ObjectMeta{
 				Name: sensor.Name,
 			},
-			Spec: resource.NvSecurityWafSpec{
-				Sensor: &resource.NvSecurityWafSensor{
+			Spec: api.NvSecurityWafSpec{
+				Sensor: &api.NvSecurityWafSensor{
 					Name:     sensor.Name,
 					RuleList: ruleList,
 					Comment:  &sensor.Comment,
@@ -1204,9 +1204,9 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	defer os.Remove(importTask.TempFilename)
 
 	json_data, _ := os.ReadFile(importTask.TempFilename)
-	var secRuleList resource.NvWafSecurityRuleList
-	var secRule resource.NvWafSecurityRule
-	var secRules []resource.NvWafSecurityRule
+	var secRuleList api.NvWafSecurityRuleList
+	var secRule api.NvWafSecurityRule
+	var secRules []api.NvWafSecurityRule
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
@@ -1217,7 +1217,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvWafSecurityRuleKind {
+		if r.APIVersion != "neuvector.com/v1" || r.Kind != api.NvWafSecurityRuleKind {
 			invalidCrdKind = true
 			break
 		}
@@ -1233,7 +1233,7 @@ func importWaf(scope string, loginDomainRoles access.DomainRole, importTask shar
 	var progress float32 // progress percentage
 
 	inc = 90.0 / float32(2+len(secRules))
-	parsedWafCfgs := make([]*resource.NvSecurityParse, 0, len(secRules))
+	parsedWafCfgs := make([]*api.NvSecurityParse, 0, len(secRules))
 	progress = 6
 
 	importTask.Percentage = int(progress)

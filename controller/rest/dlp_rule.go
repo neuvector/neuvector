@@ -1672,13 +1672,13 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		return
 	}
 
-	apiVersion := resource.NvSecurityRuleVersion
-	resp := resource.NvDlpSecurityRuleList{
+	apiVersion := api.NvSecurityRuleVersion
+	resp := api.NvDlpSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       resource.NvListKind,
 			APIVersion: apiVersion,
 		},
-		Items: make([]resource.NvDlpSecurityRule, 0, len(rconf.Names)),
+		Items: make([]api.NvDlpSecurityRule, 0, len(rconf.Names)),
 	}
 
 	// export dlp sensors
@@ -1688,7 +1688,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvDlpSecurityRuleVersion)
+	apiversion := fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, api.NvDlpSecurityRuleVersion)
 	defSensor := clusHelper.GetDlpSensor(share.CLUSDlpDefaultSensor)
 	// export selected dlp sensors
 	for _, name := range rconf.Names {
@@ -1703,7 +1703,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			continue
 		}
 
-		ruleList := make([]*resource.NvSecurityDlpRule, 0, len(sensor.RuleListNames))
+		ruleList := make([]*api.NvSecurityDlpRule, 0, len(sensor.RuleListNames))
 		for rName := range sensor.RuleListNames {
 			if r, ok := defSensor.RuleList[rName]; ok {
 				patterns := make([]api.RESTDlpCriteriaEntry, len(r.Patterns))
@@ -1717,7 +1717,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				}
 				if ss := strings.Split(rName, common.DLPRuleTag); len(ss) > 1 {
 					r.Name = ss[1] // use simple name for exported sensor's rules
-					rule := &resource.NvSecurityDlpRule{
+					rule := &api.NvSecurityDlpRule{
 						Name:     &r.Name,
 						Patterns: patterns,
 					}
@@ -1725,8 +1725,8 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				}
 			}
 		}
-		kind := resource.NvDlpSecurityRuleKind
-		resptmp := resource.NvDlpSecurityRule{
+		kind := api.NvDlpSecurityRuleKind
+		resptmp := api.NvDlpSecurityRule{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       kind,
 				APIVersion: apiversion,
@@ -1734,8 +1734,8 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			ObjectMeta: metav1.ObjectMeta{
 				Name: sensor.Name,
 			},
-			Spec: resource.NvSecurityDlpSpec{
-				Sensor: &resource.NvSecurityDlpSensor{
+			Spec: api.NvSecurityDlpSpec{
+				Sensor: &api.NvSecurityDlpSensor{
 					Name:     sensor.Name,
 					RuleList: ruleList,
 					Comment:  &sensor.Comment,
@@ -1772,9 +1772,9 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 	defer os.Remove(importTask.TempFilename)
 
 	json_data, _ := os.ReadFile(importTask.TempFilename)
-	var secRuleList resource.NvDlpSecurityRuleList
-	var secRule resource.NvDlpSecurityRule
-	var secRules []resource.NvDlpSecurityRule
+	var secRuleList api.NvDlpSecurityRuleList
+	var secRule api.NvDlpSecurityRule
+	var secRules []api.NvDlpSecurityRule
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
@@ -1785,7 +1785,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 		secRules = secRuleList.Items
 	}
 	for _, r := range secRules {
-		if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvDlpSecurityRuleKind {
+		if r.APIVersion != "neuvector.com/v1" || r.Kind != api.NvDlpSecurityRuleKind {
 			invalidCrdKind = true
 			break
 		}
@@ -1801,7 +1801,7 @@ func importDlp(scope string, loginDomainRoles access.DomainRole, importTask shar
 	var progress float32 // progress percentage
 
 	inc = 90.0 / float32(2+len(secRules))
-	parsedDlpCfgs := make([]*resource.NvSecurityParse, 0, len(secRules))
+	parsedDlpCfgs := make([]*api.NvSecurityParse, 0, len(secRules))
 	progress = 6
 
 	importTask.Percentage = int(progress)

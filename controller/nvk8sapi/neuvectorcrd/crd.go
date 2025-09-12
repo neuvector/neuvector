@@ -1573,21 +1573,21 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1(nvCrdMetaName string, v
 		Schema:  &apiextv1.CustomResourceValidation{},
 	}
 	switch nvCrdMetaName {
-	case resource.NvSecurityRuleName, resource.NvClusterSecurityRuleName:
+	case api.NvSecurityRuleName, api.NvClusterSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSeurityCrdNwPolicyV1Schema()
-	case resource.NvGroupDefName:
+	case api.NvGroupDefName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvCrdGroupDefinitionV1Schema()
-	case resource.NvAdmCtrlSecurityRuleName:
+	case api.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1Schema()
-	case resource.NvResponseSecurityRuleName:
+	case api.NvResponseSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdResponseV1Schema()
-	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
+	case api.NvDlpSecurityRuleName, api.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1Schema()
-	case resource.NvVulnProfileSecurityRuleName:
+	case api.NvVulnProfileSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdVulnProfileV1Schema()
-	case resource.NvCompProfileSecurityRuleName:
+	case api.NvCompProfileSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdCompProfileV1Schema()
-	case resource.NvCspUsageName:
+	case api.NvCspUsageName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvCspUsageV1Schema()
 	}
 	return v1
@@ -1602,21 +1602,21 @@ func (b *nvCrdSchmaBuilder) buildNvSecurityCrdByApiExtV1B1(nvCrdMetaName string,
 		Schema:  &apiextv1b1.CustomResourceValidation{},
 	}
 	switch nvCrdMetaName {
-	case resource.NvSecurityRuleName, resource.NvClusterSecurityRuleName:
+	case api.NvSecurityRuleName, api.NvClusterSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSeurityCrdNwPolicyV1B1Schema()
-	case resource.NvGroupDefName:
+	case api.NvGroupDefName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvCrdGroupDefinitionV1B1Schema()
-	case resource.NvAdmCtrlSecurityRuleName:
+	case api.NvAdmCtrlSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdAdmCtrlV1B1Schema()
-	case resource.NvResponseSecurityRuleName:
+	case api.NvResponseSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdResponseV1B1Schema()
-	case resource.NvDlpSecurityRuleName, resource.NvWafSecurityRuleName:
+	case api.NvDlpSecurityRuleName, api.NvWafSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdDlpWafV1B1Schema()
-	case resource.NvVulnProfileSecurityRuleName:
+	case api.NvVulnProfileSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdVulnProfileV1B1Schema()
-	case resource.NvCompProfileSecurityRuleName:
+	case api.NvCompProfileSecurityRuleName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvSecurityCrdCompProfileV1B1Schema()
-	case resource.NvCspUsageName:
+	case api.NvCspUsageName:
 		v1.Schema.OpenAPIV3Schema = b.buildNvCspUsageV1B1Schema()
 	}
 	return v1
@@ -1890,123 +1890,123 @@ func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []str
 	nvCrdInfoBasic := []*resource.NvCrdInfo{
 		{
 			RscType:           resource.RscTypeCrdSecurityRule,
-			MetaName:          resource.NvSecurityRuleName,
-			SpecScope:         resource.NvSecurityRuleScope,
+			MetaName:          api.NvSecurityRuleName,
+			SpecScope:         api.NvSecurityRuleScope,
 			SpecGroup:         common.OEMSecurityRuleGroup,
-			SpecVersion:       resource.NvSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvSecurityRulePlural,
-			SpecNamesKind:     resource.NvSecurityRuleKind,
-			SpecNamesSingular: resource.NvSecurityRuleSingular,
-			SpecNamesListKind: resource.NvSecurityRuleListKind,
+			SpecVersion:       api.NvSecurityRuleVersion,
+			SpecNamesPlural:   api.NvSecurityRulePlural,
+			SpecNamesKind:     api.NvSecurityRuleKind,
+			SpecNamesSingular: api.NvSecurityRuleSingular,
+			SpecNamesListKind: api.NvSecurityRuleListKind,
 			LockKey:           share.CLUSLockPolicyKey,
-			KvCrdKind:         resource.NvSecurityRuleKind,
+			KvCrdKind:         api.NvSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdClusterSecurityRule,
-			MetaName:          resource.NvClusterSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvClusterSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvClusterSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvClusterSecurityRulePlural,
-			SpecNamesKind:     resource.NvClusterSecurityRuleKind,
-			SpecNamesSingular: resource.NvClusterSecurityRuleSingular,
-			SpecNamesListKind: resource.NvClusterSecurityRuleListKind,
+			SpecVersion:       api.NvClusterSecurityRuleVersion,
+			SpecNamesPlural:   api.NvClusterSecurityRulePlural,
+			SpecNamesKind:     api.NvClusterSecurityRuleKind,
+			SpecNamesSingular: api.NvClusterSecurityRuleSingular,
+			SpecNamesListKind: api.NvClusterSecurityRuleListKind,
 			LockKey:           share.CLUSLockPolicyKey,
-			KvCrdKind:         resource.NvSecurityRuleKind,
+			KvCrdKind:         api.NvSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdAdmCtrlSecurityRule,
-			MetaName:          resource.NvAdmCtrlSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvAdmCtrlSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvAdmCtrlSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvAdmCtrlSecurityRulePlural,
-			SpecNamesKind:     resource.NvAdmCtrlSecurityRuleKind,
-			SpecNamesSingular: resource.NvAdmCtrlSecurityRuleSingular,
-			SpecNamesListKind: resource.NvAdmCtrlSecurityRuleListKind,
+			SpecVersion:       api.NvAdmCtrlSecurityRuleVersion,
+			SpecNamesPlural:   api.NvAdmCtrlSecurityRulePlural,
+			SpecNamesKind:     api.NvAdmCtrlSecurityRuleKind,
+			SpecNamesSingular: api.NvAdmCtrlSecurityRuleSingular,
+			SpecNamesListKind: api.NvAdmCtrlSecurityRuleListKind,
 			LockKey:           share.CLUSLockAdmCtrlKey,
-			KvCrdKind:         resource.NvAdmCtrlSecurityRuleKind,
+			KvCrdKind:         api.NvAdmCtrlSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdResponseSecurityRule,
-			MetaName:          resource.NvResponseSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvResponseSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvResponseSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvResponseSecurityRulePlural,
-			SpecNamesKind:     resource.NvResponseSecurityRuleKind,
-			SpecNamesSingular: resource.NvResponseSecurityRuleSingular,
-			SpecNamesListKind: resource.NvResponseSecurityRuleListKind,
+			SpecVersion:       api.NvResponseSecurityRuleVersion,
+			SpecNamesPlural:   api.NvResponseSecurityRulePlural,
+			SpecNamesKind:     api.NvResponseSecurityRuleKind,
+			SpecNamesSingular: api.NvResponseSecurityRuleSingular,
+			SpecNamesListKind: api.NvResponseSecurityRuleListKind,
 			LockKey:           share.CLUSLockPolicyKey,
-			KvCrdKind:         resource.NvResponseSecurityRuleKind,
+			KvCrdKind:         api.NvResponseSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdDlpSecurityRule,
-			MetaName:          resource.NvDlpSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvDlpSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvDlpSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvDlpSecurityRulePlural,
-			SpecNamesKind:     resource.NvDlpSecurityRuleKind,
-			SpecNamesSingular: resource.NvDlpSecurityRuleSingular,
-			SpecNamesListKind: resource.NvDlpSecurityRuleListKind,
+			SpecVersion:       api.NvDlpSecurityRuleVersion,
+			SpecNamesPlural:   api.NvDlpSecurityRulePlural,
+			SpecNamesKind:     api.NvDlpSecurityRuleKind,
+			SpecNamesSingular: api.NvDlpSecurityRuleSingular,
+			SpecNamesListKind: api.NvDlpSecurityRuleListKind,
 			LockKey:           share.CLUSLockPolicyKey,
-			KvCrdKind:         resource.NvDlpSecurityRuleKind,
+			KvCrdKind:         api.NvDlpSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdWafSecurityRule,
-			MetaName:          resource.NvWafSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvWafSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvWafSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvWafSecurityRulePlural,
-			SpecNamesKind:     resource.NvWafSecurityRuleKind,
-			SpecNamesSingular: resource.NvWafSecurityRuleSingular,
-			SpecNamesListKind: resource.NvWafSecurityRuleListKind,
+			SpecVersion:       api.NvWafSecurityRuleVersion,
+			SpecNamesPlural:   api.NvWafSecurityRulePlural,
+			SpecNamesKind:     api.NvWafSecurityRuleKind,
+			SpecNamesSingular: api.NvWafSecurityRuleSingular,
+			SpecNamesListKind: api.NvWafSecurityRuleListKind,
 			LockKey:           share.CLUSLockPolicyKey,
-			KvCrdKind:         resource.NvWafSecurityRuleKind,
+			KvCrdKind:         api.NvWafSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdVulnProfile,
-			MetaName:          resource.NvVulnProfileSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvVulnProfileSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvVulnProfileSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvVulnProfileSecurityRulePlural,
-			SpecNamesKind:     resource.NvVulnProfileSecurityRuleKind,
-			SpecNamesSingular: resource.NvVulnProfileSecurityRuleSingular,
-			SpecNamesListKind: resource.NvVulnProfileSecurityRuleListKind,
+			SpecVersion:       api.NvVulnProfileSecurityRuleVersion,
+			SpecNamesPlural:   api.NvVulnProfileSecurityRulePlural,
+			SpecNamesKind:     api.NvVulnProfileSecurityRuleKind,
+			SpecNamesSingular: api.NvVulnProfileSecurityRuleSingular,
+			SpecNamesListKind: api.NvVulnProfileSecurityRuleListKind,
 			LockKey:           share.CLUSLockVulnKey,
-			KvCrdKind:         resource.NvVulnProfileSecurityRuleKind,
+			KvCrdKind:         api.NvVulnProfileSecurityRuleKind,
 		},
 		{
 			RscType:           resource.RscTypeCrdCompProfile,
-			MetaName:          resource.NvCompProfileSecurityRuleName,
-			SpecScope:         resource.NvClusterSecurityRuleScope,
+			MetaName:          api.NvCompProfileSecurityRuleName,
+			SpecScope:         api.NvClusterSecurityRuleScope,
 			SpecGroup:         common.OEMClusterSecurityRuleGroup,
-			SpecVersion:       resource.NvCompProfileSecurityRuleVersion,
-			SpecNamesPlural:   resource.NvCompProfileSecurityRulePlural,
-			SpecNamesKind:     resource.NvCompProfileSecurityRuleKind,
-			SpecNamesSingular: resource.NvCompProfileSecurityRuleSingular,
-			SpecNamesListKind: resource.NvCompProfileSecurityRuleListKind,
+			SpecVersion:       api.NvCompProfileSecurityRuleVersion,
+			SpecNamesPlural:   api.NvCompProfileSecurityRulePlural,
+			SpecNamesKind:     api.NvCompProfileSecurityRuleKind,
+			SpecNamesSingular: api.NvCompProfileSecurityRuleSingular,
+			SpecNamesListKind: api.NvCompProfileSecurityRuleListKind,
 			LockKey:           share.CLUSLockCompKey,
-			KvCrdKind:         resource.NvCompProfileSecurityRuleKind,
+			KvCrdKind:         api.NvCompProfileSecurityRuleKind,
 		},
 	}
 	if cspType != share.CSP_NONE {
 		nvCrdInfo = []*resource.NvCrdInfo{
 			{
 				RscType:           resource.RscTypeCrdNvCspUsage,
-				MetaName:          resource.NvCspUsageName,
-				SpecScope:         resource.NvClusterSecurityRuleScope,
+				MetaName:          api.NvCspUsageName,
+				SpecScope:         api.NvClusterSecurityRuleScope,
 				SpecGroup:         "susecloud.net",
 				SpecVersion:       "v1",
-				SpecNamesPlural:   resource.NvCspUsagePlural,
-				SpecNamesKind:     resource.NvCspUsageKind,
-				SpecNamesSingular: resource.NvCspUsageSingular,
-				SpecNamesListKind: resource.NvCspUsageListKind,
+				SpecNamesPlural:   api.NvCspUsagePlural,
+				SpecNamesKind:     api.NvCspUsageKind,
+				SpecNamesSingular: api.NvCspUsageSingular,
+				SpecNamesListKind: api.NvCspUsageListKind,
 				LockKey:           "",
-				KvCrdKind:         resource.NvCspUsageKind,
+				KvCrdKind:         api.NvCspUsageKind,
 				ShortNames:        []string{"caur"},
 			},
 		}

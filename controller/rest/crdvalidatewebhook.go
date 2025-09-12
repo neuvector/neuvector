@@ -16,6 +16,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -76,7 +77,7 @@ LOOP:
 				crUid := ""
 				req := ar.Request
 				var raw []byte
-				var secRulePartial resource.NvSecurityRulePartial
+				var secRulePartial api.NvSecurityRulePartial
 				if req.Operation == "DELETE" {
 					raw = req.OldObject.Raw
 				} else {
@@ -96,7 +97,7 @@ LOOP:
 func (q *tCrdRequestsMgr) crdProcEnqueue(ar *admissionv1beta1.AdmissionReview) (string, error) {
 	var ruleNs string
 	req := ar.Request
-	if req.Kind.Kind == resource.NvSecurityRuleKind {
+	if req.Kind.Kind == api.NvSecurityRuleKind {
 		ruleNs = req.Namespace
 	} else {
 		ruleNs = "default"
@@ -271,7 +272,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			var lockKey string
 			var crdHandler nvCrdHandler
 			record := crdProcRecord.CrdRecord
-			if record.Request.Kind.Kind == resource.NvAdmCtrlSecurityRuleKind {
+			if record.Request.Kind.Kind == api.NvAdmCtrlSecurityRuleKind {
 				lockKey = share.CLUSLockAdmCtrlKey
 			} else {
 				lockKey = share.CLUSLockPolicyKey
@@ -283,7 +284,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 
 			var kind string
 			var rscType string
-			var secRulePartial resource.NvSecurityRulePartial
+			var secRulePartial api.NvSecurityRulePartial
 			var crdSecRule interface{}
 			var errCount, cachedRecords int
 			var errMsg string
@@ -318,7 +319,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 				if crdSecRule, err = resource.CreateNvCrdObject(rscType); crdSecRule != nil {
 					if err = json.Unmarshal(req.Object.Raw, crdSecRule); err == nil {
 						crdHash, _, err = crdHandler.getCrInfo(crdSecRule)
-						if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
+						if kind == api.NvSecurityRuleKind || kind == api.NvClusterSecurityRuleKind {
 							if req.Namespace != "" {
 								// if the namespace of the CR does not exist in k8s, skip processing this CREATE/DELETE request
 								_, err2 := global.ORCH.GetResource(resource.RscTypeNamespace, "", req.Namespace)
@@ -368,11 +369,11 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 					}
 				}
 
-				if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
+				if kind == api.NvSecurityRuleKind || kind == api.NvClusterSecurityRuleKind {
 					// only lead controller reaches here
 					reload := atomic.SwapUint32(&q.reloadRecords, 0)
 					if reload > 0 || len(recordList) == 0 {
-						recordList = clusHelper.GetCrdSecurityRuleRecordList(resource.NvSecurityRuleKind)
+						recordList = clusHelper.GetCrdSecurityRuleRecordList(api.NvSecurityRuleKind)
 					}
 				}
 
@@ -455,7 +456,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		if ar.Request.Name == "" {
 			req := ar.Request
 			if req != nil && reqOp == admissionv1beta1.Delete && req.Name == "" {
-				var secRulePartial resource.NvSecurityRulePartial
+				var secRulePartial api.NvSecurityRulePartial
 				if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil {
 					req.Name = secRulePartial.GetName()
 				} else {
@@ -486,18 +487,18 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		if len(sizeErrMsg) == 0 && (reqOp == admissionv1beta1.Create || reqUpdateByK8sGC) {
 			mdName := ""
 			allowedName := ""
-			var secRulePartial resource.NvSecurityRulePartial
+			var secRulePartial api.NvSecurityRulePartial
 			req := ar.Request
 			if err := json.Unmarshal(req.Object.Raw, &secRulePartial); err == nil {
 				mdName = secRulePartial.GetName()
 			}
 			if reqOp == admissionv1beta1.Create {
 				switch req.Kind.Kind {
-				case resource.NvAdmCtrlSecurityRuleKind:
+				case api.NvAdmCtrlSecurityRuleKind:
 					allowedName = share.ScopeLocal
-				case resource.NvVulnProfileSecurityRuleKind:
+				case api.NvVulnProfileSecurityRuleKind:
 					allowedName = share.DefaultVulnerabilityProfileName
-				case resource.NvCompProfileSecurityRuleKind:
+				case api.NvCompProfileSecurityRuleKind:
 					allowedName = share.DefaultComplianceProfileName
 				}
 				if allowedName != "" && mdName != allowedName {
@@ -536,7 +537,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		}
 
 		if !skip {
-			if ar.Request.Kind.Kind == resource.NvGroupDefKind {
+			if ar.Request.Kind.Kind == api.NvGroupDefKind {
 				// realtime handling only for nvgroupdefinitions CR requests
 				resultMsg, allowed = whsvr.crdServeNvGroupDef(&ar)
 			} else {
@@ -597,7 +598,7 @@ func (whsvr *WebhookServer) crdServeNvGroupDef(ar *admissionv1beta1.AdmissionRev
 		crdHandler.mdName = req.Name
 		if crdSecRule, err := resource.CreateNvCrdObject(req.Resource.Resource); crdSecRule != nil {
 			if err = json.Unmarshal(req.Object.Raw, crdSecRule); err == nil {
-				if grpDef, ok := crdSecRule.(*resource.NvGroupDefinition); ok {
+				if grpDef, ok := crdSecRule.(*api.NvGroupDefinition); ok {
 					if isReservedNvGroupDefName(grpDef.GetName()) {
 						errMsg = fmt.Sprintf("group %s cannot be defined by cr", grpDef.GetName())
 					} else {
