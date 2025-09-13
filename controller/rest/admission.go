@@ -1467,12 +1467,12 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		}
 		defer clusHelper.ReleaseLock(lock)
 
-		var admissionRules []*resource.NvSecurityAdmCtrlRule
+		var admissionRules []*api.NvSecurityAdmCtrlRule
 		actionAllow := api.ValidatingAllowRuleType
 		actionDeny := api.ValidatingDenyRuleType
 		// export selected admission control rules
 		var ids utils.Set = utils.NewSet()
-		admissionRules = make([]*resource.NvSecurityAdmCtrlRule, 0, len(rconf.IDs))
+		admissionRules = make([]*api.NvSecurityAdmCtrlRule, 0, len(rconf.IDs))
 		for _, id := range rconf.IDs {
 			if ids.Contains(id) {
 				continue
@@ -1489,7 +1489,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			if rule.RuleType == api.ValidatingExceptRuleType || rule.RuleType == share.FedAdmCtrlExceptRulesType {
 				action = &actionAllow
 			}
-			ruleItem := resource.NvSecurityAdmCtrlRule{
+			ruleItem := api.NvSecurityAdmCtrlRule{
 				Action:   action,
 				Criteria: rule.Criteria,
 			}
