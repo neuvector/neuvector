@@ -1222,6 +1222,14 @@ func fillContainerProperties(c *containerData, parent *containerData,
 			}
 			parent.hasDatapath = false
 		}
+
+		if Host.Platform == share.PlatformKubernetes {
+			if pct, secure := global.ORCH.GetPlatformRole(&info.ContainerMeta); pct != "" {
+				c.capBlock = secure
+			} else {
+				c.capBlock = true
+			}
+		}
 	}
 
 	c.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
