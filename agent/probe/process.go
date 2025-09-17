@@ -2561,16 +2561,7 @@ func (p *Probe) procProfileEval(id string, proc *procInternal, bKeepAlive bool) 
 			} else {
 				bKeepAlive = false
 			}
-		} else { // basic
-			if c, ok := p.pidContainerMap[proc.pid]; ok {
-				if yes, mounted := global.SYS.IsNotContainerFile(c.rootPid, pp.Path); yes || mounted {
-					if global.RT.IsRuntimeProcess(proc.name, nil) { // ignore them
-						pp.Action = share.PolicyActionAllow
-					}
-				}
-			}
 		}
-
 		if pp.Action == share.PolicyActionViolate || pp.Action == share.PolicyActionDeny {
 			if pp.Uuid != share.CLUSReservedUuidAnchorMode || svcGroup == share.GroupNVProtect {
 				var bParentHostProc bool
@@ -3015,11 +3006,11 @@ func (p *Probe) PatchContainerProcess(pid int, bEval bool) bool {
 }
 
 func isControllerType(role string) bool {
-	return role == "controller" || role == "controller+enforcer+manager"
+	return role == "controller" || role == "controller+enforcer+manager" || role == "allinone"
 }
 
 func isManagerType(role string) bool {
-	return role == "manager" || role == "controller+enforcer+manager"
+	return role == "manager" || role == "controller+enforcer+manager" || role == "allinone"
 }
 
 // protected by lock
@@ -3093,8 +3084,6 @@ func (p *Probe) isNVChildProcess(c *procContainer, proc *procInternal) bool {
 				return false
 			case "/usr/bin/bash": // cli checks
 				return isManagerType(nvRole)
-			case "/usr/local/bin/monitor":
-				return true
 			}
 			break
 		}
@@ -3181,11 +3170,6 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 		if yes, mounted := global.SYS.IsNotContainerFile(c.rootPid, ppe.Path); yes || mounted {
 			// We will not monitor files under the mounted folder
 			// The mounted condition: utils.IsContainerMountFile(c.rootPid, ppe.Path)
-			if global.RT.IsRuntimeProcess(proc.name, nil) { // ignore them
-				ppe.Action = share.PolicyActionAllow
-				return true
-			}
-
 			if c.bPrivileged {
 				mLog.WithFields(log.Fields{"file": ppe.Path, "id": id}).Debug("SHD: priviiged system pod")
 			} else if mounted {
@@ -3195,7 +3179,7 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				ppid := 0
 				cID := ""
 				// The process (like "setns") is from a privileged pod (like enforcer)
-				if proc.ppid == p.agentPid || proc.pid == p.agentPid {
+				if proc.ppid == p.agentPid {
 					ppid = p.agentPid
 					cID = p.selfID
 				} else if pContainer, ok := p.pidContainerMap[proc.ppid]; ok && pContainer.id != "" && pContainer.bPrivileged {
@@ -3212,11 +3196,9 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 				}
 
 				if !bFromPrivilegedPod {
-					if cID != p.selfID && cID != p.podID {
-						// this file is not existed
-						bImageFile = false
-						mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
-					}
+					// this file is not existed
+					bImageFile = false
+					mLog.WithFields(log.Fields{"file": ppe.Path, "pid": c.rootPid}).Debug("SHD: not in image")
 				}
 			}
 
@@ -3295,16 +3277,10 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			}
 		}
 	}
-
 	mLog.WithFields(log.Fields{"ppe": ppe, "pid": proc.pid, "proc": proc, "id": id}).Debug("SHD:")
 	// ZeroDrift: allow a family member of the root process
 	bFamily := isFamilyProcess(c.children, proc)
-	bNVChild := p.isNVChildProcess(c, proc)
-	if bNVChild {
-		ppe.Action = share.PolicyActionAllow
-	}
-
-	if bFamily || bRuncChild || bNVChild {
+	if bFamily || bRuncChild || p.isNVChildProcess(c, proc) {
 		// a family member
 		if bFromPmon && bFamily {
 			c.outsider.Remove(proc.pid)
@@ -3400,19 +3376,25 @@ func (p *Probe) BuildProcessFamilyGroups(id, nvRole string, rootPid int, bSandbo
 
 	c, ok := p.containerMap[id]
 	if !ok {
-		c = &procContainer{
-			id:       id,
-			children: utils.NewSet(rootPid),
-			outsider: utils.NewSet(), // empty
-			rootPid:  rootPid,
-			newBorn:  0,
-			userns:   &userNs{users: make(map[int]string), uidMin: osutil.UserUidMin},
-			portsMap: make(map[osutil.SocketInfo]*procApp),
-			fInfo:    make(map[string]*fileInfo),
-			startAt:  time.Now(),
-			nvRole:   nvRole,
+		if bSandboxPod {
+			// some reused sandbox will not have a new prcesses
+			c = &procContainer{
+				id:       id,
+				children: utils.NewSet(rootPid),
+				outsider: utils.NewSet(), // empty
+				rootPid:  rootPid,
+				newBorn:  0,
+				userns:   &userNs{users: make(map[int]string), uidMin: osutil.UserUidMin},
+				portsMap: make(map[osutil.SocketInfo]*procApp),
+				fInfo:    make(map[string]*fileInfo),
+				startAt:  time.Now(),
+				nvRole:   nvRole,
+			}
+			p.containerMap[id] = c
+		} else {
+			log.WithFields(log.Fields{"id": id}).Error("SHD: Unknown ID")
+			return
 		}
-		p.containerMap[id] = c
 	}
 
 	p.cleanupProcessInContainer(id) // remove dead processes

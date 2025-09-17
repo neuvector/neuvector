@@ -283,7 +283,7 @@ func isNeuvectorFunctionRole(role string, rootPid int) bool {
 	}
 
 	if cmds, err := global.SYS.ReadCmdLine(rootPid); err == nil && len(cmds) > 0 {
-		// log.WithFields(log.Fields{"role": role, "cmds": cmds}).Debug("PROC:")
+		//	log.WithFields(log.Fields{"role": role, "cmds": cmds}).Debug("PROC:")
 		for _, cmd := range cmds {
 			if strings.HasPrefix(cmd, entryPtSig) { // matched at least two criteria
 				return true
