@@ -655,10 +655,6 @@ func processPolicyLookup(id, riskType, pname, ppath string, pid, pgid, shellCmd 
 			ppe.Action = share.PolicyActionAllow // not recording
 		}
 
-		if bNeuvector {
-			group = share.GroupNVProtect // updated
-		}
-
 		switch ppe.Action {
 		case share.PolicyActionLearn:
 			if riskType != "" { // risky processs
