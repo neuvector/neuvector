@@ -3174,20 +3174,20 @@ func (m clusterHelper) DeleteCustomRole(name string) error {
 
 func (m clusterHelper) SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc) {}
 
-func objCfgStore2networkStore(key string) (string, bool) {
+func objCfgStore2networkStore(key string) string {
 	switch share.CLUSConfigKey2Config(key) {
 	case share.CFGEndpointFileMonitor:
-		return share.CLUSFileMonitorNetworkKey(share.CLUSKeyLastToken(key)), false
+		return share.CLUSFileMonitorNetworkKey(share.CLUSKeyLastToken(key))
 	case share.CFGEndpointFileAccessRule:
-		return share.CLUSFileAccessRuleNetworkKey(share.CLUSKeyLastToken(key)), false
+		return share.CLUSFileAccessRuleNetworkKey(share.CLUSKeyLastToken(key))
 	case share.CFGEndpointGroup:
-		return share.CLUSGroupNetworkKey(share.CLUSKeyLastToken(key)), false
+		return share.CLUSGroupNetworkKey(share.CLUSKeyLastToken(key))
 	case share.CFGEndpointScript:
-		return share.CLUSCustomCheckNetworkKey(share.CLUSKeyLastToken(key)), false
+		return share.CLUSCustomCheckNetworkKey(share.CLUSKeyLastToken(key))
 	case share.CFGEndpointProcessProfile:
-		return share.CLUSProfileKey(share.CLUSKeyLastToken(key)), true
+		return share.CLUSProfileKey(share.CLUSKeyLastToken(key))
 	}
-	return "", false
+	return ""
 }
 
 func (m clusterHelper) duplicateProfileKey(key string, value []byte, txn *cluster.ClusterTransact, bPutIfNotExist bool) error {
@@ -3196,22 +3196,13 @@ func (m clusterHelper) duplicateProfileKey(key string, value []byte, txn *cluste
 	}
 
 	// object/config/endpoint/name to profiles/
-	if profileKey, bProcessEnpt := objCfgStore2networkStore(key); profileKey != "" {
+	if profileKey := objCfgStore2networkStore(key); profileKey != "" {
 		group := share.CLUSKeyLastToken(profileKey)
 		if !utils.HasGroupProfiles(group) {
 			// skip non-profile groups, like "nv.ip.xxx"
 			return nil
 		}
-
-		profileMode := share.PolicyModeUnavailable
-		if bProcessEnpt && utils.DoesGroupHavePolicyMode(group) { // retrive its profileMode
-			var profile share.CLUSProcessProfile
-			if dbgError := json.Unmarshal(value, &profile); dbgError != nil {
-				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-			}
-			profileMode = profile.Mode
-		}
-		return dispatcher.PutProfile(group, profileKey, profileMode, utils.GzipBytes(value), txn, bPutIfNotExist)
+		return dispatcher.PutProfile(group, profileKey, utils.GzipBytes(value), txn, bPutIfNotExist)
 	}
 	return nil
 }
@@ -3232,7 +3223,7 @@ func (m clusterHelper) DuplicateNetworkKeyTxn(txn *cluster.ClusterTransact, key 
 func (m clusterHelper) RestoreNetworkKeys() {
 	keys, _ := cluster.GetStoreKeys(share.CLUSConfigStore)
 	for _, key := range keys {
-		if profileKey, _ := objCfgStore2networkStore(key); profileKey != "" {
+		if profileKey := objCfgStore2networkStore(key); profileKey != "" {
 			if utils.IsGroupNodes(share.CLUSKeyLastToken(profileKey)) {
 				// restore keys only under the common profiles
 				if value, _, _ := m.get(key); value != nil {

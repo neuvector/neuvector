@@ -1563,8 +1563,8 @@ func applyProcessProfilePolicy(c *containerData, service string) {
 		c.blocking = (pg.Mode == share.PolicyModeEnforce)
 		prober.HandleProcessPolicyChange(c.id, c.pid, pg, !c.pushPHistory, c.blocking && c.capBlock)
 		c.pushPHistory = true
-	} else { // never here
-		log.WithFields(log.Fields{"id": c.id, "service": service}).Debug("PROC: process rules not ready")
+	} else {
+		log.WithFields(log.Fields{"id": c.id}).Debug("PROC: process rules not ready")
 	}
 }
 
@@ -1994,8 +1994,8 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		return
 	}
 
-	log.WithFields(log.Fields{"name": info.Name, "id": info.ID}).Info()
-	log.WithFields(log.Fields{"container": info}).Debug()
+	log.WithFields(log.Fields{"name": info.Name, "id": info.ID}).Info("")
+	log.WithFields(log.Fields{"container": info}).Debug("")
 
 	/*
 		// Check if container is intermediate
@@ -2024,7 +2024,18 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 	gInfo.allContainers.Add(id)
 	gInfoUnlock()
 
-	svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
+	if !info.Running {
+		// service is not reported until container is running; domain should be filled.
+		// it reports the exited container as well
+		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
+		service := utils.MakeServiceName(svc.Domain, svc.Name)
+		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &service, domain: &svc.Domain}
+		ClusterEventChan <- &ev
+
+		log.Debug("Container not running")
+		return
+	}
+
 	c := &containerData{
 		id:             id,
 		name:           info.Name,
@@ -2036,34 +2047,14 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		pods:           utils.NewSet(),
 		ownListenPorts: utils.NewSet(),
 		healthCheck:    info.Healthcheck,
-		service:        utils.MakeServiceName(svc.Domain, svc.Name),
-		domain:         svc.Domain,
 	}
-
 	gInfoLock()
 	gInfo.activeContainers[id] = c
 	gInfo.activePid2ID[c.pid] = id
 	gInfoUnlock()
 
-	go func() {
-		service := makeLearnedGroupName(utils.NormalizeForURL(c.service))
-		applyProcessProfilePolicy(c, service) // mode is passed later for process monitor reasons
-	}()
-
 	if c.pid != 0 {
 		bench.AddContainer(id, info.Name)
-	}
-
-	if !info.Running {
-		// service is not reported until container is running; domain should be filled.
-		// it reports the exited container as well
-		svc := global.ORCH.GetService(&info.ContainerMeta, Host.Name)
-		service := utils.MakeServiceName(svc.Domain, svc.Name)
-		ev := ClusterEvent{event: EV_ADD_CONTAINER, id: id, info: info, service: &service, domain: &svc.Domain}
-		ClusterEventChan <- &ev
-
-		log.Debug("Container not running")
-		return
 	}
 
 	since := time.Since(info.StartedAt)
@@ -2183,6 +2174,7 @@ func taskStopContainer(id string, pid int) {
 			delProxyMeshMac(c, true)
 		}
 	}
+	delete(gInfo.activeContainers, id)
 	delete(gInfo.activePid2ID, c.pid)
 
 	subnetUpdate := refreshLocalSubnets()
@@ -2190,13 +2182,6 @@ func taskStopContainer(id string, pid int) {
 	pe.DeleteNetworkPolicy(id)
 
 	gInfoUnlock()
-
-	go func() {
-		time.Sleep(time.Second * 10)
-		gInfoLock()
-		delete(gInfo.activeContainers, id)
-		gInfoUnlock()
-	}()
 
 	if dp.Connected() {
 		if subnetUpdate {
