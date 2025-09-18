@@ -1410,7 +1410,7 @@ func createDefaultXffSetting() {
 func EnforceNetSysConfig() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
-	if cfg.XffEnabled || cfg.DisableNetPolicy || cfg.DetectUnmanagedWl {
+	if cfg.XffEnabled || cfg.DisableNetPolicy || cfg.DetectUnmanagedWl || cfg.StrictGroupMode {
 		_ = clusHelper.PutSystemConfigRev(cfg, rev)
 	}
 }

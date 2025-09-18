@@ -506,6 +506,15 @@ func GetPortRangeLink(ipproto uint8, port uint16, portR uint16) string {
 	}
 }
 
+func IsPolicyModeEnforce(addr *share.CLUSWorkloadAddr, addrMap map[string]*share.CLUSWorkloadAddr) bool {
+	if a, ok := addrMap[addr.WlID]; ok {
+		if a.PolicyMode == share.PolicyModeEnforce {
+			return true
+		}
+	}
+	return false
+}
+
 func IsHostRelated(addr *share.CLUSWorkloadAddr) bool {
 	if strings.HasPrefix(addr.WlID, share.CLUSLearnedHostPrefix) {
 		return true

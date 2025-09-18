@@ -10,6 +10,7 @@ import (
 )
 
 var polAppDir int
+var StrictGroupMode bool = false
 
 type GroupProcPolicyCallback func(id string) (*share.CLUSProcessProfile, bool)
 

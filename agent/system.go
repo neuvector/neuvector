@@ -152,6 +152,14 @@ func systemConfigUnmanagedWl(detectUnmanagedWl bool) {
 	dp.DPCtrlSetDetectUnmanagedWl(&duw)
 }
 
+func systemConfigStrictGroupMode(strictGroupMode bool) {
+	if gInfo.strictGroupMode == strictGroupMode {
+		return
+	}
+	gInfo.strictGroupMode = strictGroupMode
+	policy.StrictGroupMode = strictGroupMode
+}
+
 func systemConfigEnableIcmpPolicy(enableIcmpPolicy bool) {
 	if gInfo.enableIcmpPolicy == enableIcmpPolicy {
 		return
@@ -177,6 +185,7 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		systemConfigXff(conf.XffEnabled)
 		systemConfigNetPolicy(conf.DisableNetPolicy)
 		systemConfigUnmanagedWl(conf.DetectUnmanagedWl)
+		systemConfigStrictGroupMode(conf.StrictGroupMode)
 		systemConfigEnableIcmpPolicy(conf.EnableIcmpPolicy)
 	case cluster.ClusterNotifyDelete:
 		systemConfigPolicyMode(defaultPolicyMode)
@@ -184,6 +193,7 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 		systemConfigXff(defaultXffEnabled)
 		systemConfigNetPolicy(defaultDisableNetPolicy)
 		systemConfigUnmanagedWl(defaultDetectUnmanagedWl)
+		systemConfigStrictGroupMode(defaultStrictGroupMode)
 		systemConfigEnableIcmpPolicy(defaultEnableIcmpPolicy)
 	}
 }
