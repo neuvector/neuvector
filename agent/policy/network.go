@@ -306,7 +306,75 @@ func adjustActionNs(action uint8, from, to *share.CLUSWorkloadAddr, id uint32) u
 	return adjustedAction
 }
 
+func adjustActionStrict(action uint8, from, to *share.CLUSWorkloadAddr, id uint32) uint8 {
+	var adjustedAction uint8 = action
+	fromMode := from.PolicyMode
+	toMode := to.PolicyMode
+
+	switch fromMode {
+	case share.PolicyModeLearn:
+		if action == C.DP_POLICY_ACTION_DENY {
+			if polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 {
+				if toMode != share.PolicyModeEnforce {
+					adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+				}
+			} else if polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 {
+				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+			}
+		} else if id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
+			adjustedAction = C.DP_POLICY_ACTION_LEARN
+		}
+	case share.PolicyModeEvaluate:
+		if action == C.DP_POLICY_ACTION_DENY {
+			if polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 {
+				if toMode != share.PolicyModeEnforce {
+					adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+				}
+			} else if polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 {
+				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+			}
+		} else if toMode == share.PolicyModeLearn && id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
+			// Assume learn rule action is always ALLOW, so the original action
+			// is not checked here
+			adjustedAction = C.DP_POLICY_ACTION_LEARN
+		}
+	case share.PolicyModeEnforce:
+		if toMode == share.PolicyModeLearn && id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
+			adjustedAction = C.DP_POLICY_ACTION_LEARN
+		}
+	case "":
+		// src has no policy mode - meaning it's not a managed container
+		switch toMode {
+		case share.PolicyModeLearn:
+			if action == C.DP_POLICY_ACTION_DENY {
+				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+			} else if id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
+				adjustedAction = C.DP_POLICY_ACTION_LEARN
+			}
+		case share.PolicyModeEvaluate:
+			if action == C.DP_POLICY_ACTION_DENY {
+				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+			}
+		case share.PolicyModeEnforce:
+		case "":
+			log.WithFields(log.Fields{
+				"id": id, "from": from.WlID, "to": to.WlID,
+			}).Error("Missing policy mode for both src and dst!")
+		default:
+			log.WithFields(log.Fields{"id": id, "to": *to}).Error("Invalid policy mode!")
+		}
+	default:
+		log.WithFields(log.Fields{"id": id, "from": *from}).Error("Invalid policy mode!")
+	}
+	//log.WithFields(log.Fields{"id": id, "from": *from, "to": *to, "action": action,
+	//           "adjustedAction": adjustedAction,}).Debug("")
+	return adjustedAction
+}
+
 func adjustAction(action uint8, from, to *share.CLUSWorkloadAddr, id uint32) uint8 {
+	if StrictGroupMode {
+		return adjustActionStrict(action, from, to, id)
+	}
 	var adjustedAction uint8 = action
 	fromMode := from.PolicyMode
 	toMode := to.PolicyMode
@@ -369,7 +437,7 @@ func (e *Engine) createWorkloadRule(from, to *share.CLUSWorkloadAddr, policy *sh
 		action = C.DP_POLICY_ACTION_VIOLATE
 	}
 
-	if action == C.DP_POLICY_ACTION_LEARN || action == C.DP_POLICY_ACTION_ALLOW {
+	if pInfo.Nbe && (action == C.DP_POLICY_ACTION_LEARN || action == C.DP_POLICY_ACTION_ALLOW) {
 		action = adjustActionNs(action, from, to, policy.ID)
 	}
 
@@ -893,9 +961,10 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					e.createWorkloadRule(from, to, &pp, pInfo, false, sameHost)
 				} else {
 					isFromNbe := pInfo.Nbe
+					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(from, addrMap) && !utils.IsPolicyModeEnforce(to, addrMap)
 					// Only configure egress rule to external, as east-west egress traffic
 					// will be automatically allowed at DP
-					if isFromNbe || to.WlID == share.CLUSWLExternal || to.WlID == share.CLUSWLAddressGroup ||
+					if isStrict || isFromNbe || to.WlID == share.CLUSWLExternal || to.WlID == share.CLUSWLAddressGroup ||
 						to.WlID == share.CLUSHostAddrGroup || isWorkloadFqdn(to.WlID) || isWorkloadIP(to.WlID) {
 						fillWorkloadAddress(from, addrMap)
 						fillWorkloadAddress(to, addrMap)
@@ -936,9 +1005,10 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					e.createWorkloadRule(from, to, &pp, pInfo, true, sameHost)
 				} else {
 					isToNbe := pInfo.Nbe
+					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(to, addrMap) && !utils.IsPolicyModeEnforce(from, addrMap)
 					// Only configure ingress rule from external, as east-west ingress traffic
 					// will be automatically allowed at DP
-					if isToNbe || from.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLAddressGroup ||
+					if isStrict || isToNbe || from.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLAddressGroup ||
 						from.WlID == share.CLUSHostAddrGroup || isWorkloadFqdn(from.WlID) || isWorkloadIP(from.WlID) {
 						fillWorkloadAddress(from, addrMap)
 						fillWorkloadAddress(to, addrMap)

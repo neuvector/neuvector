@@ -226,6 +226,10 @@ func getDisableNetPolicyStatus() bool {
 	return systemConfigCache.DisableNetPolicy
 }
 
+func getStrictGroupModeStatus() bool {
+	return systemConfigCache.StrictGroupMode
+}
+
 func getNewServiceProfileBaseline() string {
 	return systemConfigCache.NewServiceProfileBaseline
 }
@@ -244,6 +248,10 @@ func (m CacheMethod) GetNetServicePolicyMode() string {
 
 func (m CacheMethod) GetDisableNetPolicyStatus() bool {
 	return getDisableNetPolicyStatus()
+}
+
+func (m CacheMethod) GetStrictGroupModeStatus() bool {
+	return getStrictGroupModeStatus()
 }
 
 func (m CacheMethod) GetNewServiceProfileBaseline() string {
@@ -313,6 +321,7 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 		NetServicePolicyMode:       systemConfigCache.NetServicePolicyMode,
 		DisableNetPolicy:           systemConfigCache.DisableNetPolicy,
 		DetectUnmanagedWl:          systemConfigCache.DetectUnmanagedWl,
+		StrictGroupMode:            systemConfigCache.StrictGroupMode,
 		ModeAutoD2M:                systemConfigCache.ModeAutoD2M,
 		ModeAutoD2MDuration:        systemConfigCache.ModeAutoD2MDuration,
 		ModeAutoM2P:                systemConfigCache.ModeAutoM2P,
@@ -488,6 +497,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			scheduleDlpRuleCalculation(true)
 		}
 		if cfg.DisableNetPolicy != systemConfigCache.DisableNetPolicy && !cfg.DisableNetPolicy {
+			bSchedulePolicy = true
+			scheduleDlpRuleCalculation(true)
+		}
+		if cfg.StrictGroupMode != systemConfigCache.StrictGroupMode {
 			bSchedulePolicy = true
 			scheduleDlpRuleCalculation(true)
 		}
