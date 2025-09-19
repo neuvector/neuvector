@@ -1894,6 +1894,7 @@ type RESTSysNetConfigConfig struct {
 	NetServicePolicyMode *string `json:"net_service_policy_mode,omitempty"`
 	DisableNetPolicy     *bool   `json:"disable_net_policy,omitempty"`
 	DetectUnmanagedWl    *bool   `json:"detect_unmanaged_wl,omitempty"`
+	StrictGroupMode      *bool   `json:"strict_group_mode,omitempty"`
 }
 
 type RESTSysAtmoConfigConfig struct {
@@ -2050,6 +2051,7 @@ type RESTSystemConfig struct {
 	NetServicePolicyMode       string                    `json:"net_service_policy_mode"`
 	DisableNetPolicy           bool                      `json:"disable_net_policy"`
 	DetectUnmanagedWl          bool                      `json:"detect_unmanaged_wl"`
+	StrictGroupMode            bool                      `json:"strict_group_mode"`
 	ModeAutoD2M                bool                      `json:"mode_auto_d2m"`
 	ModeAutoD2MDuration        int64                     `json:"mode_auto_d2m_duration"`
 	ModeAutoM2P                bool                      `json:"mode_auto_m2p"`
@@ -2141,6 +2143,7 @@ type RESTSystemConfigNetSvcV2 struct {
 	NetServicePolicyMode string `json:"net_service_policy_mode"`
 	DisableNetPolicy     bool   `json:"disable_net_policy"`
 	DetectUnmanagedWl    bool   `json:"detect_unmanaged_wl"`
+	StrictGroupMode      bool   `json:"strict_group_mode"`
 }
 
 type RESTSystemConfigModeAutoV2 struct {

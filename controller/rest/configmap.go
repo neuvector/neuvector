@@ -302,6 +302,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			NetServicePolicyMode: rc.NetServicePolicyMode,
 			DisableNetPolicy:     rc.DisableNetPolicy,
 			DetectUnmanagedWl:    rc.DetectUnmanagedWl,
+			StrictGroupMode:      rc.StrictGroupMode,
 		},
 		AtmoConfig: &api.RESTSysAtmoConfigConfig{
 			ModeAutoD2M:         rc.ModeAutoD2M,

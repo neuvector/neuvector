@@ -577,6 +577,7 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						NetServicePolicyMode: rconf.NetServicePolicyMode,
 						DisableNetPolicy:     rconf.DisableNetPolicy,
 						DetectUnmanagedWl:    rconf.DetectUnmanagedWl,
+						StrictGroupMode:      rconf.StrictGroupMode,
 					},
 					ModeAuto: api.RESTSystemConfigModeAutoV2{
 						ModeAutoD2M:         rconf.ModeAutoD2M,
@@ -1317,6 +1318,9 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 			}
 			if nc.DetectUnmanagedWl != nil {
 				cconf.DetectUnmanagedWl = *nc.DetectUnmanagedWl
+			}
+			if nc.StrictGroupMode != nil {
+				cconf.StrictGroupMode = *nc.StrictGroupMode
 			}
 		}
 

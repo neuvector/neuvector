@@ -57,6 +57,7 @@ const (
 	PolicyActionViolate  string = "violate"
 	PolicyActionCheckApp string = "check_app"
 	PolicyActionCheckVh  string = "check_vh"
+	PolicyActionCheckNbe string = "check_nbe"
 )
 
 const (

@@ -10759,6 +10759,9 @@ definitions:
       detect_unmanaged_wl:
         type: boolean
         example: true
+      strict_group_mode:
+        type: boolean
+        example: true
   RESTSystemConfig:
     type: object
     required:
@@ -11057,6 +11060,7 @@ definitions:
       - new_service_profile_baseline
       - disable_net_policy
       - detect_unmanaged_wl
+      - strict_group_mode
     properties:
       net_service_status:
         type: boolean
@@ -11068,6 +11072,9 @@ definitions:
         type: boolean
         example: false
       detect_unmanaged_wl:
+        type: boolean
+        example: true
+      strict_group_mode:
         type: boolean
         example: true
   RESTSystemConfigNewSvcV2:

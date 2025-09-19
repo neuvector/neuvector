@@ -121,6 +121,7 @@ var DefaultSystemConfig = share.CLUSSystemConfig{
 	NetServiceStatus:     false,
 	NetServicePolicyMode: share.PolicyModeLearn,
 	DisableNetPolicy:     false,
+	StrictGroupMode:      false,
 	EnableIcmpPolicy:     false,
 }
 
@@ -159,6 +160,8 @@ func PolicyActionString(action uint8) string {
 		return share.PolicyActionCheckApp
 	case C.DP_POLICY_ACTION_CHECK_VH:
 		return share.PolicyActionCheckVh
+	case C.DP_POLICY_ACTION_CHECK_NBE:
+		return share.PolicyActionCheckNbe
 	default:
 		return share.PolicyActionAllow
 	}
@@ -180,6 +183,8 @@ func PolicyActionRESTString(action uint8) string {
 		return share.PolicyActionCheckApp
 	case C.DP_POLICY_ACTION_CHECK_VH:
 		return share.PolicyActionCheckVh
+	case C.DP_POLICY_ACTION_CHECK_NBE:
+		return share.PolicyActionCheckNbe
 	default:
 		return share.PolicyActionAllow
 	}

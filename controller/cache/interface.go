@@ -225,6 +225,7 @@ type CacheInterface interface {
 	GetNetServiceStatus() bool
 	GetNetServicePolicyMode() string
 	GetDisableNetPolicyStatus() bool
+	GetStrictGroupModeStatus() bool
 
 	// Waf rule
 	GetAllWafSensors(scope string, acc *access.AccessControl) []*api.RESTWafSensor

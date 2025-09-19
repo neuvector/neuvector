@@ -121,6 +121,7 @@ type localSystemInfo struct {
 	ciliumCNI         bool
 	disableNetPolicy  bool
 	detectUnmanagedWl bool
+	strictGroupMode   bool
 	enableIcmpPolicy  bool
 	linkStates        map[string]bool
 }
@@ -132,6 +133,7 @@ var defaultTapProxymesh bool = true
 var defaultXffEnabled bool = false
 var defaultDisableNetPolicy bool = false
 var defaultDetectUnmanagedWl bool = false
+var defaultStrictGroupMode bool = false
 var defaultEnableIcmpPolicy bool = false
 var rtStorageDriver string
 
