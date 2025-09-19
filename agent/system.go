@@ -112,6 +112,8 @@ func systemConfigTapProxymesh(tapProxymesh bool) {
 	//proxy mesh status is changed
 	gInfo.tapProxymesh = tapProxymesh
 	gInfoRLock()
+	defer gInfoRUnlock()
+
 	for _, c := range gInfo.activeContainers {
 		if tapProxymesh {
 			//enable proxy mesh
@@ -121,7 +123,6 @@ func systemConfigTapProxymesh(tapProxymesh bool) {
 			disableTapProxymesh(c)
 		}
 	}
-	gInfoRUnlock()
 }
 
 func systemConfigXff(xffenabled bool) {
@@ -209,8 +210,9 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 	policyVerVal++
 	policyVer := uint16(policyVerVal % polVerMax)
 	workloadPolicyMap := make(map[string]*policy.WorkloadIPPolicyInfo)
-
 	gInfoRLock()
+	defer gInfoRUnlock()
+
 	for wlID, c := range gInfo.activeContainers {
 		//container that has no datapath needs not be
 		//in workloadPolicyMap to save memory and cpu
@@ -238,7 +240,6 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 		}
 		workloadPolicyMap[wlID] = &pInfo
 	}
-	gInfoRUnlock()
 	return workloadPolicyMap
 }
 
@@ -1403,6 +1404,8 @@ func domainConfigNbeDp(c *containerData, newnbe bool) {
 
 func domainConfigNbe(domain string, newnbe bool) {
 	gInfoRLock()
+	defer gInfoRUnlock()
+
 	for _, c := range gInfo.activeContainers {
 		if c.domain == domain {
 			if c.role != "" { //system container
@@ -1412,7 +1415,6 @@ func domainConfigNbe(domain string, newnbe bool) {
 			}
 		}
 	}
-	gInfoRUnlock()
 }
 
 func domainNBEChange(domain share.CLUSDomain) {
