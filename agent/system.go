@@ -111,6 +111,9 @@ func systemConfigPolicyMode(mode string) {
 func systemConfigTapProxymesh(tapProxymesh bool) {
 	//proxy mesh status is changed
 	gInfo.tapProxymesh = tapProxymesh
+	gInfoRLock()
+	defer gInfoRUnlock()
+
 	for _, c := range gInfo.activeContainers {
 		if tapProxymesh {
 			//enable proxy mesh
@@ -207,6 +210,9 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 	policyVerVal++
 	policyVer := uint16(policyVerVal % polVerMax)
 	workloadPolicyMap := make(map[string]*policy.WorkloadIPPolicyInfo)
+	gInfoRLock()
+	defer gInfoRUnlock()
+
 	for wlID, c := range gInfo.activeContainers {
 		//container that has no datapath needs not be
 		//in workloadPolicyMap to save memory and cpu
@@ -416,11 +422,13 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 	if hostPolicyChangeSet.Cardinality() > 0 && prober != nil {
 		// The hostPolicyChangeSet only contains parent pod, add the childen
 		// container id here as well as the prober works on individual container
+		gInfoRLock()
 		for _, c := range gInfo.activeContainers {
 			if c.parentNS != "" && hostPolicyChangeSet.Contains(c.parentNS) {
 				hostPolicyChangeSet.Add(c.id)
 			}
 		}
+		gInfoRUnlock()
 
 		log.WithFields(log.Fields{
 			"containers": hostPolicyChangeSet,
@@ -1391,6 +1399,9 @@ func domainConfigNbeDp(c *containerData, newnbe bool) {
 }
 
 func domainConfigNbe(domain string, newnbe bool) {
+	gInfoRLock()
+	defer gInfoRUnlock()
+
 	for _, c := range gInfo.activeContainers {
 		if c.domain == domain {
 			if c.role != "" { //system container
