@@ -117,10 +117,10 @@ func systemConfigTapProxymesh(tapProxymesh bool) {
 	for _, c := range gInfo.activeContainers {
 		if tapProxymesh {
 			//enable proxy mesh
-			enableTapProxymesh(c)
+			enableTapProxymesh(c, true)
 		} else {
 			//disable proxy mesh
-			disableTapProxymesh(c)
+			disableTapProxymesh(c, true)
 		}
 	}
 }

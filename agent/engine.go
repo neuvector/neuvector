@@ -737,14 +737,14 @@ func programDelProxyMeshDP(c *containerData, ns string) {
 	}
 }
 
-func enableTapProxymesh(c *containerData) {
-	updateProxyMeshMac(c, false)
+func enableTapProxymesh(c *containerData, withlock bool) {
+	updateProxyMeshMac(c, withlock)
 	programProxyMeshDP(c, false, false)
 }
 
-func disableTapProxymesh(c *containerData) {
+func disableTapProxymesh(c *containerData, withlock bool) {
 	programDelProxyMeshDP(c, "")
-	delProxyMeshMac(c, false)
+	delProxyMeshMac(c, withlock)
 }
 
 func getContainerIDByName(name string) string {
