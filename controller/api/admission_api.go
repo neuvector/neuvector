@@ -14,3 +14,15 @@ type NvSecurityAdmCtrlRule struct {
 type NvSecurityAdmCtrlRules struct {
 	Rules []*NvSecurityAdmCtrlRule `json:"rules,omitempty"`
 }
+
+// admission control CRD resourced are non-namespaced
+type NvSecurityAdmCtrlConfig struct {
+	Enable        *bool   `json:"enable,omitempty"`
+	Mode          *string `json:"mode,omitempty"`
+	AdmClientMode *string `json:"client_mode" validate:"required"`
+}
+
+type NvSecurityAdmCtrlSpec struct {
+	Config *NvSecurityAdmCtrlConfig `json:"config,omitempty"`
+	Rules  []*NvSecurityAdmCtrlRule `json:"rules,omitempty"`
+}

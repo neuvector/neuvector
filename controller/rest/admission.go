@@ -1434,7 +1434,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		ObjectMeta: metav1.ObjectMeta{
 			Name: metadatadName,
 		},
-		Spec: resource.NvSecurityAdmCtrlSpec{},
+		Spec: api.NvSecurityAdmCtrlSpec{},
 	}
 
 	enable := false
@@ -1452,7 +1452,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			mode = *state.Mode
 			admClientMode = *state.AdmClientMode
 		}
-		resp.Spec.Config = &resource.NvSecurityAdmCtrlConfig{
+		resp.Spec.Config = &api.NvSecurityAdmCtrlConfig{
 			Enable:        &enable,
 			Mode:          &mode,
 			AdmClientMode: &admClientMode,
