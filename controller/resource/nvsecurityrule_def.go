@@ -259,18 +259,6 @@ func init() {
 }
 */
 
-// admission control CRD resourced are non-namespaced
-type NvSecurityAdmCtrlConfig struct {
-	Enable        *bool   `json:"enable,omitempty"`
-	Mode          *string `json:"mode,omitempty"`
-	AdmClientMode *string `json:"client_mode" validate:"required"`
-}
-
-type NvSecurityAdmCtrlSpec struct {
-	Config *NvSecurityAdmCtrlConfig     `json:"config,omitempty"`
-	Rules  []*api.NvSecurityAdmCtrlRule `json:"rules,omitempty"`
-}
-
 /*
 	type NvAdmCtrlSecurityRule struct {
 		metav1.TypeMeta   `json:",inline"`
@@ -288,7 +276,7 @@ type NvSecurityAdmCtrlSpec struct {
 type NvAdmCtrlSecurityRule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Spec              NvSecurityAdmCtrlSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec              api.NvSecurityAdmCtrlSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvAdmCtrlSecurityRuleList struct {
