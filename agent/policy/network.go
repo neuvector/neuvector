@@ -961,7 +961,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					e.createWorkloadRule(from, to, &pp, pInfo, false, sameHost)
 				} else {
 					isFromNbe := pInfo.Nbe
-					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(from, addrMap) && !utils.IsPolicyModeEnforce(to, addrMap)
+					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(from, addrMap) &&
+						!utils.IsPolicyModeEnforce(to, addrMap) && pp.Action == C.DP_POLICY_ACTION_DENY
 					// Only configure egress rule to external, as east-west egress traffic
 					// will be automatically allowed at DP
 					if isStrict || isFromNbe || to.WlID == share.CLUSWLExternal || to.WlID == share.CLUSWLAddressGroup ||
@@ -1005,7 +1006,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					e.createWorkloadRule(from, to, &pp, pInfo, true, sameHost)
 				} else {
 					isToNbe := pInfo.Nbe
-					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(to, addrMap) && !utils.IsPolicyModeEnforce(from, addrMap)
+					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(to, addrMap) &&
+						!utils.IsPolicyModeEnforce(from, addrMap) && pp.Action == C.DP_POLICY_ACTION_DENY
 					// Only configure ingress rule from external, as east-west ingress traffic
 					// will be automatically allowed at DP
 					if isStrict || isToNbe || from.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLAddressGroup ||

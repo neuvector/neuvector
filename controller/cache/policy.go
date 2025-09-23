@@ -925,23 +925,24 @@ func getServiceAddrForMode(mode string) []*share.CLUSWorkloadAddr {
 	return dstList
 }
 
-func getMixedGroupPolicyForIngressStrict() []share.CLUSGroupIPPolicy {
-	policyList := make([]share.CLUSGroupIPPolicy, 0)
-	if len(wlLearnList) > 0 && len(wlEvalList) > 0 {
-		policy := share.CLUSGroupIPPolicy{
-			ID:     share.DefaultGroupRuleID,
-			Action: C.DP_POLICY_ACTION_VIOLATE,
-		}
-		policy.From = append(policy.From,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeLearn,
-			})
+func createMixedGroupPolicyStrict(action uint8, fromMode, toMode string, ingress bool) share.CLUSGroupIPPolicy {
+	policy := share.CLUSGroupIPPolicy{
+		ID:     share.DefaultGroupRuleID,
+		Action: action,
+	}
 
+	policy.From = append(policy.From,
+		&share.CLUSWorkloadAddr{
+			WlID:       share.CLUSWLModeGroup,
+			PolicyMode: fromMode,
+		})
+
+	// Handle "To" side differently for ingress/egress
+	if ingress {
 		policy.To = append(policy.To,
 			&share.CLUSWorkloadAddr{
 				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEvaluate,
+				PolicyMode: toMode,
 				LocalPortApp: []share.CLUSPortApp{
 					{
 						Ports:       "any",
@@ -949,58 +950,63 @@ func getMixedGroupPolicyForIngressStrict() []share.CLUSGroupIPPolicy {
 					},
 				},
 			})
-		printOneGroupIPPolicy(&policy)
+	} else {
+		policy.To = append(policy.To,
+			&share.CLUSWorkloadAddr{
+				WlID:       share.CLUSWLModeGroup,
+				PolicyMode: toMode,
+				LocalPortApp: []share.CLUSPortApp{
+					{
+						Ports:       "any",
+						Application: C.DP_POLICY_APP_ANY,
+					},
+				},
+				NatPortApp: []share.CLUSPortApp{
+					{
+						Ports:       "any",
+						Application: C.DP_POLICY_APP_ANY,
+					},
+				},
+			})
+
+		// Add service addresses for the "toMode"
+		srv := getServiceAddrForMode(toMode)
+		policy.To = append(policy.To, srv...)
+	}
+
+	printOneGroupIPPolicy(&policy)
+	return policy
+}
+
+func getMixedGroupPolicyForIngressStrict() []share.CLUSGroupIPPolicy {
+	policyList := make([]share.CLUSGroupIPPolicy, 0)
+	if len(wlLearnList) > 0 && len(wlEvalList) > 0 {
+		policy := createMixedGroupPolicyStrict(
+			C.DP_POLICY_ACTION_VIOLATE,
+			share.PolicyModeLearn,
+			share.PolicyModeEvaluate,
+			true,
+		)
 		policyList = append(policyList, policy)
 	}
 
 	if len(wlLearnList) > 0 && len(wlEnforceList) > 0 {
-		policy := share.CLUSGroupIPPolicy{
-			ID:     share.DefaultGroupRuleID,
-			Action: C.DP_POLICY_ACTION_DENY,
-		}
-		policy.From = append(policy.From,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeLearn,
-			})
-
-		policy.To = append(policy.To,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEnforce,
-				LocalPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-			})
-		printOneGroupIPPolicy(&policy)
+		policy := createMixedGroupPolicyStrict(
+			C.DP_POLICY_ACTION_DENY,
+			share.PolicyModeLearn,
+			share.PolicyModeEnforce,
+			true,
+		)
 		policyList = append(policyList, policy)
 	}
 
 	if len(wlEvalList) > 0 && len(wlEnforceList) > 0 {
-		policy := share.CLUSGroupIPPolicy{
-			ID:     share.DefaultGroupRuleID,
-			Action: C.DP_POLICY_ACTION_DENY,
-		}
-		policy.From = append(policy.From,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEvaluate,
-			})
-		policy.To = append(policy.To,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEnforce,
-				LocalPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-			})
-		printOneGroupIPPolicy(&policy)
+		policy := createMixedGroupPolicyStrict(
+			C.DP_POLICY_ACTION_DENY,
+			share.PolicyModeEvaluate,
+			share.PolicyModeEnforce,
+			true,
+		)
 		policyList = append(policyList, policy)
 	}
 	return policyList
@@ -1067,115 +1073,39 @@ func getMixedGroupPolicyForIngress() []share.CLUSGroupIPPolicy {
 func getMixedGroupPolicyStrict() []share.CLUSGroupIPPolicy {
 	policyList := make([]share.CLUSGroupIPPolicy, 0)
 	if len(wlLearnList) > 0 && len(wlEvalList) > 0 {
-		policy := share.CLUSGroupIPPolicy{
-			ID:     share.DefaultGroupRuleID,
-			Action: C.DP_POLICY_ACTION_VIOLATE,
-		}
-
-		policy.From = append(policy.From,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEvaluate,
-			})
-
-		policy.To = append(policy.To,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeLearn,
-				LocalPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-				NatPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-			})
-
-		srv := getServiceAddrForMode(share.PolicyModeLearn)
-		policy.To = append(policy.To, srv...)
+		policy := createMixedGroupPolicyStrict(
+			C.DP_POLICY_ACTION_VIOLATE,
+			share.PolicyModeEvaluate,
+			share.PolicyModeLearn,
+			false,
+		)
 		if len(policy.To) != 0 {
 			policyList = append(policyList, policy)
 		}
-		printOneGroupIPPolicy(&policy)
 	}
 
 	if len(wlLearnList) > 0 && len(wlEnforceList) > 0 {
-		policy := share.CLUSGroupIPPolicy{
-			ID:     share.DefaultGroupRuleID,
-			Action: C.DP_POLICY_ACTION_DENY,
-		}
-
-		policy.From = append(policy.From,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEnforce,
-			})
-
-		policy.To = append(policy.To,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeLearn,
-				LocalPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-				NatPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-			})
-
-		srv := getServiceAddrForMode(share.PolicyModeLearn)
-		policy.To = append(policy.To, srv...)
+		policy := createMixedGroupPolicyStrict(
+			C.DP_POLICY_ACTION_DENY,
+			share.PolicyModeEnforce,
+			share.PolicyModeLearn,
+			false,
+		)
 		if len(policy.To) != 0 {
 			policyList = append(policyList, policy)
 		}
-		printOneGroupIPPolicy(&policy)
 	}
 
 	if len(wlEvalList) > 0 && len(wlEnforceList) > 0 {
-		policy := share.CLUSGroupIPPolicy{
-			ID:     share.DefaultGroupRuleID,
-			Action: C.DP_POLICY_ACTION_DENY,
-		}
-
-		policy.From = append(policy.From,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEnforce,
-			})
-		policy.To = append(policy.To,
-			&share.CLUSWorkloadAddr{
-				WlID:       share.CLUSWLModeGroup,
-				PolicyMode: share.PolicyModeEvaluate,
-				LocalPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-				NatPortApp: []share.CLUSPortApp{
-					{
-						Ports:       "any",
-						Application: C.DP_POLICY_APP_ANY,
-					},
-				},
-			})
-		srv := getServiceAddrForMode(share.PolicyModeEvaluate)
-		policy.To = append(policy.To, srv...)
+		policy := createMixedGroupPolicyStrict(
+			C.DP_POLICY_ACTION_DENY,
+			share.PolicyModeEnforce,
+			share.PolicyModeEvaluate,
+			false,
+		)
 		if len(policy.To) != 0 {
 			policyList = append(policyList, policy)
 		}
-		printOneGroupIPPolicy(&policy)
 	}
 	return policyList
 }
@@ -1666,7 +1596,7 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 							break
 						}
 					}
-					if isFromEnforce && !isToEnforce {
+					if isFromEnforce && !isToEnforce && rul.Action == C.DP_POLICY_ACTION_DENY {
 						for _, addr := range rul.From {
 							if hid, ok := wlNode[addr.WlID]; ok {
 								t := tmpNodePolicySGM[hid]
@@ -1798,7 +1728,7 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 						break
 					}
 				}
-				if isToEnforce && !isFromEnforce {
+				if isToEnforce && !isFromEnforce && rul.Action == C.DP_POLICY_ACTION_DENY {
 					for _, addr := range rul.To {
 						if hid, ok := wlNode[addr.WlID]; ok {
 							t := tmpNodePolicySGM[hid]
