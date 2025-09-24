@@ -472,7 +472,7 @@ func updateConnectionMap(conn *dp.Connection, EPMAC net.HardwareAddr, id string)
 		}
 
 		connLog.WithFields(log.Fields{"connection": entry, "mac": EPMAC.String()}).Debug("")
-	} else if len(connectionMap) < connectionMapMax || conn.PolicyAction > C.DP_POLICY_ACTION_CHECK_APP {
+	} else if len(connectionMap) < connectionMapMax || conn.PolicyAction > C.DP_POLICY_ACTION_CHECK_APP || conn.PolicyAction == C.DP_POLICY_ACTION_LEARN {
 		if conn.Ingress {
 			conn.ServerWL = id
 			conn.Scope, conn.Network = getIPAddrScope(EPMAC, conn.ServerIP)
@@ -653,12 +653,39 @@ func putConnections() {
 			connectionMutex.Lock()
 			if len(connectionMap)+len(list) <= connectionMapMax {
 				keep = len(list)
+				for i, conn := range list[:keep] {
+					connectionMap[keys[i]] = conn
+				}
 			} else {
-				keep = connectionMapMax - len(connectionMap)
-				log.WithFields(log.Fields{"drops": len(list) - keep}).Info("Connection map full -- drop")
-			}
-			for i, conn := range list[:keep] {
-				connectionMap[keys[i]] = conn
+				// Always add high-priority connections (LEARN, VIOLATE, DENY)
+				keep = 0
+				highPriorityConnAdded := make(map[int]bool)
+
+				for i, conn := range list {
+					if conn.PolicyAction == C.DP_POLICY_ACTION_LEARN ||
+						conn.PolicyAction == C.DP_POLICY_ACTION_VIOLATE ||
+						conn.PolicyAction == C.DP_POLICY_ACTION_DENY {
+						connectionMap[keys[i]] = conn
+						keep++
+						highPriorityConnAdded[i] = true
+					}
+				}
+
+				// Add remaining connections up to the limit (only if there's space)
+				if len(connectionMap) < connectionMapMax {
+					remaining := connectionMapMax - len(connectionMap)
+					for i, conn := range list {
+						if !highPriorityConnAdded[i] && remaining > 0 {
+							connectionMap[keys[i]] = conn
+							keep++
+							remaining--
+						}
+					}
+				}
+
+				if keep < len(list) {
+					log.WithFields(log.Fields{"drops": len(list) - keep}).Info("Connection map full -- drop")
+				}
 			}
 			connectionMutex.Unlock()
 		}
