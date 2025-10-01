@@ -251,6 +251,17 @@ func DPCtrlSetEnableIcmpPolicy(enableIcmpPolicy *bool) {
 	dpSendMsg(msg)
 }
 
+func DPCtrlSetStrictGroupMode(strictGroupMode *bool) {
+
+	data := DPStrictGroupModeReq{
+		StrictGroupModeConf: &DPStrictGroupMode{
+			StrictGroupMode: strictGroupMode,
+		},
+	}
+	msg, _ := json.Marshal(data)
+	dpSendMsg(msg)
+}
+
 func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr, pips []net.IP) {
 	log.WithFields(log.Fields{"mac": mac, "iface": iface}).Debug("")
 

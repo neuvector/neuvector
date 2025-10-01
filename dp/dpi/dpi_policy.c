@@ -944,12 +944,14 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
     key.proto = proto;
     key.app = app;
 
+    bool check_sgm = g_strict_group_mode && hdl->def_action == DP_POLICY_ACTION_DENY;
+
     if (is_ingress) {
         bool is_internal = dpi_is_ip4_internal(key.sip);
         uint8_t iptype = dpi_ip4_iptype(key.sip);
 
         if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_INGRESS) &&
-            iptype != DP_IPTYPE_UWLIP && !is_nbe) {
+            iptype != DP_IPTYPE_UWLIP && !is_nbe && !check_sgm) {
             // east-west ingress traffic is always allowed
             desc->id = 0;
             desc->action = DP_POLICY_ACTION_OPEN;
@@ -1035,7 +1037,7 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         //on k8s platform, we want to learn policy if
         //egress traffic is to host ip
         if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS) && !ipv4_ent &&
-            iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP && !is_nbe) {
+            iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP && !is_nbe && !check_sgm) {
             // east-west egress traffic is always allowed
             desc->id = 0;
             desc->action = DP_POLICY_ACTION_OPEN;

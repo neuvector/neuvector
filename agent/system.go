@@ -161,6 +161,9 @@ func systemConfigStrictGroupMode(strictGroupMode bool) {
 	}
 	gInfo.strictGroupMode = strictGroupMode
 	policy.StrictGroupMode = strictGroupMode
+	//send strictGroupMode to dp
+	sgm := gInfo.strictGroupMode
+	dp.DPCtrlSetStrictGroupMode(&sgm)
 }
 
 func systemConfigEnableIcmpPolicy(enableIcmpPolicy bool) {

@@ -2270,6 +2270,9 @@ func taskDPConnect() {
 	//set enableIcmpPolicy
 	eip := gInfo.enableIcmpPolicy
 	dp.DPCtrlSetEnableIcmpPolicy(&eip)
+	//set strictGroupMode
+	sgm := gInfo.strictGroupMode
+	dp.DPCtrlSetStrictGroupMode(&sgm)
 }
 
 var nextNetworkPolicyVer *share.CLUSGroupIPPolicyVer // incoming network ploicy version
