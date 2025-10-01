@@ -979,7 +979,7 @@ func connectFromGlobal(conn *share.CLUSConnection, ca *nodeAttr, stip *serverTip
 			stip.wlPort = uint16(conn.ServerPort)
 			ca.workload = true
 			return true
-		} else if conn.Nbe || conn.NbeSns {
+		} else if conn.Nbe || conn.NbeSns || showStrictGroupMode(conn.ServerWL) {
 			if alive {
 				conn.ClientWL = wl
 				stip.wlPort = uint16(conn.ServerPort)

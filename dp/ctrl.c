@@ -2361,6 +2361,24 @@ static int dp_ctrl_enable_icmp_policy(json_t *msg)
     return 0;
 }
 
+uint8_t g_strict_group_mode = 0;
+
+static int dp_ctrl_strict_group_mode(json_t *msg)
+{
+    json_t *strict_group_mode_obj;
+    bool strict_group_mode = false;
+
+    strict_group_mode_obj = json_object_get(msg, "strict_group_mode");
+    if (strict_group_mode_obj != NULL) {
+        strict_group_mode = json_boolean_value(strict_group_mode_obj);
+    }
+    g_strict_group_mode = strict_group_mode ? 1 : 0;
+
+    DEBUG_CTRL("g_strict_group_mode=%u\n", g_strict_group_mode);
+
+    return 0;
+}
+
 #define BUF_SIZE 8192
 char ctrl_msg_buf[BUF_SIZE];
 static int dp_ctrl_handler(int fd)
@@ -2466,6 +2484,8 @@ static int dp_ctrl_handler(int fd)
             ret = dp_ctrl_detect_unmanaged_wl(msg);
         } else if (strcmp(key, "ctrl_enable_icmp_policy") == 0) {
             ret = dp_ctrl_enable_icmp_policy(msg);
+        } else if (strcmp(key, "ctrl_strict_group_mode") == 0) {
+            ret = dp_ctrl_strict_group_mode(msg);
         }
         DEBUG_CTRL("\"%s\" done\n", key);
     }

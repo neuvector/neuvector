@@ -397,6 +397,10 @@ func adjustAction(action uint8, from, to *share.CLUSWorkloadAddr, id uint32) uin
 	case share.PolicyModeEnforce:
 		if toMode == share.PolicyModeLearn && id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
 			adjustedAction = C.DP_POLICY_ACTION_LEARN
+		} else if toMode == share.PolicyModeLearn || toMode == share.PolicyModeEvaluate {
+			if action == C.DP_POLICY_ACTION_DENY {
+				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
+			}
 		}
 	case "":
 		// src has no policy mode - meaning it's not a managed container

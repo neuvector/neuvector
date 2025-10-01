@@ -171,6 +171,14 @@ type DPEnableIcmpPolicyReq struct {
 	EnableIcmpPolicyConf *DPEnableIcmpPolicy `json:"ctrl_enable_icmp_policy"`
 }
 
+type DPStrictGroupMode struct {
+	StrictGroupMode *bool `json:"strict_group_mode"`
+}
+
+type DPStrictGroupModeReq struct {
+	StrictGroupModeConf *DPStrictGroupMode `json:"ctrl_strict_group_mode"`
+}
+
 type DPStatsMACReq struct {
 	Stats *DPMACArray `json:"ctrl_stats_macs"`
 }

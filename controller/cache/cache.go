@@ -437,6 +437,17 @@ func getWorkloadCache(id string) *workloadCache {
 	return nil
 }
 
+func showStrictGroupMode(id string) bool {
+	if !getStrictGroupModeStatus() {
+		return false
+	}
+	if cache := getWorkloadCache(id); cache != nil {
+		policyMode, _ := getWorkloadEffectivePolicyMode(cache)
+		return policyMode == share.PolicyModeEnforce
+	}
+	return false
+}
+
 func (m CacheMethod) CanAccessHost(id string, acc *access.AccessControl) error {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
