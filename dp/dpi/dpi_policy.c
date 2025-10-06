@@ -655,6 +655,8 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
     _dpi_policy_chk_nbe(p, sip, dip, is_ingress, hdl, &desc);
 
     if ((desc->flags & POLICY_DESC_INTERNAL)) {
+        bool check_sgm = (hdl == NULL ? false : (g_strict_group_mode != 0 && hdl->def_action == DP_POLICY_ACTION_DENY));
+
         if (is_ingress) {
             iptype = dpi_ip4_iptype(sip);
         } else {
@@ -665,13 +667,21 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
                 if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
                     inPolicyAddr = dpi_is_policy_addr(dip);
                 } else {
-                    inPolicyAddr = dpi_is_policy_addr(sip);
+                    if (check_sgm) {
+                        inPolicyAddr = true;
+                    } else {
+                        inPolicyAddr = dpi_is_policy_addr(sip);
+                    }
                 }
             } else {
                 if (iptype == DP_IPTYPE_HOSTIP || iptype == DP_IPTYPE_TUNNELIP) {
                     inPolicyAddr = dpi_is_policy_addr(sip);
                 } else {
-                    inPolicyAddr = dpi_is_policy_addr(dip);
+                    if (check_sgm) {
+                        inPolicyAddr = true;
+                    } else {
+                        inPolicyAddr = dpi_is_policy_addr(dip);
+                    }
                 }
             }
             if (!inPolicyAddr) {
