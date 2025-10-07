@@ -3,6 +3,7 @@ package admission
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -59,6 +60,7 @@ type ValidatingWebhookConfigInfo struct {
 	WebhooksInfo        []*WebhookInfo
 	RevertCount         *uint32
 	UnexpectedMatchExpr string
+	K8sManifest         string
 }
 
 const (
@@ -222,6 +224,42 @@ func convertOperationsToStrings(ops interface{}) []string {
 	return opsRet
 }
 
+func collectK8sObjectForDebug(k8sResInfo *ValidatingWebhookConfigInfo) {
+	if k8sResInfo == nil || k8sResInfo.RevertCount == nil {
+		return
+	}
+
+	var rt string
+	if k8sResInfo.Name == resource.NvAdmValidatingName || k8sResInfo.Name == resource.NvCrdValidatingName {
+		rt = resource.RscTypeValidatingWebhookConfiguration
+		if obj, err := global.ORCH.GetResource(rt, k8s.AllNamespaces, k8sResInfo.Name); err == nil {
+			useApiV1 := false
+			if _, ok := obj.(*admregv1.ValidatingWebhookConfiguration); ok {
+				useApiV1 = true
+			} else if _, ok := obj.(*admregv1b1.ValidatingWebhookConfiguration); !ok {
+				return
+			}
+
+			if useApiV1 {
+				k8sConfig := obj.(*admregv1.ValidatingWebhookConfiguration)
+				for i := range k8sConfig.Webhooks {
+					k8sConfig.Webhooks[i].ClientConfig = admregv1.WebhookClientConfig{}
+					k8sConfig.ManagedFields = nil
+				}
+				value, _ := json.Marshal(k8sConfig)
+				k8sResInfo.K8sManifest = string(value)
+			} else {
+				k8sConfig := obj.(*admregv1b1.ValidatingWebhookConfiguration)
+				for i := range k8sConfig.Webhooks {
+					k8sConfig.Webhooks[i].ClientConfig = admregv1b1.WebhookClientConfig{}
+				}
+				value, _ := json.Marshal(k8sConfig)
+				k8sResInfo.K8sManifest = string(value)
+			}
+		}
+	}
+}
+
 func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, bool, string, error) { // returns (found, matchedCfg, verRead, error)
 	var rt string
 	if k8sResInfo.Name == resource.NvAdmValidatingName || k8sResInfo.Name == resource.NvCrdValidatingName {
@@ -252,6 +290,7 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 		k8sConfig := obj.(*admregv1.ValidatingWebhookConfiguration)
 		verRead = k8sConfig.ResourceVersion
 		if len(k8sConfig.Webhooks) != len(k8sResInfo.WebhooksInfo) {
+			collectK8sObjectForDebug(k8sResInfo)
 			return true, false, verRead, nil
 		}
 		config = &resource.K8sAdmRegValidatingWebhookConfiguration{
@@ -294,6 +333,7 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 		k8sConfig := obj.(*admregv1b1.ValidatingWebhookConfiguration)
 		verRead = k8sConfig.ResourceVersion
 		if len(k8sConfig.Webhooks) != len(k8sResInfo.WebhooksInfo) {
+			collectK8sObjectForDebug(k8sResInfo)
 			return true, false, verRead, nil
 		}
 		config = &resource.K8sAdmRegValidatingWebhookConfiguration{
@@ -393,9 +433,11 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 		if unexpectedMatchKeys.Cardinality() > 0 {
 			// found a webhook with the configurations nv needs + some unexpected entries in namespaceSelector/matchExpressions
 			k8sResInfo.UnexpectedMatchExpr = strings.Join(unexpectedMatchKeys.ToStringSlice(), ", ")
+			collectK8sObjectForDebug(k8sResInfo)
 			return true, false, verRead, nil
 		}
 		if !whFound {
+			collectK8sObjectForDebug(k8sResInfo)
 			return true, false, verRead, nil
 		}
 	}
@@ -687,9 +729,14 @@ func ConfigK8sAdmissionControl(k8sResInfo *ValidatingWebhookConfigInfo, ctrlStat
 			}
 		}
 		if op != "" {
-			if op == K8sResOpUpdate && k8sResInfo.RevertCount != nil && (k8sResInfo.UnexpectedMatchExpr != "" && *k8sResInfo.RevertCount > 0) {
+			if op == K8sResOpUpdate && k8sResInfo.RevertCount != nil && *k8sResInfo.RevertCount >= 3 {
+				log.WithFields(log.Fields{"name": k8sResInfo.Name, "reverted": *k8sResInfo.RevertCount}).Debug()
 				return true, nil
 			} else {
+				if op == K8sResOpUpdate && k8sResInfo.RevertCount != nil {
+					log.WithFields(log.Fields{"name": k8sResInfo.Name, "k8sObj": k8sResInfo.K8sManifest, "reverted": *k8sResInfo.RevertCount,
+						"unexpected": k8sResInfo.UnexpectedMatchExpr}).Info()
+				}
 				err = configK8sAdmCtrlValidateResource(op, verRead, k8sResInfo)
 				if err == nil {
 					if op == K8sResOpUpdate && k8sResInfo.RevertCount != nil {

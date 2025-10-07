@@ -1930,7 +1930,7 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 		failurePolicy = resource.Fail
 	}
 	for admType, ctrlState := range state.CtrlStates { // admType is ctrlType
-		log.WithFields(log.Fields{"admType": admType, "enable": ctrlState.Enable, "name": nvAdmName,
+		log.WithFields(log.Fields{"admType": admType, "enable": ctrlState.Enable, "name": nvAdmName, "whRevertCount": whRevertCount,
 			"uri": ctrlState.Uri, "nvstatusuri": ctrlState.NvStatusUri}).Debug("sync admission control state to k8s")
 		if admType == admission.NvAdmValidateType {
 			var k8sResInfo admission.ValidatingWebhookConfigInfo
