@@ -13,23 +13,23 @@ type BasicTransport struct {
 	Password  string
 }
 
+func isPublicURL(u string) bool {
+	var publicDomains = []string{
+		"redhat.com", "amazonaws.com", "azurecr.io",
+		"docker.io", "docker.com", "icr.io", "gitlab.com",
+	}
+	for _, d := range publicDomains {
+		if strings.Contains(u, d) {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *BasicTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// in the case of jfrog http redirect calls, basic auth is needed
-	oPublic := false
-	nPublic := false
-	publicDomains := []string{"redhat.com", "amazonaws.com", "azurecr.io", "docker.io", "docker.com", "icr.io", "gitlab.com"}
-	for _, domain := range publicDomains {
-		if strings.Contains(t.URL, domain) {
-			oPublic = true
-			break
-		}
-	}
-	for _, domain := range publicDomains {
-		if strings.Contains(req.URL.String(), domain) {
-			nPublic = true
-			break
-		}
-	}
+	oPublic := isPublicURL(t.URL)
+	nPublic := isPublicURL(req.URL.String())
 
 	// log.WithFields(log.Fields{"req": req.URL.String(), "url": t.URL, "oPublic": oPublic, "nPublic": nPublic}).Debug()
 
