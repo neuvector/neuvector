@@ -761,7 +761,8 @@ func eventLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, m
 			}
 
 			var rlog *api.Event
-			if ev.Event >= share.CLUSEvAdmCtrlK8sConfigured && ev.Event <= share.CLUSEvAdmCtrlK8sConfigFailed {
+			if (ev.Event >= share.CLUSEvAdmCtrlK8sConfigured && ev.Event <= share.CLUSEvAdmCtrlK8sConfigFailed) ||
+				ev.Event == share.CLUSEvK8sAdmissionWebhookCChange {
 				rlog = admCtrlLog2API(&ev)
 			} else {
 				rlog = eventLog2API(&ev)
