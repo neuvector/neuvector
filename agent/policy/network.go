@@ -314,11 +314,7 @@ func adjustActionStrict(action uint8, from, to *share.CLUSWorkloadAddr, id uint3
 	switch fromMode {
 	case share.PolicyModeLearn:
 		if action == C.DP_POLICY_ACTION_DENY {
-			if polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 {
-				if toMode != share.PolicyModeEnforce {
-					adjustedAction = C.DP_POLICY_ACTION_VIOLATE
-				}
-			} else if polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 {
+			if toMode != share.PolicyModeEnforce {
 				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
 			}
 		} else if id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
@@ -326,11 +322,7 @@ func adjustActionStrict(action uint8, from, to *share.CLUSWorkloadAddr, id uint3
 		}
 	case share.PolicyModeEvaluate:
 		if action == C.DP_POLICY_ACTION_DENY {
-			if polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 {
-				if toMode != share.PolicyModeEnforce {
-					adjustedAction = C.DP_POLICY_ACTION_VIOLATE
-				}
-			} else if polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 {
+			if toMode != share.PolicyModeEnforce {
 				adjustedAction = C.DP_POLICY_ACTION_VIOLATE
 			}
 		} else if toMode == share.PolicyModeLearn && id >= share.PolicyLearnedIDBase && id < share.PolicyFedRuleIDBase {
