@@ -627,7 +627,7 @@ github.com/spiffe/go-spiffe/v2/spiffeid
 # github.com/streadway/simpleuuid v0.0.0-20130420165545-6617b501e485
 ## explicit
 github.com/streadway/simpleuuid
-# github.com/stretchr/testify v1.10.0
+# github.com/stretchr/testify v1.11.1
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
