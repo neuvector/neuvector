@@ -105,7 +105,7 @@ func parseWildcardRegex(s string) (string, error) {
 	return out, nil
 }
 
-func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter, error) {
+func parseFilter(filters []string, regType, mode string) ([]*share.CLUSRegistryFilter, error) {
 	if len(filters) == 0 {
 		return make([]*share.CLUSRegistryFilter, 0), nil
 	}
@@ -137,9 +137,16 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 		}
 
 		// org
-		if (org != "" && !orgRegexp.MatchString(org)) || (org == "" && filter != "*" && regType == share.RegistryTypeOpenShift) {
-			log.WithFields(log.Fields{"org": org, "type": regType}).Error("Failed to parse organization in the filter")
-			return nil, errors.New("Invalid filter format")
+		invalidOrg := false
+		if org != "" && !orgRegexp.MatchString(org) {
+			invalidOrg = true
+		}
+		if invalidOrg || (org == "" && filter != "*" && regType == share.RegistryTypeOpenShift) {
+			if !(regType == share.RegistryTypeJFrog && mode == share.JFrogModeSubdomain &&
+				strings.HasPrefix(org, "<") && strings.HasSuffix(org, ">")) {
+				log.WithFields(log.Fields{"org": org, "type": regType}).Error("Failed to parse organization in the filter")
+				return nil, errors.New("Invalid filter format")
+			}
 		}
 
 		// repo
@@ -502,7 +509,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 	if rconf.Filters != nil {
 		filters := *rconf.Filters
 		sort.Slice(filters, func(i, j int) bool { return filters[i] < filters[j] })
-		rfilters, err := parseFilter(filters, config.Type)
+		rfilters, err := parseFilter(filters, config.Type, config.JfrogMode)
 		if err != nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -799,7 +806,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		if rconf.Filters != nil {
 			filters := *rconf.Filters
 			sort.Slice(filters, func(i, j int) bool { return filters[i] < filters[j] })
-			rfilters, err := parseFilter(filters, config.Type)
+			rfilters, err := parseFilter(filters, config.Type, config.JfrogMode)
 			if err != nil {
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 				return
