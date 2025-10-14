@@ -983,8 +983,8 @@ func getMixedGroupPolicyForIngressStrict() []share.CLUSGroupIPPolicy {
 	if len(wlLearnList) > 0 && len(wlEvalList) > 0 {
 		policy := createMixedGroupPolicyStrict(
 			C.DP_POLICY_ACTION_VIOLATE,
-			share.PolicyModeLearn,
 			share.PolicyModeEvaluate,
+			share.PolicyModeLearn,
 			true,
 		)
 		policyList = append(policyList, policy)
@@ -993,8 +993,8 @@ func getMixedGroupPolicyForIngressStrict() []share.CLUSGroupIPPolicy {
 	if len(wlLearnList) > 0 && len(wlEnforceList) > 0 {
 		policy := createMixedGroupPolicyStrict(
 			C.DP_POLICY_ACTION_DENY,
-			share.PolicyModeLearn,
 			share.PolicyModeEnforce,
+			share.PolicyModeLearn,
 			true,
 		)
 		policyList = append(policyList, policy)
@@ -1003,8 +1003,8 @@ func getMixedGroupPolicyForIngressStrict() []share.CLUSGroupIPPolicy {
 	if len(wlEvalList) > 0 && len(wlEnforceList) > 0 {
 		policy := createMixedGroupPolicyStrict(
 			C.DP_POLICY_ACTION_DENY,
-			share.PolicyModeEvaluate,
 			share.PolicyModeEnforce,
+			share.PolicyModeEvaluate,
 			true,
 		)
 		policyList = append(policyList, policy)
@@ -1075,8 +1075,8 @@ func getMixedGroupPolicyStrict() []share.CLUSGroupIPPolicy {
 	if len(wlLearnList) > 0 && len(wlEvalList) > 0 {
 		policy := createMixedGroupPolicyStrict(
 			C.DP_POLICY_ACTION_VIOLATE,
-			share.PolicyModeEvaluate,
 			share.PolicyModeLearn,
+			share.PolicyModeEvaluate,
 			false,
 		)
 		if len(policy.To) != 0 {
@@ -1087,8 +1087,8 @@ func getMixedGroupPolicyStrict() []share.CLUSGroupIPPolicy {
 	if len(wlLearnList) > 0 && len(wlEnforceList) > 0 {
 		policy := createMixedGroupPolicyStrict(
 			C.DP_POLICY_ACTION_DENY,
-			share.PolicyModeEnforce,
 			share.PolicyModeLearn,
+			share.PolicyModeEnforce,
 			false,
 		)
 		if len(policy.To) != 0 {
@@ -1099,8 +1099,8 @@ func getMixedGroupPolicyStrict() []share.CLUSGroupIPPolicy {
 	if len(wlEvalList) > 0 && len(wlEnforceList) > 0 {
 		policy := createMixedGroupPolicyStrict(
 			C.DP_POLICY_ACTION_DENY,
-			share.PolicyModeEnforce,
 			share.PolicyModeEvaluate,
+			share.PolicyModeEnforce,
 			false,
 		)
 		if len(policy.To) != 0 {
@@ -1596,7 +1596,7 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 							break
 						}
 					}
-					if isFromEnforce && !isToEnforce && rul.Action == C.DP_POLICY_ACTION_DENY {
+					if isFromEnforce && !isToEnforce {
 						for _, addr := range rul.From {
 							if hid, ok := wlNode[addr.WlID]; ok {
 								t := tmpNodePolicySGM[hid]
@@ -1728,7 +1728,7 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 						break
 					}
 				}
-				if isToEnforce && !isFromEnforce && rul.Action == C.DP_POLICY_ACTION_DENY {
+				if isToEnforce && !isFromEnforce {
 					for _, addr := range rul.To {
 						if hid, ok := wlNode[addr.WlID]; ok {
 							t := tmpNodePolicySGM[hid]
