@@ -396,7 +396,7 @@ func preProcessConnectPAI(conn *share.CLUSConnection) (*nodeAttr, *nodeAttr, *se
 					return &ca, &sa, &stip, true
 				}
 				// Ignore egress connection to service group that is hidden
-				if isIPSvcGrpHidden(svc) {
+				if isIPSvcGrpHidden(svc) && !showStrictGroupMode(conn.ClientWL) {
 					cctx.ConnLog.WithFields(log.Fields{
 						"client": net.IP(conn.ClientIP), "server": net.IP(conn.ServerIP), "ipsvcgrp": svc.group.Name,
 					}).Debug("Ignore egress connection to IP service group")
