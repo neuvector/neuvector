@@ -85,7 +85,7 @@ func TestFilterPositive(t *testing.T) {
 	}
 
 	for k, v := range cases {
-		if f, err := parseFilter([]string{k}, share.RegistryTypeDocker); err != nil {
+		if f, err := parseFilter([]string{k}, share.CLUSRegistryConfig{Type: share.RegistryTypeDocker}); err != nil {
 			t.Errorf("Error: %v %v\n", k, err)
 		} else if *f[0] != v {
 			t.Errorf("Error: %v\n", k)
@@ -107,7 +107,7 @@ func TestFilterNegative(t *testing.T) {
 		"*neuvector/*:*",
 	}
 	for _, v := range cases {
-		if f, err := parseFilter([]string{v}, share.RegistryTypeDocker); err == nil {
+		if f, err := parseFilter([]string{v}, share.CLUSRegistryConfig{Type: share.RegistryTypeDocker}); err == nil {
 			t.Errorf("Error: %v\n", v)
 			t.Errorf("  Expect: invalid format\n")
 			t.Errorf("  Actual: %v\n", *f[0])
@@ -119,7 +119,7 @@ func TestFilterNegative(t *testing.T) {
 		"iperf",
 	}
 	for _, v := range cases {
-		if f, err := parseFilter([]string{v}, share.RegistryTypeOpenShift); err == nil {
+		if f, err := parseFilter([]string{v}, share.CLUSRegistryConfig{Type: share.RegistryTypeOpenShift}); err == nil {
 			t.Errorf("Error: %v\n", v)
 			t.Errorf("  Expect: invalid format\n")
 			t.Errorf("  Actual: %v\n", *f[0])

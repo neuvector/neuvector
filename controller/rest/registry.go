@@ -105,11 +105,18 @@ func parseWildcardRegex(s string) (string, error) {
 	return out, nil
 }
 
-func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter, error) {
+func isJFrogSubdomainPlaceholder(regType, jfrogMode, org string) bool {
+	return regType == share.RegistryTypeJFrog && jfrogMode == share.JFrogModeSubdomain &&
+		strings.HasPrefix(org, "<") && strings.HasSuffix(org, ">")
+}
+
+func parseFilter(filters []string, config share.CLUSRegistryConfig) ([]*share.CLUSRegistryFilter, error) {
 	if len(filters) == 0 {
 		return make([]*share.CLUSRegistryFilter, 0), nil
 	}
 
+	regType := config.Type
+	jfrogMode := config.JfrogMode
 	repoFilters := make([]*share.CLUSRegistryFilter, len(filters))
 
 	for n, filter := range filters {
@@ -137,9 +144,22 @@ func parseFilter(filters []string, regType string) ([]*share.CLUSRegistryFilter,
 		}
 
 		// org
-		if (org != "" && !orgRegexp.MatchString(org)) || (org == "" && filter != "*" && regType == share.RegistryTypeOpenShift) {
-			log.WithFields(log.Fields{"org": org, "type": regType}).Error("Failed to parse organization in the filter")
-			return nil, errors.New("Invalid filter format")
+		// Characters '<' & '>' are invalid for org in the register filter configuration
+		// However, on the special case where the registry URL contains "{tweaked_subdomain}." , but not "{subdomain}." , as the prefix of hostname,
+		//  NV cannot tell what's the real {subdomain} value is because "{tweaked_subdomain}" could be totally irrevalent from "{subdomain}" literally.
+		// To solve this issue, characters '<' & '>' are allowed for org in the register filter configuration of JFrog registry server/subdomain mode.
+		// If user's JFrog registry URL must contain "{tweaked_subdomain}." as the prefix of hostname, user can spceify the real {subdomain} value by
+		//  configuring registry filter like "<{subdomain}>/{repo}"
+		// This special prefix "<{subdomain}>/" in the registry filter tells NV what the real {subdomain} value is for JFrog registry server/subdomain mode.
+		invalidOrg := false
+		if org != "" && !orgRegexp.MatchString(org) {
+			invalidOrg = true
+		}
+		if invalidOrg || (org == "" && filter != "*" && regType == share.RegistryTypeOpenShift) {
+			if !isJFrogSubdomainPlaceholder(regType, jfrogMode, org) {
+				log.WithFields(log.Fields{"org": org, "type": regType}).Error("Failed to parse organization in the filter")
+				return nil, errors.New("Invalid filter format")
+			}
 		}
 
 		// repo
@@ -502,7 +522,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 	if rconf.Filters != nil {
 		filters := *rconf.Filters
 		sort.Slice(filters, func(i, j int) bool { return filters[i] < filters[j] })
-		rfilters, err := parseFilter(filters, config.Type)
+		rfilters, err := parseFilter(filters, config)
 		if err != nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
@@ -799,7 +819,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		if rconf.Filters != nil {
 			filters := *rconf.Filters
 			sort.Slice(filters, func(i, j int) bool { return filters[i] < filters[j] })
-			rfilters, err := parseFilter(filters, config.Type)
+			rfilters, err := parseFilter(filters, *config)
 			if err != nil {
 				restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 				return

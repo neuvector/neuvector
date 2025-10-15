@@ -42,7 +42,7 @@ type jfrog struct {
 	mode              string
 	aql               bool
 	subdomainURL      map[string]string
-	subdomainInRegURL string
+	subdomainInRegURL string // this value could be different from the actual subdomain in jfrog. we call it {subdomain} or {tweaked_subdomain} in the code.
 }
 
 type aqlFolder struct {
@@ -78,7 +78,17 @@ func (r *jfrog) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 	return nil, ""
 }
 
-func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit int) ([]*share.CLUSImage, error) {
+func (r *jfrog) shouldSkipDir(dir jfrogDir, org, repositoryKey string) bool {
+	if repositoryKey != "" {
+		return dir.Key != repositoryKey
+	}
+	if r.subdomainInRegURL != "" {
+		return dir.Key != r.subdomainInRegURL
+	}
+	return org != "" && dir.Key != org
+}
+
+func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name, repositoryKey string, limit int) ([]*share.CLUSImage, error) {
 	repos := make([]*share.CLUSImage, 0)
 	ur, err := url.Parse(r.base.regURL)
 	if err != nil {
@@ -88,6 +98,7 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 	// NOTE: in subdomain mode,
 	// 1. if "{subdomain}." is not the prefix of registry url, the filter either contains "*" or must start with "{subdomain}/"
 	// 2. if "{subdomain}." is the prefix of registry url, the filter either contains "*", or can start with "{subdomain}/" or not
+	// 3. if "{tweaked_subdomain}." is the prefix of registry url, the filter must start with "<{subdomain}>"
 	whichURL := -1
 	myRC := r.rc
 	defer func() { r.rc = myRC }()
@@ -97,14 +108,8 @@ func (r *jfrog) getSubdomainRepoList(jdirs []jfrogDir, org, name string, limit i
 			continue
 		}
 
-		if r.subdomainInRegURL != "" {
-			if r.subdomainInRegURL != dir.Key {
-				continue
-			}
-		} else {
-			if org != "" && org != dir.Key {
-				continue
-			}
+		if r.shouldSkipDir(dir, org, repositoryKey) {
+			continue
 		}
 
 		var url1, url2 string
@@ -166,7 +171,20 @@ func (r *jfrog) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, er
 		return r.base.GetRepoList(org, name, limit)
 	}
 
-	jdirs, err := r.getJFrogDirUrl()
+	var repositoryKey string
+	if r.mode == share.JFrogModeSubdomain {
+		// org: the part before the 1st "/" in registry filter.
+		// if it's in the format "<string>", it means "string" is the real key to find in the response of GET(artifactory/api/repositories)
+		if strings.HasPrefix(org, "<") && strings.HasSuffix(org, ">") {
+			repositoryKey = org[1 : len(org)-1]
+			org = ""
+			if r.subdomainInRegURL != "" && (repositoryKey == "" || repositoryKey != r.subdomainInRegURL) {
+				return nil, nil
+			}
+		}
+	}
+
+	jdirs, err := r.getJFrogDirUrl() // calls GET(artifactory/api/repositories)
 	if err != nil {
 		return nil, err
 	} else if len(jdirs) == 0 {
@@ -178,39 +196,63 @@ func (r *jfrog) GetRepoList(org, name string, limit int) ([]*share.CLUSImage, er
 		if r.subdomainInRegURL == "" {
 			// we cannot tell the difference between the host and subdomain url
 			// a trick here to get the catalog of subdomain. host will fail, subdomain success
-			if _, err := r.rc.Repositories(); err == nil {
+			if _, err := r.rc.Repositories(); err == nil { // calls GTE(/v2/_catalog)
 				// when subdomain value is the prefix in registry url, like http://{subdomain}.{hostname-FQDN}/,
 				// registry filter could contain subdomain as prefix or not
 				r.subdomainInRegURL = getSubdomainFromRegURL(r.base.regURL)
 				repoPrefixToRevert := ""
-				if r.subdomainInRegURL != "" && org != "" && org != r.subdomainInRegURL {
-					// in 5.4.4(-), if registry filter is not "*", it must have prefix "{subdomain}/"
-					// so we need to make sure filter has prefix "{subdomain}/" before calling r.getSubdomainRepoList()
-					name = fmt.Sprintf("%s/%s", org, name)
-					repoPrefixToRevert = fmt.Sprintf("%s/", r.subdomainInRegURL)
-					org = r.subdomainInRegURL
-				}
-				rps, err := r.getSubdomainRepoList(jdirs, org, name, limit)
-				if repoPrefixToRevert != "" {
-					for _, repo := range rps {
-						repo.Repo = strings.TrimPrefix(repo.Repo, repoPrefixToRevert)
+				if r.subdomainInRegURL != "" {
+					if org != "" && org != r.subdomainInRegURL {
+						// In 5.4.4(-), if registry filter is not "*", it must have prefix "{subdomain}/"
+						// We need to make sure filter has prefix "{subdomain}/" before calling r.getSubdomainRepoList()
+						// When the filter does not have prefix "{subdomain}/", we add prefix "{subdomain}/" to filter value by:
+						//  1. change the name(i.e. repo) value to {org}/{name}
+						//  2. change the org value to {subdomain}
+						//  3. set repoPrefixToRevert so that we know whether we need to revert what we did in #1/#2
+						name = fmt.Sprintf("%s/%s", org, name)
+						repoPrefixToRevert = fmt.Sprintf("%s/", r.subdomainInRegURL)
+						org = r.subdomainInRegURL
 					}
-				} else if r.subdomainInRegURL != "" && org != "" && org == r.subdomainInRegURL {
-					// if registry filter has non-empty org(from filter) that is equal to "{subdomain}",
-					// we need to make sure image.repo contains the prefix "{subdomain}/" as that the image is not filtered out later
-					for _, repo := range rps {
-						prefix := org + "/"
-						if !strings.HasPrefix(repo.Repo, prefix) {
-							repo.Repo = prefix + repo.Repo
+				}
+				rps, err := r.getSubdomainRepoList(jdirs, org, name, repositoryKey, limit)
+				// Caller of (r *jfrog) GetRepoList() will filter out non-qualified images by the registry filter configuration.
+				// The collected repo list is for subdomain specified by r.subdomainInRegURL OR repositoryKey
+				// We need to make sure images in the collected repo list will not be mistakenly filter out
+				if repoPrefixToRevert != "" {
+					// repoPrefixToRevert being non-empty means we changed org/name values before calling r.getSubdomainRepoList()
+					// (i.e. registry's filter configuration has NO "{subdomain}/" prefix)
+					// After r.getSubdomainRepoList() returns, we need to make sure each image.Repo in the returned repo list
+					//  also has no prefix "{subdomain}/" so that the image will not be filtered out by the caller later
+					for _, image := range rps {
+						image.Repo = strings.TrimPrefix(image.Repo, repoPrefixToRevert)
+					}
+				} else if repositoryKey != "" {
+					// In the special env where the registry filter configuration has prefix "<{subdomain}>/", subdomain is specified by repositoryKey
+					// We need to make sure each image.Repo in the returned repo list has the same prefix "<{subdomain}>/" so that
+					//  the image will not be filtered out by the caller later
+					prefix := fmt.Sprintf("<%s>/", repositoryKey)
+					for _, image := range rps {
+						if !strings.HasPrefix(image.Repo, prefix) {
+							image.Repo = prefix + image.Repo
+						}
+					}
+				} else if r.subdomainInRegURL != "" && org == r.subdomainInRegURL {
+					// In the most common env where the registry filter configuration has prefix "{subdomain}/", the parsed org value is "{subdomain}"
+					// We need to make sure each image.Repo in the returned repo list has the same prefix "{subdomain}/" so that
+					//  the image will not be filtered out by the caller later
+					prefix := org + "/"
+					for _, image := range rps {
+						if !strings.HasPrefix(image.Repo, prefix) {
+							image.Repo = prefix + image.Repo
 						}
 					}
 				}
 				return rps, err
 			} else {
-				return r.getSubdomainRepoList(jdirs, org, name, limit)
+				return r.getSubdomainRepoList(jdirs, org, name, repositoryKey, limit)
 			}
 		} else {
-			return r.getSubdomainRepoList(jdirs, org, name, limit)
+			return r.getSubdomainRepoList(jdirs, org, name, repositoryKey, limit)
 		}
 	}
 
@@ -311,10 +353,24 @@ func (r *jfrog) getSubdomainUrlFromRepo(repo string) (string, string, error) {
 		return "", "", common.ErrUnsupported
 	}
 
+	useSubdomainToken := false
+	if subdomain, subrepo, found := strings.Cut(repo, "/"); found {
+		if strings.HasPrefix(subdomain, "<") && strings.HasSuffix(subdomain, ">") {
+			repo = fmt.Sprintf("%s/%s", subdomain[1:len(subdomain)-1], subrepo)
+			useSubdomainToken = true
+		}
+	}
+
 	subdomain, subrepo := getSubdomainFromRepo(repo)
-	if r.subdomainInRegURL == "" || (subdomain != "" && r.subdomainInRegURL == subdomain) {
+	if r.subdomainInRegURL == "" || (subdomain != "" && ((r.subdomainInRegURL == subdomain) || useSubdomainToken)) {
+		// 1. when "{subdomain}." is not the prefix of registry url, repo must start with "{subdomain}/".
+		//    so we remove prefix "{subdomain}/" from repo
+		// 2. when "{subdomain}." is the prefix of registry url, remove prefix "{subdomain}/" from repo only when repo starts with "{subdomain}/".
+		// 3. when "{tweaked_subdomain}." is the prefix of registry url & the filter starts with "<{subdomain}>", remove prefix "<{subdomain}>/" from repo
 		repo = subrepo
 	} else if r.subdomainInRegURL != "" && (subdomain == "" || r.subdomainInRegURL != subdomain) {
+		// when "{subdomain}." is the prefix of registry url AND repo does not have "{subdomain}/" as prefix,
+		// set "{subdomain}" to subdomain and no need to change repo.
 		subdomain = r.subdomainInRegURL
 	}
 	url, ok := r.subdomainURL[subdomain]
@@ -331,6 +387,7 @@ func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 	rc := r.rc
 	if r.mode == share.JFrogModeSubdomain {
 		url, subRepo, err := r.getSubdomainUrlFromRepo(repo)
+		// repo could contain "{subdomain}" as prefix, but subRepo does not contain "{subdomain}" as prefix
 		if err != nil {
 			smd.scanLog.WithFields(log.Fields{"err": err}).Error()
 			return nil, err
@@ -341,13 +398,14 @@ func (r *jfrog) GetTagList(domain, repo, tag string) ([]string, error) {
 		repo = subRepo
 	}
 
-	// GetArtifactoryTags fetches tags fetch tags using the Artifactory API (introduced in JFrog 4.4.3)
-	if tags, err := r.GetArtifactoryTags(repo, rc); len(tags) > 0 || err != nil {
-		return tags, err
+	// GetArtifactoryTags fetches tags using the Artifactory API (introduced in JFrog 4.4.3)
+	tags, err := r.GetArtifactoryTags(repo, rc)
+	if len(tags) > 0 && err == nil {
+		return tags, nil
 	}
 
 	// Fallback to the original `Tags` API if the Artifactory API fails or returns no tags
-	smd.scanLog.WithFields(log.Fields{"repo": repo}).Debug("Falling back to rc.Tags API")
+	smd.scanLog.WithFields(log.Fields{"repo": repo, "err": err}).Debug("Falling back to rc.Tags API")
 	return rc.Tags(repo)
 }
 
@@ -448,6 +506,7 @@ func (r *jfrog) GetImageMeta(ctx context.Context, domain, repo, tag string) (*sc
 	rc := r.rc
 	if r.mode == share.JFrogModeSubdomain {
 		url, subRepo, err := r.getSubdomainUrlFromRepo(repo)
+		// repo could contain "{subdomain}" as prefix, but subRepo does not contain "{subdomain}" as prefix
 		if err != nil {
 			smd.scanLog.WithFields(log.Fields{"err": err}).Error()
 		} else if r.regURL != url {

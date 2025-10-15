@@ -320,7 +320,7 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			if rconf.Filters != nil {
 				filters := rconf.Filters
 				sort.Slice(filters, func(i, j int) bool { return filters[i] < filters[j] })
-				rfilters, err := parseFilter(filters, config.Type)
+				rfilters, err := parseFilter(filters, config)
 				if err != nil {
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 					return
