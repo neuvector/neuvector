@@ -1250,24 +1250,24 @@ func (l restLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Context struct {
-	LocalDev           *common.LocalDevice
-	EvQueue            cluster.ObjectQueueInterface
-	AuditQueue         cluster.ObjectQueueInterface
-	Messenger          cluster.MessengerInterface
-	Cacher             cache.CacheInterface
-	Scanner            scan.ScanInterface
-	FedPort            uint
-	RESTPort           uint
-	PwdValidUnit       uint
-	TeleNeuvectorURL   string
-	TeleFreq           uint
-	NvAppFullVersion   string
-	NvSemanticVersion  string
-	CspType            share.TCspType
-	CspPauseInterval   uint   // in minutes
-	CustomCheckControl string // disable / strict / loose
-	CheckCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
-	CertManager        *kv.CertManager
+	LocalDev                *common.LocalDevice
+	EvQueue                 cluster.ObjectQueueInterface
+	AuditQueue              cluster.ObjectQueueInterface
+	Messenger               cluster.MessengerInterface
+	Cacher                  cache.CacheInterface
+	Scanner                 scan.ScanInterface
+	FedPort                 uint
+	RESTPort                uint
+	PwdValidUnit            uint
+	TeleNeuvectorURL        string
+	TeleSkipTlsVerification bool // default value is false, meaning it is secure by default
+	TeleFreq                uint
+	NvAppFullVersion        string
+	NvSemanticVersion       string
+	CspType                 share.TCspType
+	CspPauseInterval        uint   // in minutes
+	CustomCheckControl      string // disable / strict / loose
+	CheckCrdSchemaFunc      func(lead, init, crossCheck bool, cspType share.TCspType) []string
 }
 
 var cctx *Context

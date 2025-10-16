@@ -249,6 +249,7 @@ func main() {
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
+	insecureSkipTeleTLSVerification := flag.Bool("insecure_skip_telemetry_tls_verification", false, "Do not verify Telemetry server's certificate chain and host name")
 	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "")                   // for testing only
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
@@ -752,23 +753,24 @@ func main() {
 	opa.InitOpaServer()
 
 	rctx := rest.Context{
-		LocalDev:           dev,
-		EvQueue:            evqueue,
-		AuditQueue:         auditQueue,
-		Messenger:          messenger,
-		Cacher:             cacher,
-		Scanner:            scanner,
-		RESTPort:           *restPort,
-		FedPort:            *fedPort,
-		PwdValidUnit:       *pwdValidUnit,
-		TeleNeuvectorURL:   *teleNeuvectorEP,
-		TeleFreq:           *telemetryFreq,
-		NvAppFullVersion:   nvAppFullVersion,
-		NvSemanticVersion:  nvSemanticVersion,
-		CspType:            cspType,
-		CspPauseInterval:   *cspPauseInterval,
-		CustomCheckControl: *custom_check_control,
-		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
+		LocalDev:                dev,
+		EvQueue:                 evqueue,
+		AuditQueue:              auditQueue,
+		Messenger:               messenger,
+		Cacher:                  cacher,
+		Scanner:                 scanner,
+		RESTPort:                *restPort,
+		FedPort:                 *fedPort,
+		PwdValidUnit:            *pwdValidUnit,
+		TeleNeuvectorURL:        *teleNeuvectorEP,
+		TeleSkipTlsVerification: *insecureSkipTeleTLSVerification,
+		TeleFreq:                *telemetryFreq,
+		NvAppFullVersion:        nvAppFullVersion,
+		NvSemanticVersion:       nvSemanticVersion,
+		CspType:                 cspType,
+		CspPauseInterval:        *cspPauseInterval,
+		CustomCheckControl:      *custom_check_control,
+		CheckCrdSchemaFunc:      nvcrd.CheckCrdSchema,
 	}
 	// rest.PreInitContext() must be called before orch connector because existing CRD handling could happen right after orch connecter starts
 	rest.PreInitContext(&rctx)
