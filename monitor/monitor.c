@@ -50,14 +50,16 @@
 #define ENV_PWD_VALID_UNIT     "PWD_VALID_UNIT"
 #define ENV_RANCHER_EP         "RANCHER_EP"
 #define ENV_RANCHER_SSO        "RANCHER_SSO"
-#define ENV_TELE_NEUVECTOR_EP  "TELEMETRY_NEUVECTOR_EP"
-#define ENV_TELE_CURRENT_VER   "TELEMETRY_CURRENT_VER"
-#define ENV_TELEMETRY_FREQ     "TELEMETRY_FREQ"
 #define ENV_NO_DEFAULT_ADMIN   "NO_DEFAULT_ADMIN"
 #define ENV_CSP_ENV            "CSP_ENV"
 #define ENV_CSP_PAUSE_INTERVAL "CSP_PAUSE_INTERVAL"
 #define ENV_AUTOPROFILE_CLT    "AUTO_PROFILE_COLLECT"
 #define ENV_SET_CUSTOM_BENCH   "CUSTOM_CHECK_CONTROL"
+
+#define ENV_TELE_NEUVECTOR_EP             "TELEMETRY_NEUVECTOR_EP"
+#define ENV_TELE_CURRENT_VER              "TELEMETRY_CURRENT_VER"
+#define ENV_TELEMETRY_FREQ                "TELEMETRY_FREQ"
+#define ENV_INSECURE_SKIP_TELE_TLS_VERIFY "INSECURE_SKIP_TELEMETRY_TLS_VERIFICATION"
 
 #define ENV_SCANNER_DOCKER_URL  "SCANNER_DOCKER_URL"
 #define ENV_SCANNER_LICENSE     "SCANNER_LICENSE"
@@ -411,6 +413,9 @@ static pid_t fork_exec(int i)
             args[a++] = "-telemetry_freq";
             args[a++] = telemetry_freq;
         }
+        if (getenv(ENV_INSECURE_SKIP_TELE_TLS_VERIFY)) {
+            args[a++] = "-insecure_skip_telemetry_tls_verification";
+        }
         if ((enable = getenv(ENV_NO_DEFAULT_ADMIN)) != NULL) {
             if (checkImplicitEnableFlag(enable) == 1) {
                 args[a ++] = "-no_def_admin";
@@ -606,6 +611,16 @@ static void stop_proc(int i, int sig, int wait)
 #define DEFAULT_RPC_PORT "18300"
 #define DEFAULT_LAN_PORT "18301"
 
+static bool is_valid_port(const char *strPort) {
+    if ((strPort == NULL) || (strlen(strPort) != strspn(strPort, "0123456789"))) {
+        return false; // Handle NULL string and empty string case
+    }
+
+    int port = atoi(strPort);
+
+    return ((port > 0) && (port <= 65535));
+}
+
 static int check_consul_ports(void)
 {
     FILE *fp;
@@ -623,7 +638,15 @@ static int check_consul_ports(void)
     if (lan_port == NULL) {
         lan_port = DEFAULT_LAN_PORT;
     }
-    sprintf(shbuf,"netstat -lnp|grep '%s\\|%s'",rpc_port, lan_port);
+    if (!is_valid_port(rpc_port)) {
+        debug("invalid consul rpc port %s\n", rpc_port);
+        return -1;
+    }
+    if (!is_valid_port(lan_port)) {
+        debug("invalid consul lan port %s\n", lan_port);
+        return -1;
+    }
+    sprintf(shbuf,"ss -lnp|grep '%s\\|%s'",rpc_port, lan_port);
 
     fp = popen(shbuf, "r");
     if (fp == NULL) {
