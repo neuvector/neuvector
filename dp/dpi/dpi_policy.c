@@ -655,7 +655,12 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
     _dpi_policy_chk_nbe(p, sip, dip, is_ingress, hdl, &desc);
 
     if ((desc->flags & POLICY_DESC_INTERNAL)) {
-        bool check_sgm = (hdl == NULL ? false : (g_strict_group_mode != 0 && hdl->def_action == DP_POLICY_ACTION_DENY));
+        bool check_sgm = (
+            hdl != NULL &&
+            g_strict_group_mode != 0 &&
+            (hdl->def_action == DP_POLICY_ACTION_DENY ||
+            hdl->def_action == DP_POLICY_ACTION_VIOLATE)
+        );
 
         if (is_ingress) {
             iptype = dpi_ip4_iptype(sip);
