@@ -161,6 +161,10 @@ const (
 	EventNameGroupMetricViolation        = "Group.Metric.Violation"
 	EventNameKvRestored                  = "Configuration.Restore"
 	EventNameScanDataRestored            = "Scan.Data.Restore"
+	EventNameMismatchedDEKSeed           = "Security.DEK.Seed.Mismatch"
+	EventNameDEKSeedUnavailable          = "Security.DEK.Seed.Unavailable"
+	EventNameReEncryptWithDEK            = "Security.DEK.Encrypt"
+	EventNameEncryptionSecretSet         = "Security.Encryption.Secret.Set"
 )
 
 // TODO: these are not events but incidents

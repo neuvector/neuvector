@@ -1646,6 +1646,7 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 	case "uniconf":
 		uniconfUpdate(nType, key, value)
 	case "cert":
+		value, _, _ = kv.UpgradeAndConvert(key, value)
 		certObjectUpdate(nType, key, value)
 	case "throttled", "telemetry":
 	default:

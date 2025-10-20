@@ -412,8 +412,23 @@ func upgradeAdmissionCert(value []byte) (*share.CLUSAdmissionCertCloaked, bool, 
 	return nil, false, false
 }
 
-func doUpgrade(key string, value []byte) (interface{}, bool) {
+// This is called when
+// 1. restore persisted config into kv store
+// 2. import configurations into kv store
+// 3. read from kv store
+// 4. get notified by kv changes.
+//
+// returned values:
+// #1. pointer to the upgraded object(sensitive fields in 'obj' are encrypted by DEK). nil if no upgrade happened
+// #2. true to advise caller to write the upgraded object back to data source
+// #3. true to advise caller to write the re-marshalled(because of using DEK) object back to data source
+// #4. error: ErrMismatchedKey or other error
+func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, error) {
 	object := share.CLUSObjectKey2Object(key)
+
+	var err error
+	var wrtForReEncrypt bool
+	var failToDecryptFields utils.Set
 
 	switch object {
 	case "config":
@@ -423,71 +438,74 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 		case share.CFGEndpointUser:
 			var user share.CLUSUser
 			_ = nvJsonUnmarshal(key, value, &user)
-			if upd, wrt := upgradeUser(&user); upd {
-				return &user, wrt
+			if upd, wrtForUpgrade := upgradeUser(&user); upd {
+				return &user, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeSystemConfig(&cfg); upd {
-				return &cfg, wrt
+			if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil {
+				if upd, wrtForUpgrade := upgradeSystemConfig(&cfg); upd || wrtForReEncrypt {
+					return &cfg, wrtForUpgrade, wrtForReEncrypt, failToDecryptFields, nil
+				}
 			}
 		case share.CFGEndpointServer:
 			var cfg share.CLUSServer
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeServer(&cfg); upd {
-				return &cfg, wrt
+			if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil {
+				if upd, wrtForUpgrade := upgradeServer(&cfg); upd || wrtForReEncrypt {
+					return &cfg, wrtForUpgrade, wrtForReEncrypt, failToDecryptFields, nil
+				}
 			}
 		case share.CFGEndpointGroup:
 			var cfg share.CLUSGroup
 			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeGroup(&cfg); upd {
-				return &cfg, wrt
+			if upd, wrtForUpgrade := upgradeGroup(&cfg); upd {
+				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointPolicy:
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSPolicyRule
 				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrt := upgradePolicyRule(&cfg); upd {
-					return &cfg, wrt
+				if upd, wrtForUpgrade := upgradePolicyRule(&cfg); upd {
+					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			} else if share.CLUSIsPolicyZipRuleListKey(key) {
 				var cfg []*share.CLUSRuleHead
 				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrt := upgradePolicyRuleHead(cfg); upd {
-					return &cfg, wrt
+				if upd, wrtForUpgrade := upgradePolicyRuleHead(cfg); upd {
+					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 
 			}
 		case share.CFGEndpointRegistry:
 			var cfg share.CLUSRegistryConfig
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeRegistry(&cfg); upd {
-				return &cfg, wrt
+			if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil {
+				if upd, wrtForUpgrade := upgradeRegistry(&cfg); upd || wrtForReEncrypt {
+					return &cfg, wrtForUpgrade, wrtForReEncrypt, failToDecryptFields, nil
+				}
 			}
 		case share.CFGEndpointProcessProfile:
 			var cfg share.CLUSProcessProfile
 			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeProcessProfile(&cfg); upd {
-				return &cfg, wrt
+			if upd, wrtForUpgrade := upgradeProcessProfile(&cfg); upd {
+				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointFileMonitor:
 			var cfg share.CLUSFileMonitorProfile
 			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeFileMonitorProfile(&cfg); upd {
-				return &cfg, wrt
+			if upd, wrtForUpgrade := upgradeFileMonitorProfile(&cfg); upd {
+				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointDlpGroup:
 			var cfg share.CLUSDlpGroup
 			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeDlpGroup(&cfg); upd {
-				return &cfg, wrt
+			if upd, wrtForUpgrade := upgradeDlpGroup(&cfg); upd {
+				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointDlpRule:
 			var cfg share.CLUSDlpSensor
 			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrt := upgradeDlpSensor(&cfg); upd {
-				return &cfg, wrt
+			if upd, wrtForUpgrade := upgradeDlpSensor(&cfg); upd {
+				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointAdmissionControl, share.CFGEndpointCrd:
 			scope := share.CLUSPolicyKey2AdmCfgPolicySubkey(key, false)
@@ -496,53 +514,62 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 				if token == share.CLUSAdmissionCfgState {
 					var state share.CLUSAdmissionState
 					_ = nvJsonUnmarshal(key, value, &state)
-					if upd, wrt := upgradeAdmCtrlState(config, &state); upd {
-						return &state, wrt
+					if upd, wrtForUpgrade := upgradeAdmCtrlState(config, &state); upd {
+						return &state, wrtForUpgrade, false, nil, nil
 					}
 				} else {
 					if config == share.CFGEndpointAdmissionControl {
 						if token == share.CLUSAdmissionCfgRule {
 							var rule share.CLUSAdmissionRule
 							_ = nvJsonUnmarshal(key, value, &rule)
-							if upd, wrt := upgradeAdmCtrlRule(&rule); upd {
-								return &rule, wrt
+							if upd, wrtForUpgrade := upgradeAdmCtrlRule(&rule); upd {
+								return &rule, wrtForUpgrade, false, nil, nil
 							}
 						} else if token == share.CLUSAdmissionCfgRuleList {
 							var cfg []*share.CLUSRuleHead
 							_ = nvJsonUnmarshal(key, value, &cfg)
-							if upd, wrt := upgradeRuleHead(cfg); upd {
-								return &cfg, wrt
+							if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
+								return &cfg, wrtForUpgrade, false, nil, nil
 							}
 						} else if token == share.CLUSAdmissionCfgCert {
 							var cert share.CLUSAdmissionCertCloaked
-							err := dec.Unmarshal(value, &cert)
-							if err != nil || !cert.Cloaked {
+							var dec common.MigrateDecryptUnmarshaller
+							err2 := dec.Unmarshal(value, &cert)
+							if err2 != nil || !cert.Cloaked {
 								if cert, upd, wrt := upgradeAdmissionCert(value); upd {
-									return cert, wrt
+									return cert, wrt, false, nil, nil
+								}
+							} else if dec.ReEncryptRequired {
+								if dataReEncrypted, err2 := enc.Marshal(&cert); err2 == nil {
+									_ = nvJsonUnmarshal(key, dataReEncrypted, &cert)
+									return &cert, false, true, nil, nil
+								} else {
+									log.WithFields(log.Fields{"error": err2, "key": key}).Error("re-encrypt object failed")
 								}
 							}
+							err = err2
 						}
 					}
 				}
 			} else if config == share.CFGEndpointCrd && scope == resource.NvSecurityRuleKind {
 				var cfg share.CLUSCrdSecurityRule
 				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrt := upgradeCrdSecurityRule(&cfg); upd {
-					return &cfg, wrt
+				if upd, wrtForUpgrade := upgradeCrdSecurityRule(&cfg); upd {
+					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			}
 		case share.CFGEndpointResponseRule:
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSResponseRule
 				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrt := upgradeResponseRule(&cfg); upd {
-					return &cfg, wrt
+				if upd, wrtForUpgrade := upgradeResponseRule(&cfg); upd {
+					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			} else if share.CLUSIsPolicyRuleListKey(key) {
 				var cfg []*share.CLUSRuleHead
 				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrt := upgradeRuleHead(cfg); upd {
-					return &cfg, wrt
+				if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
+					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			}
 		case share.CFGEndpointVulnerability:
@@ -555,7 +582,7 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 						upd = true
 					}
 					if upd {
-						return &cfg, upd
+						return &cfg, upd, false, nil, nil
 					}
 				}
 			}
@@ -569,28 +596,47 @@ func doUpgrade(key string, value []byte) (interface{}, bool) {
 						upd = true
 					}
 					if upd {
-						return &cfg, upd
+						return &cfg, upd, false, nil, nil
 					}
 				}
 			}
+		case share.CFGEndpointFederation:
+			if key == share.CLUSFedKey(share.CLUSFedMembershipSubKey) {
+				var cfg share.CLUSFedMembership
+				if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil && wrtForReEncrypt {
+					return &cfg, false, wrtForReEncrypt, failToDecryptFields, nil
+				}
+			} else if share.CLUSFedKey2CfgKey(key) == share.CLUSFedClustersSubKey {
+				var cfg share.CLUSFedJointClusterInfo
+				if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil && wrtForReEncrypt {
+					return &cfg, false, wrtForReEncrypt, failToDecryptFields, nil
+				}
+			}
+		}
+	case "cert":
+		var cert share.CLUSX509Cert
+		if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cert); err == nil && wrtForReEncrypt {
+			return &cert, false, wrtForReEncrypt, failToDecryptFields, nil
 		}
 	}
 
-	return nil, false
+	return nil, false, false, failToDecryptFields, err
 }
 
-// This is called when we restore the persisted config into kv store
-func upgrade(key string, value []byte) ([]byte, error) {
+// This is called when we restore the persisted config or import configurations into kv store
+func upgrade(key string, value []byte) ([]byte, bool, utils.Set, error) {
 	if len(value) == 0 {
-		return value, nil
+		return value, false, nil, nil
 	}
 
-	v, _ := doUpgrade(key, value)
+	v, _, wrtForReEncrypt, failToDecryptFields, err := doUpgrade(key, value)
 	if v == nil {
-		return value, nil
+		return value, false, failToDecryptFields, err
 	}
 
-	return json.Marshal(v)
+	data, err := json.Marshal(v)
+
+	return data, wrtForReEncrypt, failToDecryptFields, err
 }
 
 // This is called whenever we read from kv store or get notified by kv changes.
@@ -599,8 +645,11 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 		return value, nil, false
 	}
 	var v interface{}
-	var wrt bool
+	var wrtForUpgrade bool
+	var wrtForReEncrypt bool
 	var policyListKey bool
+	var needToUncloak bool
+	var failToDecryptFields utils.Set
 
 	if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
 		policyListKey = true
@@ -612,7 +661,10 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 			return value, nil, false
 		}
 	}
-	v, wrt = doUpgrade(key, value)
+	v, wrtForUpgrade, wrtForReEncrypt, failToDecryptFields, _ = doUpgrade(key, value)
+	// v being nil means no need to upgrade/convert the obj represented by value at all
+	wrt := wrtForUpgrade || wrtForReEncrypt
+	// wrt means need to write v to kv or not (sensitive fields in v are still encrypted)
 
 	if v != nil && wrt {
 		var err error
@@ -624,6 +676,23 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 		} else {
 			// Write back to the cluster if needed.
 			err = cluster.Put(key, newv)
+			if err == nil && wrtForReEncrypt && key == share.CLUSConfigSystemKey && (failToDecryptFields == nil || failToDecryptFields.Cardinality() == 0) {
+				if cfg, ok := v.(*share.CLUSSystemConfig); ok && cfg != nil {
+					cfgBackup := share.CLUSSystemConfigEncMigrated{
+						EncMigratedSystemConfig: string(newv),
+						EncDataExpirationTime:   time.Now().UTC().Add(time.Hour),
+					}
+					value, err := json.Marshal(&cfgBackup)
+					if err == nil {
+						if err = cluster.PutBinary(share.CLUSSystemEncMigratedKey, value); err == nil {
+							log.Info("backup encryption-migrated config")
+						}
+					}
+					if err != nil {
+						log.WithFields(log.Fields{"err": err}).Error("failed to backup encryption-migrated config")
+					}
+				}
+			}
 		}
 		if err != nil {
 			log.WithFields(log.Fields{"key": key}).Error(err)
@@ -646,9 +715,7 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 					_ = nvJsonUnmarshal(key, value, &r)
 					v = &r
 				}
-				if err := dec.Uncloak(v); err != nil {
-					log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
-				}
+				needToUncloak = true
 			}
 		}
 	case "config":
@@ -661,27 +728,21 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			if err := dec.Uncloak(v); err != nil {
-				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
-			}
+			needToUncloak = true
 		case share.CFGEndpointServer:
 			if v == nil {
 				var cfg share.CLUSServer
 				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			if err := dec.Uncloak(v); err != nil {
-				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
-			}
+			needToUncloak = true
 		case share.CFGEndpointRegistry:
 			if v == nil {
 				var cfg share.CLUSRegistryConfig
 				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			if err := dec.Uncloak(v); err != nil {
-				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
-			}
+			needToUncloak = true
 		case share.CFGEndpointCloud:
 			if v == nil {
 				// Currently the only data structure
@@ -689,9 +750,14 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 				_ = nvJsonUnmarshal(key, value, &cfg)
 				v = &cfg
 			}
-			if err := dec.Uncloak(v); err != nil {
-				log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
-			}
+			needToUncloak = true
+		}
+	}
+
+	if v != nil && needToUncloak {
+		// sensitive fields in v are still encrypted
+		if err := dec.Uncloak(v); err != nil {
+			log.WithFields(log.Fields{"err": err, "key": key}).Error("Uncloak")
 		}
 	}
 

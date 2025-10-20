@@ -47,9 +47,10 @@ type cmdResponse struct {
 }
 
 type tNvHttpClient struct {
-	httpClient  *http.Client
-	proxyUrlStr string // non-empty for connection thru proxy
-	basicAuth   string // non-empty for proxy that requires auth
+	httpClient         *http.Client // HTTP client with TLS verification enabled.
+	insecureHttpClient *http.Client // HTTP client with TLS verification skipped.
+	proxyUrlStr        string       // non-empty for connection thru proxy
+	basicAuth          string       // non-empty for proxy that requires auth
 }
 
 const (
@@ -414,21 +415,40 @@ func getProxyURL(r *http.Request) (*url.URL, error) {
 	return nil, nil
 }
 
-func createHttpClient(proxyOption int8, timeout time.Duration) (*http.Client, string, string) {
-	var proxyUrlStr string
-	var basicAuth string
-	var proxy share.CLUSProxy
-
+func createHttpClient(basicAuth string, timeout time.Duration, tlsInsecureSkipVerify bool) *http.Client {
 	// refer to http.DefaultTransport
 	transport := &http.Transport{
 		Proxy: getProxyURL,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: tlsInsecureSkipVerify,
 		},
 		MaxIdleConns:       100,
 		IdleConnTimeout:    90 * time.Second,
 		DisableCompression: true,
 	}
+	if basicAuth != "" {
+		transport.ProxyConnectHeader = http.Header{}
+		transport.ProxyConnectHeader.Add("Proxy-Authorization", basicAuth)
+	}
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		log.WithFields(log.Fields{"tlsInsecureSkipVerify": tlsInsecureSkipVerify, "err": err}).Error("creating cookie jar")
+	} else {
+		httpClient.Jar = jar
+	}
+
+	return httpClient
+}
+
+func createNvHttpClient(proxyOption int8, timeout time.Duration) *tNvHttpClient {
+	var proxyUrlStr string
+	var basicAuth string
+	var proxy share.CLUSProxy
+
 	if proxyOption != const_no_proxy {
 		_sysProxyMutex.RLock()
 		if proxyOption == const_http_proxy {
@@ -443,22 +463,15 @@ func createHttpClient(proxyOption int8, timeout time.Duration) (*http.Client, st
 		if proxy.Username != "" {
 			auth := fmt.Sprintf("%s:%s", proxy.Username, proxy.Password)
 			basicAuth = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-			transport.ProxyConnectHeader = http.Header{}
-			transport.ProxyConnectHeader.Add("Proxy-Authorization", basicAuth)
 		}
 	}
-	httpClient := &http.Client{
-		Transport: transport,
-		Timeout:   timeout,
-	}
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		log.WithFields(log.Fields{"proxyOption": proxyOption, "err": err}).Error("creating cookie jar")
-	} else {
-		httpClient.Jar = jar
-	}
 
-	return httpClient, proxyUrlStr, basicAuth
+	return &tNvHttpClient{
+		httpClient:         createHttpClient(basicAuth, timeout, false), // http.Transport.TLSClientConfig.InsecureSkipVerify is false
+		insecureHttpClient: createHttpClient(basicAuth, timeout, true),  // http.Transport.TLSClientConfig.InsecureSkipVerify is true
+		proxyUrlStr:        proxyUrlStr,
+		basicAuth:          basicAuth,
+	}
 }
 
 func getProxyOptions(id string, useProxy int8) []int8 {
@@ -511,7 +524,6 @@ func getProxyOptions(id string, useProxy int8) []int8 {
 
 func sendRestRequest(idTarget string, method, urlStr, token, cntType, jointTicket, jointID string, cookie *http.Cookie,
 	body []byte, logError bool, specificProxy *int8, acc *access.AccessControl) ([]byte, int, bool, error) {
-
 	var useProxy int8
 	var data []byte
 	var statusCode int
@@ -540,19 +552,13 @@ func sendRestRequest(idTarget string, method, urlStr, token, cntType, jointTicke
 		nvHttpClient = _nvHttpClients[proxyOption]
 		_httpClientMutex.RUnlock()
 		if nvHttpClient == nil {
-			httpClient, proxyUrlStr, basicAuth := createHttpClient(proxyOption, clusterAuthTimeout)
-			nvHttpClient = &tNvHttpClient{
-				httpClient:  httpClient,
-				proxyUrlStr: proxyUrlStr,
-				basicAuth:   basicAuth,
-			}
+			nvHttpClient = createNvHttpClient(proxyOption, clusterAuthTimeout)
 			_httpClientMutex.Lock()
 			_nvHttpClients[proxyOption] = nvHttpClient
 			_httpClientMutex.Unlock()
 		}
-		if data, statusCode, err = sendRestReqInternal(nvHttpClient, method, urlStr, token, cntType,
+		if data, statusCode, err = sendRestReqInternal(nvHttpClient, idTarget, method, urlStr, token, cntType,
 			jointTicket, jointID, proxyOption, cookie, body, logError); err == nil {
-
 			_httpClientMutex.Lock()
 			_proxyOptionHistory[idTarget] = proxyOption
 			_httpClientMutex.Unlock()
@@ -566,13 +572,16 @@ func sendRestRequest(idTarget string, method, urlStr, token, cntType, jointTicke
 	return data, statusCode, usedProxy, err
 }
 
-func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cntType, jointTicket, jointID string,
+func sendRestReqInternal(nvHttpClient *tNvHttpClient, idTarget, method, urlStr, token, cntType, jointTicket, jointID string,
 	proxyOption int8, cookie *http.Cookie, body []byte, logError bool) ([]byte, int, error) {
-
-	var httpClient *http.Client = nvHttpClient.httpClient
+	var httpClient *http.Client = nvHttpClient.insecureHttpClient
 	var req *http.Request
 	var gzipped bool
 	var err error
+
+	if idTarget == "telemetry" && !cctx.TeleSkipTlsVerification {
+		httpClient = nvHttpClient.httpClient
+	}
 
 	if jointTicket != "" && jointID != "" {
 		if len(body) > gzipThreshold {
@@ -636,7 +645,23 @@ func sendRestReqInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, cnt
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
+	var data []byte
+	if idTarget == "telemetry" {
+		// because neuvector_versions.json only has one version entry, the expected len of returned neuvector_versions.json should be < 256
+		var dataBuffer [256]byte
+		reader := io.LimitReader(resp.Body, int64(len(dataBuffer)))
+		n, err2 := reader.Read(dataBuffer[:])
+		if err2 != io.EOF {
+			err = fmt.Errorf("unexpected %d byes of data read, error: %v", n, err2)
+			if _, err2 = io.Copy(io.Discard, resp.Body); err2 != nil {
+				log.WithFields(log.Fields{"error": err2}).Error("Discard remaining data fail")
+			}
+		} else {
+			data = dataBuffer[:n]
+		}
+	} else {
+		data, err = io.ReadAll(resp.Body)
+	}
 	if err != nil {
 		log.WithFields(log.Fields{"url": urlStr, "status": resp.Status, "proxyOption": proxyOption}).Error("Read data fail")
 		return nil, 0, err
@@ -696,17 +721,17 @@ func RestConfig(cmd, interval uint32, param1 interface{}, param2 interface{}) er
 					// no need to reconstruct a new http client when only proxy url changes.
 					// however, if proxy auth changes, we need to reconstruct a new http client because transport ProxyConnectHeader is a map
 					if nvHttpClient == nil || newBasicAuth != nvHttpClient.basicAuth {
-						newHttpClient, proxyUrlStr, basicAuth := createHttpClient(proxyOption, clusterAuthTimeout)
-						newNvHttpClient := &tNvHttpClient{
-							httpClient:  newHttpClient,
-							proxyUrlStr: proxyUrlStr,
-							basicAuth:   basicAuth,
-						}
+						newNvHttpClient := createNvHttpClient(proxyOption, clusterAuthTimeout)
 						_httpClientMutex.Lock()
 						_nvHttpClients[proxyOption] = newNvHttpClient
 						_httpClientMutex.Unlock()
-						if nvHttpClient != nil && nvHttpClient.httpClient != nil {
-							nvHttpClient.httpClient.CloseIdleConnections()
+						if nvHttpClient != nil {
+							if nvHttpClient.httpClient != nil {
+								nvHttpClient.httpClient.CloseIdleConnections()
+							}
+							if nvHttpClient.insecureHttpClient != nil {
+								nvHttpClient.insecureHttpClient.CloseIdleConnections()
+							}
 						}
 					} else {
 						if nvHttpClient.proxyUrlStr != newProxy.URL {
@@ -730,14 +755,10 @@ func initHttpClients() {
 		_sysProxyMutex.Unlock()
 	}
 	for _, proxyOption := range []int8{const_no_proxy, const_https_proxy, const_http_proxy} {
-		httpClient, proxyUrlStr, basicAuth := createHttpClient(proxyOption, clusterAuthTimeout)
+		nvHttpClient := createNvHttpClient(proxyOption, clusterAuthTimeout)
 		_httpClientMutex.Lock()
 		if _nvHttpClients[proxyOption] == nil {
-			_nvHttpClients[proxyOption] = &tNvHttpClient{
-				httpClient:  httpClient,
-				proxyUrlStr: proxyUrlStr,
-				basicAuth:   basicAuth,
-			}
+			_nvHttpClients[proxyOption] = nvHttpClient
 		}
 		_httpClientMutex.Unlock()
 	}
@@ -769,12 +790,12 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 		nvHttpClient = _nvHttpClients[proxyOption]
 		_httpClientMutex.RUnlock()
 		if scanRepository {
-			nvHttpClient.httpClient.Timeout = repoScanLingeringDuration + time.Duration(30*time.Second)
+			nvHttpClient.insecureHttpClient.Timeout = repoScanLingeringDuration + time.Duration(30*time.Second)
 		}
 		headers, statusCode, data, err = sendReqToJointClusterInternal(nvHttpClient, method, urlStr, token, contentType, tag, txnID,
 			proxyOption, body, gzipped, forward, remoteExport, logError)
 		if scanRepository {
-			nvHttpClient.httpClient.Timeout = clusterAuthTimeout
+			nvHttpClient.insecureHttpClient.Timeout = clusterAuthTimeout
 		}
 		if err == nil {
 			_httpClientMutex.Lock()
@@ -793,7 +814,7 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, contentType, tag, txnID string,
 	proxyOption int8, body []byte, gzipped, forward, remoteExport, logError bool) (map[string]string, int, []byte, error) {
 
-	var httpClient *http.Client = nvHttpClient.httpClient
+	var httpClient *http.Client = nvHttpClient.insecureHttpClient
 
 	req, err := http.NewRequest(method, urlStr, bytes.NewBuffer(body))
 	if err != nil {
@@ -882,18 +903,21 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 	if !refreshToken {
 		return cacher.GetFedJoinedClusterToken(clusterID, login.id, acc)
 	} else {
+		masterToken, err := jwtGenFedMasterToken(user, login, rc.ID, rc.Secret)
+		if err != nil {
+			return "", err
+		}
 		reqTo := &api.RESTFedAuthData{
 			ClientIP:       _masterClusterIP,
 			MasterUsername: login.fullname,
 			JointUsername:  common.DefaultAdminUser,
 			// master token is for requesting regular jwt token from joint cluster. It can be validated by joint cluster based on shared secret/key/cert between master & joint clusters
-			MasterToken: jwtGenFedMasterToken(user, login, rc.ID, rc.Secret),
+			MasterToken: masterToken,
 		}
 		if reqTo.MasterToken == "" {
 			return "", common.ErrObjectAccessDenied
 		}
 
-		var err error
 		var data []byte
 		var statusCode int
 		var proxyUsed bool
@@ -1262,7 +1286,10 @@ func pingJointCluster(tag, urlStr string, jointCluster share.CLUSFedJointCluster
 		FedKvVersion: kv.GetFedKvVer(),
 	}
 	if id != "" {
-		reqTo.Token = jwtGenFedPingToken(api.FedRoleMaster, id, jointCluster.Secret, nil)
+		reqTo.Token, err = jwtGenFedPingToken(api.FedRoleMaster, id, jointCluster.Secret, nil)
+		if err != nil {
+			return 0, false, err
+		}
 	}
 	bodyTo, _ := json.Marshal(&reqTo)
 	cmdResp := cmdResponse{id: id, result: _fedClusterDisconnected}
@@ -2301,9 +2328,9 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	// verify if joint cluster is reachable from master cluster
 	var jointCluster share.CLUSFedJointClusterInfo
 	jointCluster.RestInfo = reqData.JointCluster.RestInfo
-	statusCode, proxyUsed, _ := pingJointCluster(_tagVerifyJointCluster, "v1/fed/joint_test_internal", jointCluster, nil, accReadAll)
-	if statusCode != http.StatusOK {
-		log.WithFields(log.Fields{"statusCode": statusCode, "rest": reqData.JointCluster.RestInfo}).Error("Managed cluster unreachable")
+	statusCode, proxyUsed, err2 := pingJointCluster(_tagVerifyJointCluster, "v1/fed/joint_test_internal", jointCluster, nil, accReadAll)
+	if statusCode != http.StatusOK || err2 != nil {
+		log.WithFields(log.Fields{"statusCode": statusCode, "rest": reqData.JointCluster.RestInfo, "error": err2}).Error("Managed cluster unreachable")
 		restRespError(w, http.StatusBadRequest, api.RESTErrFedJointUnreachable)
 		return
 	}

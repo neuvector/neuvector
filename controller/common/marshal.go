@@ -1,6 +1,8 @@
 package common
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,18 +11,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 type Marshaller interface {
 	Marshal(data interface{}) ([]byte, error)
+	GetEmptyFieldsToEncrypt() utils.Set
 }
 type Unmarshaller interface {
 	Unmarshal(raw []byte, data interface{}) error
 	Uncloak(data interface{}) error
+	GetEmptyEncryptedFields() utils.Set
+	GetFailToDecryptFields() utils.Set
+	GetDecryptedFieldsNumber() int
 }
 
 const (
@@ -32,18 +41,197 @@ const (
 )
 
 const (
-	saltSize = 16
+	saltSize  = 16
+	nonceSize = 12
+
+	saltHexSize  = 32
+	nonceHexSize = 24
 
 	keyLength = 32
 	keyIter   = 600000
 
-	saltedHashPrefix = "s-"
+	DekSeedLength = 32
+
+	saltedHashPrefix   = "s-"
+	cipherTypeA        = "a"
+	cipherBundleFormat = "%s-%s-%s-%s-%s" // "{cipherTypeA}-{keyVersion}-{hex(salt)}-{hex(nonce)}-{hex(cipherText)}"
+	cipherBundleParts  = 5
 )
+
+type tMarshallResult struct {
+	emptyFieldsToEncrypt utils.Set // all to-cloak fields that have empty string value
+}
+
+func (md *tMarshallResult) Reset() {
+	if md.emptyFieldsToEncrypt == nil {
+		md.emptyFieldsToEncrypt = utils.NewSet()
+	} else {
+		md.emptyFieldsToEncrypt.Clear()
+	}
+}
+
+func (md *tMarshallResult) AddEmptyFieldToEncrypt(field string) {
+	if md.emptyFieldsToEncrypt != nil {
+		md.emptyFieldsToEncrypt.Add(field)
+	}
+}
+
+func (md *tMarshallResult) GetEmptyFieldsToEncrypt() utils.Set {
+	if md.emptyFieldsToEncrypt != nil && md.emptyFieldsToEncrypt.Cardinality() > 0 {
+		return md.emptyFieldsToEncrypt.Clone()
+	}
+	return nil
+}
+
+type tUnmarshallResult struct {
+	emptyEncryptedFields  utils.Set // all cloaked fields that have empty string value
+	failedToDecryptFields utils.Set // all cloaked fields that cannot be decrypted
+	decryptedFieldsNumber int
+}
+
+func (ud *tUnmarshallResult) Reset() {
+	if ud.emptyEncryptedFields == nil {
+		ud.emptyEncryptedFields = utils.NewSet()
+	} else {
+		ud.emptyEncryptedFields.Clear()
+	}
+
+	if ud.failedToDecryptFields == nil {
+		ud.failedToDecryptFields = utils.NewSet()
+	} else {
+		ud.failedToDecryptFields.Clear()
+	}
+}
+
+func (ud *tUnmarshallResult) AddEmptyEncryptedField(field string) {
+	if ud.emptyEncryptedFields != nil {
+		ud.emptyEncryptedFields.Add(field)
+	}
+}
+
+func (ud *tUnmarshallResult) AddFailedToDecryptField(field string) {
+	if ud.failedToDecryptFields != nil {
+		ud.failedToDecryptFields.Add(field)
+	}
+}
+
+func (ud *tUnmarshallResult) IncreaseDecryptedFields() {
+	ud.decryptedFieldsNumber++
+}
+
+func (ud *tUnmarshallResult) GetEmptyEncryptedFields() utils.Set {
+	if ud.emptyEncryptedFields != nil && ud.emptyEncryptedFields.Cardinality() > 0 {
+		return ud.emptyEncryptedFields.Clone()
+	}
+	return nil
+}
+
+func (ud *tUnmarshallResult) GetFailToDecryptFields() utils.Set {
+	if ud.failedToDecryptFields != nil && ud.failedToDecryptFields.Cardinality() > 0 {
+		return ud.failedToDecryptFields.Clone()
+	}
+	return nil
+}
+
+func (ud *tUnmarshallResult) GetDecryptedFieldsNumber() int {
+	return ud.decryptedFieldsNumber
+}
 
 type EmptyMarshaller struct{}
 type MaskMarshaller struct{}
-type EncryptMarshaller struct{}
-type DecryptUnmarshaller struct{}
+type EncryptMarshaller struct {
+	result tMarshallResult
+}
+type DecryptUnmarshaller struct {
+	result tUnmarshallResult
+}
+
+// specifically for import / restore purpose
+type MigrateDecryptUnmarshaller struct {
+	ReEncryptRequired bool // set to true when any sensitive field needs to be re-encrypted by the new encryption mechanism
+	result            tUnmarshallResult
+}
+
+type EncKeys map[string][]byte // map key is enc key version(the bigger the newer). value is the passphrase
+type nvDEK struct {
+	version string
+	dekSeed string
+}
+
+func (m nvDEK) isAvailable() bool {
+	return len(m.dekSeed) == keyLength
+}
+
+var dekSeedMutex sync.RWMutex
+var currentDekSeed nvDEK                                      // for the current dekSeed for encrypting data
+var dekSeedsCache map[string]string = make(map[string]string) // hash values of all passphrases in k8s secret neuvector-store-secret
+
+func getCurrentDekSeed() nvDEK {
+	dekSeedMutex.RLock()
+	defer dekSeedMutex.RUnlock()
+	return currentDekSeed
+}
+
+func getVersionedDekSeed(version string) string {
+	dekSeedMutex.RLock()
+	defer dekSeedMutex.RUnlock()
+	return dekSeedsCache[version]
+}
+
+func InitAesGcmKey(encKeys EncKeys, currEncKeyVer string) error {
+	if len(encKeys) == 0 {
+		return ErrInvalidPassphrase
+	}
+	dekSeedsCacheTemp := make(map[string]string, len(encKeys))
+	if passphrase, ok := encKeys[currEncKeyVer]; !ok || len(passphrase) < DekSeedLength {
+		return ErrInvalidPassphrase
+	}
+
+	for keyVersion, passphrase := range encKeys {
+		if len(passphrase) >= DekSeedLength {
+			h := sha256.New()
+			h.Write(passphrase)
+			dekSeedsCacheTemp[keyVersion] = string(h.Sum(nil))
+		}
+	}
+
+	if len(dekSeedsCacheTemp[currEncKeyVer]) < DekSeedLength {
+		return ErrInvalidPassphrase
+	}
+
+	dekSeedMutex.Lock()
+	dekSeedsCache = dekSeedsCacheTemp
+	currentDekSeed = nvDEK{
+		version: currEncKeyVer,
+		dekSeed: dekSeedsCache[currEncKeyVer],
+	}
+	dekSeedMutex.Unlock()
+
+	return nil
+}
+
+func AddAesGcmKey(keyVersion string, passphrase []byte) error {
+	if len(passphrase) >= DekSeedLength {
+		h := sha256.New()
+		h.Write(passphrase)
+		dekSeed := string(h.Sum(nil))
+
+		dekSeedMutex.Lock()
+		dekSeedsCache[keyVersion] = dekSeed
+		currentDekSeed = nvDEK{
+			version: keyVersion,
+			dekSeed: dekSeed,
+		}
+		dekSeedMutex.Unlock()
+		return nil
+	}
+	return ErrDEKSeedUnavailable
+}
+
+func IsDEKSeedAvailable() bool {
+	dekSeed := getCurrentDekSeed()
+	return dekSeed.isAvailable()
+}
 
 func HashPassword(password string, salt []byte) (string, error) {
 	if len(salt) == 0 {
@@ -64,6 +252,105 @@ func HashPassword(password string, salt []byte) (string, error) {
 	return cipherBundle, nil
 }
 
+func aesGcmEncrypt(plaintext string) (string, error) {
+	if plaintext == "" {
+		return "", ErrEmptyValue
+	}
+	dekSeed := getCurrentDekSeed()
+	if !dekSeed.isAvailable() {
+		return "", ErrDEKSeedUnavailable
+	}
+
+	salt := make([]byte, saltSize) // http://www.ietf.org/rfc/rfc2898.txt
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("failed to generate salt: %w", err)
+	}
+	dek, err := pbkdf2.Key(sha256.New, currentDekSeed.dekSeed, salt, keyIter, keyLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive DEK: %w", err)
+	}
+
+	nonce := make([]byte, nonceSize)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	additionalData := append(salt, nonce...)
+	cipherText := aesGCM.Seal(nil, nonce, []byte(plaintext), additionalData)
+	cipherBundle := fmt.Sprintf(cipherBundleFormat, cipherTypeA,
+		currentDekSeed.version, hex.EncodeToString(salt), hex.EncodeToString(nonce), hex.EncodeToString(cipherText))
+
+	return cipherBundle, nil
+}
+
+func aesGcmDecrypt(cipherBundle string) (string, error) {
+	if cipherBundle == "" {
+		return "", ErrEmptyValue
+	}
+
+	ss := strings.Split(cipherBundle, "-")
+	if len(ss) != cipherBundleParts || ss[0] != cipherTypeA || (len(ss[2]) != saltHexSize || len(ss[3]) != nonceHexSize) {
+		return "", ErrUnsupported
+	}
+
+	if _, err := strconv.ParseUint(ss[1], 10, 64); err != nil {
+		return "", fmt.Errorf("invalid version: %s", ss[1])
+	}
+
+	dekSeed := getVersionedDekSeed(ss[1])
+	if len(dekSeed) != keyLength {
+		return "", ErrDEKSeedUnavailable
+	}
+
+	salt, err := hex.DecodeString(ss[2])
+	if err != nil || len(salt) != saltSize {
+		return "", fmt.Errorf("invalid salt: %v(len=%d)", err, len(salt))
+	}
+
+	nonce, err := hex.DecodeString(ss[3])
+	if err != nil || len(nonce) != nonceSize {
+		return "", fmt.Errorf("invalid nonce: %v(len=%d)", err, len(nonce))
+	}
+
+	cipherText, err := hex.DecodeString(ss[4])
+	if err != nil {
+		return "", fmt.Errorf("invalid data: %w", err)
+	}
+
+	dek, err := pbkdf2.Key(sha256.New, dekSeed, salt, keyIter, keyLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive DEK: %w", err)
+	}
+
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	additionalData := append(salt, nonce...)
+	data, err := aesGCM.Open(nil, nonce, cipherText, additionalData)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt data: %w", err)
+	}
+
+	return string(data), nil
+}
+
 func IsSaltedPasswordHash(hash string) bool {
 	if strings.HasPrefix(hash, saltedHashPrefix) {
 		return len(strings.Split(hash, "-")) == 3
@@ -73,39 +360,88 @@ func IsSaltedPasswordHash(hash string) bool {
 }
 
 func (m EmptyMarshaller) Marshal(data interface{}) ([]byte, error) {
-	if u, err := marshal(emptyMask, data); err != nil {
+	if u, err := marshal(emptyMask, data, tMarshallResult{}); err != nil {
 		return nil, err
 	} else {
 		return json.Marshal(u)
 	}
+}
+
+func (m EmptyMarshaller) GetEmptyFieldsToEncrypt() utils.Set {
+	return nil
 }
 
 func (m MaskMarshaller) Marshal(data interface{}) ([]byte, error) {
-	if u, err := marshal(cloakMask, data); err != nil {
+	if u, err := marshal(cloakMask, data, tMarshallResult{}); err != nil {
 		return nil, err
 	} else {
 		return json.Marshal(u)
 	}
 }
 
-func (m EncryptMarshaller) Marshal(data interface{}) ([]byte, error) {
-	if u, err := marshal(cloakEncrypt, data); err != nil {
+func (m *EncryptMarshaller) Marshal(data interface{}) ([]byte, error) {
+	m.result.Reset()
+	if u, err := marshal(cloakEncrypt, data, m.result); err != nil {
 		return nil, err
 	} else {
 		return json.Marshal(u)
 	}
 }
 
-func (m DecryptUnmarshaller) Unmarshal(raw []byte, data interface{}) error {
+func (m *EncryptMarshaller) GetEmptyFieldsToEncrypt() utils.Set {
+	return m.result.GetEmptyFieldsToEncrypt()
+}
+
+func (m *DecryptUnmarshaller) Unmarshal(raw []byte, data interface{}) error {
 	if err := json.Unmarshal(raw, data); err != nil {
 		return err
 	} else {
-		return unmarshal(cloakDecrypt, data)
+		m.result.Reset()
+		return unmarshal(cloakDecrypt, data, nil, m.result)
 	}
 }
 
-func (m DecryptUnmarshaller) Uncloak(data interface{}) error {
-	return unmarshal(cloakDecrypt, data)
+func (m *DecryptUnmarshaller) Uncloak(data interface{}) error {
+	m.result.Reset()
+	return unmarshal(cloakDecrypt, data, nil, m.result)
+}
+
+func (m *DecryptUnmarshaller) GetEmptyEncryptedFields() utils.Set {
+	return m.result.GetEmptyEncryptedFields()
+}
+
+func (m *DecryptUnmarshaller) GetFailToDecryptFields() utils.Set {
+	return m.result.GetFailToDecryptFields()
+}
+
+func (m *DecryptUnmarshaller) GetDecryptedFieldsNumber() int {
+	return m.result.decryptedFieldsNumber
+}
+
+func (m *MigrateDecryptUnmarshaller) Unmarshal(raw []byte, data interface{}) error {
+	if err := json.Unmarshal(raw, data); err != nil {
+		return err
+	} else {
+		m.result.Reset()
+		return unmarshal(cloakDecrypt, data, &m.ReEncryptRequired, m.result)
+	}
+}
+
+func (m *MigrateDecryptUnmarshaller) Uncloak(data interface{}) error {
+	m.result.Reset()
+	return unmarshal(cloakDecrypt, data, &m.ReEncryptRequired, m.result)
+}
+
+func (m *MigrateDecryptUnmarshaller) GetEmptyEncryptedFields() utils.Set {
+	return m.result.GetEmptyEncryptedFields()
+}
+
+func (m *MigrateDecryptUnmarshaller) GetFailToDecryptFields() utils.Set {
+	return m.result.GetFailToDecryptFields()
+}
+
+func (m *MigrateDecryptUnmarshaller) GetDecryptedFieldsNumber() int {
+	return m.result.decryptedFieldsNumber
 }
 
 type MarshalInvalidTypeError struct {
@@ -154,7 +490,7 @@ func parseTag(tag string) (string, utils.Set) {
 	return tokens[0], utils.NewSetFromSliceKind(tokens[1:])
 }
 
-func unmarshal(cloak string, data interface{}) error {
+func unmarshal(cloak string, data interface{}, reEncryptRequired *bool, unmarshalResult tUnmarshallResult) error {
 	v := reflect.ValueOf(data)
 	t := v.Type()
 
@@ -168,7 +504,7 @@ func unmarshal(cloak string, data interface{}) error {
 	}
 
 	if t.Kind() != reflect.Struct {
-		return unmarshalValue(cloak, v)
+		return unmarshalValue(cloak, v, reEncryptRequired, unmarshalResult)
 	}
 
 	for i := 0; i < t.NumField(); i++ {
@@ -200,7 +536,36 @@ func unmarshal(cloak string, data interface{}) error {
 				switch cloak {
 				case cloakDecrypt:
 					if val.CanSet() {
-						s := utils.DecryptPassword(val.Interface().(string))
+						var s string
+						var err error
+						if strVal := val.Interface().(string); strVal != "" {
+							if idx := strings.Index(strVal, "-"); idx < 0 {
+								// it's encrypted by the fixed default key.
+								if s = utils.DecryptPassword(strVal); s != "" {
+									if reEncryptRequired != nil {
+										*reEncryptRequired = true
+									}
+									unmarshalResult.IncreaseDecryptedFields()
+								} else {
+									s = strVal
+								}
+							} else {
+								// it's encrypted by variant DEK
+								if s, err = aesGcmDecrypt(strVal); err != nil {
+									if err != ErrDEKSeedUnavailable && err != ErrEmptyValue {
+										log.WithFields(log.Fields{"error": err, "jsonTag": jsonTag}).Error()
+									}
+									if err == ErrEmptyValue {
+										unmarshalResult.AddEmptyEncryptedField(jsonTag)
+									} else {
+										unmarshalResult.AddFailedToDecryptField(jsonTag)
+									}
+									s = strVal
+								} else {
+									unmarshalResult.IncreaseDecryptedFields()
+								}
+							}
+						}
 						val.SetString(s)
 					}
 				}
@@ -208,7 +573,7 @@ func unmarshal(cloak string, data interface{}) error {
 		}
 
 		if val.CanAddr() {
-			err := unmarshalValue(cloak, val.Addr())
+			err := unmarshalValue(cloak, val.Addr(), reEncryptRequired, unmarshalResult)
 			if err != nil {
 				return err
 			}
@@ -218,7 +583,7 @@ func unmarshal(cloak string, data interface{}) error {
 	return nil
 }
 
-func unmarshalValue(cloak string, v reflect.Value) error {
+func unmarshalValue(cloak string, v reflect.Value, reEncryptRequired *bool, unmarshalResult tUnmarshallResult) error {
 	// return nil on nil pointer struct fields
 	if !v.IsValid() || !v.CanInterface() {
 		return nil
@@ -232,7 +597,7 @@ func unmarshalValue(cloak string, v reflect.Value) error {
 
 	if k == reflect.Interface || k == reflect.Struct {
 		if v.CanAddr() {
-			return unmarshal(cloak, v.Addr().Interface())
+			return unmarshal(cloak, v.Addr().Interface(), reEncryptRequired, unmarshalResult)
 		} else {
 			return nil
 		}
@@ -241,7 +606,7 @@ func unmarshalValue(cloak string, v reflect.Value) error {
 	if k == reflect.Slice {
 		l := v.Len()
 		for i := 0; i < l; i++ {
-			err := unmarshalValue(cloak, v.Index(i))
+			err := unmarshalValue(cloak, v.Index(i), reEncryptRequired, unmarshalResult)
 			if err != nil {
 				return err
 			}
@@ -257,7 +622,7 @@ func unmarshalValue(cloak string, v reflect.Value) error {
 			return MarshalInvalidTypeError{t: mapKeys[0].Kind(), data: v.Interface()}
 		}
 		for _, key := range mapKeys {
-			err := unmarshalValue(cloak, v.MapIndex(key))
+			err := unmarshalValue(cloak, v.MapIndex(key), reEncryptRequired, unmarshalResult)
 			if err != nil {
 				return err
 			}
@@ -267,7 +632,7 @@ func unmarshalValue(cloak string, v reflect.Value) error {
 	return nil
 }
 
-func marshal(cloak string, data interface{}) (interface{}, error) {
+func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (interface{}, error) {
 	v := reflect.ValueOf(data)
 	t := v.Type()
 
@@ -281,7 +646,7 @@ func marshal(cloak string, data interface{}) (interface{}, error) {
 	}
 
 	if t.Kind() != reflect.Struct {
-		return marshalValue(cloak, v)
+		return marshalValue(cloak, v, marshalResult)
 	}
 
 	dest := make(map[string]interface{})
@@ -326,13 +691,29 @@ func marshal(cloak string, data interface{}) (interface{}, error) {
 					m := api.RESTMaskedValue
 					val = reflect.ValueOf(m)
 				case cloakEncrypt:
-					m := utils.EncryptPassword(val.Interface().(string))
+					var m string
+					if strVal := val.Interface().(string); strVal != "" {
+						if currentDekSeed.isAvailable() {
+							var err error
+							if m, err = aesGcmEncrypt(strVal); err != nil {
+								if err != ErrDEKSeedUnavailable && err != ErrEmptyValue {
+									log.WithFields(log.Fields{"err": err, "jsonTag": jsonTag}).Error()
+								}
+								if err == ErrEmptyValue {
+									marshalResult.AddEmptyFieldToEncrypt(jsonTag)
+								}
+								m = utils.EncryptPassword(strVal)
+							}
+						} else {
+							m = utils.EncryptPassword(strVal)
+						}
+					}
 					val = reflect.ValueOf(m)
 				}
 			}
 		}
 
-		v, err := marshalValue(cloak, val)
+		v, err := marshalValue(cloak, val, marshalResult)
 		if err != nil {
 			return nil, err
 		}
@@ -350,7 +731,7 @@ func marshal(cloak string, data interface{}) (interface{}, error) {
 	return dest, nil
 }
 
-func marshalValue(cloak string, v reflect.Value) (interface{}, error) {
+func marshalValue(cloak string, v reflect.Value, marshalResult tMarshallResult) (interface{}, error) {
 	// return nil on nil pointer struct fields
 	if !v.IsValid() || !v.CanInterface() {
 		return nil, nil
@@ -374,7 +755,7 @@ func marshalValue(cloak string, v reflect.Value) (interface{}, error) {
 	}
 
 	if k == reflect.Interface || k == reflect.Struct {
-		return marshal(cloak, val)
+		return marshal(cloak, val, marshalResult)
 	}
 	if k == reflect.Slice {
 		if isEmptyValue(v) {
@@ -384,7 +765,7 @@ func marshalValue(cloak string, v reflect.Value) (interface{}, error) {
 		l := v.Len()
 		dest := make([]interface{}, l)
 		for i := 0; i < l; i++ {
-			d, err := marshalValue(cloak, v.Index(i))
+			d, err := marshalValue(cloak, v.Index(i), marshalResult)
 			if err != nil {
 				return nil, err
 			}
@@ -411,7 +792,7 @@ func marshalValue(cloak string, v reflect.Value) (interface{}, error) {
 			return nil, MarshalInvalidTypeError{t: mapKeys[0].Kind(), data: val}
 		}
 		for _, key := range mapKeys {
-			d, err := marshalValue(cloak, v.MapIndex(key))
+			d, err := marshalValue(cloak, v.MapIndex(key), marshalResult)
 			if err != nil {
 				return nil, err
 			}
