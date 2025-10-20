@@ -652,14 +652,14 @@ func sendRestReqInternal(nvHttpClient *tNvHttpClient, idTarget, method, urlStr, 
 		n, err2 := reader.Read(dataBuffer[:])
 		if err2 != io.EOF {
 			err = fmt.Errorf("unexpected %d byes of data read, error: %v", n, err2)
-			if _, err2 = io.Copy(io.Discard, resp.Body); err2 != nil {
+			if _, err2 = io.Copy(ioutil.Discard, resp.Body); err2 != nil {
 				log.WithFields(log.Fields{"error": err2}).Error("Discard remaining data fail")
 			}
 		} else {
 			data = dataBuffer[:n]
 		}
 	} else {
-		data, err = io.ReadAll(resp.Body)
+		data, err = ioutil.ReadAll(resp.Body)
 	}
 	if err != nil {
 		log.WithFields(log.Fields{"url": urlStr, "status": resp.Status, "proxyOption": proxyOption}).Error("Read data fail")
