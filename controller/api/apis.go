@@ -3865,13 +3865,14 @@ type RESTUserRoleConfigData struct {
 
 // Import task
 type RESTImportTask struct {
-	TID            string    `json:"tid"`
-	CtrlerID       string    `json:"ctrler_id"`
-	LastUpdateTime time.Time `json:"last_update_time,omitempty"`
-	Percentage     int       `json:"percentage"`
-	TriggeredBy    string    `json:"triggered_by,omitempty"` // fullname of the user who triggers import
-	Status         string    `json:"status,omitempty"`
-	TempToken      string    `json:"temp_token,omitempty"`
+	TID                    string              `json:"tid"`
+	CtrlerID               string              `json:"ctrler_id"`
+	LastUpdateTime         time.Time           `json:"last_update_time,omitempty"`
+	Percentage             int                 `json:"percentage"`
+	TriggeredBy            string              `json:"triggered_by,omitempty"` // fullname of the user who triggers import
+	Status                 string              `json:"status,omitempty"`
+	TempToken              string              `json:"temp_token,omitempty"`
+	FailToDecryptKeyFields map[string][]string `json:"fail_to_decrypt_key_fields"` // key : []fields
 }
 
 type RESTImportTaskData struct {

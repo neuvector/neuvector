@@ -154,7 +154,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 		}
 	default:
 		logFields := log.Fields{"event": event, "type": rt}
-		if rt != resource.RscTypeConfigMap {
+		if rt != resource.RscTypeConfigMap && rt != resource.RscTypeSecret {
 			logFields["object"] = res
 		}
 		k8sResLog.WithFields(logFields).Debug("Event received")
@@ -203,11 +203,14 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim, resource.RscTypeConfigMap}
 	for _, r := range rscTypes {
 		if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, nil); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("StartWatchResource")
+			log.WithFields(log.Fields{"type": r, "error": err}).Error("StartWatchResource")
 		}
 	}
-	if err := global.ORCH.StartWatchResource(resource.RscTypeDeployment, Ctrler.Domain, c.cbResourceWatcher, nil); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("StartWatchResource")
+
+	for _, r := range []string{resource.RscTypeDeployment, resource.RscTypeSecret} {
+		if err := global.ORCH.StartWatchResource(r, Ctrler.Domain, c.cbResourceWatcher, nil); err != nil {
+			log.WithFields(log.Fields{"type": r, "error": err}).Error("StartWatchResource")
+		}
 	}
 
 	rscTypes = []string{

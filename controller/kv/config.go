@@ -32,7 +32,7 @@ type PauseResumeStoreWatcherFunc func(ip string, port uint16, req share.CLUSStor
 type ConfigHelper interface {
 	NotifyConfigChange(endpoint string)
 	BackupAll()
-	Restore() (string, bool, bool, string, error)
+	Restore(host share.CLUSHost, ctrler share.CLUSController) (string, bool, bool, string, error)
 	Export(w *bufio.Writer, sections utils.Set) error
 	Import(eps []*common.RPCEndpoint, localCtrlerID, localCtrlerIP string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
 		tempToken string, revertFedRoles RevertFedRolesFunc, postImportOp PostImportFunc, pauseResumeStoreWatcher PauseResumeStoreWatcherFunc,
@@ -92,7 +92,7 @@ func GetConfigHelper() ConfigHelper {
 }
 
 func Init(id, version, platform, flavor string, persist bool, isGroupMember FuncIsGroupMember, getConfigData FuncGetConfigKVData,
-	evQueue cluster.ObjectQueueInterface) {
+	evQueue cluster.ObjectQueueInterface, keyRotationDuration time.Duration) {
 
 	evqueue = evQueue
 	for _, ep := range cfgEndpoints {
@@ -100,7 +100,7 @@ func Init(id, version, platform, flavor string, persist bool, isGroupMember Func
 	}
 
 	newConfigHelper(id, version, persist)
-	clusHelper = newClusterHelper(id, version, persist)
+	clusHelper = newClusterHelper(id, version, persist, keyRotationDuration)
 
 	orchPlatform = platform
 	orchFlavor = flavor
@@ -341,11 +341,10 @@ func (c *configHelper) BackupAll() {
 func restoreEP(ep *cfgEndpoint, ch chan<- error, importInfo *fedRulesRevInfo) error {
 	var rc error
 
+	ep.backupReEncrypted = false
 	txn := cluster.Transact()
 	if rc = ep.restore(importInfo, txn); rc == errDone {
 		rc = nil
-	} else if rc != nil {
-		log.WithFields(log.Fields{"endpoint": ep.name, "rc": rc}).Error()
 	}
 	applyTransaction(txn, nil, false, 0)
 
@@ -374,7 +373,7 @@ func restoreEPs(eps utils.Set, ch chan error, importInfo *fedRulesRevInfo) error
 	return err
 }
 
-func (c *configHelper) Restore() (string, bool, bool, string, error) {
+func (c *configHelper) Restore(host share.CLUSHost, ctrler share.CLUSController) (string, bool, bool, string, error) {
 	log.Info()
 
 	if !c.persist {
@@ -425,6 +424,9 @@ func (c *configHelper) Restore() (string, bool, bool, string, error) {
 	var err error
 	ch := make(chan error)
 	eps := utils.NewSetFromSliceKind(cfgEndpoints)
+	for _, ep := range cfgEndpoints {
+		ep.errRestoreKeys = utils.NewSet()
+	}
 
 	// restore federation endpoint
 	if rc := restoreEP(fedCfgEndpoint, nil, &importInfo); rc != nil {
@@ -451,6 +453,47 @@ func (c *configHelper) Restore() (string, bool, bool, string, error) {
 
 	go restoreRegistry(ch, importInfo)
 
+	epsReEncrypted := make([]string, 0, len(cfgEndpoints))
+	epsMismatchedKey := make([]string, 0, len(cfgEndpoints))
+	for _, ep := range cfgEndpoints {
+		if ep.errRestoreKeys.Cardinality() > 0 {
+			epsMismatchedKey = append(epsMismatchedKey, ep.errRestoreKeys.ToStringSlice()...)
+			ep.errRestoreKeys = nil
+		} else if ep.backupReEncrypted {
+			epsReEncrypted = append(epsReEncrypted, ep.name)
+			ep.backupReEncrypted = false
+		}
+	}
+	log.WithFields(log.Fields{"names": epsReEncrypted}).Info("re-encrypt")
+	messages := map[share.TLogEvent]string{
+		share.CLUSEvMismatchedDEKSeed: fmt.Sprintf("Sensitive data in these kv keys cannot be restored because of decryption failure:\n%s",
+			strings.Join(epsMismatchedKey, ", ")),
+		share.CLUSEvReEncryptWithDEK: fmt.Sprintf("Sensitive data in the backup file for these endpoint(s) are re-encrypted by DEK:\n%s",
+			strings.Join(epsReEncrypted, ", ")),
+	}
+	for evt, eps := range map[share.TLogEvent][]string{share.CLUSEvMismatchedDEKSeed: epsMismatchedKey} {
+		if len(eps) > 0 {
+			clog := share.CLUSEventLog{
+				Event:          evt,
+				HostID:         host.ID,
+				HostName:       host.Name,
+				ControllerID:   ctrler.ID,
+				ControllerName: ctrler.Name,
+				ReportedAt:     time.Now().UTC(),
+				Msg:            messages[evt],
+			}
+			if err := evqueue.Append(&clog); err != nil {
+				log.WithFields(log.Fields{"error": err, "msg": clog.Msg}).Error("evqueue.Append")
+			}
+		}
+	}
+
+	c.cfgMutex.Lock()
+	for _, ep := range epsReEncrypted {
+		c.cfgChanged.Add(ep)
+	}
+	c.cfgMutex.Unlock()
+
 	ver := getBackupVersion()
 	_ = putControlVersion(&ver)
 	log.WithFields(log.Fields{"version": ver}).Info("Done")
@@ -475,6 +518,7 @@ type configHeader struct {
 	CreatedAt        string   `json:"created_at"`
 	Sections         []string `json:"sections"`
 	ExportedFromRole string   `json:"exported_from_role"`
+	DEKEncrypted     string   `json:"dek_encrypted"`
 }
 
 func getFedRole() (string, *share.CLUSFedRulesRevision) {
@@ -508,6 +552,7 @@ func (c *configHelper) Export(w *bufio.Writer, sections utils.Set) error {
 			sections.Add(ep.section)
 		}
 	}
+
 	// Fill header.Sections with order
 	added := utils.NewSet()
 	for _, ep := range cfgEndpoints {
@@ -783,8 +828,15 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 			// Value can be empty if a key was never been written when it's exported. No need to
 			// write empty string because keys have been purged.
 			if len(value) != 0 {
-				array, err := upgrade(key, []byte(value))
-				if err != nil {
+				array, _, failToDecryptFields, err := upgrade(key, []byte(value))
+				if failToDecryptFields != nil && failToDecryptFields.Cardinality() > 0 {
+					log.WithFields(log.Fields{"error": err, "key": key, "fields": failToDecryptFields}).Error("Failed to decrypt fields")
+					if importTask.FailToDecryptKeyFields == nil {
+						importTask.FailToDecryptKeyFields = make(map[string][]string)
+					}
+					fields := importTask.FailToDecryptKeyFields[key]
+					importTask.FailToDecryptKeyFields[key] = append(fields, failToDecryptFields.ToStringSlice()...)
+				} else if err != nil {
 					log.WithFields(log.Fields{"error": err, "key": key, "value": value}).Error("Failed to upgrade key/value")
 					return ErrInvalidFileFormat
 				}

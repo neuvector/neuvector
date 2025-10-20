@@ -2324,6 +2324,7 @@ func getNvUpgradeInfo() *api.RESTCheckUpgradeInfo {
 
 func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]string, []string, []string, []string, []string, map[string]string, utils.Set) {
 	var clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors []string
+	otherAlerts := map[string]string{}
 	if k8sPlatform {
 		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors =
 			resource.VerifyNvK8sRBAC(localDev.Host.Flavor, "", false)
@@ -2345,8 +2346,18 @@ func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]stri
 	}
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
 
+	if k8sPlatform {
+		if secretResetByNV := resource.IsStoreSecretUpdatedByNV(); secretResetByNV {
+			alert := "Important: Please backup the data in Kubernetes secret neuvector-store-secret reset by NeuVector"
+			b := sha256.Sum256([]byte(alert))
+			key := hex.EncodeToString(b[:])
+			if !acceptedAlerts.Contains(key) {
+				otherAlerts[key] = alert
+			}
+		}
+	}
+
 	fedRole := cacher.GetFedMembershipRoleNoAuth()
-	otherAlerts := map[string]string{}
 	if (fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin() || acc.HasPermFed())) ||
 		(fedRole == api.FedRoleJoint && acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0)) {
 		// _fedClusterLeft(206), _fedClusterDisconnected(204)
@@ -2478,9 +2489,14 @@ func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httproute
 	if NvCrdSchemaAlertGroup := getAlertGroup(nvCrdSchemaAlerts, api.AlertTypeRBAC, acceptedAlerts); NvCrdSchemaAlertGroup != nil {
 		resp.AcceptableAlerts.NvCrdSchemaAlerts = NvCrdSchemaAlertGroup
 	}
+
+	if NvCrdSchemaAlertGroup := getAlertGroup(nvCrdSchemaAlerts, api.AlertTypeRBAC, acceptedAlerts); NvCrdSchemaAlertGroup != nil {
+		resp.AcceptableAlerts.NvCrdSchemaAlerts = NvCrdSchemaAlertGroup
+	}
+
 	if otherAlerts != nil {
 		otherAlertGroup := &api.RESTNvAlertGroup{
-			Type: api.AlertTypeRBAC,
+			Type: api.AlertTypeOthers,
 		}
 		for id, msg := range otherAlerts {
 			otherAlertGroup.Data = append(otherAlertGroup.Data, &api.RESTNvAlert{
@@ -2806,6 +2822,10 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				restRespErrorMessageEx(w, status, api.RESTErrFailImport, importTask.Status, resp)
 			} else {
 				// import is not running and caller tries to query the last import status
+				resp.Data.FailToDecryptKeyFields = importTask.FailToDecryptKeyFields
+				if len(importTask.FailToDecryptKeyFields) > 0 {
+					log.WithFields(log.Fields{"FailToDecryptKeyFields": importTask.FailToDecryptKeyFields}).Warn()
+				}
 				restRespSuccess(w, r, &resp, acc, login, nil, "")
 				if importType == share.IMPORT_TYPE_CONFIG {
 					if importTask.Status == share.IMPORT_DONE {
@@ -2872,16 +2892,6 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		}
 		if err == nil {
 			var tempToken string
-			if importType == share.IMPORT_TYPE_CONFIG {
-				user := &share.CLUSUser{
-					Fullname: login.fullname,
-					Username: login.fullname,
-					Server:   login.server,
-				}
-				domainRoles := access.DomainRole{access.AccessDomainGlobal: api.UserRoleImportStatus}
-				_, tempToken, _ = jwtGenerateToken(user, domainRoles, nil, login.remote, login.mainSessionID, "", nil)
-			}
-
 			importTask.TotalLines = lines
 			importTask.Percentage = 3
 			importTask.LastUpdateTime = time.Now().UTC()
@@ -2890,14 +2900,23 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 			switch importType {
 			case share.IMPORT_TYPE_CONFIG:
-				value := r.Header.Get("X-As-Standalone")
-				ignoreFed, _ := strconv.ParseBool(value)
-				go func() {
-					if err := cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask,
-						tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher, ignoreFed); err != nil {
-						log.WithFields(log.Fields{"error": err}).Error("Import")
-					}
-				}()
+				user := &share.CLUSUser{
+					Fullname: login.fullname,
+					Username: login.fullname,
+					Server:   login.server,
+				}
+				domainRoles := access.DomainRole{access.AccessDomainGlobal: api.UserRoleImportStatus}
+				_, tempToken, _, err = jwtGenerateToken(user, domainRoles, nil, login.remote, login.mainSessionID, "", nil)
+				if err == nil {
+					value := r.Header.Get("X-As-Standalone")
+					ignoreFed, _ := strconv.ParseBool(value)
+					go func() {
+						if err := cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask,
+							tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher, ignoreFed); err != nil {
+							log.WithFields(log.Fields{"error": err}).Error("Import")
+						}
+					}()
+				}
 			case share.IMPORT_TYPE_GROUP_POLICY:
 				go func() {
 					if err := importGroupPolicy(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
