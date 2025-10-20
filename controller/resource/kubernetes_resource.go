@@ -133,6 +133,7 @@ const (
 	nvCspUsageRoleBinding = nvCspUsageRole
 
 	nvBootstrapSecret = "neuvector-bootstrap-secret"
+	nvStoreSecret     = "neuvector-store-secret"
 
 	secretKeyResetByNV         = "resetByNV"
 	secretKeyBootstrapPassword = "bootstrapPassword"
@@ -707,7 +708,7 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 				"v1",
 				func() metav1.Object { return new(corev1.Secret) },
 				func() metav1.ListInterface { return new(corev1.SecretList) },
-				nil, // xlateSecret,
+				xlateSecret,
 				nil,
 			},
 		},
@@ -1202,6 +1203,10 @@ func xlateConfigMap(obj metav1.Object) (string, interface{}) {
 	}
 
 	return "", nil
+}
+
+func xlateSecret(obj metav1.Object) (string, interface{}) {
+	return string(obj.GetUID()), obj
 }
 
 // func xlateMutatingWebhookConfiguration(obj metav1.Object) (string, interface{}) {
@@ -2243,27 +2248,29 @@ func xlatePersistentVolumeClaim(obj metav1.Object) (string, interface{}) {
 	return "", nil
 }
 
-func retrieveSecretData(secretName, key string) ([]byte, bool, error) {
-	var objSecret *corev1.Secret
-	var foundSecret bool
+func retrieveSecretData(secretName, key string) ([]byte, map[string][]byte, string, bool, error) {
 	obj, err := global.ORCH.GetResource(RscTypeSecret, NvAdmSvcNamespace, secretName)
 	if obj != nil && err == nil {
-		objSecret, foundSecret = obj.(*corev1.Secret)
+		objSecret, foundSecret := obj.(*corev1.Secret)
 		if foundSecret && objSecret != nil {
 			if objSecret.Data != nil {
-				if v, ok := objSecret.Data[key]; ok {
-					return v, foundSecret, nil
+				if key != "" {
+					if v, ok := objSecret.Data[key]; ok {
+						return v, nil, "", foundSecret, nil
+					}
+				} else {
+					return nil, objSecret.Data, objSecret.ResourceVersion, foundSecret, nil
 				}
 			}
 		} else {
-			err = errors.New("type conversion failed")
+			err = fmt.Errorf("type conversion failed")
 		}
 	}
 	if err != nil {
 		log.WithFields(log.Fields{"err": err, "secretName": secretName}).Error()
 	}
 
-	return nil, foundSecret, err
+	return nil, nil, "", false, err
 }
 
 func GenRandomString(length int) (string, error) {
@@ -2281,7 +2288,7 @@ func GenRandomString(length int) (string, error) {
 }
 
 func RetrieveBootstrapPassword() (string, error) {
-	data, foundSecret, err := retrieveSecretData(nvBootstrapSecret, secretKeyBootstrapPassword)
+	data, _, _, foundSecret, err := retrieveSecretData(nvBootstrapSecret, secretKeyBootstrapPassword)
 	if err == nil && len(data) > 0 {
 		return string(data), nil
 	}
@@ -2327,6 +2334,124 @@ func RetrieveBootstrapPassword() (string, error) {
 	}
 
 	return "", err
+}
+
+// Caller must acquire/lease CLUSStoreSecretKey lock befor/after calling this function
+func RetrieveStorePassphrases() (common.EncKeys, string, string, error) {
+	var err error
+	var msg string
+	var currEncKeyIdx uint64
+	var currEncKeyVer string
+
+	_, secretData, rscVersion, foundSecret, _ := retrieveSecretData(nvStoreSecret, "")
+	encKeys := make(common.EncKeys, len(secretData))
+	for k, v := range secretData {
+		if ui64, err := strconv.ParseUint(k, 10, 64); err == nil {
+			if ui64 > currEncKeyIdx {
+				currEncKeyIdx = ui64
+			}
+			encKeys[k] = v
+		}
+	}
+
+	if len(encKeys) == 0 {
+		var action string
+		randomPass := make([]byte, common.DekSeedLength)
+		if _, err := rand.Read(randomPass); err != nil {
+			return nil, "", "", fmt.Errorf("failed to generate random password: %w", err)
+		}
+		encKeys = make(common.EncKeys, 1)
+		currEncKeyIdx = 1
+		currEncKeyVer = fmt.Sprintf("%v", currEncKeyIdx)
+		encKeys[currEncKeyVer] = randomPass
+		objSecret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      nvStoreSecret,
+				Namespace: NvAdmSvcNamespace,
+			},
+			Data: map[string][]byte{
+				strconv.Itoa(int(currEncKeyIdx)): randomPass,
+				secretKeyResetByNV:               []byte("true"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		if !foundSecret {
+			err = global.ORCH.AddResource(RscTypeSecret, &objSecret)
+			action = "created"
+		} else {
+			objSecret.ResourceVersion = rscVersion
+			err = global.ORCH.UpdateResource(RscTypeSecret, &objSecret)
+			action = "updated"
+		}
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "rscVersion": rscVersion, "foundSecret": foundSecret}).Error()
+		} else {
+			msg = fmt.Sprintf("Kubernetes secret %s is %s", nvStoreSecret, action)
+		}
+	} else {
+		err = nil
+	}
+
+	return encKeys, fmt.Sprintf("%d", currEncKeyIdx), msg, err
+}
+
+func AddStorePassphrase() error {
+	var err error
+	var currEncKeyIdx uint64
+
+	_, secretData, rscVersion, foundSecret, _ := retrieveSecretData(nvStoreSecret, "")
+	for k := range secretData {
+		if ui64, err := strconv.ParseUint(k, 10, 64); err == nil {
+			if ui64 > currEncKeyIdx {
+				currEncKeyIdx = ui64
+			}
+		}
+	}
+	if secretData == nil {
+		secretData = make(map[string][]byte, 2)
+		secretData[secretKeyResetByNV] = []byte("true")
+	}
+
+	randomPass := make([]byte, common.DekSeedLength)
+	if _, err := rand.Read(randomPass); err != nil {
+		return fmt.Errorf("failed to generate random password: %w", err)
+	}
+	currEncKeyIdx++
+	keyVersion := fmt.Sprintf("%d", currEncKeyIdx)
+	secretData[keyVersion] = randomPass
+	objSecret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nvStoreSecret,
+			Namespace: NvAdmSvcNamespace,
+		},
+		Data: secretData,
+		Type: corev1.SecretTypeOpaque,
+	}
+	if !foundSecret {
+		err = global.ORCH.AddResource(RscTypeSecret, &objSecret)
+	} else {
+		objSecret.ResourceVersion = rscVersion
+		err = global.ORCH.UpdateResource(RscTypeSecret, &objSecret)
+	}
+	if err == nil {
+		err = common.AddAesGcmKey(keyVersion, randomPass)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "foundSecret": foundSecret}).Error()
+	}
+
+	return err
+}
+
+func IsStoreSecretUpdatedByNV() bool {
+	secretResetByNV := false
+
+	data, _, _, found, err := retrieveSecretData(nvStoreSecret, secretKeyResetByNV)
+	if err == nil && found && string(data) == "true" {
+		secretResetByNV = true
+	}
+
+	return secretResetByNV
 }
 
 func GetNvControllerPodsNumber() {

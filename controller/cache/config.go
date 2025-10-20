@@ -32,6 +32,7 @@ type webhookCache struct {
 
 const DefaultScannerConfigUpdateTimeout = time.Minute * 5
 
+var encMigratedConfigRestored bool
 var systemConfigCache share.CLUSSystemConfig = common.DefaultSystemConfig
 var fedSystemConfigCache share.CLUSSystemConfig = share.CLUSSystemConfig{CfgType: share.FederalCfg}
 var webhookCacheMap map[string]*webhookCache = make(map[string]*webhookCache, 0)    // Only the enabled webhooks
@@ -467,6 +468,42 @@ func (m CacheMethod) GetSystemConfigClusterName(acc *access.AccessControl) strin
 	return systemConfigCache.ClusterName
 }
 
+func encMigrateSystemConfig(valueBackup, value []byte) {
+	controllers := cacher.GetAllControllers(access.NewAdminAccessControl())
+	for _, ctrler := range controllers {
+		if ctrler.Ver != cctx.CtrlerVersion {
+			log.WithFields(log.Fields{"target": ctrler.Ver, "me": cctx.CtrlerVersion}).Info()
+			// the system config backup for variant encryption key migration is found.
+			// it means sensitive fields in system config are re-encrypted for variant encryption key migration.
+			var dec common.DecryptUnmarshaller
+			var cfg share.CLUSSystemConfig
+			if err := dec.Unmarshal(value, &cfg); err == nil && dec.GetDecryptedFieldsNumber() == 0 {
+				// however, it's unexpected that no sensitive field is decrypted in dec.Unmarshal() call.
+				// it means all sensitive fields in current system config(cfg) were set to empty string that we need to restore system config from the system config backup
+				var cfgEncBackup share.CLUSSystemConfigEncMigrated
+				if err = json.Unmarshal(valueBackup, &cfgEncBackup); err == nil {
+					if time.Now().UTC().Before(cfgEncBackup.EncDataExpirationTime) {
+						// the backup is not expired yet
+						if err = cluster.PutBinary(share.CLUSConfigSystemKey, []byte(cfgEncBackup.EncMigratedSystemConfig)); err == nil {
+							log.Info("encryption-migrated config is restored")
+							encMigratedConfigRestored = true
+						}
+					} else {
+						_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+						log.Info("encryption-migrated config backup is deleted")
+					}
+				} else {
+					_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+					log.WithFields(log.Fields{"err": err}).Error("failed to json unmarshal encryption-migrated config")
+				}
+			} else if err != nil {
+				log.WithFields(log.Fields{"err": err}).Error("failed to dec unmarshal system config")
+			}
+			break
+		}
+	}
+}
+
 func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
@@ -476,6 +513,14 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		_ = json.Unmarshal(value, &cfg)
 		log.WithFields(log.Fields{"config": cfg}).Debug()
+
+		if nType == cluster.ClusterNotifyModify {
+			if valueBackup, _ := cluster.Get(share.CLUSSystemEncMigratedKey); len(valueBackup) > 0 {
+				if !encMigratedConfigRestored {
+					encMigrateSystemConfig(valueBackup, value)
+				}
+			}
+		}
 
 		if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 			if isLeader() {

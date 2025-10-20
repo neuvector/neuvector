@@ -174,6 +174,7 @@ var restErrMessage = []string{
 	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
 	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
 	api.RESTErrPollJobNotFoundError:  "Job not found in the Job Queue",
+	api.RESTErrServerError:           "Server Error",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -1297,24 +1298,25 @@ func (l restLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Context struct {
-	LocalDev           *common.LocalDevice
-	EvQueue            cluster.ObjectQueueInterface
-	AuditQueue         cluster.ObjectQueueInterface
-	Messenger          cluster.MessengerInterface
-	Cacher             cache.CacheInterface
-	Scanner            scan.ScanInterface
-	SearchRegistries   string
-	FedPort            uint
-	RESTPort           uint
-	PwdValidUnit       uint
-	TeleNeuvectorURL   string
-	TeleFreq           uint
-	NvAppFullVersion   string
-	NvSemanticVersion  string
-	CspType            share.TCspType
-	CspPauseInterval   uint   // in minutes
-	CustomCheckControl string // disable / strict / loose
-	CheckCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
+	LocalDev                *common.LocalDevice
+	EvQueue                 cluster.ObjectQueueInterface
+	AuditQueue              cluster.ObjectQueueInterface
+	Messenger               cluster.MessengerInterface
+	Cacher                  cache.CacheInterface
+	Scanner                 scan.ScanInterface
+	SearchRegistries        string
+	FedPort                 uint
+	RESTPort                uint
+	PwdValidUnit            uint
+	TeleNeuvectorURL        string
+	TeleSkipTlsVerification bool // default value is false, meaning it is secure by default
+	TeleFreq                uint
+	NvAppFullVersion        string
+	NvSemanticVersion       string
+	CspType                 share.TCspType
+	CspPauseInterval        uint   // in minutes
+	CustomCheckControl      string // disable / strict / loose
+	CheckCrdSchemaFunc      func(lead, init, crossCheck bool, cspType share.TCspType) []string
 }
 
 var cctx *Context

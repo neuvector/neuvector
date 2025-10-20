@@ -263,9 +263,12 @@ func main() {
 	pwdValidUnit := flag.Uint("pwd_valid_unit", 1440, "")
 	rancherEP := flag.String("rancher_ep", "", "Rancher endpoint URL")
 	rancherSSO := flag.Bool("rancher_sso", false, "Rancher SSO integration")
+	insecureSkipTeleTLSVerification := flag.Bool("insecure_skip_telemetry_tls_verification", false, "Do not verify Telemetry server's certificate chain and host name")
 	teleNeuvectorEP := flag.String("telemetry_neuvector_ep", "", "")                   // for testing only
 	teleCurrentVer := flag.String("telemetry_current_ver", "", "")                     // in the format {major}.{minor}.{patch}[-s{#}], for testing only
 	telemetryFreq := flag.Uint("telemetry_freq", 60, "")                               // in minutes, for testing only
+	keyRotationPeriod := flag.String("key_rotation_period", "", "")                    // for testing only
+	checkKeyRotationPeriod := flag.String("check_key_rotation_period", "", "")         // for testing only
 	noDefAdmin := flag.Bool("no_def_admin", false, "Do not create default admin user") // for new install only
 	cspEnv := flag.String("csp_env", "", "")                                           // "" or "aws"
 	cspPauseInterval := flag.Uint("csp_pause_interval", 240, "")                       // in minutes, for testing only
@@ -484,6 +487,34 @@ func main() {
 
 	if platform == share.PlatformKubernetes {
 		resource.AdjustAdmWebhookName(cache.QueryK8sVersion, cspType)
+
+		resource.GetNvCtrlerServiceAccount()
+		if !nvHasK8sSecretRbac(true) {
+			goodRBAC := false
+			ticker := time.Tick(time.Second * time.Duration(5))
+			c_sig := make(chan os.Signal, 1)
+			signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
+		exit_controller:
+			for {
+				select {
+				case <-ticker:
+					logLevel := log.GetLevel()
+					log.SetLevel(log.WarnLevel)
+					goodRBAC = nvHasK8sSecretRbac(false)
+					log.SetLevel(logLevel)
+					if goodRBAC {
+						log.Info("Required Kubernetes RBAC for secrets are found")
+						break exit_controller
+					}
+				case <-c_sig:
+					break exit_controller
+				}
+			}
+			if !goodRBAC {
+				log.Error("Required Kubernetes RBAC for secrets are not found")
+				os.Exit(-2)
+			}
+		}
 	}
 
 	// Assign controller interface/IP scope
@@ -582,7 +613,21 @@ func main() {
 		log.WithFields(log.Fields{"error": err}).Error("CreateVulAssetDb")
 	}
 
-	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember, getConfigKvData, evqueue)
+	keyRotationDuration := time.Duration(time.Hour * 24 * 30 * 3)
+	checkKeyRotationDuration := time.Duration(time.Hour)
+	if *keyRotationPeriod != "" {
+		if duration, err := time.ParseDuration(*keyRotationPeriod); err == nil && duration.Seconds() != 0 {
+			keyRotationDuration = duration
+		}
+	}
+	if *checkKeyRotationPeriod != "" {
+		if duration, err := time.ParseDuration(*checkKeyRotationPeriod); err == nil && duration.Seconds() != 0 {
+			checkKeyRotationDuration = duration
+		}
+	}
+
+	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember,
+		getConfigKvData, evqueue, keyRotationDuration)
 	ruleid.Init()
 
 	// Start cluster
@@ -664,6 +709,44 @@ func main() {
 		log.WithError(err).Warn("installation id is not readable. Will retry later.")
 	}
 
+	var dekSeedEvent share.TLogEvent = share.CLUSEvDEKSeedUnavailable
+	var dekSeedEventMsg string
+	if platform == share.PlatformKubernetes {
+		var err error
+		var lock cluster.LockInterface
+		var encKeys common.EncKeys
+		var currEncKeyVer string
+		dekSeedEventMsg = "Failed to generate store passphrase for DEK seed"
+		for i := 0; i < 4; i++ {
+			lock, err = clusHelper.AcquireLock(share.CLUSStoreSecretKey, time.Duration(time.Second)*4)
+			if err == nil {
+				var msg string
+				if encKeys, currEncKeyVer, msg, err = resource.RetrieveStorePassphrases(); err == nil {
+					if err = common.InitAesGcmKey(encKeys, currEncKeyVer); err == nil {
+						if msg != "" {
+							dekSeedEvent = share.CLUSEvEncryptionSecretSet
+							dekSeedEventMsg = msg
+							log.Info(msg)
+						}
+						log.Info("store passphrase generate/read")
+					} else {
+						log.WithFields(log.Fields{"err": err, "len": len(encKeys)}).Error("Failed to init AesGcm")
+					}
+				} else {
+					log.WithFields(log.Fields{"err": err}).Error("Failed to generate/read store passphrase")
+				}
+				clusHelper.ReleaseLock(lock)
+				break
+			}
+			log.WithFields(log.Fields{"i": i, "err": err}).Info("retry for store passphrase")
+			time.Sleep(time.Second)
+		}
+		if err != nil || len(encKeys) == 0 {
+			log.WithFields(log.Fields{"err": err}).Error("Failed to read store passphrases")
+			os.Exit(-2)
+		}
+	}
+
 	emptyKvFound := false
 	ver := kv.GetControlVersion()
 	if ver.CtrlVersion == "" && ver.KVVersion == "" {
@@ -671,6 +754,7 @@ func main() {
 	}
 	log.WithFields(log.Fields{"emptyKvFound": emptyKvFound, "ver": ver}).Info()
 
+	var restoreEvent string
 	if Ctrler.Leader || emptyKvFound {
 		// See [NVSHAS-5490]:
 		// clusterHelper.AcquireLock() may fail with error "failed to create session: Unexpected response code: 500 (Missing node registration)".
@@ -694,20 +778,10 @@ func main() {
 		var restored bool
 		var restoredKvVersion string
 		var errRestore error
-		restoredFedRole, defAdminRestored, restored, restoredKvVersion, errRestore = kv.GetConfigHelper().Restore()
+		restoredFedRole, defAdminRestored, restored, restoredKvVersion, errRestore = kv.GetConfigHelper().Restore(Host, Ctrler)
+		log.WithFields(log.Fields{"restored": restored, "errRestore": errRestore}).Info()
 		if restored && errRestore == nil {
-			clog := share.CLUSEventLog{
-				Event:          share.CLUSEvKvRestored,
-				HostID:         Host.ID,
-				HostName:       Host.Name,
-				ControllerID:   Ctrler.ID,
-				ControllerName: Ctrler.Name,
-				ReportedAt:     time.Now().UTC(),
-				Msg:            fmt.Sprintf("Restored kv version: %s", restoredKvVersion),
-			}
-			if err := evqueue.Append(&clog); err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
-			}
+			restoreEvent = fmt.Sprintf("Restored kv version: %s", restoredKvVersion)
 		}
 		if restoredFedRole == api.FedRoleJoint {
 			// fed rules are not restored on joint cluster but there might be fed rules left in kv so
@@ -838,6 +912,8 @@ func main() {
 		RancherEP:                *rancherEP,
 		RancherSSO:               *rancherSSO,
 		TelemetryFreq:            *telemetryFreq,
+		KeyRotationDuration:      keyRotationDuration,
+		CheckKeyRotationDuration: checkKeyRotationDuration,
 		CheckDefAdminFreq:        checkDefAdminFreq,
 		LocalDev:                 dev,
 		EvQueue:                  evqueue,
@@ -885,7 +961,7 @@ func main() {
 
 	if platform == share.PlatformKubernetes {
 		// k8s rbac watcher won't know anything about non-existing resources
-		resource.GetNvCtrlerServiceAccount(cache.CacheEvent)
+		resource.SetCacheEventFunc(cache.CacheEvent)
 
 		clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors := resource.VerifyNvK8sRBAC(dev.Host.Flavor, "", true)
 		if len(clusterRoleErrors) > 0 || len(roleErrors) > 0 || len(clusterRoleBindingErrors) > 0 || len(roleBindingErrors) > 0 {
@@ -903,24 +979,25 @@ func main() {
 	opa.InitOpaServer()
 
 	rctx := rest.Context{
-		LocalDev:           dev,
-		EvQueue:            evqueue,
-		AuditQueue:         auditQueue,
-		Messenger:          messenger,
-		Cacher:             cacher,
-		Scanner:            scanner,
-		RESTPort:           *restPort,
-		FedPort:            *fedPort,
-		PwdValidUnit:       *pwdValidUnit,
-		TeleNeuvectorURL:   *teleNeuvectorEP,
-		SearchRegistries:   *searchRegistries,
-		TeleFreq:           *telemetryFreq,
-		NvAppFullVersion:   nvAppFullVersion,
-		NvSemanticVersion:  nvSemanticVersion,
-		CspType:            cspType,
-		CspPauseInterval:   *cspPauseInterval,
-		CustomCheckControl: *custom_check_control,
-		CheckCrdSchemaFunc: nvcrd.CheckCrdSchema,
+		LocalDev:                dev,
+		EvQueue:                 evqueue,
+		AuditQueue:              auditQueue,
+		Messenger:               messenger,
+		Cacher:                  cacher,
+		Scanner:                 scanner,
+		RESTPort:                *restPort,
+		FedPort:                 *fedPort,
+		PwdValidUnit:            *pwdValidUnit,
+		TeleNeuvectorURL:        *teleNeuvectorEP,
+		TeleSkipTlsVerification: *insecureSkipTeleTLSVerification,
+		SearchRegistries:        *searchRegistries,
+		TeleFreq:                *telemetryFreq,
+		NvAppFullVersion:        nvAppFullVersion,
+		NvSemanticVersion:       nvSemanticVersion,
+		CspType:                 cspType,
+		CspPauseInterval:        *cspPauseInterval,
+		CustomCheckControl:      *custom_check_control,
+		CheckCrdSchemaFunc:      nvcrd.CheckCrdSchema,
 	}
 	// rest.PreInitContext() must be called before orch connector because existing CRD handling could happen right after orch connecter starts
 	rest.PreInitContext(&rctx)
@@ -1033,8 +1110,14 @@ func main() {
 	c_sig := make(chan os.Signal, 1)
 	signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
 
-	logController(share.CLUSEvControllerStart)
-	logController(share.CLUSEvControllerJoin)
+	if dekSeedEventMsg != "" {
+		logController(dekSeedEvent, dekSeedEventMsg)
+	}
+	if restoreEvent != "" {
+		logController(share.CLUSEvKvRestored, restoreEvent)
+	}
+	logController(share.CLUSEvControllerStart, "")
+	logController(share.CLUSEvControllerJoin, "")
 
 	cache.PopulateRulesToOpa()
 
@@ -1088,7 +1171,7 @@ func main() {
 					memorySnapshot(mStats.WorkingSet)
 				}
 			case <-c_sig:
-				logController(share.CLUSEvControllerStop)
+				logController(share.CLUSEvControllerStop, "")
 				flushEventQueue()
 				done <- true
 			}
@@ -1170,4 +1253,11 @@ func amendNotPrivilegedMode() error {
 		}
 	}
 	return nil
+}
+
+func nvHasK8sSecretRbac(logging bool) bool {
+	k8sRbacRequried := []string{resource.NvSecretRole, resource.NvSecretControllerRole}
+	errs, _ := resource.VerifyNvRbacRoles(k8sRbacRequried, false, logging)
+	errs2, _ := resource.VerifyNvRbacRoleBindings(k8sRbacRequried, false, logging)
+	return len(errs) == 0 && len(errs2) == 0
 }

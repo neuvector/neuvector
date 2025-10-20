@@ -154,6 +154,7 @@ const (
 	userTooMany
 	userKeyError
 	userNoPlatformAuth
+	userTokenGenError
 )
 
 // const (
@@ -207,7 +208,10 @@ func newLoginSessionFromUser(user *share.CLUSUser, domainRoles access.DomainRole
 	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (*loginSession, int) {
 
 	// Note: JWT keys should be loaded in initJWTSignKey() before calling this function.
-	id, token, claims := jwtGenerateToken(user, domainRoles, extraDomainPermits, remote, mainSessionID, mainSessionUser, sso)
+	id, token, claims, err := jwtGenerateToken(user, domainRoles, extraDomainPermits, remote, mainSessionID, mainSessionUser, sso)
+	if err != nil {
+		return nil, userTokenGenError
+	}
 	now := user.LastLoginAt // Already updated
 	s := &loginSession{
 		id:                 id,
@@ -1279,14 +1283,16 @@ func resetFedJointKeys() {
 func setJointKeysInCache(callerFedRole string, jointCluster *share.CLUSFedJointClusterInfo) error {
 	var err error
 	var data []byte
+	var token string
 	var rsaPrivateKey *rsa.PrivateKey
 	var rsaPublicKey *rsa.PublicKey
 	if data, err = base64.StdEncoding.DecodeString(jointCluster.ClientKey); err == nil {
 		if rsaPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(data); err == nil && rsaPrivateKey != nil {
 			if data, err = base64.StdEncoding.DecodeString(jointCluster.ClientCert); err == nil {
 				if rsaPublicKey, err = jwt.ParseRSAPublicKeyFromPEM(data); err == nil && rsaPublicKey != nil {
-					if token := jwtGenFedPingToken(callerFedRole, jointCluster.ID, jointCluster.Secret, rsaPrivateKey); token != "" {
-						if _, err := jwtValidateToken(token, jointCluster.Secret, rsaPublicKey); err == nil {
+					token, err = jwtGenFedPingToken(callerFedRole, jointCluster.ID, jointCluster.Secret, rsaPrivateKey)
+					if token != "" && err == nil {
+						if _, err = jwtValidateToken(token, jointCluster.Secret, rsaPublicKey); err == nil {
 							_setFedJointPrivateKey(jointCluster.ID, rsaPrivateKey)
 							if callerFedRole == api.FedRoleJoint {
 								_setFedJointPublicKey(rsaPublicKey)
@@ -1352,7 +1358,11 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	}
 
 	if secret == "" {
-		tokenString = utils.DecryptUserToken(encryptedToken, []byte(installID))
+		if tokenString, err = utils.DecryptUserToken(encryptedToken, []byte(installID)); err != nil {
+			err = fmt.Errorf("failed to decrypt token: %w", err)
+			log.WithError(err).Error()
+			return nil, err
+		}
 	} else {
 		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
@@ -1447,13 +1457,13 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 
 // permits is for Rancher SSO only
 func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extraDomainPermits access.DomainPermissions,
-	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim) {
+	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim, error) {
 
 	id := utils.GetRandomID(idLength, "")
 	installID, err := clusHelper.GetInstallationID()
 	if err != nil {
 		log.WithError(err).Error("failed to get installation ID")
-		return "", "", &tokenClaim{}
+		return "", "", nil, err
 	}
 	now := time.Now()
 	c := tokenClaim{
@@ -1494,10 +1504,15 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	jwtCert := GetJWTSigningKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
 	tokenString, err := token.SignedString(jwtCert.jwtPrivateKey)
-	if tokenString == "" || err != nil {
-		log.WithFields(log.Fields{"err": err}).Error()
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("failed to sign token")
+		return "", "", nil, err
 	}
-	return id, utils.EncryptUserToken(tokenString, []byte(installID)), &c
+	if tokenString, err = utils.EncryptUserToken(tokenString, []byte(installID)); err != nil {
+		log.WithError(err).Error("failed to encrypt token")
+		return "", "", nil, err
+	}
+	return id, tokenString, &c, nil
 }
 
 func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
@@ -1521,7 +1536,7 @@ func jwtGenFedTicket(secret string, duration time.Duration) string {
 	return utils.EncryptSensitive(string(tokenBytes), []byte(secret))
 }
 
-func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) string {
+func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) (string, error) {
 	// rsaPrivateKey being non-nil is for validating new public/private keys purpose
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, *c)
 	var privateKey *rsa.PrivateKey
@@ -1537,24 +1552,33 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 	} else {
 		privateKey = rsaPrivateKey
 	}
+
+	var tokenString string
+	var err error
 	if privateKey != nil {
-		tokenString, _ := token.SignedString(privateKey)
-		return utils.EncryptSensitive(tokenString, []byte(secret))
+		tokenString, err = token.SignedString(privateKey)
+		if tokenString == "" || err != nil {
+			log.WithFields(log.Fields{"id": clusterID, "err": err}).Error("failed to sign token")
+			return "", err
+		}
+		return utils.EncryptSensitive(tokenString, []byte(secret)), nil
 	} else {
-		log.WithFields(log.Fields{"id": clusterID}).Error("empty private key")
+		err = errors.New("empty private key")
+		log.WithFields(log.Fields{"id": clusterID, "err": err}).Error()
 	}
-	return ""
+
+	return "", err
 }
 
-func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, secret string) string {
+func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, secret string) (string, error) {
 
 	if !login.hasFedPermission() {
 		// caller needs to have fed role or fed permission
-		return ""
+		return "", common.ErrObjectAccessDenied
 	}
 
 	if user.RemoteRolePermits == nil || (len(user.RemoteRolePermits.DomainRole) == 0 && len(user.RemoteRolePermits.ExtraPermits) == 0) {
-		return ""
+		return "", common.ErrObjectAccessDenied
 	}
 
 	id := utils.GetRandomID(idLength, "")
@@ -1585,7 +1609,7 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 	return _genFedJwtToken(&c, api.FedRoleMaster, clusterID, secret, nil)
 }
 
-func jwtGenFedPingToken(callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) string {
+func jwtGenFedPingToken(callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) (string, error) {
 	// rsaPrivateKey being non-nil is for validating new public/private keys purpose
 	id := utils.GetRandomID(idLength, "")
 

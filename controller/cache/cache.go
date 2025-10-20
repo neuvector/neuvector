@@ -1,12 +1,15 @@
 package cache
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -178,11 +181,13 @@ const (
 type Context struct {
 	k8sVersion               string
 	ocVersion                string
-	RancherEP                string // from yaml/helm chart
-	RancherSSO               bool   // from yaml/helm chart
-	TelemetryFreq            uint   // from yaml
-	CheckDefAdminFreq        uint   // from yaml, in minutes
-	CspPauseInterval         uint   // from yaml, in minutes
+	RancherEP                string        // from yaml/helm chart
+	RancherSSO               bool          // from yaml/helm chart
+	TelemetryFreq            uint          // from yaml
+	KeyRotationDuration      time.Duration // from yaml
+	CheckKeyRotationDuration time.Duration // from yaml
+	CheckDefAdminFreq        uint          // from yaml, in minutes
+	CspPauseInterval         uint          // from yaml, in minutes
 	LocalDev                 *common.LocalDevice
 	EvQueue                  cluster.ObjectQueueInterface
 	AuditQueue               cluster.ObjectQueueInterface
@@ -1679,6 +1684,9 @@ func startWorkerThread(ctx *Context) {
 	groupMetricCheckTicker := time.NewTicker(groupMetricCheckPeriod)
 	policyMetricCheckTicker := time.NewTicker(policyMetricCheckPeriod)
 
+	keyRotationCheckTicker := time.NewTicker(cctx.CheckKeyRotationDuration)
+	log.WithFields(log.Fields{"CheckKeyRotationDuration": cctx.CheckKeyRotationDuration, "KeyRotationDuration": cctx.KeyRotationDuration}).Info()
+
 	wlSuspected := utils.NewSet() // supicious workload ids
 	pruneKvTicker := time.NewTicker(pruneKVPeriod)
 	pruneWorkloadKV(wlSuspected) // the first scan
@@ -1742,6 +1750,8 @@ func startWorkerThread(ctx *Context) {
 				cacheMutexUnlock()
 			case <-pruneKvTicker.C:
 				pruneWorkloadKV(wlSuspected)
+			case <-keyRotationCheckTicker.C:
+				checkKeyRotation()
 			case <-scannerTicker.C:
 				if isScanner() {
 					// Remove stalled scanner
@@ -2031,6 +2041,33 @@ func startWorkerThread(ctx *Context) {
 							log.WithFields(log.Fields{"name": o.Name, "domain": o.Domain}).Info("deleted")
 						}
 					}
+				case resource.RscTypeSecret:
+					var err error
+					var lock cluster.LockInterface
+					for i := 0; i < 4; i++ {
+						var encKeys common.EncKeys
+						var currEncKeyVer string
+						lock, err = clusHelper.AcquireLock(share.CLUSStoreSecretKey, time.Duration(time.Second)*4)
+						if err == nil {
+							if encKeys, currEncKeyVer, _, err = resource.RetrieveStorePassphrases(); err == nil {
+								if len(encKeys) > 0 {
+									if err = common.InitAesGcmKey(encKeys, currEncKeyVer); err == nil {
+										log.Info("store passphrases reloaded")
+										clusHelper.ReleaseLock(lock)
+										break
+									}
+									log.WithFields(log.Fields{"i": i, "lead": isLeader(), "err": err}).Error("Failed to init AesGcm")
+								}
+							} else {
+								log.WithFields(log.Fields{"i": i, "err": err}).Error("Failed to reloaded store passphrases")
+							}
+							clusHelper.ReleaseLock(lock)
+						}
+						time.Sleep(time.Second)
+					}
+					if err != nil {
+						log.WithFields(log.Fields{"err": err}).Error("Failed to reloaded store passphrases")
+					}
 				/*
 						case resource.RscTypeMutatingWebhookConfiguration:
 							var n, o *resource.AdmissionWebhookConfiguration
@@ -2106,6 +2143,54 @@ func startWorkerThread(ctx *Context) {
 			}
 		}
 	}()
+}
+
+func checkKeyRotation() {
+	if !isLeader() {
+		return
+	}
+
+	if valueBackup, _ := cluster.Get(share.CLUSSystemEncMigratedKey); len(valueBackup) > 0 {
+		var cfgEncBackup share.CLUSSystemConfigEncMigrated
+		if err := json.Unmarshal(valueBackup, &cfgEncBackup); err == nil {
+			if time.Now().UTC().After(cfgEncBackup.EncDataExpirationTime) {
+				// the backup is expired
+				_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+				log.Info("encryption-migrated config backup is deleted")
+			}
+		}
+	}
+
+	value, _ := cluster.Get(share.CLUSNextKeyRotationTSKey)
+	if len(value) == 0 {
+		_ = kv.SetNextKeyRotationTime(cctx.KeyRotationDuration)
+		return
+	}
+	i, err := strconv.ParseInt(string(value), 10, 64)
+	if err != nil {
+		return
+	}
+	nextKeyRotationTime := time.Unix(i, 0)
+	if time.Now().After(nextKeyRotationTime) {
+		if err := resource.AddStorePassphrase(); err == nil {
+			if err = kv.SetNextKeyRotationTime(cctx.KeyRotationDuration); err == nil {
+				alert := "Important: Please backup the data in Kubernetes secret neuvector-store-secret reset by NeuVector"
+				b := sha256.Sum256([]byte(alert))
+				key := hex.EncodeToString(b[:])
+				allUser := clusHelper.GetAllUsers(access.NewReaderAccessControl())
+				for _, user := range allUser {
+					accepted := utils.NewSetFromStringSlice(user.AcceptedAlerts)
+					if accepted.Contains(key) {
+						accepted.Remove(key)
+						user.AcceptedAlerts = accepted.ToStringSlice()
+						if err = clusHelper.PutUser(user); err != nil {
+							log.WithFields(log.Fields{"": user.Fullname, "err": err}).Error()
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // handler of K8s resource watcher calls cbResourceWatcher() which sends to orchObjChan/objChan

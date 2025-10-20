@@ -180,6 +180,7 @@ type AlertType string
 const (
 	AlertTypeRBAC           AlertType = "RBAC"
 	AlertTypeTlsCertificate AlertType = "TLS_CERTIFICATE"
+	AlertTypeOthers         AlertType = "Others"
 )
 
 type RESTNvAlertGroup struct {

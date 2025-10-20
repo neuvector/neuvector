@@ -1043,7 +1043,10 @@ func TestJWTSignValidate(t *testing.T) {
 	}
 	remote := "10.1.2.3"
 
-	_, tokenString, _ := jwtGenerateToken(user, roles, nil, remote, "", "", nil)
+	_, tokenString, _, err := jwtGenerateToken(user, roles, nil, remote, "", "", nil)
+	if err != nil {
+		t.Errorf("Failed to generate jwt token: user=%+v error=%+v", user, err)
+	}
 
 	token, _ := jwtValidateToken(tokenString, "", nil)
 	if token.Fullname != user.Fullname {

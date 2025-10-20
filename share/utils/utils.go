@@ -1058,34 +1058,28 @@ func EncryptSensitive(data string, key []byte) string {
 	return encrypted
 }
 
-func DecryptUserToken(encrypted string, key []byte) string {
+func DecryptUserToken(encrypted string, key []byte) (string, error) {
+	if len(key) == 0 {
+		return "", errors.New("empty encryption key")
+	}
 	if encrypted == "" {
-		return ""
+		return "", nil
 	}
 
-	encrypted = strings.ReplaceAll(encrypted, "_", "/")
-	if key == nil {
-		key = getPasswordSymKey()
-	}
-	token, _ := DecryptFromRawStdBase64(key, encrypted)
-	return token
+	return DecryptFromRawURLBase64(key, encrypted)
 }
 
-// User token cannot have / in it and cannot have - as the first char.
-func EncryptUserToken(token string, key []byte) string {
-	if token == "" {
-		return ""
+func EncryptUserToken(token string, key []byte) (string, error) {
+	if len(key) == 0 {
+		return "", errors.New("empty encryption key")
 	}
-
-	if key == nil {
-		key = getPasswordSymKey()
+	if token == "" {
+		return "", nil
 	}
 
 	// Std base64 encoding has + and /, instead of - and _ (url encoding)
-	// token can be part of kv key, so we replace / with _
-	encrypted, _ := EncryptToRawStdBase64(key, []byte(token))
-	encrypted = strings.ReplaceAll(encrypted, "/", "_")
-	return encrypted
+	// encrypted token can be used as part of kv key string, so we replace / with _
+	return EncryptToRawURLBase64(key, []byte(token))
 }
 
 func DecryptURLSafe(encrypted string) string {

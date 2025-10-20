@@ -7519,6 +7519,14 @@ definitions:
       temp_token:
         type: string
         example: ""
+      fail_to_decrypt_key_fields:
+        type: object
+        description: Object key is kv key and value is array of cloaked fields that cannot be decrypted
+        additionalProperties:
+          type: array
+          items:
+            type: string
+          example: ["x509_cert", "signing_cert"]
   RESTImportTaskData:
     type: object
     required:

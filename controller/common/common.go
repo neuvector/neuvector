@@ -82,6 +82,9 @@ var ErrObjectExists error = errors.New("Object exists")
 var ErrAtomicWriteFail error = errors.New("Atomic write failed")
 var ErrUnsupported error = errors.New("Unsupported action")
 var ErrClusterWriteFail error = errors.New("Failed to write cluster")
+var ErrInvalidPassphrase error = errors.New("Invalid passphrase for data encryption key")
+var ErrDEKSeedUnavailable error = errors.New("store passphrase unavailable")
+var ErrEmptyValue error = errors.New("Empty value")
 
 var defaultWebhookCategory []string = []string{}
 var defaultSyslogCategory []string = []string{
@@ -340,6 +343,10 @@ var LogEventMap = map[share.TLogEvent]LogEventInfo{
 	share.CLUSEvGroupMetricViolation:        {api.EventNameGroupMetricViolation, api.EventCatGroup, api.LogLevelWARNING},
 	share.CLUSEvKvRestored:                  {api.EventNameKvRestored, api.EventCatConfig, api.LogLevelINFO},
 	share.CLUSEvScanDataRestored:            {api.EventNameScanDataRestored, api.EventCatScan, api.LogLevelINFO},
+	share.CLUSEvMismatchedDEKSeed:           {api.EventNameMismatchedDEKSeed, api.EventCatConfig, api.LogLevelERR},
+	share.CLUSEvDEKSeedUnavailable:          {api.EventNameDEKSeedUnavailable, api.EventCatConfig, api.LogLevelWARNING},
+	share.CLUSEvReEncryptWithDEK:            {api.EventNameReEncryptWithDEK, api.EventCatConfig, api.LogLevelINFO},
+	share.CLUSEvEncryptionSecretSet:         {api.EventNameEncryptionSecretSet, api.EventCatConfig, api.LogLevelNOTICE},
 }
 
 type LogIncidentInfo struct {
