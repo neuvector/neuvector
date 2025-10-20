@@ -39,6 +39,7 @@ const CLUSLockFedScanDataKey string = CLUSLockStore + "fed_scan_data"
 const CLUSLockApikeyKey string = CLUSLockStore + "apikey"
 const CLUSLockVulnKey string = CLUSLockStore + "vulnerability"
 const CLUSLockCompKey string = CLUSLockStore + "compliance"
+const CLUSStoreSecretKey string = CLUSLockStore + "store_secret"
 
 //const CLUSLockResponseRuleKey string = CLUSLockStore + "response_rule"
 
@@ -163,6 +164,8 @@ const CLUSNodeCommonProfileStore string = CLUSNodeCommonStoreKey + CLUSWorkloadP
 // state
 const CLUSCtrlEnabledValue string = "ok"
 
+const CLUSSystemEncMigratedKey string = CLUSStateStore + "enc_migrated"
+
 // cluster key represent one installation, which will remain unchanged when controllers
 // come and go, and rolling upgrade. It is not part of system configuration.
 const CLUSCtrlInstallationKey string = CLUSStateStore + "installation"
@@ -174,7 +177,7 @@ const CLUSCtrlVerKey string = CLUSStateStore + "ctrl_ver"
 const CLUSKvRestoreKey string = CLUSStateStore + "kv_restore"
 const CLUSExpiredTokenStore string = CLUSStateStore + "expired_token/"
 const CLUSImportStore string = CLUSStateStore + "import/"
-
+const CLUSNextKeyRotationTSKey string = CLUSStateStore + "next_key_rotation_ts"
 const CLUSConfigSecretPatternsKey string = CLUSConfigCustomRuleStore + "secret_patterns"
 
 func CLUSExpiredTokenKey(token string) string {
@@ -834,6 +837,11 @@ type CLUSSystemConfig struct {
 	AllowNsUserExportNetPolicy bool                      `json:"allow_ns_user_export_net_policy,omitempty"`
 }
 
+type CLUSSystemConfigEncMigrated struct {
+	EncMigratedSystemConfig string    `json:"enc_migrated_system_config"`
+	EncDataExpirationTime   time.Time `json:"enc_data_expiration_time"`
+}
+
 type CLUSSystemConfigAutoscale struct {
 	Strategy         string `json:"strategy"`
 	MinPods          uint32 `json:"min_pods"`
@@ -1478,6 +1486,10 @@ const (
 	CLUSEvGroupMetricViolation       //network metric violation per group level
 	CLUSEvKvRestored                 // kv is restored from pvc
 	CLUSEvScanDataRestored           // scan data is restored from pvc
+	CLUSEvMismatchedDEKSeed          // mismatched dekSeed for backup from pvc
+	CLUSEvDEKSeedUnavailable         // dekSeed unavailable (most likely because of RBAC neuvector-binding-secret-controller)
+	CLUSEvReEncryptWithDEK           // re-encrypt sensitive data in backup files with variant DEK
+	CLUSEvEncryptionSecretSet        // neuvector-store-secret secret is set
 )
 
 const (
@@ -2984,18 +2996,19 @@ func CLUSImportOpKey(name string) string {
 }
 
 type CLUSImportTask struct {
-	TID            string    `json:"tid"`
-	ImportType     string    `json:"import_type"`
-	CtrlerID       string    `json:"ctrler_id"`
-	TempFilename   string    `json:"temp_filename"`
-	Status         string    `json:"status"`
-	Percentage     int       `json:"percentage"`
-	TotalLines     int       `json:"total_lines"`
-	LastUpdateTime time.Time `json:"last_update_time"`
-	CallerFullname string    `json:"caller_fullname"`
-	CallerRemote   string    `json:"caller_remote"`
-	CallerID       string    `json:"caller_id"`
-	Overwrite      string    `json:"overwrite"`
+	TID                    string              `json:"tid"`
+	ImportType             string              `json:"import_type"`
+	CtrlerID               string              `json:"ctrler_id"`
+	TempFilename           string              `json:"temp_filename"`
+	Status                 string              `json:"status"`
+	Percentage             int                 `json:"percentage"`
+	TotalLines             int                 `json:"total_lines"`
+	LastUpdateTime         time.Time           `json:"last_update_time"`
+	CallerFullname         string              `json:"caller_fullname"`
+	CallerRemote           string              `json:"caller_remote"`
+	CallerID               string              `json:"caller_id"`
+	Overwrite              string              `json:"overwrite"`
+	FailToDecryptKeyFields map[string][]string `json:"fail_to_decrypt_key_fields"` // key_path : []fields
 }
 
 func CLUSNodeProfileStoreKey(nodeID string) string {

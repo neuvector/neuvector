@@ -141,7 +141,7 @@ func leadChangeHandler(newLead, oldLead string) {
 			}
 
 			if emptyKvFound {
-				if _, _, restored, restoredKvVersion, err := kv.GetConfigHelper().Restore(); restored && err == nil {
+				if _, _, restored, restoredKvVersion, err := kv.GetConfigHelper().Restore(Host, Ctrler); restored && err == nil {
 					clog := share.CLUSEventLog{
 						Event:          share.CLUSEvKvRestored,
 						HostID:         Host.ID,
@@ -216,7 +216,7 @@ func ctlrMemberUpdateHandler(nType cluster.ClusterNotifyType, memberAddr string,
 			selfRejoin = false
 
 			ctlrPutLocalInfo()
-			logController(share.CLUSEvControllerJoin)
+			logController(share.CLUSEvControllerJoin, "")
 		}
 	} else if nType == cluster.ClusterNotifyDelete {
 		if Ctrler.ClusterIP == memberAddr {
@@ -247,13 +247,14 @@ func clusterStart(clusterCfg *cluster.ClusterConfig) (string, string, error) {
 	return cluster.GetSelfAddress(), lead, nil
 }
 
-func logController(ev share.TLogEvent) {
+func logController(ev share.TLogEvent, msg string) {
 	clog := share.CLUSEventLog{
 		Event:          ev,
 		HostID:         Host.ID,
 		HostName:       Host.Name,
 		ControllerID:   Ctrler.ID,
 		ControllerName: Ctrler.Name,
+		Msg:            msg,
 	}
 	switch ev {
 	case share.CLUSEvControllerStart:

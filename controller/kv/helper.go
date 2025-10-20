@@ -316,24 +316,42 @@ var (
 )
 
 type clusterHelper struct {
-	id      string
-	version string
-	persist bool
+	id                  string
+	version             string
+	persist             bool
+	keyRotationDuration time.Duration
 }
 
 var clusHelperImpl *clusterHelper
 var clusHelper ClusterHelper
 
-func newClusterHelper(id, version string, persist bool) ClusterHelper {
+func newClusterHelper(id, version string, persist bool, keyRotationDuration time.Duration) ClusterHelper {
 	clusHelperImpl = new(clusterHelper)
 	clusHelperImpl.id = id
 	clusHelperImpl.version = version
 	clusHelperImpl.persist = persist
+	clusHelperImpl.keyRotationDuration = keyRotationDuration
 	return clusHelperImpl
 }
 
 func GetClusterHelper() ClusterHelper {
 	return clusHelperImpl
+}
+
+func SetNextKeyRotationTime(keyRotationDuration time.Duration) error {
+	var err error
+	var nextRotationTime int64
+
+	key := share.CLUSNextKeyRotationTSKey
+	nextRotationTime = time.Now().Add(keyRotationDuration).Unix()
+	nextValue := fmt.Sprintf("%d", nextRotationTime)
+	if err = cluster.Put(key, []byte(nextValue)); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+	} else {
+		log.WithFields(log.Fields{"nextRotationTime": nextRotationTime}).Info()
+	}
+
+	return err
 }
 
 func nvJsonUnmarshal(key string, data []byte, v any) error {
@@ -349,6 +367,59 @@ func nvJsonUnmarshal(key string, data []byte, v any) error {
 	}
 
 	return err
+}
+
+// for switching from fixed default key to variant DEK.
+// [1]. If there is cloaked-by-fixed-default-key field in the json object represented by parameter 'data':
+// 1-1. 'data' is unmarshalled to 'obj' and cloaked-by-fixed-default-key fields are decrypted with the fixed default key
+// 1-2. 'obj' is marshalled to 'data' and sensitive fields are encrypted with variant DEK (no change on 'obj')
+// 1-3. 'data' is json unmarshalled to 'obj' (i.e. keep sensitive fields cloaked-by-DEK in 'obj')
+// [2]. If no field is cloaked by the fixed default key in the json object represented by parameter 'data', this function is equivalent to nvJsonUnmarshal()
+//
+// parameters:
+// 1. key:  kv key
+// 2. data: kv value
+// 3. obj:  pointer of the object for json unmarshalling.
+// when this function returns, sensitive fields in 'obj' are encrypted by DEK
+func nvJsonUnmarshalReEncrypt(key string, data []byte, obj any) (bool, utils.Set, error) {
+	if !common.IsDEKSeedAvailable() {
+		_ = nvJsonUnmarshal(key, data, obj)
+		return false, nil, nil
+	}
+
+	if obj == nil {
+		err := fmt.Errorf("nil target")
+		log.WithFields(log.Fields{"error": err, "key": key}).Error()
+		return false, nil, err
+	}
+
+	var dec common.MigrateDecryptUnmarshaller
+
+	err := dec.Unmarshal(data, obj)
+	if err == nil {
+		// it reaches here because dec.Unmarshal() return nil error & any of following conditions:
+		// 1. there is no sensitive field in 'obj'. No re-encryption required.
+		// 2. there is any sensitive field encrypted by the fixed default key in 'obj' that 'obj' need to be re-encrypted by DEK
+		// 3. all sensitive fields are encrypted with a DEK and can be DEK-decypted in 'obj'.
+		if dec.ReEncryptRequired { // condition #2
+			// data re-encryption is required because of switching from the fixed default key to variant DEK
+			// notice: when this function returns, the sensitive fields in 'obj' are encrypted by DEK
+			var dataReEncrypted []byte
+			var enc common.EncryptMarshaller
+			if dataReEncrypted, err = enc.Marshal(obj); err == nil {
+				if err = nvJsonUnmarshal(key, dataReEncrypted, obj); err == nil {
+					return true, dec.GetFailToDecryptFields(), nil
+				}
+			} else {
+				log.WithFields(log.Fields{"error": err, "key": key}).Error("re-encrypt object failed")
+			}
+		}
+	} else {
+		log.WithFields(log.Fields{"error": err, "key": key}).Error("dec.Unmarshal")
+	}
+	err = nvJsonUnmarshal(key, data, obj)
+
+	return false, dec.GetFailToDecryptFields(), err
 }
 
 func getAllSubKeys(scope, store string) utils.Set {
@@ -451,6 +522,7 @@ func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 	} else {
 		var wrt bool
 		if value, err, wrt = UpgradeAndConvert(key, value); wrt {
+			// wrt being true means value is out-of-date & it needs to get from kv again
 			value, rev, err = cluster.GetRev(key)
 			// [31, 139] is the first 2 bytes of gzip-format data
 			if needToUnzip(key, value) {
@@ -571,10 +643,15 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 			return err
 		}
 
+		if value, _ := cluster.Get(share.CLUSNextKeyRotationTSKey); len(value) == 0 {
+			_ = SetNextKeyRotationTime(m.keyRotationDuration)
+		}
+
 		if err = cluster.PutRev(key, []byte(id), index); err != nil {
 			// Return the error. CASError will be automatically retried.
 			return err
 		}
+
 		return nil
 	}); err != nil {
 		return "", err
@@ -761,13 +838,13 @@ func (m clusterHelper) GetDomain(name string, acc *access.AccessControl) (*share
 
 func (m clusterHelper) PutDomainIfNotExist(domain *share.CLUSDomain) error {
 	key := share.CLUSDomainKey(domain.Name)
-	value, _ := enc.Marshal(domain)
+	value, _ := json.Marshal(domain)
 	return cluster.PutIfNotExist(key, value, true)
 }
 
 func (m clusterHelper) PutDomain(domain *share.CLUSDomain, rev *uint64) error {
 	key := share.CLUSDomainKey(domain.Name)
-	value, _ := enc.Marshal(domain)
+	value, _ := json.Marshal(domain)
 	if rev == nil {
 		return cluster.Put(key, value)
 	} else {
@@ -1030,19 +1107,19 @@ func (m clusterHelper) DeletePolicyRuleTxn(txn *cluster.ClusterTransact, id uint
 
 func (m clusterHelper) PutPolicyVer(s *share.CLUSGroupIPPolicyVer) error {
 	key := share.CLUSPolicyIPRulesKey(s.Key)
-	value, _ := enc.Marshal(s)
+	value, _ := json.Marshal(s)
 	return cluster.Put(key, value)
 }
 
 func (m clusterHelper) PutPolicyVerNode(s *share.CLUSGroupIPPolicyVer) error {
 	key := share.CLUSPolicyIPRulesKeyNode(s.Key, s.NodeId)
-	value, _ := enc.Marshal(s)
+	value, _ := json.Marshal(s)
 	return cluster.Put(key, value)
 }
 
 func (m clusterHelper) PutDlpVer(s *share.CLUSDlpRuleVer) error {
 	key := share.CLUSDlpWorkloadRulesKey(s.Key)
-	value, _ := enc.Marshal(s)
+	value, _ := json.Marshal(s)
 	return cluster.Put(key, value)
 }
 
@@ -1351,7 +1428,7 @@ func (m clusterHelper) GetAllProcessProfileSubKeys(scope string) utils.Set {
 // Scanner
 func (m clusterHelper) PutScannerTxn(txn *cluster.ClusterTransact, s *share.CLUSScanner) error {
 	key := share.CLUSScannerKey(s.ID)
-	value, err := enc.Marshal(s)
+	value, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
@@ -2151,8 +2228,11 @@ func (m clusterHelper) GetAdmissionCertRev(svcName string) (*share.CLUSAdmission
 
 func (m clusterHelper) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error) {
 	key := share.CLUSObjectCertKey(cn)
-	value, rev, err := cluster.GetRev(key)
-	if err != nil || value == nil {
+	value, rev, err := m.get(key)
+	if err == nil && value == nil {
+		err = fmt.Errorf("cert %s is not set", key)
+	}
+	if err != nil {
 		log.WithFields(log.Fields{"cn": cn, "error": err}).Error()
 		return nil, rev, err
 	} else {

@@ -25,12 +25,14 @@ import (
 type purgeFilterFunc func(epName, key string) bool
 
 type cfgEndpoint struct {
-	name        string
-	key         string
-	section     string
-	lock        string
-	isStore     bool
-	purgeFilter purgeFilterFunc
+	name              string
+	key               string
+	section           string
+	lock              string
+	isStore           bool
+	backupReEncrypted bool
+	errRestoreKeys    utils.Set
+	purgeFilter       purgeFilterFunc
 }
 
 const (
@@ -383,7 +385,7 @@ func (ep cfgEndpoint) backup(fedRole string) error {
 }
 
 // value of each key in the file is always in text format (i.e. non-gzip format). Compress it if it's >= 512k before restoring to kv
-func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterTransact) error {
+func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterTransact) error {
 	fedEndpointCfg := false
 	source := ep.getBackupFilename()
 	if ep.name == share.CFGEndpointFederation {
@@ -444,6 +446,8 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 
 	// Restore key/value from files
 	count := 0
+
+	log.WithFields(log.Fields{"name": ep.name}).Info()
 	r := bufio.NewReader(f)
 	policyZipRuleListKey := share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName)
 	for {
@@ -537,10 +541,16 @@ func (ep cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.ClusterT
 
 		// Value can be empty if a key was never been written when it's exported
 		if !skip && len(value) != 0 {
-			array, err := upgrade(key, []byte(value))
-			if err != nil {
+			array, wrtForReEncrypt, failToDecryptFields, err := upgrade(key, []byte(value))
+			if failToDecryptFields != nil && failToDecryptFields.Cardinality() > 0 {
+				log.WithFields(log.Fields{"error": err, "key": key}).Error("Failed to upgrade key")
+				ep.errRestoreKeys.Add(key)
+			} else if err != nil {
 				log.WithFields(log.Fields{"error": err, "key": key, "value": value}).Error("Failed to upgrade key/value")
 				return ErrInvalidFileFormat
+			}
+			if wrtForReEncrypt {
+				ep.backupReEncrypted = true
 			}
 			if key == policyZipRuleListKey {
 				applyTransaction(txn, nil, false, 0)

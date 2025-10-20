@@ -1975,8 +1975,7 @@ func GetSaFromJwtToken(tokenStr string) (string, error) {
 	return sa, err
 }
 
-func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
-	cacheEventFunc = objFunc
+func GetNvCtrlerServiceAccount() {
 	// controller pod runs as "controller" sa if it's deployed with least privilge enabled
 	filePath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	if data, err := os.ReadFile(filePath); err == nil {
@@ -1992,6 +1991,10 @@ func GetNvCtrlerServiceAccount(objFunc common.CacheEventFunc) {
 	getNeuvectorSvcAccount()
 
 	log.WithFields(log.Fields{"nvControllerSA": ctrlerSubjectWanted}).Info()
+}
+
+func SetCacheEventFunc(objFunc common.CacheEventFunc) {
+	cacheEventFunc = objFunc
 }
 
 func getSubjectsString(ns string, subjects []string) string {
