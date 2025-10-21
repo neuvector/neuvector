@@ -1,7 +1,7 @@
 .PHONY: fleet
 
 STAGE_DIR = stage
-BASE_IMAGE_TAG = latest
+BASE_IMAGE_TAG = alpine
 BUILD_IMAGE_TAG = latest
 
 copy_ctrl:
