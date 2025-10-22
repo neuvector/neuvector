@@ -47,16 +47,6 @@ func getImageName(req *api.RESTScanRepoReq) string {
 	return fmt.Sprintf("%s:%s", req.Repository, req.Tag)
 }
 
-// // newRepoScanMgr initializes the repository scan manager with the specified parameters.
-// // - repoScanLongPollTimeout: The timeout duration for long polling operations.
-// // - staleScanJobCleanupIntervalHour: The interval for cleaning up stale jobs.
-// // - maxConcurrentRepoScanTasks: The maximum number of concurrent repository scan tasks allowed.
-// // - scanJobQueueCapacity: The capacity of the job queue for managing repository scan tasks.
-// // - scanJobFailRetryMax: The maximum number of retry attempts for failed jobs.
-// func newRepoScanMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour time.Duration, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax int) {
-// 	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax)
-// }
-
 type repoScanTask struct {
 }
 

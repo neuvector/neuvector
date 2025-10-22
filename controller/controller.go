@@ -282,7 +282,7 @@ func main() {
 	scanJobFailRetryMax := flag.Int("scan_job_fail_retry_max", 5, "Maximum retry attempts for failed scan jobs")
 	staleScanJobCleanupIntervalHour := flag.Int("stale_scan_job_cleanup_interval_hour", 1, "Interval (in hours) for cleaning up stale scan jobs")
 	repoScanLongPollTimeout := flag.Int("repo_scan_long_poll_timeout", 30, "Timeout for long polling repository scan jobs")
-	scannerLBMax := flag.Int("scanner_lb_max", 128, "Maximum number of scanner per controller")
+	maxScannersPerController := flag.Int("max_scanners_per_controller", 128, "Maximum number of scanners per controller")
 	flag.Parse()
 
 	// default log_level is LogLevel_Info
@@ -357,9 +357,6 @@ func main() {
 	} else if *custom_check_control != share.CustomCheckControl_Disable {
 		*custom_check_control = share.CustomCheckControl_Disable
 	}
-
-	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
-	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks, *scannerLBMax)
 
 	// Set global objects at the very first
 	platform, flavor, cloudPlatform, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
@@ -629,6 +626,10 @@ func main() {
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember,
 		getConfigKvData, evqueue, keyRotationDuration)
 	ruleid.Init()
+
+	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
+	// Initialize after kv.Init() to ensure clusterHelper is available
+	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks, *maxScannersPerController)
 
 	// Start cluster
 	clusterCfg := &cluster.ClusterConfig{

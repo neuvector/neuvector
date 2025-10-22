@@ -189,14 +189,16 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	newVer, _ := utils.NewVersion(data.CVEDBVersion)
 
 	newScanner := share.CLUSScanner{
-		ID:              data.ID,
-		CVEDBVersion:    data.CVEDBVersion,
-		CVEDBCreateTime: data.CVEDBCreateTime,
-		JoinedAt:        time.Now().UTC(),
-		RPCServer:       data.RPCServer,
-		RPCServerPort:   uint16(data.RPCServerPort),
-		BuiltIn:         data.RPCServer == "127.0.0.1",
-		CVEDBEntries:    len(data.CVEDB),
+		ID:                           data.ID,
+		CVEDBVersion:                 data.CVEDBVersion,
+		CVEDBCreateTime:              data.CVEDBCreateTime,
+		JoinedAt:                     time.Now().UTC(),
+		RPCServer:                    data.RPCServer,
+		RPCServerPort:                uint16(data.RPCServerPort),
+		BuiltIn:                      data.RPCServer == "127.0.0.1",
+		CVEDBEntries:                 len(data.CVEDB),
+		MaxConcurrentScansPerScanner: rpc.ScanCreditMgr.GetMaxConcurrentScansPerScanner(),
+		ScanCredit:                   rpc.ScanCreditMgr.GetMaxConcurrentScansPerScanner(),
 	}
 	if newScanner.BuiltIn {
 		// If scanner running in container, the ID should already by controller's ID.
@@ -304,9 +306,8 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 func (ss *ScanService) ScannerDeregister(ctx context.Context, data *share.ScannerDeregisterData) (*share.RPCVoid, error) {
 	log.WithFields(log.Fields{"scanner": data.ID}).Info()
 
-	clusHelper := kv.GetClusterHelper()
-	if err := clusHelper.DeleteScanner(data.ID); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("DeleteScanner")
+	if err := rpc.ScanCreditMgr.RemoveScanner(data.ID); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("RemoveScanner")
 	}
 	return &share.RPCVoid{}, nil
 }
