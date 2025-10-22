@@ -1767,7 +1767,7 @@ func startWorkerThread(ctx *Context) {
 									cache.errCount++
 									if cache.errCount >= scannerClearnupErrorMax {
 										log.WithFields(log.Fields{"scanner": sid}).Info("Remove stalled internal scanner")
-										_ = clusHelper.DeleteScanner(sid)
+										_ = rpc.ScanCreditMgr.RemoveScanner(sid)
 									}
 								} else {
 									cache.errCount = 0
@@ -1775,12 +1775,12 @@ func startWorkerThread(ctx *Context) {
 							}
 						} else {
 							// Ping external scanner, remove if no response after 3 tries.
-							if err := rpc.Ping(sid, scannerClearnupTimeout); err != nil {
+							if err := rpc.ScanCreditMgr.Ping(sid, scannerClearnupTimeout); err != nil {
 								log.WithFields(log.Fields{"scanner": sid, "error": err}).Error("Failed to ping scanner")
 								cache.errCount++
 								if cache.errCount >= scannerClearnupErrorMax {
 									log.WithFields(log.Fields{"scanner": sid}).Info("Remove stalled external scanner")
-									_ = clusHelper.DeleteScanner(sid)
+									_ = rpc.ScanCreditMgr.RemoveScanner(sid)
 								}
 							} else {
 								cache.errCount = 0
