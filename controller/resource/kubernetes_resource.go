@@ -2184,6 +2184,9 @@ func getNeuvectorSvcAccount() {
 			if objName == "neuvector-registry-adapter-pod" {
 				// registry_adapter is not deployed. do not include its sa in the rbac checking/alert
 				regAdapterSubjectWanted = ""
+			} else if objName == "neuvector-scanner-pod" {
+				// scanner is not deployed. do not include its sa in the rbac checking/alert
+				scannerSubjectWanted = ""
 			}
 			log.WithFields(log.Fields{"name": objName, "rt": rt, "err": err}).Error("resource no found")
 			continue
@@ -2234,6 +2237,11 @@ func getNeuvectorSvcAccount() {
 		// it means neuvector-registry-adapter-pod is not deployed.
 		// so the alert message for rolebinding neuvector-binding-secret will not containsa the "registry-adapter" sa
 		regAdapterSubjectWanted = ctrlerSubjectWanted
+	}
+	if scannerSubjectWanted == "" {
+		// it means neuvector-scanner-pod is not deployed.
+		// so the alert message for rolebinding neuvector-binding-secret will not containsa the "scanner" sa
+		scannerSubjectWanted = ctrlerSubjectWanted
 	}
 
 	secretSubjectsWanted[0] = enforcerSubjectWanted
