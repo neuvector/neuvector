@@ -761,6 +761,8 @@ func getContainerIDByName(name string) string {
 
 // Get IP scope by workload MAC and ip address
 func getIPAddrScope(mac net.HardwareAddr, ip net.IP) (string, string) {
+	gInfoRLock()
+	defer gInfoRUnlock()
 	if pair, ok := gInfo.macPortPairMap[mac.String()]; ok {
 		for _, addr := range pair.Addrs {
 			if ip.String() == addr.IPNet.IP.String() {
