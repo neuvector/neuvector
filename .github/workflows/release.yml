@@ -120,7 +120,7 @@ jobs:
         COMMIT_MESSAGE: "chore: update upgrade-responder.json"
         BRANCH_NAME_PREFIX: "auto-update/upgrade-responder-"
         GIT_PATH_EXTERNAL_PROD: "external-production/"
-      if: ${{ needs.parse_tag.outputs.parsed_tag != '' }} 
+      if: ${{ needs.publish.outputs.parsed_tag != '' }}
       steps:
         - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
