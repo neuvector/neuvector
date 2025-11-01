@@ -382,9 +382,9 @@ func (w *Webhook) Notify(elog interface{}, level, category, cluster, title, comm
 			ctype = ctypeJSON
 			var extra string
 			if comment != "" {
-				extra = fmt.Sprintf("{\"cluster\":\"%s\",\"comment\":\"%s\",", cluster, comment)
+				extra = fmt.Sprintf("{\"cluster\":\"%s\",\"category\":\"%s\",\"comment\":\"%s\",", cluster, comment, category)
 			} else {
-				extra = fmt.Sprintf("{\"cluster\":\"%s\",", cluster)
+				extra = fmt.Sprintf("{\"cluster\":\"%s\",\"category\":\"%s\",", cluster, category)
 			}
 
 			data, _ = json.Marshal(elog)
