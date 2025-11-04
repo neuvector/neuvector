@@ -10,13 +10,17 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/neuvector/k8s"
 	log "github.com/sirupsen/logrus"
 	admregv1 "k8s.io/api/admissionregistration/v1"
@@ -161,9 +165,10 @@ const (
 )
 
 type resourceWatcher struct {
-	watcher *k8s.Watcher
-	cancel  context.CancelFunc
-	cb      orchAPI.WatchCallback
+	watcher      *k8s.Watcher
+	cancel       context.CancelFunc
+	cb           orchAPI.WatchCallback
+	tokenRenewed bool
 }
 
 type resourceMaker struct {
@@ -773,12 +778,15 @@ const (
 type kubernetes struct {
 	*noop
 
-	lock      sync.RWMutex
-	rbacLock  sync.RWMutex
-	client    *k8s.Client
-	discovery *k8s.Discovery
-	version   *k8s.Version
-	watchers  map[string]*resourceWatcher
+	lock               sync.RWMutex
+	rbacLock           sync.RWMutex
+	clientLock         sync.RWMutex
+	client             *k8s.Client    // to use 'client' for talking to k8s, always access it by getK8sClient()
+	lastTokenModTime   time.Time      // last modification time of file /var/run/secrets/kubernetes.io/serviceaccount/token
+	lastNewClientError error          // error for last creating a k8s client
+	discovery          *k8s.Discovery // to use 'discovery', always access it by getK8sClient()
+	version            *k8s.Version
+	watchers           map[string]*resourceWatcher
 
 	userCache map[k8sSubjectObjRef]utils.Set         // k8s user -> set of k8sRoleRef
 	roleCache map[k8sObjectRef]string                // k8s (cluster)role -> nv reserved role
@@ -799,6 +807,8 @@ func newKubernetesDriver(platform, flavor, network string) *kubernetes {
 		permitsCache:     make(map[k8sObjectRef]share.NvPermissions),
 		permitsRbacCache: make(map[k8sSubjectObjRef]map[string]share.NvFedPermissions),
 	}
+	d.createK8sClient()
+	go d.monitorK8sTokenFile()
 	return d
 }
 
@@ -1251,16 +1261,124 @@ func xlateValidatingWebhookConfiguration(obj metav1.Object) (string, interface{}
 	return "", nil
 }
 
+func (d *kubernetes) createK8sClient() {
+	client, err := k8s.NewInClusterClient()
+	if err != nil {
+		d.lastNewClientError = err
+		log.WithFields(log.Fields{"err": err}).Error("Failed to create cluster client")
+		return
+	}
+	discovery := k8s.NewDiscoveryClient(client)
+	version, err := discovery.Version(context.Background())
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("Failed to discover k8s version")
+	}
+
+	d.clientLock.Lock()
+	d.client = client
+	d.discovery = discovery
+	if version != nil {
+		d.version = version
+	}
+	d.lastNewClientError = nil
+	d.clientLock.Unlock()
+}
+
+func (d *kubernetes) monitorK8sTokenFile() {
+	const filePath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	info, err := os.Stat(filePath)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to get file info")
+		return
+	}
+	d.lastTokenModTime = info.ModTime()
+	log.WithFields(log.Fields{"lastTokenModTime": d.lastTokenModTime}).Info("Initial mod time")
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to create token file watcher")
+		return
+	}
+	defer watcher.Close()
+
+	// listening OS shutdown singal
+	c_sig := make(chan os.Signal, 1)
+	signal.Notify(c_sig, os.Interrupt, syscall.SIGTERM)
+
+	// Add the directory to be monitored.
+	err = watcher.Add("/var/run/secrets/kubernetes.io/serviceaccount")
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to add watcher")
+		return
+	}
+
+exit_watcher:
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				log.WithFields(log.Fields{"error": err}).Error("Channel is closed")
+				return
+			}
+			// In a pod, under /var/run/secrets/kubernetes.io/serviceaccount folder:
+			//   token(A: symbolic) -> ..data/token (B: ..data is symbolic too) -> actual token folder/file like (C1) ..2025_10_30_19_15_47.4131197903/token
+			// When the token is renewed:
+			// 1. A new target folder is created for storing the new token file (like C2: ..2025_10_30_20_04_41.9385673578/token)
+			// 2. The 2nd symbolic(in B) is updated to point to the new target folder/file(C2)
+			// 3. The old target folder(C1) is removed (this is the last operation on /var/run/secrets/kubernetes.io/serviceaccount folder for token renewal)
+			// 4. There is no change on the 1st symbolic(A)
+			// So we only care about Remove event, not events like CHMOD, for token renewal activity.
+			if event.Has(fsnotify.Remove) {
+				for range 4 {
+					time.Sleep(time.Second * 2)
+					info, err := os.Stat(filePath)
+					if err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("Failed to get file info")
+						continue
+					}
+					newLastModTime := info.ModTime()
+					if newLastModTime == d.lastTokenModTime {
+						continue
+					}
+					d.lastTokenModTime = newLastModTime
+					log.WithFields(log.Fields{"new": newLastModTime, "old": d.lastTokenModTime}).Info("File modified")
+					d.createK8sClient()
+					d.lock.Lock()
+					for rt, rtWatcher := range d.watchers {
+						if rtWatcher != nil && rtWatcher.cancel != nil {
+							log.WithFields(log.Fields{"resource": rt}).Info("Cancel context")
+							rtWatcher.tokenRenewed = true
+							rtWatcher.cancel()
+							// 1. watchResource() is notified. It sends an error(ex: context.Canceled) to errCh channel and returns
+							// 2. watcher's ctx.Done() channel is closed
+						}
+					}
+					d.lock.Unlock()
+					break
+				}
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				log.WithFields(log.Fields{"error": err}).Error("Channel is closed")
+				return
+			}
+		case <-c_sig:
+			log.Info("Got OS shutdown signal, shutting down token watcher...")
+			break exit_watcher
+		}
+	}
+	log.Info("leave")
+}
+
 func (d *kubernetes) discoverResource(rt string) (*resourceMaker, error) {
 	r, ok := resourceMakers[rt]
 	if !ok {
 		return nil, fmt.Errorf("Unknown resource name: %s", rt)
 	}
 
-	if d.discovery == nil {
-		if err := d.newClient(); err != nil {
-			return nil, err
-		}
+	_, k8sDiscovery := d.getK8sClient()
+	if k8sDiscovery == nil {
+		return nil, d.lastNewClientError
 	}
 
 	// Don't know how to discover core API group. 'v1' is always supported.
@@ -1268,7 +1386,7 @@ func (d *kubernetes) discoverResource(rt string) (*resourceMaker, error) {
 		return r.makers[0], nil
 	}
 
-	g, err := d.discovery.APIGroup(context.Background(), r.apiGroup)
+	g, err := k8sDiscovery.APIGroup(context.Background(), r.apiGroup)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to discover API group: %s(%s)", r.apiGroup, err.Error())
 	}
@@ -1301,6 +1419,7 @@ func (d *kubernetes) watchResource(rt string, maker *resourceMaker, watcher *k8s
 	for {
 		obj := maker.newObject()
 		if evt, err := watcher.Next(obj); err != nil {
+			log.WithFields(log.Fields{"resource": rt, "err": err}).Debug()
 			errCh <- err
 			return
 		} else {
@@ -1407,15 +1526,14 @@ func (d *kubernetes) listResource(rt, namespace string) ([]interface{}, error) {
 		return nil, err
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return nil, err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return nil, d.lastNewClientError
 	}
 
 	objs := maker.newList()
 	d.lock.Lock()
-	err = d.client.List(context.Background(), namespace, objs)
+	err = k8sClient.List(context.Background(), namespace, objs)
 	d.lock.Unlock()
 	if err != nil {
 		return nil, err
@@ -1485,23 +1603,33 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 		return err
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return err
-		}
+	if client, _ := d.getK8sClient(); client == nil {
+		return d.lastNewClientError
 	}
 
 	go func() {
+		var k8sClient *k8s.Client
+
 		// When watcher is closed, watch raises an error, but this goroutine already exits,
 		// so size-1 channel is required.
 		errCh := make(chan error, 1)
 
 		for {
+			useNewK8sClient := false
+			if newK8sClient, _ := d.getK8sClient(); newK8sClient != nil && newK8sClient != k8sClient {
+				k8sClient = newK8sClient
+				useNewK8sClient = true
+			}
+			if k8sClient == nil {
+				log.WithFields(log.Fields{"resource": rt}).Error("Cluster client unavailable")
+				return
+			}
+
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			d.lock.Lock()
-			watcher, err := d.client.Watch(ctx, ns, maker.newObject())
+			watcher, err := k8sClient.Watch(ctx, ns, maker.newObject())
 			d.lock.Unlock()
 			if err != nil {
 				errCh <- err
@@ -1510,8 +1638,19 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 					scb(ConnStateConnected, nil)
 				}
 				d.lock.Lock()
-				if d.watchers[rt] != nil {
-					d.watchers[rt].cancel()
+				rtWatcher := d.watchers[rt]
+				if rtWatcher != nil {
+					log.WithFields(log.Fields{"resource": rt, "tokenRenewed": rtWatcher.tokenRenewed, "useNewK8sClient": useNewK8sClient}).Info()
+					rtWatcher.cancel()
+					if rtWatcher.tokenRenewed {
+						select {
+						case e := <-errCh:
+							// The last watchResource() go routine probably sent a value to errCh channel
+							// We need to drain that value from errCh channel so that we can keep watching this resource type by the new k8s token
+							log.WithFields(log.Fields{"resource": rt, "e": e}).Info("Drained errCh")
+						default:
+						}
+					}
 				}
 				w := &resourceWatcher{
 					watcher: watcher,
@@ -1549,7 +1688,21 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 				}
 			case <-ctx.Done():
 				watcher.Close()
-				return
+				tokenRenewed := false
+				d.lock.RLock()
+				rtWatcher := d.watchers[rt]
+				if rtWatcher != nil {
+					tokenRenewed = rtWatcher.tokenRenewed
+				}
+				d.lock.RUnlock()
+				log.WithFields(log.Fields{"resource": rt, "tokenRenewed": tokenRenewed}).Info("Context cancelled")
+				if !tokenRenewed {
+					// The context is cancelled not because of k8s token renewal
+					// It means this go routine should be exiting now.
+					return
+				}
+				// It reaches here when the context is cancelled because of k8s token renewal
+				// Keep re-watching the resource using the new k8s token
 			}
 		}
 	}()
@@ -1608,28 +1761,6 @@ func (d *kubernetes) StopWatchAllResources() error {
 	return nil
 }
 
-/*
-func (d *kubernetes) GetVersion() (string, string) {
-	// version is read when new client is created
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return "", ""
-		}
-	}
-
-	var k8sVer string
-	if d.version != nil {
-		k8sVer = strings.TrimLeft(d.version.GitVersion, "v")
-	}
-	if k8sVer == "" {
-		k8sVer = d.k8sVer
-	}
-	ocVer := d.ocVer
-	log.WithFields(log.Fields{"k8s": k8sVer, "oc": ocVer}).Debug()
-	return k8sVer, ocVer
-}
-*/
-
 func (d *kubernetes) GetOEMVersion() (string, error) {
 	url := common.OEMPlatformVersionURL()
 	if url == "" {
@@ -1638,16 +1769,11 @@ func (d *kubernetes) GetOEMVersion() (string, error) {
 	return getVersion(url)
 }
 
-func (d *kubernetes) newClient() error {
-	if client, err := k8s.NewInClusterClient(); err != nil {
-		return err
-	} else {
-		d.client = client
-		d.discovery = k8s.NewDiscoveryClient(client)
+func (d *kubernetes) getK8sClient() (*k8s.Client, *k8s.Discovery) {
+	d.clientLock.RLock()
+	defer d.clientLock.RUnlock()
 
-		d.version, _ = d.discovery.Version(context.Background())
-	}
-	return nil
+	return d.client, d.discovery
 }
 
 type openshifVersion struct {
@@ -1716,16 +1842,15 @@ func (d *kubernetes) getResource(rt, namespace, name string) (interface{}, error
 		return nil, err
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return nil, err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return nil, d.lastNewClientError
 	}
 
 	obj := maker.newObject()
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	err = d.client.Get(context.Background(), namespace, name, obj)
+	err = k8sClient.Get(context.Background(), namespace, name, obj)
 
 	return obj, err
 }
@@ -1747,10 +1872,9 @@ func (d *kubernetes) addResource(rt string, res interface{}) error {
 		return err
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return d.lastNewClientError
 	}
 
 	// Note: Currently(Jan./2019) we only support creating neuvector-validating-admission-webhook resource
@@ -1760,7 +1884,7 @@ func (d *kubernetes) addResource(rt string, res interface{}) error {
 	}
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	err = d.client.Create(context.Background(), obj)
+	err = k8sClient.Create(context.Background(), obj)
 
 	return err
 }
@@ -1803,10 +1927,9 @@ func (d *kubernetes) updateResource(rt string, res interface{}) error {
 		return err
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return d.lastNewClientError
 	}
 
 	obj, ok := res.(metav1.Object)
@@ -1816,7 +1939,7 @@ func (d *kubernetes) updateResource(rt string, res interface{}) error {
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	err = d.client.Update(context.Background(), obj)
+	err = k8sClient.Update(context.Background(), obj)
 
 	return err
 }
@@ -1840,10 +1963,9 @@ func (d *kubernetes) deleteResource(rt string, res interface{}) error {
 		return err
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return d.lastNewClientError
 	}
 
 	// Note: Currently(Jan./2019) we only support deleting neuvector-validating-admission-webhook resource
@@ -1853,7 +1975,7 @@ func (d *kubernetes) deleteResource(rt string, res interface{}) error {
 	}
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	err = d.client.Delete(context.Background(), obj)
+	err = k8sClient.Delete(context.Background(), obj)
 	return err
 }
 

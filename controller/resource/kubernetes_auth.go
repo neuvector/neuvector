@@ -171,19 +171,18 @@ func (d *kubernetes) Login(username, password string) (string, string, error) {
 		return "", "", ErrMethodNotSupported
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return "", "", err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return "", "", d.lastNewClientError
 	}
 
-	authzEP, err := discoverAuthzEndpoint(d.client.Endpoint)
+	authzEP, err := discoverAuthzEndpoint(k8sClient.Endpoint)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to discover authz endpoint. Fallback!")
-		authzEP = fmt.Sprintf(openshiftOAuthDefaultURL, d.client.Endpoint)
+		authzEP = fmt.Sprintf(openshiftOAuthDefaultURL, k8sClient.Endpoint)
 	} else if authzEP == "" {
 		log.Error("Empty authz endpoint. Fallback!")
-		authzEP = fmt.Sprintf(openshiftOAuthDefaultURL, d.client.Endpoint)
+		authzEP = fmt.Sprintf(openshiftOAuthDefaultURL, k8sClient.Endpoint)
 	}
 
 	resp, err := loginOpenShift(authzEP, username, password)
@@ -209,6 +208,11 @@ type OpenShiftUser struct {
 func (d *kubernetes) GetPlatformUserGroups(token string) ([]string, error) {
 	groups := make([]string, 0)
 
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return nil, d.lastNewClientError
+	}
+
 	cfg := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -219,7 +223,7 @@ func (d *kubernetes) GetPlatformUserGroups(token string) ([]string, error) {
 		},
 	}
 
-	url := fmt.Sprintf("%s/apis/user.openshift.io/v1/users/~", d.client.Endpoint)
+	url := fmt.Sprintf("%s/apis/user.openshift.io/v1/users/~", k8sClient.Endpoint)
 	r, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return groups, err
@@ -256,13 +260,12 @@ func (d *kubernetes) Logout(username, token string) error {
 		return ErrMethodNotSupported
 	}
 
-	if d.client == nil {
-		if err := d.newClient(); err != nil {
-			return err
-		}
+	k8sClient, _ := d.getK8sClient()
+	if k8sClient == nil {
+		return d.lastNewClientError
 	}
 
-	err := logoutOpenShift(d.client.Endpoint, token)
+	err := logoutOpenShift(k8sClient.Endpoint, token)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to logout user")
 		return err
