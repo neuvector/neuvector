@@ -2309,6 +2309,9 @@ func getNeuvectorSvcAccount() {
 			} else if objName == "neuvector-scanner-pod" {
 				// scanner is not deployed. do not include its sa in the rbac checking/alert
 				scannerSubjectWanted = ""
+			} else if objName == "neuvector-enforcer-pod" {
+				// enforcer is not deployed. do not include its sa in the rbac checking/alert
+				enforcerSubjectWanted = ""
 			}
 			log.WithFields(log.Fields{"name": objName, "rt": rt, "err": err}).Error("resource no found")
 			continue
@@ -2364,6 +2367,11 @@ func getNeuvectorSvcAccount() {
 		// it means neuvector-scanner-pod is not deployed.
 		// so the alert message for rolebinding neuvector-binding-secret will not containsa the "scanner" sa
 		scannerSubjectWanted = ctrlerSubjectWanted
+	}
+	if enforcerSubjectWanted == "" {
+		// it means neuvector-enforcer-pod is not deployed.
+		// so the alert message for rolebinding neuvector-binding-secret will not containsa the "enforcer" sa
+		enforcerSubjectWanted = ctrlerSubjectWanted
 	}
 
 	secretSubjectsWanted[0] = enforcerSubjectWanted
