@@ -24,6 +24,7 @@ enum ScanErrorCode {
 	ScanErrAwsDownloadErr = 18;
 	ScanErrArgument = 19;
     ScanErrSignatureScanError = 20;
+    ScanErrAcquireScannerTimeout = 21;
 }
 
 enum ScanObjectType {

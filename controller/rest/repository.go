@@ -47,16 +47,6 @@ func getImageName(req *api.RESTScanRepoReq) string {
 	return fmt.Sprintf("%s:%s", req.Repository, req.Tag)
 }
 
-// // newRepoScanMgr initializes the repository scan manager with the specified parameters.
-// // - repoScanLongPollTimeout: The timeout duration for long polling operations.
-// // - staleScanJobCleanupIntervalHour: The interval for cleaning up stale jobs.
-// // - maxConcurrentRepoScanTasks: The maximum number of concurrent repository scan tasks allowed.
-// // - scanJobQueueCapacity: The capacity of the job queue for managing repository scan tasks.
-// // - scanJobFailRetryMax: The maximum number of retry attempts for failed jobs.
-// func newRepoScanMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour time.Duration, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax int) {
-// 	RepoScanMgr = NewLongPollOnceMgr(repoScanLongPollTimeout, staleScanJobCleanupIntervalHour, maxConcurrentRepoScanTasks, scanJobQueueCapacity, scanJobFailRetryMax)
-// }
-
 type repoScanTask struct {
 }
 
@@ -77,7 +67,8 @@ func (t *repoScanTask) ShouldRetry(arg interface{}) bool {
 		share.ScanErrorCode_ScanErrRegistryAPI,
 		share.ScanErrorCode_ScanErrFileSystem,
 		share.ScanErrorCode_ScanErrNetwork,
-		share.ScanErrorCode_ScanErrContainerAPI:
+		share.ScanErrorCode_ScanErrContainerAPI,
+		share.ScanErrorCode_ScanErrAcquireScannerTimeout:
 		return true
 
 	case share.ScanErrorCode_ScanErrImageNotFound:
@@ -141,12 +132,13 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 		// RPC request failed
 		scanErr = NewJobError(api.RESTErrClusterRPCError, err, nil)
 		log.WithFields(log.Fields{
-			"registry": req.Registry, "image": getImageName(req), "error": rsr.errMsg,
+			"registry": req.Registry, "image": getImageName(req), "error": err,
 		}).Error("RPC request fail")
 	} else if result.Error != share.ScanErrorCode_ScanErrNone {
-		scanErr = NewJobError(api.RESTErrFailRepoScan, err, scanUtils.ScanErrorToStr(result.Error))
+		// Include the error code in Detail to enable ShouldRetry logic
+		scanErr = NewJobError(api.RESTErrFailRepoScan, err, result.Error)
 		log.WithFields(log.Fields{
-			"registry": req.Registry, "image": getImageName(req), "error": rsr.errMsg,
+			"registry": req.Registry, "image": getImageName(req), "error": scanUtils.ScanErrorToStr(result.Error),
 		}).Error("Failed to scan repository")
 	} else {
 		log.WithFields(log.Fields{
