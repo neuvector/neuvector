@@ -6,9 +6,11 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -134,6 +136,22 @@ type ClusterHelper interface {
 	PutScannerStats(id string, objType share.ScanObjectType, result *share.ScanResult) error
 	GetScannerDB(store string) []*share.CLUSScannerDB
 
+	// GetAvailableScanners returns a list of all available scanners.
+	// Expected outcome: []*share.CLUSScanner representing all registered scanners in the cluster.
+	GetAvailableScanners() []*share.CLUSScanner
+
+	// PickLeastLoadedScanner selects the scanner with the least active tasks, scanCredit means the number of available tasks, the scanner with the most scanCredit will be selected.
+	// The ScannerHealthCheckFunc is used to ensure the scanner is available.
+	// Expected outcome: The least loaded scanner or an error if none are available.
+	PickLeastLoadedScanner(ScannerHealthCheckFunc func(string, time.Duration) error) (*share.CLUSScanner, error)
+
+	// ReleaseScanCredit releases a scan credit for a specific scanner, identified by scannerId.
+	// Expected outcome: Return an error if the release fails, or nil on success.
+	ReleaseScanCredit(scannerId string) error
+
+	// GetScannerRev retrieves a scanner along with its revision number for internal operations without authentication checks.
+	// Expected outcome: The scanner and its revision number or an error if retrieval fails.
+	GetScannerRev(id string) (*share.CLUSScanner, uint64, error)
 	GetScanReport(key string) *share.CLUSScanReport
 	GetScanState(key string) *share.CLUSScanState
 
@@ -335,7 +353,7 @@ func newClusterHelper(id, version string, persist bool, keyRotationDuration time
 }
 
 func GetClusterHelper() ClusterHelper {
-	return clusHelperImpl
+	return clusHelper
 }
 
 func SetNextKeyRotationTime(keyRotationDuration time.Duration) error {
@@ -1551,6 +1569,22 @@ func (m clusterHelper) GetScanner(id string, acc *access.AccessControl) *share.C
 	return nil
 }
 
+// GetScannerRev gets scanner with revision for internal operations (no auth check)
+func (m clusterHelper) GetScannerRev(id string) (*share.CLUSScanner, uint64, error) {
+	key := share.CLUSScannerKey(id)
+	value, rev, err := m.get(key)
+	if err != nil || value == nil {
+		return nil, 0, fmt.Errorf("scanner %s not found", id)
+	}
+
+	var s share.CLUSScanner
+	if err := nvJsonUnmarshal(key, value, &s); err != nil {
+		return nil, 0, err
+	}
+
+	return &s, rev, nil
+}
+
 func (m clusterHelper) DeleteScanner(id string) error {
 	key := share.CLUSScannerStatsKey(id)
 	_ = cluster.Delete(key)
@@ -1580,6 +1614,148 @@ func (m clusterHelper) GetScannerDB(store string) []*share.CLUSScannerDB {
 		}
 	}
 	return dbs
+}
+
+func (m clusterHelper) GetAvailableScanners() []*share.CLUSScanner {
+	scanners := make([]*share.CLUSScanner, 0)
+	if keys, err := cluster.GetStoreKeys(share.CLUSScannerStore); err == nil {
+		for _, key := range keys {
+			var scanner share.CLUSScanner
+			value, _, err := m.get(key)
+			if err != nil {
+				log.WithFields(log.Fields{"key": key, "error": err}).Error("Failed to get scanner")
+				continue
+			}
+			if value != nil {
+				if err := nvJsonUnmarshal(key, value, &scanner); err != nil {
+					log.WithFields(log.Fields{"key": key, "error": err}).Error("Failed to unmarshal scanner")
+					continue
+				}
+				if scanner.ID != share.CLUSScannerDBVersionID {
+					scanners = append(scanners, &scanner)
+				}
+			}
+		}
+	}
+
+	return scanners
+}
+
+func (m clusterHelper) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string, time.Duration) error) (*share.CLUSScanner, error) {
+	scanners := m.GetAvailableScanners()
+	if len(scanners) == 0 {
+		return nil, share.ErrNoScannerFound
+	}
+
+	// To minimize CAS conflicts and improve fairness, sort scanners by ScanCredit (descending).
+	// This ensures we try to consume credits from the most available scanner first.
+	sort.Slice(scanners, func(i, j int) bool {
+		return scanners[i].ScanCredit > scanners[j].ScanCredit
+	})
+
+	for _, scanner := range scanners {
+		if scanner == nil {
+			log.Error("scanner is nil, skipping")
+			continue
+		}
+
+		if ScannerHealthCheckFunc != nil {
+			if err := ScannerHealthCheckFunc(scanner.ID, time.Second*10); err != nil {
+				log.WithFields(log.Fields{"scanner": scanner.ID, "error": err}).Error("Failed to ping scanner")
+				continue
+			}
+		}
+
+		selectedScanner, rev, err := m.GetScannerRev(scanner.ID)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "scanner": selectedScanner.ID}).Error("Failed to get scanner")
+			continue
+		}
+
+		// If the CAS is failed, try the next least loaded scanner
+		if selectedScanner.ScanCredit <= 0 {
+			continue
+		}
+
+		selectedScanner.ScanCredit--
+
+		// Update the scanner in KV store
+		key := share.CLUSScannerKey(selectedScanner.ID)
+		value, err := json.Marshal(selectedScanner)
+		if err != nil {
+			return nil, err
+		}
+
+		// If the CAS is failed, try the next least loaded scanner
+		if err := cluster.PutRev(key, value, rev); err != nil {
+			log.WithFields(log.Fields{"error": err, "scanner": selectedScanner.ID}).Error("Failed to update scanner credit")
+			continue
+		}
+
+		return selectedScanner, nil
+	}
+
+	return nil, share.ErrNoScannerAvailable
+}
+
+func (m clusterHelper) ReleaseScanCredit(scannerId string) error {
+	// Infinite retry loop to ensure credit is never lost
+	// This is critical because losing credits would cause scanner starvation
+	key := share.CLUSScannerKey(scannerId)
+	maxRetries := 10
+	for retry := 0; retry < maxRetries; retry++ {
+		// Get current scanner state with revision
+		value, rev, err := m.get(key)
+		if err != nil {
+			// Check if scanner was deleted (object not found)
+			if errors.Is(err, common.ErrObjectNotFound) {
+				// Scanner has been deleted - credit is implicitly released with the scanner
+				log.WithFields(log.Fields{"scanner": scannerId}).Debug("Scanner not found during credit release, likely deleted")
+				return nil
+			}
+
+			// Network error or other temporary failure - retry with backoff
+			log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Warn("Failed to get scanner, retrying")
+			continue
+		}
+
+		if value == nil {
+			// Scanner key exists but has no value - treat as deleted
+			log.WithFields(log.Fields{"scanner": scannerId}).Debug("Scanner not found during credit release, likely deleted")
+			return nil
+		}
+
+		var scanner share.CLUSScanner
+		if err := nvJsonUnmarshal(key, value, &scanner); err != nil {
+			log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Error("Failed to unmarshal scanner")
+			return err
+		}
+
+		// Increment credit, ensuring it doesn't exceed max
+		scanner.ScanCredit = min(scanner.ScanCredit+1, scanner.MaxConcurrentScansPerScanner)
+
+		// Attempt to update using CAS (PutRev)
+		value, err = json.Marshal(scanner)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Error("Failed to marshal scanner")
+			return err
+		}
+
+		// Use PutRev for atomic compare-and-swap
+		if err := cluster.PutRev(key, value, rev); err != nil {
+			if errors.Is(err, cluster.ErrPutCAS) {
+				// CAS failed - either revision mismatch or scanner was deleted
+				// Both cases are handled by retrying (scanner deletion will be caught in next iteration)
+				log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Warn("Failed to release scanner credit, retrying")
+				continue
+			}
+			return err
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("failed to release scanner credit after %d retries", maxRetries)
 }
 
 // Compliance Profile
