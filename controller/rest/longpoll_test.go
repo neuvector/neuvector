@@ -244,11 +244,14 @@ func TestNewJobWithLargeScaleConcurrency(t *testing.T) {
 	assert.Equal(t, 0, mgr.GetJobCount(), "Expected all jobs to be cleaned up after concurrency test")
 }
 
-// TestNewJobWithLargeScaleConcurrency tests when capacity is 0, make sure we get fail
+// TestJobQueueCapacityZero tests that when queue capacity is 0 and no workers are available,
+// attempting to add a job should immediately return an error.
+// We set poolSize to 0 to ensure no worker goroutines are listening on the channel,
+// which guarantees that the select statement in scheduleJobToQueue will hit the default case.
 func TestJobQueueCapacityZero(t *testing.T) {
 	mockTimeOut := 1 * time.Second
-	mockPoolSize := 1
-	mockJobQueueCapacity := 0
+	mockPoolSize := 0         // No workers to consume from the queue
+	mockJobQueueCapacity := 0 // Zero capacity channel
 	mockRetry := 1
 	mockStaleJobCleanupInterval := 10 * time.Second
 
@@ -257,9 +260,10 @@ func TestJobQueueCapacityZero(t *testing.T) {
 
 	mockTask := NewMockTask(taskResult, 100*time.Millisecond, nil)
 	// Attempt to add a job should immediately return an error
+	// because there's no buffer and no worker to receive
 	job, err := mgr.NewJob("key1", &mockTask, nil)
-	assert.Nil(t, job, "Expected no job to be created when queue capacity is zero")
-	assert.Equal(t, errTooManyJobs, err, "Expected errTooManyJobs when queue capacity is zero")
+	assert.Nil(t, job, "Expected no job to be created when queue capacity is zero and no workers")
+	assert.Equal(t, errTooManyJobs, err, "Expected errTooManyJobs when queue capacity is zero and no workers")
 }
 
 // TestShutdownResourceCleanup verifies that Shutdown correctly cleans up all resources,

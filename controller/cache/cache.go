@@ -1775,7 +1775,7 @@ func startWorkerThread(ctx *Context) {
 							}
 						} else {
 							// Ping external scanner, remove if no response after 3 tries.
-							if err := rpc.Ping(sid, scannerClearnupTimeout); err != nil {
+							if err := rpc.ScannerAcquisitionMgr.Ping(sid, scannerClearnupTimeout); err != nil {
 								log.WithFields(log.Fields{"scanner": sid, "error": err}).Error("Failed to ping scanner")
 								cache.errCount++
 								if cache.errCount >= scannerClearnupErrorMax {

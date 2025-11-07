@@ -590,7 +590,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 
 			ctx, cancel := context.WithTimeout(context.Background(), scannerConfigTimeout)
 			defer cancel()
-			err := rpc.ScanCreditMgr.RunTaskForEachScanner(func(client share.ScannerServiceClient) error {
+			err := rpc.ScannerAcquisitionMgr.RunTaskForEachScanner(func(client share.ScannerServiceClient) error {
 				_, err := client.SetScannerSettings(ctx, &share.ScannerSettings{
 					EnableTLSVerification: cfg.EnableTLSVerification,
 					CACerts:               strings.Join(cfg.GlobalCaCerts, "\n"),
