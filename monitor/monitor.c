@@ -80,7 +80,6 @@
 #define ENV_SCANNER_CTRL_PASS   "SCANNER_CTRL_API_PASSWORD"
 
 #define ENV_MAX_SCANNER_TASKS                      "MAX_SCANNER_TASKS"
-#define ENV_SCANNER_LB_MAX                         "SCANNER_LB_MAX"
 #define ENV_SCAN_JOB_QUEUE_CAPACITY                "SCAN_JOB_QUEUE_CAPACITY"
 #define ENV_SCAN_JOB_FAIL_RETRY_MAX                "SCAN_JOB_FAIL_RETRY_MAX"
 #define ENV_REPO_SCAN_LONG_POLL_TIMEOUT            "REPO_SCAN_LONG_POLL_TIMEOUT"
@@ -247,7 +246,7 @@ static pid_t fork_exec(int i)
     char *pwd_valid_unit, *rancher_ep, *debug_level, *policy_pull_period, *search_regs;
     char *telemetry_neuvector_ep, *telemetry_current_ver, *telemetry_freq, *csp_env, *csp_pause_interval;
     char *custom_check_control, *log_level, *key_rotation_period, *check_key_rotation_period;
-    char *max_scanner_tasks, *max_concurrent_repo_scan_tasks, *scanner_lb_max, *scan_job_queue_capacity, *scan_job_fail_retry_max, *repo_scan_long_poll_timeout, *stale_scan_job_cleanup_interval_hour;
+    char *max_scanner_tasks, *max_concurrent_repo_scan_tasks, *scan_job_queue_capacity, *scan_job_fail_retry_max, *repo_scan_long_poll_timeout, *stale_scan_job_cleanup_interval_hour;
     int a;
 
     switch (i) {
@@ -514,16 +513,12 @@ static pid_t fork_exec(int i)
         if ((stale_scan_job_cleanup_interval_hour = getenv(ENV_STALE_SCAN_JOB_CLEANUP_INTERVAL_HOUR)) != NULL) {
             args[a++] = "-stale_scan_job_cleanup_interval_hour";
             args[a++] = stale_scan_job_cleanup_interval_hour;
-        }        
+        }
         if ((repo_scan_long_poll_timeout = getenv(ENV_REPO_SCAN_LONG_POLL_TIMEOUT)) != NULL) {
             args[a++] = "-repo_scan_long_poll_timeout";
             args[a++] = repo_scan_long_poll_timeout;
-        }    
-        if ((scanner_lb_max = getenv(ENV_SCANNER_LB_MAX)) != NULL) {
-            args[a++] = "-scanner_lb_max";
-            args[a++] = scanner_lb_max;
         }
-        
+
         //  debug("Start %s, pid=%d\n", g_procs[i].name, g_procs[i].pid);
         args[a] = NULL;
         break;
