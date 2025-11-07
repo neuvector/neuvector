@@ -277,12 +277,11 @@ func main() {
 	autoProfile := flag.Int("apc", 1, "Enable auto profile collection")
 	custom_check_control := flag.String("cbench", share.CustomCheckControl_Disable, "Custom check control")
 	maxScannerTasks := flag.Int("max_scanner_tasks", 2, "Maximum number of concurrent tasks a scanner can handle")
-	maxConcurrentRepoScanTasks := flag.Int("max_concurrent_repo_scan_tasks", 32, "Maximum number of concurrent repository scan tasks")
+	maxConcurrentRepoScanTasks := flag.Int("max_concurrent_repo_scan_tasks", 6, "Maximum number of concurrent repository scan tasks")
 	scanJobQueueCapacity := flag.Int("scan_job_queue_capacity", 2048, "Capacity of the scan job queue for pending tasks")
 	scanJobFailRetryMax := flag.Int("scan_job_fail_retry_max", 5, "Maximum retry attempts for failed scan jobs")
 	staleScanJobCleanupIntervalHour := flag.Int("stale_scan_job_cleanup_interval_hour", 1, "Interval (in hours) for cleaning up stale scan jobs")
 	repoScanLongPollTimeout := flag.Int("repo_scan_long_poll_timeout", 30, "Timeout for long polling repository scan jobs")
-	scannerLBMax := flag.Int("scanner_lb_max", 128, "Maximum number of scanner per controller")
 	flag.Parse()
 
 	// default log_level is LogLevel_Info
@@ -357,9 +356,6 @@ func main() {
 	} else if *custom_check_control != share.CustomCheckControl_Disable {
 		*custom_check_control = share.CustomCheckControl_Disable
 	}
-
-	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
-	rpc.ScanCreditMgr = rpc.NewScanCreditManager(*maxScannerTasks, *scannerLBMax)
 
 	// Set global objects at the very first
 	platform, flavor, cloudPlatform, network, containers, err := global.SetGlobalObjects(*rtSock, resource.Register)
@@ -629,6 +625,10 @@ func main() {
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember,
 		getConfigKvData, evqueue, keyRotationDuration)
 	ruleid.Init()
+
+	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
+	// Initialize after kv.Init() to ensure clusterHelper is available
+	rpc.ScannerAcquisitionMgr = rpc.NewScannerAcquisitionManager(*maxScannerTasks, *maxConcurrentRepoScanTasks)
 
 	// Start cluster
 	clusterCfg := &cluster.ClusterConfig{
