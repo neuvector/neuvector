@@ -1,9 +1,16 @@
 package share
 
 import (
+	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+)
+
+// Scanner-related errors
+var (
+	ErrNoScannerFound     = errors.New("no scanner found")
+	ErrNoScannerAvailable = errors.New("no scanner available")
 )
 
 const DefaultCVEDBName = "cvedb"

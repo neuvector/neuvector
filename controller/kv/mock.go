@@ -3,12 +3,14 @@ package kv
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	log "github.com/sirupsen/logrus"
 )
 
 type mockLock struct {
@@ -31,6 +33,8 @@ func (l *mockLock) Key() string {
 
 type MockCluster struct {
 	ClusterHelper
+
+	mu sync.RWMutex // Protects all fields below
 
 	sysconfig            share.CLUSSystemConfig
 	customrolesCluster   map[string]*share.CLUSUserRole
@@ -62,6 +66,8 @@ type MockCluster struct {
 	mockKvRoleConfigUpdateFunc   MockKvConfigUpdateFunc
 	mockKvSystemConfigUpdateFunc MockKvConfigUpdateFunc
 	kv                           map[string]string
+
+	scanners map[string]*share.CLUSScanner
 }
 
 func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGroup) {
@@ -103,6 +109,8 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 	m.awsCloudResource = make(map[string]*share.CLUSAwsResource)
 	m.awsProjectCfg = make(map[string]*share.CLUSAwsProjectCfg)
 	m.kv = make(map[string]string)
+
+	m.scanners = make(map[string]*share.CLUSScanner)
 }
 
 func (m *MockCluster) AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error) {
@@ -492,6 +500,103 @@ func (m *MockCluster) SetCacheMockCallback(keyStore string, mockFunc MockKvConfi
 	}
 }
 
+// Scanner-related mock methods
+func (m *MockCluster) GetAvailableScanners() []*share.CLUSScanner {
+	var result []*share.CLUSScanner
+	for _, scanner := range m.scanners {
+		result = append(result, scanner)
+	}
+	return result
+}
+
+func (m *MockCluster) GetScannerRev(id string) (*share.CLUSScanner, uint64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if scanner, ok := m.scanners[id]; ok {
+		return scanner, 0, nil
+	}
+	return nil, 0, common.ErrObjectNotFound
+}
+
+func (m *MockCluster) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string, time.Duration) error) (*share.CLUSScanner, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if len(m.scanners) == 0 {
+		return nil, share.ErrNoScannerFound
+	}
+
+	maxScanCredits := -1
+	var selectedScanner *share.CLUSScanner
+	for _, scanner := range m.scanners {
+		if ScannerHealthCheckFunc != nil {
+			if err := ScannerHealthCheckFunc(scanner.ID, time.Second*10); err != nil {
+				log.WithFields(log.Fields{"scanner": scanner.ID, "error": err}).Error("Failed to ping scanner")
+				continue
+			}
+		}
+
+		if scanner.ScanCredit <= 0 {
+			continue
+		}
+
+		// Skip scanners that are at full capacity
+		// ScanCredit is the number of assigned tasks, so if it's >= max, scanner is full
+		if scanner.ScanCredit > maxScanCredits {
+			maxScanCredits = scanner.ScanCredit
+			selectedScanner = scanner
+		}
+	}
+
+	if selectedScanner == nil {
+		return nil, share.ErrNoScannerAvailable
+	}
+
+	// Increment the scan credit (assign a new task)
+	selectedScanner.ScanCredit = max(0, selectedScanner.ScanCredit-1)
+
+	return selectedScanner, nil
+}
+
+func (m *MockCluster) ReleaseScanCredit(scannerId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	scanner, ok := m.scanners[scannerId]
+	if !ok {
+		return common.ErrObjectNotFound
+	}
+
+	// Decrement credit (release a task), ensuring it doesn't go below 0
+	scanner.ScanCredit = min(scanner.ScanCredit+1, scanner.MaxConcurrentScansPerScanner)
+
+	return nil
+}
+
+// AddScanner adds a scanner to the mock cluster for testing
+func (m *MockCluster) AddScanner(scanner *share.CLUSScanner) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.scanners[scanner.ID] = scanner
+	return nil
+}
+
+// DeleteScanner deletes a scanner from the mock cluster (matches MockCluster interface)
+func (m *MockCluster) DeleteScanner(scannerID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.scanners, scannerID)
+	return nil
+}
+
+// RemoveScanner removes a scanner from the mock cluster for testing
+func (m *MockCluster) RemoveScanner(scannerID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.scanners, scannerID)
+}
+
 func (m *MockCluster) GetAwsCloudResource(projectName string) (*share.CLUSAwsResource, error) {
 	if r, ok := m.awsCloudResource[projectName]; ok {
 		clone := *r
@@ -562,13 +667,13 @@ func (m *MockCluster) DeleteApikey(name string) error {
 	}
 }
 
-func (m MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
+func (m *MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
 	value, _ := json.Marshal(cert)
 	m.kv[cn] = string(value)
 	return nil
 }
 
-func (m MockCluster) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
+func (m *MockCluster) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
 	v, ok := m.kv[cn]
 	// Only use existing value when index = 0.
 	// When index > 0 => force write.
@@ -592,7 +697,7 @@ func (m MockCluster) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out 
 	return nil
 }
 
-func (m MockCluster) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error) {
+func (m *MockCluster) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, error) {
 	out := share.CLUSX509Cert{}
 	v, ok := m.kv[cn]
 	if !ok {
