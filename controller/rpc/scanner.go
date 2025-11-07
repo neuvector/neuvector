@@ -443,7 +443,7 @@ func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.Scan
 func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInput) (*share.ScanResult, error) {
 	scanner, err := ScannerAcquisitionMgr.acquireScanner(ctx)
 	if err != nil {
-		return nil, err
+		return &share.ScanResult{Error: share.ScanErrorCode_ScanErrAcquireScannerTimeout}, err
 	}
 
 	req := &share.ScanAwsLambdaRequest{
