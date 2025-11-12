@@ -994,7 +994,10 @@ func handlerRegistryList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	} else {
 		query := restParseQuery(r)
-		scope := query.pairs[api.QueryScope] // empty string means fed & local groups
+		scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+		if err != nil {
+			return
+		}
 
 		list := scanner.GetAllRegistrySummary(scope, acc)
 		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })

@@ -25,15 +25,6 @@ type ProcessRuleIDHelper interface {
 
 type FuncGetGroupWithoutLock func(string) *share.CLUSGroup
 
-// local quick reference
-var cfgTypeMap2Api = map[share.TCfgType]string{
-	share.Learned:       api.CfgTypeLearned,
-	share.UserCreated:   api.CfgTypeUserCreated,
-	share.GroundCfg:     api.CfgTypeGround,
-	share.FederalCfg:    api.CfgTypeFederal,
-	share.SystemDefined: api.CfgSystemDefined, // reserved
-}
-
 // ///////
 const calculateInterval uint32 = 10
 
@@ -147,7 +138,7 @@ func pRule2ApiEntry(pRule *share.ProcRule) *api.RESTProcessUuidEntry {
 		Rule: api.RESTProcessProfileEntry{
 			Name:             pRule.Rule.Name,
 			Path:             pRule.Rule.Path,
-			CfgType:          cfgTypeMap2Api[pRule.Rule.CfgType],
+			CfgType:          common.TCfgTypeToApi(pRule.Rule.CfgType),
 			User:             pRule.Rule.User,
 			Uuid:             pRule.Rule.Uuid,
 			Action:           pRule.Rule.Action,

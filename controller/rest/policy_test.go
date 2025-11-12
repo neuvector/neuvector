@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 )
@@ -1404,7 +1405,7 @@ func TestPolicyRuleReplaceTime(t *testing.T) {
 			ID: rule1.ID, From: rule1.From, To: rule1.To, Action: rule1.Action,
 			Ports:        api.PolicyPortAny,
 			Applications: []string{"HTTP"},
-			CfgType:      cfgTypeMap2Api[rule1.CfgType],
+			CfgType:      common.TCfgTypeToApi(rule1.CfgType),
 		}
 		data := api.RESTPolicyRuleActionData{Rules: &[]*api.RESTPolicyRule{&rr1}}
 		body, _ := json.Marshal(data)

@@ -693,14 +693,20 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 func GetAdmRuleTypeOptions(ruleType string) *api.RESTAdmCatOptions {
 	if admRuleTypeOptions == nil {
 		admRuleTypeOptions = map[string]*api.RESTAdmCatOptions{
-			api.ValidatingDenyRuleType:   {},
-			api.ValidatingExceptRuleType: {},
+			api.ValidatingDenyRuleType:      {},
+			api.ValidatingExceptRuleType:    {},
+			share.FedAdmCtrlExceptRulesType: {},
+			share.FedAdmCtrlDenyRulesType:   {},
 		}
 		for _, admType := range admission.GetAdmissionCtrlTypes(share.PlatformKubernetes) {
 			switch admType {
 			case admission.NvAdmValidateType:
-				admRuleTypeOptions[api.ValidatingDenyRuleType].K8sOptions = &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sDenyRuleOptions()}
-				admRuleTypeOptions[api.ValidatingExceptRuleType].K8sOptions = &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sExceptRuleOptions()}
+				denyRuleOptions := &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sDenyRuleOptions()}
+				admRuleTypeOptions[api.ValidatingDenyRuleType].K8sOptions = denyRuleOptions
+				admRuleTypeOptions[share.FedAdmCtrlDenyRulesType].K8sOptions = denyRuleOptions
+				allowRuleOptions := &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sExceptRuleOptions()}
+				admRuleTypeOptions[api.ValidatingExceptRuleType].K8sOptions = allowRuleOptions
+				admRuleTypeOptions[share.FedAdmCtrlExceptRulesType].K8sOptions = allowRuleOptions
 			}
 		}
 	}

@@ -2262,9 +2262,11 @@ type CLUSCrdSecurityRule struct {
 	WafSensor       string                 `json:"waf_sensor,omitempty"`        // waf sensor defined in this crd security rule
 	VulnProfile     string                 `json:"vuln_profile,omitempty"`      // vulnerability profile defined in this crd security rule
 	CompProfile     string                 `json:"comp_profile,omitempty"`      // compliance profile defined in this crd security rule
+	FedConfig       string                 `json:"fed_config,omitempty"`        // fed system config(webhooks) defined in this crd security rule
 	Uid             string                 `json:"uid"`                         // metadata.uid in admissionreview CREATE request
 	CrdHash         string                 `json:"crd_hash"`                    // hex(sha256) of k8s crd resource metadata's name/namespace only
 	UpdatedAt       time.Time              `json:"updated_at"`
+	CfgType         TCfgType               `json:"cfgType"`
 }
 
 // Multi-Clusters (Federation)
@@ -2971,6 +2973,7 @@ const (
 	PREFIX_IMPORT_GROUP_POLICY = "group_import_"
 	PREFIX_IMPORT_ADMCTRL      = "admctrl_import_"
 	PREFIX_IMPORT_RESPONSE     = "response_import_"
+	PREFIX_IMPORT_FED_CONFIG   = "fed_config_import_"
 	PREFIX_IMPORT_DLP          = "dlp_import_"
 	PREFIX_IMPORT_WAF          = "waf_import_"
 	PREFIX_IMPORT_VULN_PROFILE = "vul_profile_import_" // for vulnerability profile
@@ -2982,6 +2985,7 @@ const (
 	IMPORT_TYPE_GROUP_POLICY = "group"
 	IMPORT_TYPE_ADMCTRL      = "admctrl"
 	IMPORT_TYPE_RESPONSE     = "response"
+	IMPORT_TYPE_FED_CONFIG   = "fed_config" // for fed config only
 	IMPORT_TYPE_DLP          = "dlp"
 	IMPORT_TYPE_WAF          = "waf"
 	IMPORT_TYPE_VULN_PROFILE = "vuln_profile" // for vulnerability profile
@@ -2998,6 +3002,7 @@ func CLUSImportOpKey(name string) string {
 type CLUSImportTask struct {
 	TID                    string              `json:"tid"`
 	ImportType             string              `json:"import_type"`
+	Scope                  string              `json:"scope"`
 	CtrlerID               string              `json:"ctrler_id"`
 	TempFilename           string              `json:"temp_filename"`
 	Status                 string              `json:"status"`
@@ -3042,6 +3047,7 @@ const (
 	ReviewTypeImportGroup       // interactive import
 	ReviewTypeImportAdmCtrl     // interactive import
 	ReviewTypeImportResponse    // interactive import
+	ReviewTypeImportFedConfig   // interactive import
 	ReviewTypeImportDLP         // interactive import
 	ReviewTypeImportWAF         // interactive import
 	ReviewTypeImportVulnProfile // interactive import vulnerability profile
@@ -3053,6 +3059,7 @@ const (
 	ReviewTypeDisplayGroup       = "Group Policy"                       // interactive import
 	ReviewTypeDisplayAdmission   = "Admission Control Configurations"   // interactive import
 	ReviewTypeDisplayResponse    = "Non-group-dependent response rules" // interactive import
+	ReviewTypeDisplayFedConfig   = "Federal Config"                     // interactive import
 	ReviewTypeDisplayDLP         = "DLP Configurations"                 // interactive import
 	ReviewTypeDisplayWAF         = "WAF Configurations"                 // interactive import
 	ReviewTypeDisplayVulnProfile = "Vulnerability Profile"              // interactive import

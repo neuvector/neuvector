@@ -119,7 +119,7 @@ func complianceProfile2REST(ccp *share.CLUSComplianceProfile) *api.RESTComplianc
 		Name:          ccp.Name,
 		DisableSystem: ccp.DisableSystem,
 		Entries:       make([]api.RESTComplianceProfileEntry, len(ccp.Entries)),
-		CfgType:       cfgTypeMapping[ccp.CfgType],
+		CfgType:       common.TCfgTypeToApi(ccp.CfgType),
 	}
 
 	i := 0

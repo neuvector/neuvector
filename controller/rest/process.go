@@ -93,7 +93,10 @@ func handlerProcessProfileList(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	query := restParseQuery(r)
-	scope := query.pairs[api.QueryScope] // empty string means fed & local process profiles
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 
 	var resp api.RESTProcessProfilesData
 	resp.Profiles = make([]*api.RESTProcessProfile, 0)
@@ -276,6 +279,11 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 	if profile == nil {
 		log.WithFields(log.Fields{"group": group}).Error("Get profile failed!")
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
+		return
+	}
+
+	if profile.CfgType == share.GroundCfg {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 		return
 	}
 

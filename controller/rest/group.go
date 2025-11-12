@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -60,8 +61,10 @@ func handlerGroupBrief(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	query := restParseQuery(r)
-
-	scope := query.pairs[api.QueryScope] // empty string means fed & local groups
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 
 	var resp api.RESTGroupsBriefData
 	resp.Groups = make([]*api.RESTGroupBrief, 0)
@@ -163,7 +166,10 @@ func handlerGroupList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	if value, ok := query.pairs[api.QueryKeyView]; ok && value == api.QueryValueViewPod {
 		view = api.QueryValueViewPod
 	}
-	scope := query.pairs[api.QueryScope] // empty string means fed & local groups
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 
 	var resp api.RESTGroupsData
 	resp.Groups = make([]*api.RESTGroup, 0)
@@ -283,7 +289,7 @@ func validateAddressRange(ipRange string) error {
 	ip, ipr := utils.ParseIPRange(ipRange)
 	if ip == nil || ipr == nil || bytes.Compare(ip, ipr) > 0 {
 		e := "Invalid IP range"
-		return fmt.Errorf("%s", e)
+		return errors.New(e)
 	}
 	return nil
 }
@@ -303,24 +309,23 @@ func validateDomainName(name string) bool {
 		((len(name) < api.PolicyDomainNameMaxLen+len(api.AddrGrpValVhPrefix)) && (regVhDomain.MatchString(name) || regVhSubDomain.MatchString(name))))
 }
 
-// check for non-fed groups only
 func isReservedGroupName(name string) bool {
 	return strings.HasPrefix(name, api.LearnedGroupPrefix) ||
 		strings.HasPrefix(name, api.LearnedHostPrefix) ||
 		strings.HasPrefix(name, api.LearnedWorkloadPrefix) ||
-		strings.HasPrefix(name, api.FederalGroupPrefix) ||
 		isDefaultGroup(name)
 }
 
 func isDefaultGroup(name string) bool {
-	return name == api.LearnedExternal || name == api.AllHostGroup || name == api.AllContainerGroup
+	groups := utils.NewSet(api.LearnedExternal, api.AllHostGroup, api.AllContainerGroup, api.FedAllHostGroup, api.FedAllContainerGroup)
+	return groups.Contains(name)
 }
 
 func isReservedNvGroupDefName(name string) bool {
 	if isDefaultGroup(name) || name == api.WorkloadTunnelIF {
 		return true
 	} else {
-		prefix := []string{api.LearnedHostPrefix, api.LearnedWorkloadPrefix, api.FederalGroupPrefix}
+		prefix := []string{api.LearnedHostPrefix, api.LearnedWorkloadPrefix}
 		for _, p := range prefix {
 			if strings.HasPrefix(name, p) {
 				return true
@@ -1779,7 +1784,7 @@ func handlerGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	_importHandler(w, r, tid, share.IMPORT_TYPE_GROUP_POLICY, share.PREFIX_IMPORT_GROUP_POLICY, acc, login)
+	_importHandler(w, r, tid, share.IMPORT_TYPE_GROUP_POLICY, share.PREFIX_IMPORT_GROUP_POLICY, share.PERMS_RUNTIME_POLICIES, acc, login)
 }
 
 func handlerGetGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1936,7 +1941,8 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 }
 
 // if there are multiple yaml documents(separated by "---" line) in the yaml file, only the first document is parsed for import
-func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
+func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
+	postImportOp kv.PostImportFunc, acc *access.AccessControl, login *loginSession) error {
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
@@ -1949,7 +1955,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 	if err != nil {
 		msg := "Failed to read/parse the imported file"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_GROUP_POLICY)
 		return nil
 	} else if len(secRules) == 0 {
 		log.Info("no security rule in yaml")
@@ -1975,12 +1981,21 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		defer crdHandler.ReleaseLock()
 
 		for _, nvGrpDef := range nvGrpDefs {
-			if grpDefRet, errCount, errMsg := crdHandler.parseCurCrdGrpDefContent(&nvGrpDef, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
-				err = fmt.Errorf("%s", errMsg)
+			grpDefRet, errCount, errMsg := crdHandler.parseCurCrdGrpDefContent(&nvGrpDef, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup)
+			if errCount > 0 {
+				err = errors.New(errMsg)
 				break
-			} else if grpDefRet != nil && !isReservedNvGroupDefName(grpDefRet.TargetName) {
-				log.WithFields(log.Fields{"group": grpDefRet.TargetName}).Debug()
-				parsedGrpDefs[grpDefRet.TargetName] = grpDefRet
+			}
+			if (importTask.Scope == share.ScopeFed && grpDefRet.CfgType != share.FederalCfg) ||
+				(importTask.Scope == share.ScopeLocal && grpDefRet.CfgType != share.UserCreated) {
+				err = fmt.Errorf("Group definition %s is not allowed for import with scope=%s", grpDefRet.TargetName, importTask.Scope)
+				break
+			}
+			if grpDefRet != nil {
+				if !isReservedNvGroupDefName(grpDefRet.TargetName) {
+					log.WithFields(log.Fields{"group": grpDefRet.TargetName}).Debug()
+					parsedGrpDefs[grpDefRet.TargetName] = grpDefRet
+				}
 			}
 		}
 		if err != nil {
@@ -1992,6 +2007,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		progress += inc
 		importTask.Percentage = int(progress)
 		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		updatedFedRuleTypes := utils.NewSet(share.FedGroupType, share.FedNetworkRulesType)
 
 		// The following code does the same job as crdGFwRuleProcessRecord(grpCfgRet, resource.NvSecurityRuleKind, namebase)
 		// It processes the group and network rule list parsed from the import payload yaml
@@ -2003,13 +2019,18 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 		// ---------------------------------------------------
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			if grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(&secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup); errCount > 0 {
-				err = fmt.Errorf("%s", errMsg)
+			grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(&secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup)
+			if errCount > 0 {
+				err = errors.New(errMsg)
 				break
-			} else {
-				log.WithFields(log.Fields{"target": grpCfgRet.TargetName, "len": len(grpCfgRet.GroupCfgs)}).Debug()
-				parsedGrpCfg = append(parsedGrpCfg, grpCfgRet)
 			}
+			if (importTask.Scope == share.ScopeFed && grpCfgRet.CfgType != share.FederalCfg) ||
+				(importTask.Scope == share.ScopeLocal && grpCfgRet.CfgType != share.UserCreated) {
+				err = fmt.Errorf("Group %s is not allowed for import with scope=%s", grpCfgRet.TargetName, importTask.Scope)
+				break
+			}
+			log.WithFields(log.Fields{"target": grpCfgRet.TargetName, "len": len(grpCfgRet.GroupCfgs)}).Debug()
+			parsedGrpCfg = append(parsedGrpCfg, grpCfgRet)
 		}
 
 		progress += inc
@@ -2021,10 +2042,11 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 			var hasDlpWafSetting bool
 			targetGroupDlpWAF := make(map[string]bool, len(parsedGrpCfg))
 			targetGroups := make([]string, 0, len(parsedGrpCfg))
+			oneSuccess := false
 			// [2]: import all non-reserved groups referenced in the yaml file
 			for _, grpCfgRet := range parsedGrpCfg {
 				// do same job as crdHandleGroupsAdd(crdCfgRet.GroupCfgs) but only import target group
-				if updatedGroups, hasDlpWafSetting, err = importGroup(scope, grpCfgRet.TargetName, grpCfgRet.GroupCfgs); err == nil {
+				if updatedGroups, hasDlpWafSetting, err = importGroup(importTask.Scope, grpCfgRet.TargetName, grpCfgRet.GroupCfgs); err == nil {
 					targetGroupDlpWAF[grpCfgRet.TargetName] = hasDlpWafSetting
 					if updatedGroups.Contains(grpCfgRet.TargetName) {
 						targetGroups = append(targetGroups, grpCfgRet.TargetName)
@@ -2056,6 +2078,7 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 					var policyMode string
 					var profileMode string
 					var baseline string
+
 					if grpCfgRet.PolicyModeCfg != nil && grpCfgRet.PolicyModeCfg.PolicyMode != nil {
 						policyMode = *grpCfgRet.PolicyModeCfg.PolicyMode
 						crdRecord.PolicyMode = policyMode
@@ -2069,18 +2092,22 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 							ProcessProfile: &share.CLUSCrdProcessProfile{Baseline: grpCfgRet.ProcessProfileCfg.Baseline},
 							ProcessRules:   crdHandler.crdGetProcessRules(grpCfgRet.ProcessProfileCfg),
 							FileRules:      crdHandler.crdGetFileRules(grpCfgRet.FileProfileCfg),
+							CfgType:        grpCfgRet.CfgType,
 						}
 					}
 
 					// do same job as crdHandleNetworkRules(crdCfgRet.RuleCfgs, crdRecord)
-					importGroupNetworkRules(grpCfgRet.RuleCfgs)
+					importGroupNetworkRules(grpCfgRet.RuleCfgs, grpCfgRet.CfgType)
 
 					if len(grpCfgRet.GroupResponseCfg) > 0 {
 						//  import response rules for this group
 						grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
 							grpCfgRet.TargetName: grpCfgRet.GroupResponseCfg,
 						}
-						_, _ = crdHandler.crdHandleGroupResponseRules(scope, grpResponseCfg, share.UserCreated)
+						_, _ = crdHandler.crdHandleGroupResponseRules(importTask.Scope, grpResponseCfg, grpCfgRet.CfgType)
+						if importTask.Scope == share.ScopeFed {
+							updatedFedRuleTypes.Add(share.FedResponseRulesType)
+						}
 					}
 
 					if crdRecord.ProfileName != "" && utils.HasGroupProfiles(crdRecord.ProfileName) {
@@ -2101,9 +2128,9 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 
 						txn := cluster.Transact()
 						// [5-4]: import dlp group data
-						crdHandler.crdHandleDlpGroup(txn, grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, share.UserCreated)
+						crdHandler.crdHandleDlpGroup(txn, grpCfgRet.TargetName, grpCfgRet.DlpGroupCfg, grpCfgRet.CfgType)
 						// [5-5]: import waf group data
-						crdHandler.crdHandleWafGroup(txn, grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, share.UserCreated)
+						crdHandler.crdHandleWafGroup(txn, grpCfgRet.TargetName, grpCfgRet.WafGroupCfg, grpCfgRet.CfgType)
 						if ok, err := txn.Apply(); err != nil || !ok {
 							log.WithFields(log.Fields{"ok": ok, "error": err}).Error("Atomic write to the cluster failed")
 						}
@@ -2118,6 +2145,10 @@ func importGroupPolicy(scope string, loginDomainRoles access.DomainRole, importT
 				progress += inc
 				importTask.Percentage = int(progress)
 				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+				if importTask.Scope == share.ScopeFed && oneSuccess && updatedFedRuleTypes.Cardinality() > 0 {
+					updateFedRulesRevision(updatedFedRuleTypes.ToStringSlice(), acc, login)
+				}
 			}
 		}
 	}
@@ -2188,6 +2219,8 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 			cg.CfgType = share.UserCreated
 			if utils.IsGroupLearned(group.Name) {
 				cg.CfgType = share.Learned
+			} else if scope == share.ScopeFed {
+				cg.CfgType = share.FederalCfg
 			}
 		}
 		cg.Criteria = make([]share.CLUSCriteriaEntry, 0, len(groupCriteria))
@@ -2251,7 +2284,8 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 	return updatedGroups, targetGroupDlpWAF, err
 }
 
-func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
+// for import thru REST API only
+func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig, cfgType share.TCfgType) {
 	if len(rulesCfg) == 0 {
 		return
 	}
@@ -2260,17 +2294,31 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 	// so all imported network rules are treated as "user created"
 	var cr *share.CLUSPolicyRule
 	crhs := clusHelper.GetPolicyRuleList()
-	idsUserCreated := utils.NewSet() // ids used by existing user-created rules
-	startIdx := 0                    // the idx of first non-fed/non-crd rule in crhs
+	idsInUse := utils.NewSet() // ids used by existing user-created or fed rules
+	// startIdx: the idx of
+	// 1. for importing local rules, first non-fed/non-crd rule in crhs, or
+	// 2. for importing fed rules, first non-fed-crd rule in crhs
+	startIdx := 0
 	startFound := false
 	for i, crh := range crhs {
-		if crh.CfgType == share.Learned || crh.CfgType == share.UserCreated {
-			if crh.CfgType == share.UserCreated {
-				idsUserCreated.Add(crh.ID)
+		switch cfgType {
+		case share.UserCreated:
+			if crh.CfgType == share.Learned || crh.CfgType == share.UserCreated {
+				if crh.CfgType == share.UserCreated {
+					idsInUse.Add(crh.ID)
+				}
+				if !startFound {
+					startIdx = i
+					startFound = true
+				}
 			}
-			if !startFound {
-				startIdx = i
-				startFound = true
+		case share.FederalCfg:
+			if crh.CfgType == share.FederalCfg {
+				idsInUse.Add(crh.ID)
+				if !startFound {
+					startIdx = i
+					startFound = true
+				}
 			}
 		}
 	}
@@ -2285,18 +2333,18 @@ func importGroupNetworkRules(rulesCfg []api.RESTPolicyRuleConfig) {
 
 	var hasError bool
 	for _, ruleConf := range rulesCfg {
-		ruleConf.ID = common.GetAvailablePolicyID(idsUserCreated, share.UserCreated)
-		idsUserCreated.Add(ruleConf.ID)
+		ruleConf.ID = common.GetAvailablePolicyID(idsInUse, cfgType)
+		idsInUse.Add(ruleConf.ID)
 
 		cr = &share.CLUSPolicyRule{
 			ID:        ruleConf.ID,
 			CreatedAt: time.Now().UTC(),
 			Disable:   false,
-			CfgType:   share.UserCreated,
+			CfgType:   cfgType,
 		}
 		newRules = append(newRules, &share.CLUSRuleHead{
 			ID:      ruleConf.ID,
-			CfgType: share.UserCreated,
+			CfgType: cfgType,
 			//Priority: ruleConf.Priority,
 		})
 

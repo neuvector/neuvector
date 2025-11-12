@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,11 +31,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-// const (
-// 	_writeHeader   = true
-// 	_noWriteHeader = false
-// )
-
 type admissionRequestObject struct {
 	ApiVersion string            `json:"apiVersion,omitempty"`
 	Kind       string            `json:"kind,omitempty"`
@@ -62,9 +58,10 @@ func getAdmCtrlRuleTypes(query *restQuery, defScope string) ([]string, string) {
 }
 
 func getRuleId(w http.ResponseWriter, ps httprouter.Params) (uint32, error) {
-	id, err := strconv.Atoi(ps.ByName("id"))
-	if err != nil || id <= 0 || id > 4294967295 {
-		log.WithFields(log.Fields{"id": id}).Error("Invalid ID")
+	idStr := ps.ByName("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		log.WithFields(log.Fields{"id": idStr}).Error("Invalid ID")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return 0, common.ErrObjectNotFound
 	}
@@ -287,17 +284,13 @@ func getAdmissionRule(id uint32, acc *access.AccessControl) (*api.RESTAdmissionR
 func applyTransact(w http.ResponseWriter, txn *cluster.ClusterTransact) error {
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
-		if w != nil {
-			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		}
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return err
 	} else if !ok {
 		e := "Atomic write to the cluster failed"
 		log.Error(e)
-		if w != nil {
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, e)
-		}
-		return fmt.Errorf("%s", e)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, e)
+		return errors.New(e)
 	}
 	return nil
 }
@@ -841,7 +834,7 @@ func handlerGetAdmissionRules(w http.ResponseWriter, r *http.Request, ps httprou
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get admission control rules list")
 }
 
-// caller must own CLUSLockAdmCtrlKey lock
+// caller must own CLUSLockAdmCtrlKey lock. only for REST api caller
 func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []string, acc *access.AccessControl) ([]string, error) {
 	type delRulesMetadata struct {
 		delRules     utils.Set             // id of rules to delete
@@ -1414,17 +1407,30 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
+	// special case for exporting admission control rules:
+	// all exported rules are id-independent which means scope parameter doesn't affect what rules can be exported
+	scope, err := checkExportScope(w, r, share.IMPORT_TYPE_ADMCTRL, login)
+	if err != nil {
+		return
+	}
+
 	var rconf api.RESTAdmCtrlRulesExport
 	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
 
+	exportFileName := "cfgAdmissionRulesExport.yaml"
+	exportType := "admission control settings"
+	if scope == share.ScopeFed {
+		exportFileName = "cfgFedAdmissionRulesExport.yaml"
+		exportType = "federal admission control rules"
+	}
+
 	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, resource.NvAdmCtrlSecurityRuleVersion)
-	metadatadName := share.ScopeLocal
 	kind := resource.NvAdmCtrlSecurityRuleKind
 	resp := resource.NvAdmCtrlSecurityRule{
 		TypeMeta: metav1.TypeMeta{
@@ -1432,7 +1438,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			Kind:       kind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: metadatadName,
+			Name: scope,
 		},
 		Spec: api.NvSecurityAdmCtrlSpec{},
 	}
@@ -1440,7 +1446,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	enable := false
 	mode := share.AdmCtrlModeProtect
 	admClientMode := share.AdmClientModeSvc
-	if rconf.ExportConfig {
+	if rconf.ExportConfig && scope == share.ScopeLocal {
 		// export admission control config
 		if k8sPlatform {
 			state, err := cacher.GetAdmissionState(acc)
@@ -1493,7 +1499,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 				Action:   action,
 				Criteria: rule.Criteria,
 			}
-			if rule.Critical {
+			if rule.Critical && scope == share.ScopeLocal {
 				ruleItem.ID = &rule.ID
 			}
 			ruleItem.ConversionIdRef = &rule.ID
@@ -1515,7 +1521,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		resp.Spec.Rules = admissionRules
 	}
 
-	doExport("cfgAdmissionRulesExport.yaml", "admission control settings", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport(exportFileName, exportType, rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerAdmCtrlImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1531,10 +1537,11 @@ func handlerAdmCtrlImport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	tid := r.Header.Get("X-Transaction-ID")
-	_importHandler(w, r, tid, share.IMPORT_TYPE_ADMCTRL, share.PREFIX_IMPORT_ADMCTRL, acc, login)
+	_importHandler(w, r, tid, share.IMPORT_TYPE_ADMCTRL, share.PREFIX_IMPORT_ADMCTRL, share.PERM_ADM_CONTROL, acc, login)
 }
 
-func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
+func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
+	postImportOp kv.PostImportFunc, acc *access.AccessControl, login *loginSession) error {
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
@@ -1543,7 +1550,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
 		return nil
 	}
 
@@ -1566,21 +1573,23 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 		// [1] parse security rule in the yaml file
 		parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdAdmCtrlContent(&secRule, share.ReviewTypeImportAdmCtrl, share.ReviewTypeDisplayAdmission)
 		if errCount > 0 {
-			err = fmt.Errorf("%s", errMsg)
+			err = errors.New(errMsg)
+		} else if (importTask.Scope == share.ScopeFed && parsedCfg.CfgType != share.FederalCfg) ||
+			(importTask.Scope == share.ScopeLocal && parsedCfg.CfgType != share.UserCreated) {
+			err = fmt.Errorf("Admission control security rule %s is not allowed for import with scope=%s", secRule.GetName(), importTask.Scope)
 		} else {
 			progress += inc
 			importTask.Percentage = int(progress)
 			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
-			acc := access.NewAdminAccessControl()
 			// [2] import admission control configuration described in the yaml file
-			if k8sPlatform && parsedCfg.AdmCtrlCfg != nil {
+			if k8sPlatform && parsedCfg.AdmCtrlCfg != nil && importTask.Scope == share.ScopeLocal {
 				var currState *api.RESTAdmissionState
 				if currState, err = cacher.GetAdmissionState(acc); err == nil {
 					if currState.CfgType == api.CfgTypeGround {
-						err = fmt.Errorf("%s", restErrMessage[api.RESTErrOpNotAllowed])
+						err = errors.New(restErrMessage[api.RESTErrOpNotAllowed])
 					} else {
-						err = crdHandler.crdHandleAdmCtrlConfig(scope, parsedCfg.AdmCtrlCfg, nil, share.ReviewTypeImportAdmCtrl)
+						err = crdHandler.crdHandleAdmCtrlConfig(parsedCfg.CfgType, parsedCfg.AdmCtrlCfg, nil, share.ReviewTypeImportAdmCtrl)
 					}
 				}
 				if err != nil {
@@ -1592,8 +1601,13 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 			}
 			if err == nil && parsedCfg.AdmCtrlRulesCfg != nil {
 				// [3] delete all user-created non-default admission control rules
-				ruleTypeKeys := []string{api.ValidatingExceptRuleType, api.ValidatingDenyRuleType}
-				if _, err = deleteAdmissionRules(nil, scope, ruleTypeKeys, acc); err != nil {
+				ruleTypeKeys := make([]string, 0, 2)
+				if importTask.Scope == share.ScopeLocal {
+					ruleTypeKeys = append(ruleTypeKeys, api.ValidatingExceptRuleType, api.ValidatingDenyRuleType)
+				} else {
+					ruleTypeKeys = append(ruleTypeKeys, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType)
+				}
+				if _, err = deleteAdmissionRules(nil, importTask.Scope, ruleTypeKeys, acc); err != nil {
 					importTask.Status = err.Error()
 				}
 				progress += inc
@@ -1602,7 +1616,7 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 				if err == nil && len(parsedCfg.AdmCtrlRulesCfg) > 0 {
 					var cacheRecord share.CLUSCrdSecurityRule
 					// [4] import all admission control rules defined in the yaml file
-					crdHandler.crdHandleAdmCtrlRules(scope, parsedCfg.AdmCtrlRulesCfg, &cacheRecord, share.ReviewTypeImportAdmCtrl)
+					crdHandler.crdHandleAdmCtrlRules(parsedCfg.CfgType, parsedCfg.AdmCtrlRulesCfg, &cacheRecord, share.ReviewTypeImportAdmCtrl)
 					progress += inc
 					importTask.Percentage = int(progress)
 					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
@@ -1610,6 +1624,10 @@ func importAdmCtrl(scope string, loginDomainRoles access.DomainRole, importTask 
 			}
 			importTask.Percentage = 90
 			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+			if err == nil && importTask.Scope == share.ScopeFed && len(parsedCfg.AdmCtrlRulesCfg) > 0 {
+				updateFedRulesRevision([]string{share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType}, acc, login)
+			}
 		}
 	}
 

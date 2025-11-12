@@ -279,9 +279,7 @@ func lockClusKey(w http.ResponseWriter, key string) (cluster.LockInterface, erro
 	lock, err := clusHelper.AcquireLock(key, clusterLockWait)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "key": key}).Error("Failed to acquire cluster lock")
-		if w != nil {
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
-		}
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, err.Error())
 		return nil, err
 	} else {
 		return lock, err
@@ -1079,6 +1077,7 @@ func cleanFedRules() {
 		RuleHeads: make([]*share.CLUSRuleHead, 0),
 	}
 	replaceFedResponseRules(resRulesData.Rules, resRulesData.RuleHeads)
+	deleteFedConfig(access.NewFedAdminAccessControl())
 
 	deleteFedGroupPolicy()
 	deleteFedDlpGroupSensors()
@@ -1227,6 +1226,10 @@ func updateClusterState(id, masterClusterID string, status int, cspUsage *share.
 }
 
 func notifyDeployFedRules(acc *access.AccessControl, login *loginSession) {
+	userName := common.ReservedFedUser
+	if login != nil {
+		userName = login.fullname
+	}
 	myDeployCount := atomic.AddUint32(&_fedDeployCount, 1)
 	time.Sleep(time.Second * 10)
 	newDeployCount := atomic.LoadUint32(&_fedDeployCount)
@@ -1243,7 +1246,7 @@ func notifyDeployFedRules(acc *access.AccessControl, login *loginSession) {
 		reqTo := api.RESTFedInternalCommandReq{
 			FedKvVersion: kv.GetFedKvVer(),
 			Command:      _cmdPollFedRules,
-			User:         login.fullname, // user on master cluster who changes the fed rules settings
+			User:         userName, // user on master cluster who changes the fed rules settings
 			Revisions:    cacher.GetAllFedRulesRevisions(),
 		}
 		for id, disabled := range ids {
@@ -3586,6 +3589,12 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					"/v1/file/vulnerability/profile/config",
 				})
 				if importURIs.Contains(request) {
+					query := restParseQuery(r)
+					if scope, _ := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal); scope != share.ScopeLocal {
+						log.WithFields(log.Fields{"scope": scope}).Error()
+						restRespError(w, http.StatusForbidden, api.RESTErrOpNotAllowed)
+						return
+					}
 					txnID = r.Header.Get("X-Transaction-ID")
 				}
 			}

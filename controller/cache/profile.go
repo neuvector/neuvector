@@ -228,9 +228,9 @@ func (m *CacheMethod) GetProcessProfile(group string, acc *access.AccessControl)
 				AllowFileUpdate:  gproc.AllowFileUpdate,
 				CreatedTimeStamp: gproc.CreatedAt.Unix(),
 				UpdatedTimeStamp: gproc.UpdatedAt.Unix(),
+				CfgType:          common.TCfgTypeToApi(gproc.CfgType),
 			}
 
-			proc.CfgType = cfgTypeMapping[gproc.CfgType]
 			resp.ProcessList = append(resp.ProcessList, proc)
 
 			// store for reference
@@ -294,9 +294,9 @@ func (m *CacheMethod) GetAllProcessProfile(scope string, acc *access.AccessContr
 					AllowFileUpdate:  gproc.AllowFileUpdate,
 					CreatedTimeStamp: gproc.CreatedAt.Unix(),
 					UpdatedTimeStamp: gproc.UpdatedAt.Unix(),
+					CfgType:          common.TCfgTypeToApi(gproc.CfgType),
 				}
 
-				proc.CfgType = cfgTypeMapping[gproc.CfgType]
 				resp.ProcessList = append(resp.ProcessList, proc)
 			}
 			if getLocal && p.CfgType != share.FederalCfg {

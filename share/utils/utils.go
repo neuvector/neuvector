@@ -1209,10 +1209,11 @@ func UnsetReady() error {
 
 // Utilities: find group attribute from the grou's name definitions, based on controller/api/apis.go
 var CfgTypeToApiMapping = map[share.TCfgType]string{
-	share.Learned:     api.CfgTypeLearned,
-	share.UserCreated: api.CfgTypeUserCreated,
-	share.GroundCfg:   api.CfgTypeGround,
-	share.FederalCfg:  api.CfgTypeFederal,
+	share.Learned:       api.CfgTypeLearned,
+	share.UserCreated:   api.CfgTypeUserCreated,
+	share.GroundCfg:     api.CfgTypeGround,
+	share.FederalCfg:    api.CfgTypeFederal,
+	share.SystemDefined: api.CfgSystemDefined,
 }
 
 func IsGroupLearned(name string) bool {

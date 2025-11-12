@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/neuvector/neuvector/controller/access"
 	"io"
 	"net/http"
 	"strings"
@@ -17,7 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
+	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
 	"github.com/neuvector/neuvector/controller/resource"
@@ -137,13 +138,13 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 								Disabled:       assessResult.Disabled,
 								Mode:           assessResult.RuleMode,
 								RuleDetails:    assessResult.RuleDetails,
+								RuleCfgType:    common.TCfgTypeToApi(assessResult.RuleCfgType),
 							}
 							if assessResult.IsDenyRuleType {
 								matchedRule.Type = api.ValidatingDenyRuleType
 							} else {
 								matchedRule.Type = api.ValidatingAllowRuleType
 							}
-							matchedRule.RuleCfgType = cfgTypeMap2Api[assessResult.RuleCfgType]
 							matchedRules = append(matchedRules, matchedRule)
 						}
 						oneResult.MatchedRules = matchedRules
