@@ -27,14 +27,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-var cfgTypeMap2Api = map[share.TCfgType]string{
-	share.Learned:       api.CfgTypeLearned,
-	share.UserCreated:   api.CfgTypeUserCreated,
-	share.GroundCfg:     api.CfgTypeGround,
-	share.FederalCfg:    api.CfgTypeFederal,
-	share.SystemDefined: api.CfgSystemDefined,
-}
-
 var cfgTypeMapping = map[string]share.TCfgType{
 	api.CfgTypeLearned:     share.Learned,
 	api.CfgTypeUserCreated: share.UserCreated,
@@ -86,7 +78,10 @@ func handlerPolicyRuleList(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	query := restParseQuery(r)
-	scope := query.pairs[api.QueryScope] // empty string means fed & local rules
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 
 	var resp api.RESTPolicyRulesData
 	resp.Rules = make([]*api.RESTPolicyRule, 0)
@@ -503,8 +498,8 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 		Applications: appNames2IDs(r.Applications),
 		Action:       r.Action,
 		Disable:      r.Disable,
+		CfgType:      cfgTypeMapping[r.CfgType],
 	}
-	rule.CfgType = cfgTypeMapping[r.CfgType]
 	return rule
 }
 
@@ -608,14 +603,14 @@ func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgTyp
 	if moveIdx == -1 {
 		e := "Rule to move doesn't exist"
 		log.WithFields(log.Fields{"move": id}).Error(e)
-		return fmt.Errorf("%s", e)
+		return errors.New(e)
 	}
 
 	toIdx, af := locatePosition(crhs, after, moveIdx)
 	if toIdx == -1 {
 		e := "Move-to position cannot be found"
 		log.WithFields(log.Fields{"after": af}).Error(e)
-		return fmt.Errorf("%s", e)
+		return errors.New(e)
 	}
 	if bottomIdx == -1 {
 		bottomIdx = len(crhs) - 1
@@ -672,7 +667,7 @@ func movePolicyRule(w http.ResponseWriter, r *http.Request, move *api.RESTPolicy
 		e := "Policy rule doesn't exist"
 		log.WithFields(log.Fields{"move": move.ID}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf("%s", e), 0
+		return errors.New(e), 0
 	}
 
 	if move.After != nil && *move.After != 0 && *move.After == int(move.ID) {
@@ -750,7 +745,7 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"scope": scope, "after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return fmt.Errorf("%s", e)
+		return errors.New(e)
 	}
 
 	if toIdx < topIdx {
@@ -778,19 +773,19 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 			e := "Mismatched rule CfgType with request"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf("%s", e)
+			return errors.New(e)
 		}
 		if ids.Contains(rr.ID) {
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf("%s", e)
+			return errors.New(e)
 		}
 		if cfgType == share.Learned || cfgType == share.GroundCfg {
 			e := "Cannot create learned/Base policy rule"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-			return fmt.Errorf("%s", e)
+			return errors.New(e)
 		}
 		if e := isLocalReservedId(rr.ID); e != nil {
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
@@ -1027,7 +1022,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	for _, rr := range rules {
 		if rr.CfgType == "" { // CfgType is not specified in new rule. deduce from scope
 			if rr.From == "" && rr.To == "" {
-				rr.CfgType = cfgTypeMap2Api[common.PolicyRuleIdToCfgType(rr.ID)]
+				rr.CfgType = common.TCfgTypeToApi(common.PolicyRuleIdToCfgType(rr.ID))
 			} else {
 				if rr.Learned {
 					rr.CfgType = api.CfgTypeLearned
@@ -1057,7 +1052,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		return false
 	})
 
-	// 2. get all IDs in rules param that need to referenced by auto ID generation, so auto ID generation will not create duplicate ID
+	// 2. get all IDs in rules param that need to be referenced by auto ID generation, so auto ID generation will not create duplicate ID
 	// for namespace user this is just a subset of the whole rules' IDs. we will keep adding IDs in-use to it when iterating existing crhs in step 3
 	for _, rr := range rules {
 		if rr.ID != api.PolicyAutoID {
@@ -1066,7 +1061,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					e := "Duplicate rule ID"
 					log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
-					return fmt.Errorf("%s", e)
+					return errors.New(e)
 				} else {
 					// for admin/fedAdmin, because they can see all rules, rules param contains all rest-created rules' IDs in use.
 					// but for namespace user, because they cannot see all rules, rules param contains only subset of rest-created rules' IDs in use.
@@ -1388,8 +1383,9 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	return nil
 }
 
-func deletePolicyRule(scope string, w http.ResponseWriter, r *http.Request, ruleIDs []uint32, acc *access.AccessControl) (int, error) { // deleted rules, err
-	log.Debug("")
+func deletePolicyRule(scope string, w http.ResponseWriter, r *http.Request, ruleIDs []uint32,
+	acc *access.AccessControl) (int, error) { // deleted rules, err
+	log.Debug()
 
 	delIDs := utils.NewSet()
 	for _, id := range ruleIDs {
@@ -1485,16 +1481,27 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	var scope string
-	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
-		scope = share.ScopeLocal
-	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
+		return
+	}
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if scope == share.ScopeFed && fedRole != api.FedRoleMaster {
+		log.WithFields(log.Fields{"scope": scope, "fedRole": fedRole, "error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
 
 	dataChanged := false
 	if rconf.Move != nil {
+		isFedPolicy := isFedPolicyID(rconf.Move.ID)
+		if (scope == share.ScopeFed && !isFedPolicy) || (scope == share.ScopeLocal && isFedPolicy) ||
+			(isFedPolicy && fedRole != api.FedRoleMaster) {
+			e := "Rule can't be moved"
+			log.WithFields(log.Fields{"id": rconf.Move.ID, "scope": scope, "fedRole": fedRole}).Error(e)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrOpNotAllowed, e)
+		}
 		err, cfgType := movePolicyRule(w, r, rconf.Move, acc, login)
 		if err == nil {
 			if cfgType == share.FederalCfg {
@@ -1813,20 +1820,18 @@ func handlerPolicyRuleDelete(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	scope := share.ScopeLocal
-	var cfgType share.TCfgType
 	if crule, err := cacher.GetPolicyRuleCache(uint32(id), acc); crule == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	} else {
-		cfgType = crule.CfgType
-		if cfgType == share.FederalCfg {
+		if crule.CfgType == share.FederalCfg {
 			scope = share.ScopeFed
 		}
 	}
 
 	// No need to authorize again as it's done in the GetPolicyRuleCache()
 	if deleted, err := deletePolicyRule(scope, w, r, []uint32{uint32(id)}, acc); err == nil {
-		restRespSuccess(w, r, nil, acc, login, nil, "Delete policy rules")
+		restRespSuccess(w, r, nil, acc, login, nil, "Delete policy rule")
 		if deleted > 0 && scope == share.ScopeFed {
 			updateFedRulesRevision([]string{share.FedNetworkRulesType}, acc, login)
 		}
@@ -1846,12 +1851,8 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	query := restParseQuery(r)
-	delScope := query.pairs[api.QueryScope]
-	if delScope == "" {
-		delScope = share.ScopeLocal
-	}
-	if delScope != share.ScopeFed && delScope != share.ScopeLocal {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+	delScope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
 		return
 	}
 
@@ -1913,7 +1914,7 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 
 	// Write rule ID list to cluster
 	if err := clusHelper.PutPolicyRuleListTxn(txn, keeps); err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("")
+		log.WithFields(log.Fields{"error": err}).Error()
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		return
 	}

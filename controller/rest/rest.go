@@ -1639,26 +1639,37 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.PATCH("/v1/server/:name/groups", handlerServerGroupsOrderConfig)            // (4.3+) For CLI to modify mapped groups order
 	r.DELETE("/v1/server/:name", handlerServerDelete)
 	r.GET("/v1/file/config", handlerConfigExport)
-	r.POST("/v1/file/config", handlerConfigImport)
+	r.POST("/v1/file/fed_config", handlerFedConfigExport)
+	r.POST("/v1/file/config", handlerConfigImport) // supported 'scope' query parameter values: "local"(default value if it's not specified)/"fed".
+
+	// supported 'scope' query parameter values: "local"(default value if it's not specified)/"fed".
+	// for UI redirection usage in multi-cluster env, only "local"(default value if it's not specified) is supported.
 	r.GET("/v1/file/group", handlerGroupCfgExport)
-	r.POST("/v1/file/group", handlerGroupCfgExport)                           // as client, GO's http.NewRequest(http.MethodGet) doesn't use body. This API is for multi-cluster purpose.
-	r.GET("/v1/file/group/config", handlerGetGroupCfgImport)                  // get current running import task
-	r.POST("/v1/file/group/config", handlerGroupCfgImport)                    // for providing similar function as crd import but do not rely on crd webhook. supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/admission", handlerAdmCtrlExport)                        // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/admission/config", handlerAdmCtrlImport)                 // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/file/response/rule", handlerResponseRuleExport)               // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/response/rule/config", handlerResponseRuleImport)        // for providing similar function as crd import but do not rely on crd webhook. it's for replacement only if header "X-Import-Overwrite" is specified
-	r.POST("/v1/file/dlp", handlerDlpExport)                                  // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/dlp/config", handlerDlpImport)                           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/file/waf", handlerWafExport)                                  // supported 'scope' query parameter values: "local"(default).
-	r.POST("/v1/file/waf/config", handlerWafImport)                           // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/file/compliance/profile", handlerCompProfileExport)           //
-	r.POST("/v1/file/compliance/profile/config", handlerCompProfileImport)    // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/file/vulnerability/profile", handlerVulnProfileExport)        //
-	r.POST("/v1/file/vulnerability/profile/config", handlerVulnProfileImport) // for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement
-	r.POST("/v1/internal/alert", handlerAcceptAlert)                          // skip API document
-	r.GET("/v1/internal/system", handlerInternalSystem)                       // skip API document
-	r.GET("/v1/system/usage", handlerSystemUsage)                             // skip API document
+	r.POST("/v1/file/group", handlerGroupCfgExport) // as client, GO's http.NewRequest(http.MethodGet) doesn't use body. This API is for multi-cluster purpose.
+	r.POST("/v1/file/admission", handlerAdmCtrlExport)
+	r.POST("/v1/file/response/rule", handlerResponseRuleExport)
+	r.POST("/v1/file/dlp", handlerDlpExport)
+	r.POST("/v1/file/waf", handlerWafExport)
+
+	// for providing similar function as crd import but do not rely on crd webhook. besides, it's for replacement unless with specific comment.
+	// supported 'scope' query parameter values: "local"(default value if it's not specified)/"fed".
+	// for UI redirection usage in multi-cluster env, only "local"(default value if it's not specified) is supported.
+	r.POST("/v1/file/group/config", handlerGroupCfgImport)
+	r.POST("/v1/file/admission/config", handlerAdmCtrlImport)
+	r.POST("/v1/file/response/rule/config", handlerResponseRuleImport) // it's for replacement only if header "X-Import-Overwrite" is specified
+	r.POST("/v1/file/dlp/config", handlerDlpImport)
+	r.POST("/v1/file/waf/config", handlerWafImport)
+
+	// ignore 'scope' query parameter
+	r.POST("/v1/file/compliance/profile", handlerCompProfileExport)
+	r.POST("/v1/file/vulnerability/profile", handlerVulnProfileExport)
+	r.POST("/v1/file/compliance/profile/config", handlerCompProfileImport)
+	r.POST("/v1/file/vulnerability/profile/config", handlerVulnProfileImport)
+
+	r.GET("/v1/file/group/config", handlerGetGroupCfgImport) // get status of current running group import task
+	r.POST("/v1/internal/alert", handlerAcceptAlert)         // skip API document
+	r.GET("/v1/internal/system", handlerInternalSystem)      // skip API document
+	r.GET("/v1/system/usage", handlerSystemUsage)            // skip API document
 	r.GET("/v1/system/summary", handlerSystemSummary)
 	r.GET("/v1/system/config", handlerSystemGetConfig)   // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
@@ -1741,17 +1752,17 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.GET("/v1/dlp/group", handlerDlpGroupList)
 	r.GET("/v1/dlp/group/:name", handlerDlpGroupShow)
 	r.PATCH("/v1/dlp/group/:name", handlerDlpGroupConfig)
-	r.GET("/v1/dlp/rule", handlerDlpRuleList)
+	r.GET("/v1/dlp/rule", handlerDlpRuleList) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local".
 	r.GET("/v1/dlp/rule/:name", handlerDlpRuleShow)
 	//r.POST("/v1/dlp/rule", handlerDlpRuleCreate)							  // before uncomment this line, check if access control needs to be adjusted in handlerDlpRuleCreate for required permissions
 	//r.PATCH("/v1/dlp/rule/:name", handlerDlpRuleConfig)					  // before uncomment this line, check if access control needs to be adjusted in handlerDlpRuleConfig for required permissions
 	//r.DELETE("/v1/dlp/rule/:name", handlerDlpRuleDelete)					  // before uncomment this line, check if access control needs to be adjusted in handlerDlpRuleDelete for required permissions
-	r.GET("/v1/waf/sensor", handlerWafSensorList) // supported 'scope' query parameter values: "local"(default).
+	r.GET("/v1/waf/sensor", handlerWafSensorList) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local".
 	r.GET("/v1/waf/sensor/:name", handlerWafSensorShow)
 	r.POST("/v1/waf/sensor", handlerWafSensorCreate)
 	r.PATCH("/v1/waf/sensor/:name", handlerWafSensorConfig)
 	r.DELETE("/v1/waf/sensor/:name", handlerWafSensorDelete)
-	r.GET("/v1/waf/group", handlerWafGroupList) // supported 'scope' query parameter values: "local"(default).
+	r.GET("/v1/waf/group", handlerWafGroupList) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local".
 	r.GET("/v1/waf/group/:name", handlerWafGroupShow)
 	r.PATCH("/v1/waf/group/:name", handlerWafGroupConfig)
 	r.GET("/v1/waf/rule", handlerWafRuleList)

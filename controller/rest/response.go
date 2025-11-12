@@ -33,18 +33,27 @@ import (
 var responseRuleOptions map[string]*api.RESTResponseRuleOptions
 var responseRuleOptionsForLocalUsers map[string]*api.RESTResponseRuleOptions
 
-func getResPolicyName(w http.ResponseWriter, id string) (int, string, error) {
-	idNum, err := strconv.Atoi(id)
-	if err != nil || idNum <= 0 {
+func getResponseExportPolicyName(gName string, id uint32) string {
+	policyName := share.DefaultPolicyName
+	if gName != "" {
+		if strings.HasPrefix(gName, api.FederalGroupPrefix) {
+			policyName = share.FedPolicyName
+		}
+	} else if id > api.StartingFedAdmRespRuleID && id < api.MaxFedAdmRespRuleID {
+		policyName = share.FedPolicyName
+	}
+	return policyName
+}
+
+func getResponsePolicyName(w http.ResponseWriter, id string) (uint32, string, error) {
+	idNum, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
 		log.WithFields(log.Fields{"id": id, "err": err}).Error("Invalid ID")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return 0, "", common.ErrObjectNotFound
 	}
-	if idNum > api.StartingFedAdmRespRuleID && idNum < api.MaxFedAdmRespRuleID {
-		return idNum, share.FedPolicyName, nil
-	} else {
-		return idNum, share.DefaultPolicyName, nil
-	}
+	policyName := getResponseExportPolicyName("", uint32(idNum))
+	return uint32(idNum), policyName, nil
 }
 
 func getSecurityEventNameList() []string {
@@ -245,9 +254,10 @@ func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	var scope string
-	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
-		scope = share.ScopeLocal
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
+		return
 	}
 	if (scope == share.ScopeFed && (!acc.IsFedReader() && !acc.IsFedAdmin() && !acc.HasPermFed())) || !acc.Authorize(&share.CLUSResponseRuleOptionsDummy{}, nil) {
 		restRespAccessDenied(w, login)
@@ -388,17 +398,18 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 		}
 	}
 
-	supportedGroups := utils.NewSetFromStringSlice([]string{api.LearnedExternal})
+	reservedGroups := utils.NewSetFromStringSlice([]string{api.LearnedExternal})
 	switch grpCfgType {
 	case share.FederalCfg:
-		supportedGroups.Add(api.FederalGroupPrefix + api.AllHostGroup)
-		supportedGroups.Add(api.FederalGroupPrefix + api.AllContainerGroup)
+		reservedGroups.Add(api.FedAllHostGroup)
+		reservedGroups.Add(api.FedAllContainerGroup)
 	default:
-		supportedGroups.Add(api.AllHostGroup)
-		supportedGroups.Add(api.AllContainerGroup)
+		reservedGroups.Add(api.AllHostGroup)
+		reservedGroups.Add(api.AllContainerGroup)
 	}
-	if supportedGroups.Contains(r.Group) {
-		// fed.nodes/fed.containers/containers/external/nodes are allowed for fed response rules
+	if reservedGroups.Contains(r.Group) {
+		// fed.nodes/fed.containers/external are allowed for fed response rules
+		// nodes/containers/external are allowed for local response rules
 	} else if (r.CfgType == api.CfgTypeFederal && grpCfgType != share.FederalCfg) ||
 		(r.CfgType != api.CfgTypeFederal && grpCfgType == share.FederalCfg) {
 		return fmt.Errorf("Rule cannot be applied to group %s", r.Group)
@@ -417,8 +428,8 @@ func responseRule2Cluster(r *api.RESTResponseRule) *share.CLUSResponseRule {
 		Actions:    r.Actions,    // Actions    []string             `json:"actions"`
 		Webhooks:   r.Webhooks,
 		Disable:    r.Disable,
+		CfgType:    cfgTypeMapping[r.CfgType],
 	}
-	ret.CfgType = cfgTypeMapping[r.CfgType]
 	return ret
 }
 
@@ -485,7 +496,10 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	query := restParseQuery(r)
-	scope := query.pairs[api.QueryScope] // empty string means fed & local rules
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 
 	size := query.limit
 	if size == 0 {
@@ -531,14 +545,14 @@ func handlerResponseRuleShow(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	id, policyName, err := getResPolicyName(w, ps.ByName("id"))
+	id, policyName, err := getResponsePolicyName(w, ps.ByName("id"))
 	if err != nil {
 		return
 	}
 
 	var resp api.RESTResponseRuleData
 
-	rule, err := cacher.GetResponseRule(policyName, uint32(id), acc)
+	rule, err := cacher.GetResponseRule(policyName, id, acc)
 	if rule == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -588,8 +602,23 @@ func deleteResponseRules(policyName string, txn *cluster.ClusterTransact, dels u
 }
 
 func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RESTResponseRuleInsert,
-	lockAcquired, grpMustExist bool, acc *access.AccessControl) ([]uint32, error) {
+	lockAcquired, grpMustExist bool, cfgType share.TCfgType, acc *access.AccessControl) ([]uint32, error) {
 	log.Debug()
+
+	if insert == nil || len(insert.Rules) == 0 {
+		e := "No rule"
+		log.Error(e)
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return nil, errors.New(e)
+	}
+	for _, rule := range insert.Rules {
+		if len(rule.Conditions) == 0 {
+			e := "No criteria"
+			log.Error(e)
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+			return nil, errors.New(e)
+		}
+	}
 
 	if !lockAcquired {
 		// Acquire locks
@@ -625,16 +654,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 		e := "Insert position cannot be found"
 		log.WithFields(log.Fields{"after": after}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return nil, fmt.Errorf("%s", e)
-	}
-
-	var cfgType share.TCfgType = share.UserCreated
-	if policyName == share.FedPolicyName {
-		cfgType = share.FederalCfg
-	} else {
-		if insert != nil && len(insert.Rules) > 0 {
-			cfgType = cfgTypeMapping[insert.Rules[0].CfgType]
-		}
+		return nil, errors.New(e)
 	}
 
 	idAdded := make([]uint32, 0, len(insert.Rules))
@@ -644,10 +664,11 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 			e := "Duplicate rule ID"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-			return nil, fmt.Errorf("%s", e)
+			return nil, errors.New(e)
 		}
 
 		if rr.ID == api.PolicyAutoID {
+			cfgType := cfgTypeMapping[rr.CfgType]
 			rr.ID = getAvailableRuleID(ruleTypeRespRule, ids, cfgType)
 			if rr.ID == 0 {
 				err := errors.New("Failed to locate available rule ID")
@@ -681,7 +702,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 	for i, r := range insert.Rules {
 		news[i] = &share.CLUSRuleHead{
 			ID:      r.ID,
-			CfgType: cfgType,
+			CfgType: cfgTypeMapping[insert.Rules[0].CfgType],
 		}
 	}
 
@@ -756,7 +777,7 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 		} else {
 			policyName = share.DefaultPolicyName
 		}
-		_, err = insertResponseRule(policyName, w, rconf.Insert, false, true, acc)
+		_, err = insertResponseRule(policyName, w, rconf.Insert, false, true, cfgTypeMapping[firstCfgType], acc)
 		if err == nil {
 			if policyName == share.FedPolicyName {
 				updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)
@@ -778,7 +799,7 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	id, policyName, err := getResPolicyName(w, ps.ByName("id"))
+	id, policyName, err := getResponsePolicyName(w, ps.ByName("id"))
 	if err != nil {
 		return
 	}
@@ -793,14 +814,20 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	if rconf.Config.ID != uint32(id) {
+	if rconf.Config.ID != id {
 		e := "Rule ID mismatch in the request"
 		log.WithFields(log.Fields{"id": id}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
 		return
 	}
+	if rconf.Config.Conditions != nil && len(*rconf.Config.Conditions) == 0 {
+		e := "No criteria"
+		log.Error(e)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, e)
+		return
+	}
 
-	rule, err := cacher.GetResponseRule(policyName, uint32(id), acc)
+	rule, err := cacher.GetResponseRule(policyName, id, acc)
 	if rule == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -886,12 +913,12 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	id, policyName, err := getResPolicyName(w, ps.ByName("id"))
+	id, policyName, err := getResponsePolicyName(w, ps.ByName("id"))
 	if err != nil {
 		return
 	}
 
-	rule, err := cacher.GetResponseRule(policyName, uint32(id), acc)
+	rule, err := cacher.GetResponseRule(policyName, id, acc)
 	if rule == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -916,7 +943,7 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var idx int = -1
 	for i, crh := range crhs {
-		if crh.ID == uint32(id) {
+		if crh.ID == id {
 			idx = i
 			break
 		}
@@ -942,7 +969,7 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	dels := utils.NewSet(uint32(id))
+	dels := utils.NewSet(id)
 	deleteResponseRules(policyName, txn, dels)
 	if ok, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error()
@@ -974,11 +1001,8 @@ func handlerResponseRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	query := restParseQuery(r)
-	scope := query.pairs[api.QueryScope]
-	if scope == "" {
-		scope = share.ScopeLocal
-	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
 		return
 	}
 
@@ -1054,9 +1078,14 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
+	scope, err := checkExportScope(w, r, share.IMPORT_TYPE_RESPONSE, login)
+	if err != nil {
+		return
+	}
+
 	var rconf api.RESTResponseRulesExport
 	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || len(rconf.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1071,6 +1100,24 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 		},
 	}
 
+	// do not support mixed export of fed/local response rules. rules do not qualify scope are filtered out.
+	exportIDs := make([]uint32, 0, len(rconf.IDs))
+	for _, id := range rconf.IDs {
+		isFedRule := isFedPolicyID(id)
+		if (scope == share.ScopeFed && isFedRule) || (scope == share.ScopeLocal && !isFedRule) {
+			exportIDs = append(exportIDs, id)
+		} else {
+			log.WithFields(log.Fields{"id": id, "scope": scope}).Warn("skip")
+		}
+	}
+
+	exportFileName := "cfgResponseRulesExport.yaml"
+	exportType := "response rules"
+	if scope == share.ScopeFed {
+		exportFileName = "cfgFedResponseRulesExport.yaml"
+		exportType = "federal " + exportType
+	}
+
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 	if err != nil {
 		e := "Failed to acquire cluster lock"
@@ -1080,9 +1127,9 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 	defer clusHelper.ReleaseLock(lock)
 
 	apiversion := fmt.Sprintf("%s/%s", common.OEMSecurityRuleGroup, resource.NvResponseSecurityRuleVersion)
-	for _, id := range rconf.IDs {
+	for _, id := range exportIDs {
 		// export response rules
-		responseRules, err := exportResponseRules("", id, acc)
+		responseRules, err := exportResponseRules(scope, "", id, acc)
 		if err != nil {
 			e := fmt.Sprintf("Failed to export response rule %v", id)
 			log.WithFields(log.Fields{"err": err}).Error(e)
@@ -1093,9 +1140,9 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 			continue
 		}
 		responseRule := responseRules[0]
-		crName, err := genResponseRuleCrName(id, *responseRule)
+		crName, err := genResponseRuleCrName(id, scope, *responseRule)
 		if err != nil {
-			log.WithFields(log.Fields{"id": id, "err": err}).Error()
+			log.WithFields(log.Fields{"id": id, "scope": scope, "err": err}).Error()
 			continue
 		}
 		respTemp := resource.NvResponseSecurityRule{
@@ -1113,7 +1160,7 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 		resp.Items = append(resp.Items, respTemp)
 	}
 
-	doExport("cfgResponseRulesExport.yaml", "response rules", rconf.RemoteExportOptions, resp, w, r, acc, login)
+	doExport(exportFileName, exportType, rconf.RemoteExportOptions, resp, w, r, acc, login)
 }
 
 func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1126,10 +1173,10 @@ func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	tid := r.Header.Get("X-Transaction-ID")
-	_importHandler(w, r, tid, share.IMPORT_TYPE_RESPONSE, share.PREFIX_IMPORT_RESPONSE, acc, login)
+	_importHandler(w, r, tid, share.IMPORT_TYPE_RESPONSE, share.PREFIX_IMPORT_RESPONSE, share.PERMS_RUNTIME_POLICIES, acc, login)
 }
 
-func genResponseRuleCrName(id uint32, crdRule resource.NvCrdResponseRule) (string, error) {
+func genResponseRuleCrName(id uint32, scope string, crdRule resource.NvCrdResponseRule) (string, error) {
 	rMini := api.RESTResponseRule{
 		ID:         id,
 		Event:      crdRule.Event,
@@ -1142,14 +1189,19 @@ func genResponseRuleCrName(id uint32, crdRule resource.NvCrdResponseRule) (strin
 		return "", err
 	}
 	b := sha256.Sum256(jsonData)
+	crName := fmt.Sprintf("%s--%s", crdRule.Event, hex.EncodeToString(b[:]))
+	if scope == share.ScopeFed {
+		crName = api.FederalGroupPrefix + crName
+	}
 
-	return fmt.Sprintf("%s--%s", crdRule.Event, hex.EncodeToString(b[:])), nil
+	return crName, nil
 }
 
-func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]*resource.NvCrdResponseRule, error) {
+func exportResponseRules(scope, gName string, id uint32, acc *access.AccessControl) ([]*resource.NvCrdResponseRule, error) {
+	policyName := getResponseExportPolicyName(gName, id)
 	if id != 0 {
 		// export a specific response rule
-		r, err := cacher.GetResponseRule(share.DefaultPolicyName, id, acc)
+		r, err := cacher.GetResponseRule(policyName, id, acc)
 		if err != nil {
 			return nil, err
 		}
@@ -1162,7 +1214,7 @@ func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]
 			return nil, fmt.Errorf("response rule %d is for group <%s>", id, r.Group)
 		}
 		crdRule := &resource.NvCrdResponseRule{
-			PolicyName: share.DefaultPolicyName,
+			PolicyName: policyName,
 			Event:      r.Event,
 			Actions:    r.Actions,
 			Comment:    r.Comment,
@@ -1175,11 +1227,11 @@ func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]
 	if gName != "" {
 		var rules []*resource.NvCrdResponseRule
 		// export all response rules that are for the group
-		allRules := cacher.GetAllResponseRules(share.ScopeLocal, acc)
+		allRules := cacher.GetAllResponseRules(scope, acc)
 		for _, r := range allRules {
 			if r.Group == gName {
 				crdRule := &resource.NvCrdResponseRule{
-					PolicyName: share.DefaultPolicyName,
+					PolicyName: policyName,
 					Event:      r.Event,
 					Actions:    r.Actions,
 					Comment:    r.Comment,
@@ -1197,7 +1249,6 @@ func exportResponseRules(gName string, id uint32, acc *access.AccessControl) ([]
 }
 
 func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule, error) {
-
 	importDataStr := string(importData)
 	yamlParts := strings.Split(importDataStr, "\n---\n")
 
@@ -1283,7 +1334,8 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 	return nvSecRules, err
 }
 
-func importResponse(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
+func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
+	postImportOp kv.PostImportFunc, acc *access.AccessControl, login *loginSession) error {
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
@@ -1295,7 +1347,7 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 	if err != nil {
 		msg := "Failed to read/parse the imported file"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
 		return nil
 	} else if len(secRules) == 0 {
 		log.Info("no security rule in yaml")
@@ -1306,8 +1358,8 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 	var inc float32
 	var progress float32 // progress percentage
 
-	inc = 90.0 / float32(3)
-	parsedResponseCfgs := make([]*resource.NvCrdResponseRule, 0, len(secRules))
+	inc = 90.0 / float32(3+len(secRules))
+	parsedResponseCfgs := make([]*resource.NvSecurityParse, 0, len(secRules))
 	progress = 6
 
 	importTask.Percentage = int(progress)
@@ -1323,11 +1375,16 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 		for _, secRule := range secRules {
 			parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdResponseContent(&secRule, share.ReviewTypeImportResponse, share.ReviewTypeDisplayResponse)
 			if errCount > 0 {
-				err = fmt.Errorf("%s", errMsg)
+				err = errors.New(errMsg)
 				break
-			} else {
-				parsedResponseCfgs = append(parsedResponseCfgs, parsedCfg.ResponseCfg)
 			}
+			if (importTask.Scope == share.ScopeFed && parsedCfg.CfgType != share.FederalCfg) ||
+				(importTask.Scope == share.ScopeLocal && parsedCfg.CfgType != share.UserCreated) {
+				log.WithFields(log.Fields{"scope": importTask.Scope, "event": parsedCfg.ResponseCfg.Event}).Warn("skip")
+				err = fmt.Errorf("Response rule %s is not allowed for import with scope=%s", secRule.GetName(), importTask.Scope)
+				break
+			}
+			parsedResponseCfgs = append(parsedResponseCfgs, parsedCfg)
 		}
 		if err != nil {
 			postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)
@@ -1338,22 +1395,31 @@ func importResponse(scope string, loginDomainRoles access.DomainRole, importTask
 			kv.DeleteResponseRuleByGroup("")
 		}
 
+		oneSuccess := false
 		progress += inc
 		importTask.Percentage = int(progress)
 		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
 
-		if len(parsedResponseCfgs) > 0 {
+		for _, parsedCfg := range parsedResponseCfgs {
 			cacheRecord := share.CLUSCrdSecurityRule{
 				ResponseRules: &share.CLUSCrdResponseRules{},
 			}
 			// [4] import all security rules defined in the yaml file
-			err := crdHandler.crdHandleResponseRule(scope, parsedResponseCfgs, &cacheRecord, share.ReviewTypeImportResponse)
+			err = crdHandler.crdHandleResponseRule(parsedCfg.CfgType, parsedCfg.ResponseCfg, &cacheRecord, share.ReviewTypeImportResponse)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error()
+				break
 			}
+			oneSuccess = true
+			progress += inc
+			importTask.Percentage = int(progress)
+			_ = clusHelper.PutImportTask(&importTask)
 		}
 		importTask.Percentage = 90
 		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+		if oneSuccess && importTask.Scope == share.ScopeFed {
+			updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)
+		}
 	}
 
 	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_RESPONSE)

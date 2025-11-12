@@ -47,6 +47,13 @@ const NvResponseSecurityRuleKind = "NvResponseRuleSecurityRule"
 const NvResponseSecurityRuleListKind = "NvResponseRuleSecurityRuleList"
 const NvResponseSecurityRuleSingular = "nvresponserulesecurityrule"
 
+const NvConfigSecurityRuleName = "nvconfigsecurityrules.neuvector.com"
+const NvConfigSecurityRuleVersion = "v1"
+const NvConfigSecurityRulePlural = "nvconfigsecurityrules"
+const NvConfigSecurityRuleKind = "NvConfigSecurityRule"
+const NvConfigSecurityRuleListKind = "NvConfigSecurityRuleList"
+const NvConfigSecurityRuleSingular = "nvconfigsecurityrule"
+
 const NvDlpSecurityRuleName = "nvdlpsecurityrules.neuvector.com"
 const NvDlpSecurityRuleVersion = "v1"
 const NvDlpSecurityRulePlural = "nvdlpsecurityrules"
@@ -119,11 +126,13 @@ type NvSecurityParse struct {
 	AdmCtrlCfg        *NvCrdAdmCtrlConfig
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
 	ResponseCfg       *NvCrdResponseRule             // response rules for all groups
+	FedConfig         *api.RESTCrdFedConfig          // fed config(webhooks) defined by this crd object
 	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
 	VulnProfileCfg    *NvCrdVulnProfileConfig        // vulerability profile defined by this crd object
 	CompProfileCfg    *NvCrdCompProfileConfig        // compliance profile defined by this crd object
 	Uid               string                         // Metadata.Uid from AdmissionReview request
+	CfgType           share.TCfgType
 }
 
 type NvSecurityTarget struct {
@@ -259,20 +268,6 @@ func init() {
 }
 */
 
-/*
-	type NvAdmCtrlSecurityRule struct {
-		metav1.TypeMeta   `json:",inline"`
-		metav1.ObjectMeta `json:"metadata,omitempty"`
-		Spec              NvSecurityAdmCtrlSpec `json:"spec"`
-	}
-
-	type NvAdmCtrlSecurityRuleList struct {
-		metav1.TypeMeta  `json:",inline"`
-		metav1.ListMeta  `json:"metadata,omitempty"`
-		Items            []*NvAdmCtrlSecurityRule `json:"items"`
-		XXX_unrecognized []byte                   `json:"-"`
-	}
-*/
 type NvAdmCtrlSecurityRule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -295,7 +290,6 @@ type NvCrdResponseRule struct {
 	Disable    bool                       `json:"disable,omitempty"`
 	Webhooks   []string                   `json:"webhooks,omitempty"`
 	Conditions []share.CLUSEventCondition `json:"conditions,omitempty"`
-	CfgType    string                     `json:"cfg_type,omitempty"` //CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal
 }
 
 type NvSecurityResponseSpec struct {
@@ -315,6 +309,24 @@ type NvResponseSecurityRuleList struct {
 	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items            []NvResponseSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
 	XXX_unrecognized []byte                   `json:"-"`
+}
+
+// for fed configuration(webhooks)
+type NvCrdFedConfigSpec struct {
+	FedConfig *api.RESTCrdFedConfig `json:"fed_config"`
+}
+
+type NvCrdFedConfigSecurityRule struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec              NvCrdFedConfigSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+type NvCrdFedConfigSecurityRuleList struct {
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items            []NvCrdFedConfigSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+	XXX_unrecognized []byte                       `json:"-"`
 }
 
 // DLP
