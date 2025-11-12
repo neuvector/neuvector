@@ -188,12 +188,12 @@ func group2BriefREST(cache *groupCache, withCap bool) *api.RESTGroupBrief {
 		GrpSessCur:      cache.group.GrpSessCur,
 		GrpSessRate:     cache.group.GrpSessRate,
 		GrpBandWidth:    cache.group.GrpBandWidth,
+		CfgType:         common.TCfgTypeToApi(cache.group.CfgType),
 	}
 	if withCap {
 		g.CapChgMode = &cache.capChgMode
 		g.CapScorable = &cache.capScorable
 	}
-	g.CfgType = cfgTypeMapping[cache.group.CfgType]
 	return g
 }
 

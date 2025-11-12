@@ -122,6 +122,9 @@ const UserRoleFedReader string = "fedReader"
 const LearnedGroupPrefix string = "nv."
 const LearnedSvcGroupPrefix string = "nv.ip."
 const FederalGroupPrefix string = "fed."
+const FedAllHostGroup string = "fed.nodes"
+const FedAllContainerGroup string = "fed.containers"
+
 const LearnedExternal string = "external"
 const AllHostGroup string = "nodes"
 const AllContainerGroup string = "containers"
@@ -553,6 +556,10 @@ type RESTAdmCtrlRulesExport struct {
 
 type RESTResponseRulesExport struct {
 	IDs                 []uint32                 `json:"ids"`
+	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
+}
+
+type RESTFedConfigExport struct {
 	RemoteExportOptions *RESTRemoteExportOptions `json:"remote_export_options,omitempty"`
 }
 
@@ -3064,6 +3071,19 @@ type RESTProcessProfileConfig struct {
 
 type RESTProcessProfileConfigData struct {
 	Config *RESTProcessProfileConfig `json:"process_profile_config"`
+}
+
+type RESTCrdFedWebHook struct {
+	Name     string `json:"name"`
+	Url      string `json:"url"`
+	Enable   bool   `json:"enable"`
+	UseProxy bool   `json:"use_proxy"`
+	Type     string `json:"type"`
+}
+
+type RESTCrdFedConfig struct {
+	Name     string              `json:"name"`
+	Webhooks []RESTCrdFedWebHook `json:"webhooks"`
 }
 
 const MinDlpRuleID = 20000

@@ -197,6 +197,11 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	profConf, profRev := clusHelper.GetFileMonitorProfile(group)
 	ruleConf, ruleRev := clusHelper.GetFileAccessRule(group)
 
+	if profConf != nil && profConf.CfgType == share.GroundCfg {
+		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+		return
+	}
+
 	tm := time.Now().UTC()
 	// delete filters
 	if config.DelFilters != nil {
@@ -367,7 +372,10 @@ func handlerFileMonitorList(w http.ResponseWriter, r *http.Request, ps httproute
 
 	var predefined bool
 	query := restParseQuery(r)
-	scope := query.pairs[api.QueryScope] // empty string means fed & local file mointor list
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 
 	for key := range r.URL.Query() {
 		if strings.Contains(key, api.FilterByPredefined) {

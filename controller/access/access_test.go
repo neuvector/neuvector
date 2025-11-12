@@ -1379,6 +1379,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/controller/*/profiling",
 			"v1/enforcer/*/profiling",
 			"v1/file/config",
+			"v1/file/fed_config",
 			"v1/csp/file/support",
 			"v1/internal/alert",
 		},

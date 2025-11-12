@@ -323,7 +323,7 @@ func AdmissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 		RuleType: rule.RuleType,
 		RuleMode: rule.RuleMode,
 	}
-	r.CfgType = cfgTypeMapping[rule.CfgType]
+	r.CfgType = common.TCfgTypeToApi(rule.CfgType)
 	if rule.CfgType == share.FederalCfg {
 		if r.RuleType == share.FedAdmCtrlExceptRulesType {
 			r.RuleType = api.ValidatingExceptRuleType

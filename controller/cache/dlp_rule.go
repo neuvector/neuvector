@@ -888,7 +888,7 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 		rdre := &api.RESTDlpRule{
 			Name:    cdre.Name,
 			ID:      cdre.ID,
-			CfgType: cfgTypeMapping[cdre.CfgType],
+			CfgType: common.TCfgTypeToApi(cdre.CfgType),
 		}
 		for _, cpt := range cdre.Patterns {
 			if cpt.Context == "" {
@@ -914,7 +914,7 @@ func (m *CacheMethod) GetDlpRule(rulename string, acc *access.AccessControl) (*a
 			rdre := &api.RESTDlpRule{
 				Name:    cdre.Name,
 				ID:      cdre.ID,
-				CfgType: cfgTypeMapping[cdre.CfgType],
+				CfgType: common.TCfgTypeToApi(cdre.CfgType),
 			}
 			for _, cpt := range cdre.Patterns {
 				if cpt.Context == "" {
@@ -953,8 +953,8 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 			RuleList:  make([]*api.RESTDlpRule, 0),
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
+			CfgType:   common.TCfgTypeToApi(cdr.CfgType),
 		}
-		resp.CfgType = cfgTypeMapping[cdr.CfgType]
 
 		for name := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
@@ -966,7 +966,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 				rdre := &api.RESTDlpRule{
 					Name:    cdre.Name,
 					ID:      cdre.ID,
-					CfgType: cfgTypeMapping[cdre.CfgType],
+					CfgType: common.TCfgTypeToApi(cdre.CfgType),
 				}
 				for _, cpt := range cdre.Patterns {
 					if cpt.Context == "" {
@@ -987,7 +987,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 					rdre := &api.RESTDlpRule{
 						Name:    cdre.Name,
 						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
+						CfgType: common.TCfgTypeToApi(cdre.CfgType),
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -1010,7 +1010,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 					rdre := &api.RESTDlpRule{
 						Name:    common.GetOrigDlpRuleName(cdrename),
 						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
+						CfgType: common.TCfgTypeToApi(cdre.CfgType),
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -1030,7 +1030,7 @@ func (m *CacheMethod) GetDlpSensor(sensor string, acc *access.AccessControl) (*a
 						rdre := &api.RESTDlpRule{
 							Name:    common.GetOrigDlpRuleName(cdre.Name),
 							ID:      cdre.ID,
-							CfgType: cfgTypeMapping[cdre.CfgType],
+							CfgType: common.TCfgTypeToApi(cdre.CfgType),
 						}
 						for _, cpt := range cdre.Patterns {
 							if cpt.Context == "" {
@@ -1103,8 +1103,8 @@ func (m *CacheMethod) GetAllDlpSensors(scope string, acc *access.AccessControl) 
 			RuleList:  make([]*api.RESTDlpRule, 0),
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
+			CfgType:   common.TCfgTypeToApi(cdr.CfgType),
 		}
-		resp.CfgType = cfgTypeMapping[cdr.CfgType]
 		for name := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
 		}
@@ -1115,7 +1115,7 @@ func (m *CacheMethod) GetAllDlpSensors(scope string, acc *access.AccessControl) 
 				rdre := &api.RESTDlpRule{
 					Name:    common.GetOrigDlpRuleName(cdre.Name),
 					ID:      cdre.ID,
-					CfgType: cfgTypeMapping[cdre.CfgType],
+					CfgType: common.TCfgTypeToApi(cdre.CfgType),
 				}
 				for _, cpt := range cdre.Patterns {
 					if cpt.Context == "" {
@@ -1135,7 +1135,7 @@ func (m *CacheMethod) GetAllDlpSensors(scope string, acc *access.AccessControl) 
 					rdre := &api.RESTDlpRule{
 						Name:    common.GetOrigDlpRuleName(cdre.Name),
 						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
+						CfgType: common.TCfgTypeToApi(cdre.CfgType),
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -1210,7 +1210,7 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 				Status:  cg.Status,
 				Sensors: make([]*api.RESTDlpSetting, 0),
 			}
-			resp.CfgType = cfgTypeMapping[cg.CfgType]
+			resp.CfgType = common.TCfgTypeToApi(cg.CfgType)
 
 			for _, cs := range cg.Sensors {
 				rdsa := &api.RESTDlpSetting{
@@ -1219,7 +1219,7 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 				}
 				if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
 					rdsa.Comment = dlpsensor.Comment
-					rdsa.CfgType = cfgTypeMapping[dlpsensor.CfgType]
+					rdsa.CfgType = common.TCfgTypeToApi(dlpsensor.CfgType)
 					rdsa.Exist = true
 					if dlpsensor.CfgType == share.SystemDefined {
 						rdsa.Predefine = true
@@ -1270,8 +1270,8 @@ func (m *CacheMethod) GetAllDlpGroup(scope string, acc *access.AccessControl) []
 			Name:    cg.Name,
 			Status:  cg.Status,
 			Sensors: make([]*api.RESTDlpSetting, 0),
+			CfgType: common.TCfgTypeToApi(cg.CfgType),
 		}
-		resp.CfgType = cfgTypeMapping[cg.CfgType]
 
 		for _, cs := range cg.Sensors {
 			rdsa := &api.RESTDlpSetting{
@@ -1280,7 +1280,7 @@ func (m *CacheMethod) GetAllDlpGroup(scope string, acc *access.AccessControl) []
 			}
 			if dlpsensor, ok1 := dlpSensors[cs.Name]; ok1 {
 				rdsa.Comment = dlpsensor.Comment
-				rdsa.CfgType = cfgTypeMapping[dlpsensor.CfgType]
+				rdsa.CfgType = common.TCfgTypeToApi(dlpsensor.CfgType)
 				rdsa.Exist = true
 				if dlpsensor.CfgType == share.SystemDefined {
 					rdsa.Predefine = true

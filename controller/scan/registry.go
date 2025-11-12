@@ -1829,13 +1829,8 @@ func (rs *Registry) getConfigSummary(acc *access.AccessControl) *api.RESTRegistr
 	if rs.state.StartedAt != 0 {
 		summary.StartedAt = api.RESTTimeString(time.Unix(rs.state.StartedAt, 0))
 	}
-	if rs.config.CfgType == share.FederalCfg {
-		summary.CfgType = api.CfgTypeFederal
-	} else if rs.config.CfgType == share.GroundCfg {
-		summary.CfgType = api.CfgTypeGround
-	} else {
-		summary.CfgType = api.CfgTypeUserCreated
-	}
+
+	summary.CfgType = common.TCfgTypeToApi(rs.config.CfgType)
 
 	return summary
 }

@@ -563,7 +563,7 @@ func handlerCompProfileImport(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	tid := r.Header.Get("X-Transaction-ID")
-	_importHandler(w, r, tid, share.IMPORT_TYPE_COMP_PROFILE, share.PREFIX_IMPORT_COMP_PROFILE, acc, login)
+	_importHandler(w, r, tid, share.IMPORT_TYPE_COMP_PROFILE, share.PREFIX_IMPORT_COMP_PROFILE, 0, acc, login)
 }
 
 func importCompProfile(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {
@@ -592,7 +592,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	if invalidCrdKind || len(secRules) == 0 {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
-		postImportOp(fmt.Errorf("%s", msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
 		return nil
 	}
 
@@ -615,7 +615,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
 			if cpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdCompProfileContent(&secRule, share.ReviewTypeImportCompProfile, share.ReviewTypeDisplayCompProfile); errCount > 0 {
-				err = fmt.Errorf("%s", errMsg)
+				err = errors.New(errMsg)
 				break
 			} else {
 				cmpProfilesCfg = append(cmpProfilesCfg, cpCfgRet)

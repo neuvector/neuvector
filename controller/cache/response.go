@@ -118,8 +118,8 @@ func (m CacheMethod) ResponseRule2REST(rule *share.CLUSResponseRule) *api.RESTRe
 		Comment: rule.Comment,
 		Group:   rule.Group,
 		Disable: rule.Disable,
+		CfgType: common.TCfgTypeToApi(rule.CfgType),
 	}
-	restRule.CfgType = cfgTypeMapping[rule.CfgType]
 	restRule.Conditions = make([]share.CLUSEventCondition, len(rule.Conditions))
 	copy(restRule.Conditions, rule.Conditions)
 

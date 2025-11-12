@@ -85,8 +85,8 @@ func (m *mockCache) Group2CLUS(group *api.RESTGroup) *share.CLUSGroup {
 		Kind:           group.Kind,
 		PlatformRole:   group.PlatformRole,
 		Criteria:       make([]share.CLUSCriteriaEntry, len(group.Criteria)),
+		CfgType:        cfgTypeMapping[group.CfgType],
 	}
-	c.CfgType = cfgTypeMapping[group.CfgType]
 	copy(c.CreaterDomains, group.CreaterDomains)
 
 	for i, crt := range group.Criteria {
@@ -112,8 +112,8 @@ func (m *mockCache) Policy2CLUS(rule *api.RESTPolicyRule) *share.CLUSPolicyRule 
 		LastModAt:      time.Unix(rule.LastModTS, 0),
 		Priority:       rule.Priority,
 		Applications:   appNames2IDs(rule.Applications),
+		CfgType:        cfgTypeMapping[rule.CfgType],
 	}
-	c.CfgType = cfgTypeMapping[rule.CfgType]
 
 	return &c
 }
@@ -209,8 +209,8 @@ func (m *mockCache) GetPolicyRuleCache(id uint32, acc *access.AccessControl) (*s
 			Disable:      rule.Disable,
 			CreatedAt:    time.Unix(rule.CreatedTS, 0),
 			LastModAt:    time.Unix(rule.LastModTS, 0),
+			CfgType:      cfgTypeMapping[rule.CfgType],
 		}
-		r.CfgType = cfgTypeMapping[rule.CfgType]
 		return r, nil
 	} else if !acc.Authorize(&share.CLUSPolicyRule{}, nil) {
 		return nil, common.ErrObjectAccessDenied
@@ -323,8 +323,8 @@ func (m *mockCache) Group2REST(group *share.CLUSGroup) *api.RESTGroup {
 			CreaterDomains: make([]string, len(group.CreaterDomains)),
 		},
 	}
+	g.CfgType = common.TCfgTypeToApi(group.CfgType)
 	copy(g.CreaterDomains, group.CreaterDomains)
-	g.CfgType = cfgTypeMap2Api[group.CfgType]
 	return &g
 }
 
@@ -346,8 +346,8 @@ func (m *mockCache) PolicyRule2REST(rule *share.CLUSPolicyRule) *api.RESTPolicyR
 		Applications: appIDs2Names(rule.Applications),
 		Action:       rule.Action,
 		Disable:      rule.Disable,
+		CfgType:      common.TCfgTypeToApi(rule.CfgType),
 	}
-	r.CfgType = cfgTypeMap2Api[rule.CfgType]
 	return &r
 }
 

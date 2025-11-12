@@ -32,6 +32,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -441,7 +442,11 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 
 	var rconf *api.RESTSystemConfig
 	var fedConf *api.RESTFedSystemConfig
-	scope := restParseQuery(r).pairs[api.QueryScope]
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
 	if scope == share.ScopeFed || scope == share.ScopeAll {
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster || fedRole == api.FedRoleJoint {
 			if cconf := cacher.GetFedSystemConfig(acc); cconf == nil {
@@ -462,8 +467,12 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 				}
 				for i, wh := range cconf.Webhooks {
 					fedConf.Webhooks[i] = api.RESTWebhook{
-						Name: wh.Name, Url: wh.Url, Enable: wh.Enable, UseProxy: wh.UseProxy,
-						Type: wh.Type, CfgType: api.CfgTypeFederal,
+						Name:     wh.Name,
+						Url:      wh.Url,
+						Enable:   wh.Enable,
+						UseProxy: wh.UseProxy,
+						Type:     wh.Type,
+						CfgType:  common.TCfgTypeToApi(wh.CfgType),
 					}
 				}
 				sort.Slice(fedConf.Webhooks, func(i, j int) bool { return fedConf.Webhooks[i].Name < fedConf.Webhooks[j].Name })
@@ -792,7 +801,6 @@ func validateWebhook(h *api.RESTWebhook) (int, error) {
 
 func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfWebhooks []share.CLUSWebhook,
 	cfgType share.TCfgType, acc *access.AccessControl) ([]share.CLUSWebhook, int, error) {
-
 	// WebhookUrl is kept for backward-compatibility, it will be written into the webhook list
 	newWebhooks := make([]share.CLUSWebhook, 0)
 	newWebhookNames := utils.NewSet()
@@ -995,11 +1003,9 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	var scope string
-	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
-		scope = share.ScopeLocal
-	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
 		return
 	}
 
@@ -1017,7 +1023,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTSystemWebhookConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1126,11 +1132,9 @@ func handlerSystemWebhookDelete(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	var scope string
-	if scope = restParseQuery(r).pairs[api.QueryScope]; scope == "" {
-		scope = share.ScopeLocal
-	} else if scope != share.ScopeFed && scope != share.ScopeLocal {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
 		return
 	}
 
@@ -1816,7 +1820,7 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 							if len(errs) > 0 {
 								msg := strings.Join(errs, "<p>")
 								restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, msg)
-								return kick, fmt.Errorf("%s", msg)
+								return kick, errors.New(msg)
 							}
 							if min == 0 {
 								min = 3
@@ -2774,7 +2778,27 @@ func _preprocessImportBody(body []byte) []byte {
 	return body
 }
 
-func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tempFilePrefix string, acc *access.AccessControl, login *loginSession) {
+func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tempFilePrefix string, requiredPermissions uint32,
+	acc *access.AccessControl, login *loginSession) {
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
+		return
+	}
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if requiredPermissions != 0 && scope == share.ScopeFed {
+		if fedRole == api.FedRoleMaster {
+			requiredPermissions = requiredPermissions | share.PERM_FED
+			if !acc.HasGlobalPermissions(requiredPermissions, requiredPermissions) {
+				restRespAccessDenied(w, login)
+				return
+			}
+		} else {
+			restRespAccessDenied(w, login)
+			return
+		}
+	}
+
 	importRunning := false
 	importNoResponse := false
 	importTask, _ := clusHelper.GetImportTask()
@@ -2842,6 +2866,15 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		return
 	}
 
+	if importTask.Scope == share.ScopeFed {
+		fedRole := cacher.GetFedMembershipRoleNoAuth()
+		if fedRole != api.FedRoleMaster {
+			msg := fmt.Sprintf("Import scope '%s' is not allowed on non-primary cluster", importTask.Scope)
+			restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrFailImport, msg, resp)
+			return
+		}
+	}
+
 	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "importType": importType}).Error("Error in parsing media type")
@@ -2854,6 +2887,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		importTask := share.CLUSImportTask{
 			TID:            utils.GetRandomID(tidLength, ""),
 			ImportType:     importType,
+			Scope:          scope,
 			CtrlerID:       localDev.Ctrler.ID,
 			TempFilename:   tmpfile.Name(),
 			Percentage:     1,
@@ -2919,31 +2953,37 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				}
 			case share.IMPORT_TYPE_GROUP_POLICY:
 				go func() {
-					if err := importGroupPolicy(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+					if err := importGroupPolicy(login.domainRoles, importTask, postImportOp, acc, login); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("importGroupPolicy")
 					}
 				}()
 			case share.IMPORT_TYPE_ADMCTRL:
 				go func() {
-					if err := importAdmCtrl(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+					if err := importAdmCtrl(login.domainRoles, importTask, postImportOp, acc, login); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("importAdmCtrl")
 					}
 				}()
 			case share.IMPORT_TYPE_RESPONSE:
 				go func() {
-					if err := importResponse(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+					if err := importResponse(login.domainRoles, importTask, postImportOp, acc, login); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("importResponse")
+					}
+				}()
+			case share.IMPORT_TYPE_FED_CONFIG:
+				go func() {
+					if err := importFedConfig(login.domainRoles, importTask, postImportOp, acc, login); err != nil {
+						log.WithFields(log.Fields{"error": err}).Error("importFedConfig")
 					}
 				}()
 			case share.IMPORT_TYPE_DLP:
 				go func() {
-					if err := importDlp(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+					if err := importDlp(login.domainRoles, importTask, postImportOp, acc, login); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("importDlp")
 					}
 				}()
 			case share.IMPORT_TYPE_WAF:
 				go func() {
-					if err := importWaf(share.ScopeLocal, login.domainRoles, importTask, postImportOp); err != nil {
+					if err := importWaf(login.domainRoles, importTask, postImportOp, acc, login); err != nil {
 						log.WithFields(log.Fields{"error": err}).Error("importWaf")
 					}
 				}()
@@ -3034,12 +3074,19 @@ func handlerConfigImport(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		}
 	}
 
-	_importHandler(w, r, tid, share.IMPORT_TYPE_CONFIG, share.PREFIX_IMPORT_CONFIG, acc, login)
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)
+	if err != nil {
+		return
+	}
+	if scope == share.ScopeFed {
+		_importHandler(w, r, tid, share.IMPORT_TYPE_FED_CONFIG, share.PREFIX_IMPORT_FED_CONFIG, share.PERM_SYSTEM_CONFIG, acc, login)
+	} else {
+		_importHandler(w, r, tid, share.IMPORT_TYPE_CONFIG, share.PREFIX_IMPORT_CONFIG, share.PERM_SYSTEM_CONFIG, acc, login)
+	}
 }
 
-func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles access.DomainRole, tempToken, importType string) {
-	defer kv.SetImporting(0)
-
+func getExportImportMsgToken(importType string) string {
 	var msgToken string
 	switch importType {
 	case share.IMPORT_TYPE_CONFIG:
@@ -3063,6 +3110,13 @@ func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles a
 		msgToken = "compliance profile"
 	}
 
+	return msgToken
+}
+
+func postImportOp(err error, importTask share.CLUSImportTask, loginDomainRoles access.DomainRole, tempToken, importType string) {
+	defer kv.SetImporting(0)
+
+	msgToken := getExportImportMsgToken(importType)
 	importTask.LastUpdateTime = time.Now().UTC()
 	login := &loginSession{
 		fullname:    importTask.CallerFullname,
@@ -3176,15 +3230,6 @@ func triggerSyncLearnedPolicyImport() {
 
 // caller has been verified for federal admin access right
 func replaceFedSystemConfig(newCfg *share.CLUSSystemConfig) bool {
-	/*
-		lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
-			return false
-		}
-		defer clusHelper.ReleaseLock(lock)
-	*/
-
 	// fed system config
 	if err := clusHelper.PutFedSystemConfigRev(newCfg, 0); err != nil {
 		// Write to cluster
@@ -3225,4 +3270,162 @@ func getFedDisconnectAlert(fedRole, id string, acc *access.AccessControl) (strin
 	key := hex.EncodeToString(b[:])
 
 	return key, alert
+}
+
+func handlerFedConfigExport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	// Use system config to authorize but it's not exactly system config here
+	if !acc.Authorize(&share.CLUSSystemConfig{CfgType: share.FederalCfg}, nil) {
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	var err error
+	fedRole := cacher.GetFedMembershipRoleNoAuth()
+	if fedRole != api.FedRoleMaster {
+		err = fmt.Errorf("Federal configurations cannot be exported on non-primary cluster")
+		log.Error(err)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+		return
+	}
+
+	var rconf api.RESTFedConfigExport
+	body, _ := io.ReadAll(r.Body)
+	err = json.Unmarshal(body, &rconf)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	resp := resource.NvCrdFedConfigSecurityRule{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", common.OEMClusterSecurityRuleGroup, resource.NvConfigSecurityRuleVersion),
+			Kind:       resource.NvConfigSecurityRuleKind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: share.ScopeFed,
+		},
+		Spec: resource.NvCrdFedConfigSpec{},
+	}
+
+	var webhooks []api.RESTCrdFedWebHook
+	if cconf := cacher.GetFedSystemConfig(access.NewFedAdminAccessControl()); cconf != nil {
+		webhooks = make([]api.RESTCrdFedWebHook, 0, len(cconf.Webhooks))
+		for _, wh := range cconf.Webhooks {
+			webhooks = append(webhooks, api.RESTCrdFedWebHook{
+				Name:     wh.Name,
+				Url:      wh.Url,
+				Enable:   wh.Enable,
+				UseProxy: wh.UseProxy,
+				Type:     wh.Type,
+			})
+		}
+	}
+	resp.Spec = resource.NvCrdFedConfigSpec{
+		FedConfig: &api.RESTCrdFedConfig{
+			Name:     share.ScopeFed,
+			Webhooks: webhooks,
+		},
+	}
+
+	doExport("cfgFedConfigExport.yaml", "federal config", rconf.RemoteExportOptions, resp, w, r, acc, login)
+}
+
+func deleteFedConfig(acc *access.AccessControl) {
+	var cconf *share.CLUSSystemConfig
+	var rev uint64
+	// Retrieve from the cluster
+	cconf, rev = clusHelper.GetFedSystemConfigRev(acc)
+	if cconf == nil {
+		return
+	}
+
+	webhooks := make([]share.CLUSWebhook, 0, len(cconf.Webhooks))
+	for i := range cconf.Webhooks {
+		if cconf.Webhooks[i].CfgType == share.FederalCfg {
+			webhooks = append(webhooks, cconf.Webhooks[i])
+		}
+	}
+	cconf.Webhooks = webhooks
+
+	err := clusHelper.PutFedSystemConfigRev(cconf, rev)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
+	}
+}
+
+func importFedConfig(loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,
+	postImportOp kv.PostImportFunc, acc *access.AccessControl, login *loginSession) error {
+	log.Debug()
+	defer os.Remove(importTask.TempFilename)
+
+	json_data, _ := os.ReadFile(importTask.TempFilename)
+	var secRule resource.NvCrdFedConfigSecurityRule
+	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvConfigSecurityRuleKind {
+		msg := "Invalid security rule(s)"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_FED_CONFIG)
+		return nil
+	}
+
+	var inc float32
+	var progress float32 // progress percentage
+
+	inc = 90.0 / float32(3)
+	progress = 6
+
+	importTask.Percentage = int(progress)
+	importTask.Status = share.IMPORT_RUNNING
+	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+	var err error
+	var crdHandler nvCrdHandler
+	crdHandler.Init(share.CLUSLockServerKey, importCallerRest)
+	if crdHandler.AcquireLock(clusterLockWait) {
+		defer crdHandler.ReleaseLock()
+
+		// [1] parse nvconfigsecurityrules in the yaml file
+		parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdFedConfigContent(&secRule, share.ReviewTypeImportFedConfig, share.ReviewTypeDisplayFedConfig)
+		if errCount > 0 {
+			err = errors.New(errMsg)
+			postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_FED_CONFIG)
+			return nil
+		}
+
+		if importTask.Overwrite == "1" {
+			kv.DeleteResponseRuleByGroup("")
+		}
+
+		progress += inc
+		importTask.Percentage = int(progress)
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+		cacheRecord := share.CLUSCrdSecurityRule{
+			ResponseRules: &share.CLUSCrdResponseRules{},
+		}
+		// [4] import all security rules defined in the yaml file
+		err := crdHandler.crdHandleFedConfig(parsedCfg.CfgType, parsedCfg.FedConfig, &cacheRecord, share.ReviewTypeImportResponse)
+		if err != nil {
+			importTask.Status = err.Error()
+		}
+
+		importTask.Percentage = 90
+		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+
+		if err == nil && importTask.Scope == share.ScopeFed {
+			updateFedRulesRevision([]string{share.FedSystemConfigType}, acc, login)
+		}
+	}
+
+	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_FED_CONFIG)
+
+	return nil
 }
