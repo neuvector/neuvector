@@ -38,7 +38,6 @@ type ScannerAcquisitionManager struct {
 	clusterHelper                kv.ClusterHelper
 	requestChan                  chan *acquireScannerRequest
 	workerStarted                sync.Once
-	shutdownCh                   chan struct{}
 }
 
 var ScannerAcquisitionMgr *ScannerAcquisitionManager
@@ -58,7 +57,6 @@ func NewScannerAcquisitionManager(maxConcurrentScansPerScanner, maxConcurrentRep
 		maxConcurrentScansPerScanner: maxConcurrentScansPerScanner,
 		clusterHelper:                kv.GetClusterHelper(),
 		requestChan:                  make(chan *acquireScannerRequest, maxConcurrentRepoScanTasks*2), // Buffer for up to maxConcurrentRepoScanTasks * 2 pending requests,
-		shutdownCh:                   make(chan struct{}),
 	}
 	mgr.SetScannerHealthChecker(mgr.Ping)
 	return mgr
@@ -72,17 +70,21 @@ func (mgr *ScannerAcquisitionManager) GetMaxConcurrentScansPerScanner() int {
 	return mgr.maxConcurrentScansPerScanner
 }
 
+func (mgr *ScannerAcquisitionManager) SetClusterHelper(clusterHelper kv.ClusterHelper) {
+	mgr.clusterHelper = clusterHelper
+}
+
 func (mgr *ScannerAcquisitionManager) GetClusterHelper() kv.ClusterHelper {
 	return mgr.clusterHelper
 }
 
 // backoffDelay calculates exponential backoff with jitter
-func (mgr *ScannerAcquisitionManager) backoffDelay(attempt int) time.Duration {
-	if attempt <= 1 {
+func (mgr *ScannerAcquisitionManager) backoffDelay(attempts int) time.Duration {
+	if attempts <= 1 {
 		return BaseDelay
 	}
 
-	exp := float64(BaseDelay) * math.Pow(2, float64(attempt-1))
+	exp := float64(BaseDelay) * math.Pow(2, float64(attempts-1))
 	if exp > float64(MaxDelay) {
 		exp = float64(MaxDelay)
 	}
@@ -101,6 +103,18 @@ func (mgr *ScannerAcquisitionManager) startWorker() {
 	})
 }
 
+func (mgr *ScannerAcquisitionManager) collectPendingRequests() []*acquireScannerRequest {
+	pendingRequests := []*acquireScannerRequest{}
+	for {
+		select {
+		case req := <-mgr.requestChan:
+			pendingRequests = append(pendingRequests, req)
+		default:
+			return pendingRequests
+		}
+	}
+}
+
 // processRequestQueue processes scanner acquisition requests in pull-time order
 func (mgr *ScannerAcquisitionManager) processRequestQueue() {
 	var pendingRequests []*acquireScannerRequest
@@ -108,24 +122,10 @@ func (mgr *ScannerAcquisitionManager) processRequestQueue() {
 	for {
 		// If no pending requests, wait for new ones from channel (blocking)
 		if len(pendingRequests) == 0 {
-			select {
-			case <-mgr.shutdownCh:
-				return
-			case req := <-mgr.requestChan:
-				pendingRequests = append(pendingRequests, req)
-			}
+			pendingRequests = append(pendingRequests, <-mgr.requestChan)
 		}
 
-		for len(mgr.requestChan) > 0 {
-			select {
-			case req := <-mgr.requestChan:
-				pendingRequests = append(pendingRequests, req)
-			case <-mgr.shutdownCh:
-				return
-			default:
-				break
-			}
-		}
+		pendingRequests = append(pendingRequests, mgr.collectPendingRequests()...)
 
 		// Sort by pullTime to get earliest request first
 		sort.Slice(pendingRequests, func(i, j int) bool {
@@ -238,7 +238,7 @@ func (mgr *ScannerAcquisitionManager) getAllAvailableScanners() map[string]share
 
 func (mgr *ScannerAcquisitionManager) CountScanners() (busy, idle uint32) {
 	for _, scanner := range mgr.clusterHelper.GetAvailableScanners() {
-		if scanner.ScanCredit > 0 {
+		if scanner.ScanCredit <= 0 {
 			busy++
 		} else {
 			idle++
