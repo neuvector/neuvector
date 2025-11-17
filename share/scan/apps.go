@@ -68,6 +68,11 @@ const (
 var pyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\.]+)-([a-zA-Z0-9\.]+)[\-a-zA-Z0-9\.]*\.(egg-info\/PKG-INFO|dist-info\/WHEEL)$`)
 var rubyRegexp = regexp.MustCompile(`/([a-zA-Z0-9_\-]+)-([0-9\.]+)\.gemspec$`)
 
+type NodeJSPackageInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 type ComposerLock struct {
 	Packages    []ComposerPackage `json:"packages"`
 	DevPackages []ComposerPackage `json:"packages-dev"`
@@ -291,44 +296,24 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 }
 
 func isNodejs(filename string) bool {
-	return strings.Contains(filename, nodeModules) &&
-		strings.HasSuffix(filename, nodePackage)
+	return strings.HasSuffix(filename, nodePackage)
 }
 
 func (s *ScanApps) parseNodePackage(filename, fullpath string) {
-	var version string
-	var name string
-	inputFile, err := os.Open(fullpath)
+	data, err := os.ReadFile(fullpath)
 	if err != nil {
-		log.WithFields(log.Fields{"err": err, "fullpath": fullpath, "filename": filename}).Debug("read file fail")
+		log.WithFields(log.Fields{"err": err, "fullpath": fullpath}).Debug("read file fail")
 		return
 	}
-	defer inputFile.Close()
 
-	scanner := bufio.NewScanner(inputFile)
-	for scanner.Scan() {
-		s := scanner.Text()
-		if strings.HasPrefix(s, "  \"version\":") {
-			a := len("  \"version\": \"")
-			b := strings.LastIndex(s, "\"")
-			if b < 0 {
-				continue
-			}
-			version = s[a:b]
-		} else if strings.HasPrefix(s, "  \"name\": \"") {
-			a := len("  \"name\": \"")
-			b := strings.LastIndex(s, "\"")
-			if b < 0 {
-				continue
-			}
-			name = s[a:b]
-		}
-		if name != "" && version != "" {
-			break
-		}
+	var pkgInfo NodeJSPackageInfo
+	if err := json.Unmarshal(data, &pkgInfo); err != nil {
+		log.WithFields(log.Fields{"err": err, "fullpath": fullpath}).Debug("unmarshal fail")
+		return
 	}
 
-	if name == "" || version == "" {
+	if pkgInfo.Name == "" || pkgInfo.Version == "" {
+		log.WithFields(log.Fields{"name": pkgInfo.Name, "version": pkgInfo.Version, "filename": filename}).Warn("package.json is not complete")
 		return
 	}
 
@@ -337,8 +322,8 @@ func (s *ScanApps) parseNodePackage(filename, fullpath string) {
 	// filename = strings.Replace(filename, "/package.json", "", -1)
 	pkg := AppPackage{
 		AppName:    nodeJs,
-		ModuleName: name,
-		Version:    version,
+		ModuleName: pkgInfo.Name,
+		Version:    pkgInfo.Version,
 		FileName:   filename,
 	}
 	s.pkgs[filename] = []AppPackage{pkg}
