@@ -353,7 +353,7 @@ func newClusterHelper(id, version string, persist bool, keyRotationDuration time
 }
 
 func GetClusterHelper() ClusterHelper {
-	return clusHelper
+	return clusHelperImpl
 }
 
 func SetNextKeyRotationTime(keyRotationDuration time.Duration) error {
@@ -1574,7 +1574,7 @@ func (m clusterHelper) GetScannerRev(id string) (*share.CLUSScanner, uint64, err
 	key := share.CLUSScannerKey(id)
 	value, rev, err := m.get(key)
 	if err != nil || value == nil {
-		return nil, 0, fmt.Errorf("scanner %s not found", id)
+		return nil, 0, common.ErrObjectNotFound
 	}
 
 	var s share.CLUSScanner
@@ -1668,11 +1668,10 @@ func (m clusterHelper) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string
 
 		selectedScanner, rev, err := m.GetScannerRev(scanner.ID)
 		if err != nil {
-			log.WithFields(log.Fields{"error": err, "scanner": selectedScanner.ID}).Error("Failed to get scanner")
+			log.WithFields(log.Fields{"error": err, "scanner": scanner.ID}).Error("Failed to get scanner")
 			continue
 		}
 
-		// If the CAS is failed, try the next least loaded scanner
 		if selectedScanner.ScanCredit <= 0 {
 			continue
 		}
@@ -1705,7 +1704,7 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string) error {
 	maxRetries := 10
 	for retry := 0; retry < maxRetries; retry++ {
 		// Get current scanner state with revision
-		value, rev, err := m.get(key)
+		scanner, rev, err := m.GetScannerRev(scannerId)
 		if err != nil {
 			// Check if scanner was deleted (object not found)
 			if errors.Is(err, common.ErrObjectNotFound) {
@@ -1719,23 +1718,11 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string) error {
 			continue
 		}
 
-		if value == nil {
-			// Scanner key exists but has no value - treat as deleted
-			log.WithFields(log.Fields{"scanner": scannerId}).Debug("Scanner not found during credit release, likely deleted")
-			return nil
-		}
-
-		var scanner share.CLUSScanner
-		if err := nvJsonUnmarshal(key, value, &scanner); err != nil {
-			log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Error("Failed to unmarshal scanner")
-			return err
-		}
-
 		// Increment credit, ensuring it doesn't exceed max
 		scanner.ScanCredit = min(scanner.ScanCredit+1, scanner.MaxConcurrentScansPerScanner)
 
 		// Attempt to update using CAS (PutRev)
-		value, err = json.Marshal(scanner)
+		value, err := json.Marshal(scanner)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Error("Failed to marshal scanner")
 			return err
