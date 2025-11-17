@@ -132,13 +132,20 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 		// RPC request failed
 		scanErr = NewJobError(api.RESTErrClusterRPCError, err, nil)
 		log.WithFields(log.Fields{
-			"registry": req.Registry, "image": getImageName(req), "error": err,
+			"registry": req.Registry,
+			"image":    getImageName(req),
+			"error":    err,
+			"errMsg":   rsr.errMsg,
 		}).Error("RPC request fail")
 	} else if result.Error != share.ScanErrorCode_ScanErrNone {
 		// Include the error code in Detail to enable ShouldRetry logic
 		scanErr = NewJobError(api.RESTErrFailRepoScan, err, result.Error)
 		log.WithFields(log.Fields{
-			"registry": req.Registry, "image": getImageName(req), "error": scanUtils.ScanErrorToStr(result.Error),
+			"registry":   req.Registry,
+			"image":      getImageName(req),
+			"error":      err,
+			"error_msg":  rsr.errMsg,
+			"scan_error": scanUtils.ScanErrorToStr(result.Error),
 		}).Error("Failed to scan repository")
 	} else {
 		log.WithFields(log.Fields{

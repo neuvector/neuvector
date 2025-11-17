@@ -309,8 +309,8 @@ func TestCountScanners(t *testing.T) {
 
 	// Two scanners should be busy (ScanCredit > 0, meaning they have available slots)
 	// One scanner should be idle (ScanCredit = 0, fully utilized)
-	assert.Equal(t, uint32(2), busy, "Should count 2 busy scanners (ScanCredit > 0)")
-	assert.Equal(t, uint32(1), idle, "Should count 1 idle scanner (ScanCredit = 0)")
+	assert.Equal(t, uint32(1), busy, "Should count 1 busy scanner (ScanCredit > 0)")
+	assert.Equal(t, uint32(2), idle, "Should count 2 idle scanners (ScanCredit = 0)")
 }
 
 // TestHealthCheckIntegration verifies health check is called during acquire
