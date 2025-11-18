@@ -1986,8 +1986,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 				err = errors.New(errMsg)
 				break
 			}
-			if (importTask.Scope == share.ScopeFed && grpDefRet.CfgType != share.FederalCfg) ||
-				(importTask.Scope == share.ScopeLocal && grpDefRet.CfgType != share.UserCreated) {
+			if isScopeCfgTypeMismatch(importTask.Scope, grpDefRet.CfgType) {
 				err = fmt.Errorf("Group definition %s is not allowed for import with scope=%s", grpDefRet.TargetName, importTask.Scope)
 				break
 			}
@@ -2024,8 +2023,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 				err = errors.New(errMsg)
 				break
 			}
-			if (importTask.Scope == share.ScopeFed && grpCfgRet.CfgType != share.FederalCfg) ||
-				(importTask.Scope == share.ScopeLocal && grpCfgRet.CfgType != share.UserCreated) {
+			if isScopeCfgTypeMismatch(importTask.Scope, grpCfgRet.CfgType) {
 				err = fmt.Errorf("Group %s is not allowed for import with scope=%s", grpCfgRet.TargetName, importTask.Scope)
 				break
 			}

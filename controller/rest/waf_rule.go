@@ -1278,8 +1278,7 @@ func importWaf(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 				err = errors.New(errMsg)
 				break
 			}
-			if (importTask.Scope == share.ScopeFed && parsedCfg.CfgType != share.FederalCfg) ||
-				(importTask.Scope == share.ScopeLocal && parsedCfg.CfgType != share.UserCreated) {
+			if isScopeCfgTypeMismatch(importTask.Scope, parsedCfg.CfgType) {
 				err = fmt.Errorf("WAS sensor %s is not allowed for import with scope=%s", parsedCfg.WafSensorCfg.Name, importTask.Scope)
 				break
 			}
