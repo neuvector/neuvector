@@ -124,6 +124,7 @@ const LearnedSvcGroupPrefix string = "nv.ip."
 const FederalGroupPrefix string = "fed."
 const FedAllHostGroup string = "fed.nodes"
 const FedAllContainerGroup string = "fed.containers"
+const FedExternalGroup string = "fed.external"
 
 const LearnedExternal string = "external"
 const AllHostGroup string = "nodes"
