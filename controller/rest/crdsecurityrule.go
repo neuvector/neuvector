@@ -2190,31 +2190,21 @@ func (h *nvCrdHandler) doGroupReferral(owner string, crdGroupCfg *api.RESTCrdGro
 		  if a learned/regualr group already exists, replace it
 */
 
-func (h *nvCrdHandler) parseCrdGroup(targetName string, crdgroupCfg *api.RESTCrdGroupConfig, curGroups *[]api.RESTCrdGroupConfig,
+func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgroupCfg *api.RESTCrdGroupConfig, curGroups *[]api.RESTCrdGroupConfig,
 	groupsInSecRule utils.Set, recordList map[string]*share.CLUSCrdSecurityRule, recordName string,
 	hasDlpWafCfg bool, reviewType share.TReviewType, reviewTypeDisplay, owner string) (string, int) {
 	var err int
 	var retMsg string
 	var groupSrcDesc string
-	var cfgType share.TCfgType
 
 	errMsgSubject := fmt.Sprintf("%s Rule format error", reviewTypeDisplay)
-	isTargetFedGroup := strings.HasPrefix(targetName, api.FederalGroupPrefix)
-	isFedSecRule := (strings.HasPrefix(crdgroupCfg.Name, api.FederalGroupPrefix) || crdgroupCfg.Name == api.LearnedExternal)
-	if isFedSecRule && h.fedRole != api.FedRoleMaster {
+	isFedGroup := strings.HasPrefix(crdgroupCfg.Name, api.FederalGroupPrefix)
+	if inFedSecRule && h.fedRole != api.FedRoleMaster {
 		retMsg = fmt.Sprintf("%s: Security rule %s can only be imported on primary cluster", errMsgSubject, h.mdName)
 		return retMsg, 1
 	}
 
-	cfgType = share.GroundCfg
-	if reviewType == share.ReviewTypeImportGroup {
-		if isTargetFedGroup {
-			cfgType = share.FederalCfg
-		} else {
-			cfgType = share.UserCreated
-		}
-	}
-
+	cfgType := h.calcSecRuleCfgType(inFedSecRule, reviewType)
 	allowNameChange := true
 	if owner == resource.NvGroupDefKind || crdgroupCfg.NameReferral || isReservedNvGroupDefName(crdgroupCfg.Name) {
 		allowNameChange = false
@@ -2249,11 +2239,13 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, crdgroupCfg *api.RESTCrd
 	} else {
 		groupStr = fmt.Sprintf("%s(under %s section)", groupCfg.Name, owner)
 	}
-	if isTargetFedGroup != isFedSecRule {
-		retMsg = fmt.Sprintf("%s: Group %s validate error. Details: incompatible with target group %s for a security rule", errMsgSubject, groupStr, targetName)
+	if isFedGroup != inFedSecRule && (crdgroupCfg.Name != api.LearnedExternal) {
+		retMsg = fmt.Sprintf("%s: Group %s validate error. Details: incompatible with target group %s for a security rule",
+			errMsgSubject, groupStr, targetName)
 		return retMsg, 1
-	} else if isFedSecRule && isLearnedGroupName {
-		retMsg = fmt.Sprintf("%s: Group %s validate error. Details: learned groups are not supported for federal policy", errMsgSubject, groupStr)
+	} else if inFedSecRule && isLearnedGroupName {
+		retMsg = fmt.Sprintf("%s: Group %s validate error. Details: learned groups are not supported for federal policy",
+			errMsgSubject, groupStr)
 		return retMsg, api.RESTErrInvalidName
 	} else if isLearnedGroupName {
 		err, msg := validateLearnGroupConfig(groupCfg)
@@ -2666,7 +2658,7 @@ func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec)
 }
 
 // for CRD & group import
-func (h *nvCrdHandler) parseCurCrdGfwContent(gfwrule *resource.NvSecurityRule, recordList map[string]*share.CLUSCrdSecurityRule,
+func (h *nvCrdHandler) parseCurCrdGfwContent(scope string, gfwrule *resource.NvSecurityRule, recordList map[string]*share.CLUSCrdSecurityRule,
 	reviewType share.TReviewType, reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 	var buffer bytes.Buffer
 	var errNo int
@@ -2691,14 +2683,32 @@ func (h *nvCrdHandler) parseCurCrdGfwContent(gfwrule *resource.NvSecurityRule, r
 	}
 
 	h.mdName = gfwrule.GetName()
-	isFedSecRule := strings.HasPrefix(h.mdName, api.FederalGroupPrefix)
 	targetName := gfwrule.Spec.Target.Selector.Name
+	isFedSecRule := strings.HasPrefix(targetName, api.FederalGroupPrefix)
+	if targetName == api.LearnedExternal {
+		// for fed "external" group imported thru REST api, its k8s cr name must be "fed.external"
+		// for fed "external" group imported thru CRD, only k8s cr name "fed.external" is valid name
+		// for local "external" group imported thru crd/REST api, its k8s cr name could be anything but not "fed.external"
+		if scope == share.ScopeFed && (h.mdName != api.FedExternalGroup) {
+			errMsg = fmt.Sprintf("%s:  security rule name of target group %s with scope %s must be %s",
+				errMsgSubject, targetName, scope, api.FedExternalGroup)
+			return nil, 1, errMsg, ""
+		}
+		if scope == share.ScopeLocal && (h.mdName == api.FedExternalGroup) {
+			errMsg = fmt.Sprintf("%s:  security rule name of target group %s with scope %s must not be %s",
+				errMsgSubject, targetName, scope, api.FedExternalGroup)
+			return nil, 1, errMsg, ""
+		}
+		if h.mdName == api.FedExternalGroup {
+			isFedSecRule = true
+		}
+	}
 	if isFedSecRule {
 		if h.fedRole != api.FedRoleMaster {
 			errMsg = fmt.Sprintf("%s:  security rule %s can only be imported on primary cluster", errMsgSubject, h.mdName)
 			return nil, 1, errMsg, ""
 		}
-		if h.mdName != targetName {
+		if h.mdName != targetName && targetName != api.LearnedExternal {
 			errMsg = fmt.Sprintf("%s:  security rule %s name is different from target group name %s", errMsgSubject, h.mdName, targetName)
 			return nil, 1, errMsg, ""
 		}
@@ -2738,7 +2748,7 @@ func (h *nvCrdHandler) parseCurCrdGfwContent(gfwrule *resource.NvSecurityRule, r
 
 	// 2. Get the target group and do validation. crdCfgRet.GroupCfgs collects all the mentioned groups in this security rule.
 	hasDlpWafCfg := (crdCfgRet.DlpGroupCfg != nil || crdCfgRet.WafGroupCfg != nil)
-	errMsg, errNo = h.parseCrdGroup(targetName, &gfwrule.Spec.Target.Selector, &crdCfgRet.GroupCfgs, groupsInSecRule,
+	errMsg, errNo = h.parseCrdGroup(targetName, isFedSecRule, &gfwrule.Spec.Target.Selector, &crdCfgRet.GroupCfgs, groupsInSecRule,
 		recordList, recordName, hasDlpWafCfg, reviewType, reviewTypeDisplay, "target")
 	if errNo > 0 {
 		errCount++
@@ -2802,13 +2812,20 @@ targetpass:
 
 	// 3. Get the ingress policy and From Group, the target group will be used as To Group
 	for _, ruleDetail := range gfwrule.Spec.IngressRule {
-		errMsg, errNo = h.parseCrdGroup(targetName, &ruleDetail.Selector, &crdCfgRet.GroupCfgs, groupsInSecRule,
+		errMsg, errNo = h.parseCrdGroup(targetName, isFedSecRule, &ruleDetail.Selector, &crdCfgRet.GroupCfgs, groupsInSecRule,
 			recordList, recordName, false, reviewType, reviewTypeDisplay, "ingress")
 		if errNo > 0 {
 			errCount++
 			return nil, errCount, errMsg, recordName
 		}
 
+		fromFedGroup := strings.HasPrefix(ruleDetail.Selector.Name, api.FederalGroupPrefix)
+		if crdCfgRet.TargetName == api.LearnedExternal {
+			if (isFedSecRule && !fromFedGroup) || (!isFedSecRule && fromFedGroup) {
+				log.WithFields(log.Fields{"isFedSecRule": isFedSecRule, "from": ruleDetail.Selector.Name, "to": crdCfgRet.TargetName}).Info("skip")
+				continue
+			}
+		}
 		ruleCfg, errMsg, errNo = h.parseCrdFwRule(ruleDetail.Selector.Name, crdCfgRet.TargetName,
 			recordName, ruleDetail, ruleSet, reviewType, "ingress")
 		if errNo > 0 {
@@ -2825,13 +2842,20 @@ targetpass:
 
 	// 4. Get the egress policy and To Group, the target group will be used as From Group
 	for _, ruleDetail := range gfwrule.Spec.EgressRule {
-		errMsg, errNo = h.parseCrdGroup(targetName, &ruleDetail.Selector, &crdCfgRet.GroupCfgs, groupsInSecRule,
+		errMsg, errNo = h.parseCrdGroup(targetName, isFedSecRule, &ruleDetail.Selector, &crdCfgRet.GroupCfgs, groupsInSecRule,
 			recordList, recordName, false, reviewType, reviewTypeDisplay, "egress")
 		if errNo > 0 {
 			errCount++
 			return nil, errCount, errMsg, recordName
 		}
 
+		toFedGroup := strings.HasPrefix(ruleDetail.Selector.Name, api.FederalGroupPrefix)
+		if crdCfgRet.TargetName == api.LearnedExternal {
+			if (isFedSecRule && !toFedGroup) || (!isFedSecRule && toFedGroup) {
+				log.WithFields(log.Fields{"isFedSecRule": isFedSecRule, "from": crdCfgRet.TargetName, "to": ruleDetail.Selector.Name}).Info("skip")
+				continue
+			}
+		}
 		ruleCfg, errMsg, errNo = h.parseCrdFwRule(crdCfgRet.TargetName, ruleDetail.Selector.Name,
 			recordName, ruleDetail, ruleSet, reviewType, "egress")
 		if errNo > 0 {
@@ -3013,7 +3037,7 @@ func (h *nvCrdHandler) parseCurCrdGrpDefContent(grpDef *resource.NvGroupDefiniti
 		Criteria: selector.Criteria,
 	}
 
-	errMsg, errNo = h.parseCrdGroup(crdgroupCfg.Name, &crdgroupCfg, &crdCfgRet.GroupCfgs, groupsInSecRule, nil, "", false,
+	errMsg, errNo = h.parseCrdGroup(crdgroupCfg.Name, isFedSecRule, &crdgroupCfg, &crdCfgRet.GroupCfgs, groupsInSecRule, nil, "", false,
 		reviewType, reviewTypeDisplay, resource.NvGroupDefKind)
 	if errNo > 0 {
 		return nil, 1, errMsg
@@ -3874,7 +3898,7 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 	} else {
 		switch kind {
 		case resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind:
-			crdCfgRet, errCount, errMsg, recordName = h.parseCurCrdGfwContent(gfwrule, recordList, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
+			crdCfgRet, errCount, errMsg, recordName = h.parseCurCrdGfwContent("", gfwrule, recordList, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 		case resource.NvGroupDefKind:
 			crdCfgRet, errCount, errMsg = h.parseCurCrdGrpDefContent(grpDef, share.ReviewTypeCRD, share.ReviewTypeDisplayCRD)
 		case resource.NvAdmCtrlSecurityRuleKind:
@@ -4018,7 +4042,6 @@ func isExportSkipGroupName(name, owner string, alwaysAllowNsUser bool, acc *acce
 
 func exportAttachRule(scope string, rule *api.RESTPolicyRule, owner string, acc *access.AccessControl, cnt int,
 	useNameReferral, alwaysAllowNsUser bool) (*resource.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
-
 	var detail resource.NvSecurityRuleDetail
 	var group *api.RESTGroup
 	var nvGroupDefCfg resource.NvGroupDefCfg
@@ -4174,6 +4197,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 	defer clusHelper.ReleaseLock(lock)
 
+	isFedScope := (scope == share.ScopeFed)
 	for _, gname := range exportGroups {
 		if skip, group = isExportSkipGroupName(gname, "target", false, acc); skip {
 			e := "Skip special group export"
@@ -4219,6 +4243,9 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				ProcessRule: make([]resource.NvSecurityProcessRule, 0),
 				FileRule:    make([]resource.NvSecurityFileRule, 0),
 			},
+		}
+		if isFedScope && tgroup.Name == api.LearnedExternal {
+			resptmp.ObjectMeta.Name = api.FedExternalGroup
 		}
 		if rconf.UseNameReferral {
 			resptmp.Spec.Target.Selector.Comment = ""
@@ -4306,12 +4333,22 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				var detail *resource.NvSecurityRuleDetail
 				var nvGroupDefCfg resource.NvGroupDefCfg
 				if rule.To == gname {
+					fromFedGroup := strings.HasPrefix(rule.From, api.FederalGroupPrefix)
+					if gname == api.LearnedExternal && isFedScope != fromFedGroup {
+						log.WithFields(log.Fields{"scope": scope, "from": rule.From, "to": rule.To}).Info("skip")
+						continue
+					}
 					detail, nvGroupDefCfg = exportAttachRule(scope, rule, "ingress", acc, inCount, rconf.UseNameReferral, alwaysAllowNsUser)
 					if detail != nil {
 						resptmp.Spec.IngressRule = append(resptmp.Spec.IngressRule, *detail)
 						inCount = inCount + 1
 					}
 				} else {
+					toFedGroup := strings.HasPrefix(rule.To, api.FederalGroupPrefix)
+					if gname == api.LearnedExternal && isFedScope != toFedGroup {
+						log.WithFields(log.Fields{"scope": scope, "from": rule.From, "to": rule.To}).Info("skip")
+						continue
+					}
 					detail, nvGroupDefCfg = exportAttachRule(scope, rule, "egress", acc, eCount, rconf.UseNameReferral, alwaysAllowNsUser)
 					if detail != nil {
 						resptmp.Spec.EgressRule = append(resptmp.Spec.EgressRule, *detail)

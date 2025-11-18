@@ -2019,7 +2019,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 		// ---------------------------------------------------
 		// [1]: parse all security rules in the yaml file
 		for _, secRule := range secRules {
-			grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(&secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup)
+			grpCfgRet, errCount, errMsg, _ := crdHandler.parseCurCrdGfwContent(importTask.Scope, &secRule, nil, share.ReviewTypeImportGroup, share.ReviewTypeDisplayGroup)
 			if errCount > 0 {
 				err = errors.New(errMsg)
 				break
