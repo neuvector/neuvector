@@ -4106,6 +4106,17 @@ func checkScopeParameter(w http.ResponseWriter, query *restQuery, defaultValue s
 	return scope, nil
 }
 
+func isScopeCfgTypeMismatch(scope string, cfgType share.TCfgType) bool {
+	switch scope {
+	case share.ScopeFed:
+		return cfgType != share.FederalCfg
+	case share.ScopeLocal:
+		return cfgType != share.UserCreated
+	default:
+		return true
+	}
+}
+
 func checkExportScope(w http.ResponseWriter, r *http.Request, exportType string, login *loginSession) (string, error) {
 	query := restParseQuery(r)
 	scope, err := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal+enumScopeFed)

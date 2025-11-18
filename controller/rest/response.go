@@ -1378,8 +1378,7 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 				err = errors.New(errMsg)
 				break
 			}
-			if (importTask.Scope == share.ScopeFed && parsedCfg.CfgType != share.FederalCfg) ||
-				(importTask.Scope == share.ScopeLocal && parsedCfg.CfgType != share.UserCreated) {
+			if isScopeCfgTypeMismatch(importTask.Scope, parsedCfg.CfgType) {
 				log.WithFields(log.Fields{"scope": importTask.Scope, "event": parsedCfg.ResponseCfg.Event}).Warn("skip")
 				err = fmt.Errorf("Response rule %s is not allowed for import with scope=%s", secRule.GetName(), importTask.Scope)
 				break

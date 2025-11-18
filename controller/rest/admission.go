@@ -1407,8 +1407,6 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	// special case for exporting admission control rules:
-	// all exported rules are id-independent which means scope parameter doesn't affect what rules can be exported
 	scope, err := checkExportScope(w, r, share.IMPORT_TYPE_ADMCTRL, login)
 	if err != nil {
 		return
@@ -1422,6 +1420,9 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
+
+	// special case for exporting admission control rules:
+	// all exported rules are id-independent which means scope parameter doesn't affect what rules can be exported
 
 	exportFileName := "cfgAdmissionRulesExport.yaml"
 	exportType := "admission control settings"
@@ -1574,8 +1575,7 @@ func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImpo
 		parsedCfg, errCount, errMsg, _ := crdHandler.parseCurCrdAdmCtrlContent(&secRule, share.ReviewTypeImportAdmCtrl, share.ReviewTypeDisplayAdmission)
 		if errCount > 0 {
 			err = errors.New(errMsg)
-		} else if (importTask.Scope == share.ScopeFed && parsedCfg.CfgType != share.FederalCfg) ||
-			(importTask.Scope == share.ScopeLocal && parsedCfg.CfgType != share.UserCreated) {
+		} else if isScopeCfgTypeMismatch(importTask.Scope, parsedCfg.CfgType) {
 			err = fmt.Errorf("Admission control security rule %s is not allowed for import with scope=%s", secRule.GetName(), importTask.Scope)
 		} else {
 			progress += inc
