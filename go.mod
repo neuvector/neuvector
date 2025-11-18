@@ -51,7 +51,7 @@ require (
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/net v0.45.0
 	golang.org/x/oauth2 v0.30.0
-	golang.org/x/sys v0.37.0
+	golang.org/x/sys v0.38.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/grpc/security/advancedtls v1.0.0
 	gopkg.in/yaml.v3 v3.0.1
