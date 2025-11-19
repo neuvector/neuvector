@@ -626,9 +626,8 @@ func main() {
 		getConfigKvData, evqueue, keyRotationDuration)
 	ruleid.Init()
 
-	// Each scanner can handle multiple requests concurrently, set 2 to avoid OOM.
 	// Initialize after kv.Init() to ensure clusterHelper is available
-	rpc.ScannerAcquisitionMgr = rpc.NewScannerAcquisitionManager(*maxScannerTasks, *maxConcurrentRepoScanTasks)
+	rpc.ScannerAcquisitionMgr = rpc.NewScannerAcquisitionManager(*maxScannerTasks, *maxConcurrentRepoScanTasks, kv.GetClusterHelper())
 
 	// Start cluster
 	clusterCfg := &cluster.ClusterConfig{

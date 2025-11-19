@@ -77,6 +77,7 @@ var scanErrString = []string{
 	share.ScanErrorCode_ScanErrAwsDownloadErr:        "Aws Resource download error",
 	share.ScanErrorCode_ScanErrArgument:              "invalid input arguments",
 	share.ScanErrorCode_ScanErrAcquireScannerTimeout: "acquire scanner timeout",
+	share.ScanErrorCode_ScanErrSignatureScanError:    "signature scan error",
 }
 
 type CacheRecord struct {
