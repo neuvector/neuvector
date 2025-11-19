@@ -31,6 +31,8 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
+var defGroups utils.Set = utils.NewSet(api.LearnedExternal, api.AllHostGroup, api.AllContainerGroup, api.FedAllHostGroup, api.FedAllContainerGroup)
+
 func criteria2REST(inEntries []share.CLUSCriteriaEntry) []api.RESTCriteriaEntry {
 	var outEntries []api.RESTCriteriaEntry
 	for _, inC := range inEntries {
@@ -317,8 +319,7 @@ func isReservedGroupName(name string) bool {
 }
 
 func isDefaultGroup(name string) bool {
-	groups := utils.NewSet(api.LearnedExternal, api.AllHostGroup, api.AllContainerGroup, api.FedAllHostGroup, api.FedAllContainerGroup)
-	return groups.Contains(name)
+	return defGroups.Contains(name)
 }
 
 func isReservedNvGroupDefName(name string) bool {

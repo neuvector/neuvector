@@ -4200,6 +4200,8 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		exportType = "federal " + exportType
 	}
 
+	nvGrpDefSet := utils.NewSet()
+
 	lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, clusterLockWait)
 	if err != nil {
 		e := "Failed to acquire cluster lock"
@@ -4233,8 +4235,6 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 			}
 		}
-
-		nvGrpDefSet := utils.NewSet()
 
 		resptmp := resource.NvSecurityRule{
 			TypeMeta: metav1.TypeMeta{
@@ -4295,6 +4295,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				},
 			}
 			respGroupDefs.Items = append(respGroupDefs.Items, nvGrpDefItem)
+			nvGrpDefSet.Add(tgroup.Name)
 		}
 
 		// export process and file profiles
@@ -4372,6 +4373,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 					nvGrpDefItem.Spec.Selector.Name = nvGroupDefCfg.Name
 					nvGrpDefItem.Spec.Selector.Criteria = nvGroupDefCfg.Criteria
 					respGroupDefs.Items = append(respGroupDefs.Items, nvGrpDefItem)
+					nvGrpDefSet.Add(nvGroupDefCfg.Name)
 				}
 			}
 		}
