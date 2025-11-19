@@ -1085,6 +1085,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 					Enable:   rwh.Enable,
 					UseProxy: rwh.UseProxy,
 					Type:     rwh.Type,
+					CfgType:  wh.CfgType,
 				}
 				found = true
 				break
