@@ -1248,6 +1248,10 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 					isNewScanner = true
 				}
 				cacheMutexUnlock()
+
+				// Only add the scanner if it's newly discovered and either:
+				// 1. It's not a built-in scanner
+				// 2. It's the built-in scanner on this controller node
 				if isNewScanner && (!s.BuiltIn || s.ID == localDev.Ctrler.ID) {
 					if err := scan.AddScanner(s.ID); err != nil {
 						log.WithError(err).Warn("failed to add scanner to reg scheduler")

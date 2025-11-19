@@ -25,8 +25,7 @@ func TestIBMSAIntegration(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 	cacher = &cache.CacheMethod{}
-	rpc.ScannerAcquisitionMgr = rpc.NewScannerAcquisitionManager(2, 6)
-	rpc.ScannerAcquisitionMgr.SetClusterHelper(&mockCluster)
+	rpc.ScannerAcquisitionMgr = rpc.NewScannerAcquisitionManager(2, 6, &mockCluster)
 	cache.MockCacheInit()
 	clusHelper.SetCacheMockCallback(share.CLUSConfigSystemKey, cache.MockSystemConfigUpdate)
 	clusHelper.SetCacheMockCallback(share.CLUSConfigUserRoleStore, cache.MockUserRoleConfigUpdate)
