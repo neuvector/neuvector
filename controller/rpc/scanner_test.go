@@ -31,11 +31,10 @@ func newMockScanner(i int, maxConns int) *share.CLUSScanner {
 
 // setupTestManager creates a new ScannerAcquisitionManager with MockCluster for testing
 func setupTestManager(maxConns, maxConcurrentRepoScanTasks int) (*ScannerAcquisitionManager, *kv.MockCluster) {
-	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks)
 	mockHelper := &kv.MockCluster{}
 	mockHelper.Init(nil, nil)
-	mgr.clusterHelper = mockHelper
-	mgr.SetScannerHealthChecker(nil) // Disable health check for most tests
+	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks, mockHelper)
+	mgr.ScannerHealthChecker = nil // Disable health check for most tests
 	return mgr, mockHelper
 }
 
@@ -43,18 +42,18 @@ func setupTestManager(maxConns, maxConcurrentRepoScanTasks int) (*ScannerAcquisi
 func TestNewScannerAcquisitionManager(t *testing.T) {
 	maxConns := 3
 	maxConcurrentRepoScanTasks := 6
-	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks)
+	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks, &kv.MockCluster{})
 
 	assert.NotNil(t, mgr, "ScannerAcquisitionManager should be created")
 	assert.Equal(t, maxConns, mgr.maxConcurrentScansPerScanner, "maxConcurrentScansPerScanner should match")
-	assert.NotNil(t, mgr.scannerHealthChecker, "scannerHealthChecker should be initialized")
+	assert.NotNil(t, mgr.ScannerHealthChecker, "ScannerHealthChecker should be initialized")
 }
 
 // TestGetMaxConcurrentScansPerScanner verifies the getter method
 func TestGetMaxConcurrentScansPerScanner(t *testing.T) {
 	maxConns := 5
 	maxConcurrentRepoScanTasks := 6
-	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks)
+	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks, &kv.MockCluster{})
 
 	assert.Equal(t, maxConns, mgr.GetMaxConcurrentScansPerScanner(), "GetMaxConcurrentScansPerScanner should return correct value")
 }
@@ -323,11 +322,11 @@ func TestHealthCheckIntegration(t *testing.T) {
 	require.NoError(t, mockHelper.AddScanner(scanner))
 
 	healthCheckCalled := false
-	mgr.SetScannerHealthChecker(func(scannerID string, timeout time.Duration) error {
+	mgr.ScannerHealthChecker = func(scannerID string, timeout time.Duration) error {
 		healthCheckCalled = true
 		assert.Equal(t, scanner.ID, scannerID, "Health check should be called with correct scanner ID")
 		return nil
-	})
+	}
 
 	ctx := context.Background()
 	scannerID, err := mgr.acquireScanner(ctx)
@@ -348,9 +347,9 @@ func TestHealthCheckFailure(t *testing.T) {
 	scanner := newMockScanner(1, maxConns)
 	require.NoError(t, mockHelper.AddScanner(scanner))
 
-	mgr.SetScannerHealthChecker(func(scannerID string, timeout time.Duration) error {
+	mgr.ScannerHealthChecker = func(scannerID string, timeout time.Duration) error {
 		return fmt.Errorf("health check failed")
-	})
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

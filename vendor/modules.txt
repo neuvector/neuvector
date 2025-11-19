@@ -103,6 +103,9 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beevik/etree v1.5.1
 ## explicit; go 1.21.0
 github.com/beevik/etree
+# github.com/cenkalti/backoff/v5 v5.0.3
+## explicit; go 1.23
+github.com/cenkalti/backoff/v5
 # github.com/cenkalti/hub v1.0.2
 ## explicit; go 1.20
 github.com/cenkalti/hub

@@ -3,12 +3,13 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"math"
-	"math/rand/v2"
+	"net"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
@@ -25,19 +26,20 @@ type acquireScannerResult struct {
 
 // acquireScannerRequest represents a request to acquire a scanner
 type acquireScannerRequest struct {
-	pullTime   time.Time
-	ctx        context.Context
-	resultChan chan acquireScannerResult
-	attempts   int
+	pullTime     time.Time
+	resultChan   chan acquireScannerResult
+	attempts     int
+	shutdownChan chan struct{}
+	backoff      backoff.BackOff
 }
 
 // ScannerAcquisitionManager is responsible for managing the scan credit for the scanners.
 type ScannerAcquisitionManager struct {
 	maxConcurrentScansPerScanner int
-	scannerHealthChecker         ScannerHealthCheckFunc
+	ScannerHealthChecker         ScannerHealthCheckFunc
 	clusterHelper                kv.ClusterHelper
 	requestChan                  chan *acquireScannerRequest
-	workerStarted                sync.Once
+	workerStartedOnce            sync.Once
 }
 
 var ScannerAcquisitionMgr *ScannerAcquisitionManager
@@ -52,55 +54,26 @@ const (
 // It pings a scanner to verify it's available before assigning scan tasks to it
 type ScannerHealthCheckFunc func(scannerID string, timeout time.Duration) error
 
-func NewScannerAcquisitionManager(maxConcurrentScansPerScanner, maxConcurrentRepoScanTasks int) *ScannerAcquisitionManager {
+func NewScannerAcquisitionManager(maxConcurrentScansPerScanner, maxConcurrentRepoScanTasks int, clusterHelper kv.ClusterHelper) *ScannerAcquisitionManager {
 	mgr := &ScannerAcquisitionManager{
 		maxConcurrentScansPerScanner: maxConcurrentScansPerScanner,
-		clusterHelper:                kv.GetClusterHelper(),
+		clusterHelper:                clusterHelper,
 		requestChan:                  make(chan *acquireScannerRequest, maxConcurrentRepoScanTasks*2), // Buffer for up to maxConcurrentRepoScanTasks * 2 pending requests,
 	}
-	mgr.SetScannerHealthChecker(mgr.Ping)
-	return mgr
-}
 
-func (mgr *ScannerAcquisitionManager) SetScannerHealthChecker(healthChecker ScannerHealthCheckFunc) {
-	mgr.scannerHealthChecker = healthChecker
+	mgr.ScannerHealthChecker = mgr.Ping
+	mgr.workerStartedOnce.Do(func() {
+		go mgr.requestProcessLoop()
+	})
+	return mgr
 }
 
 func (mgr *ScannerAcquisitionManager) GetMaxConcurrentScansPerScanner() int {
 	return mgr.maxConcurrentScansPerScanner
 }
 
-func (mgr *ScannerAcquisitionManager) SetClusterHelper(clusterHelper kv.ClusterHelper) {
-	mgr.clusterHelper = clusterHelper
-}
-
 func (mgr *ScannerAcquisitionManager) GetClusterHelper() kv.ClusterHelper {
 	return mgr.clusterHelper
-}
-
-// backoffDelay calculates exponential backoff with jitter
-func (mgr *ScannerAcquisitionManager) backoffDelay(attempts int) time.Duration {
-	if attempts <= 1 {
-		return BaseDelay
-	}
-
-	exp := float64(BaseDelay) * math.Pow(2, float64(attempts-1))
-	if exp > float64(MaxDelay) {
-		exp = float64(MaxDelay)
-	}
-
-	// between [1-JitterFactor, 1+JitterFactor]
-	jitter := 1 - JitterFactor + rand.Float64()*(2*JitterFactor)
-	delay := exp * jitter
-
-	return time.Duration(delay)
-}
-
-// startWorker starts the background worker that processes requests from priority queue
-func (mgr *ScannerAcquisitionManager) startWorker() {
-	mgr.workerStarted.Do(func() {
-		go mgr.processRequestQueue()
-	})
 }
 
 func (mgr *ScannerAcquisitionManager) collectPendingRequests() []*acquireScannerRequest {
@@ -115,8 +88,8 @@ func (mgr *ScannerAcquisitionManager) collectPendingRequests() []*acquireScanner
 	}
 }
 
-// processRequestQueue processes scanner acquisition requests in pull-time order
-func (mgr *ScannerAcquisitionManager) processRequestQueue() {
+// requestProcessLoop processes scanner acquisition requests in pull-time order
+func (mgr *ScannerAcquisitionManager) requestProcessLoop() {
 	var pendingRequests []*acquireScannerRequest
 
 	for {
@@ -135,37 +108,41 @@ func (mgr *ScannerAcquisitionManager) processRequestQueue() {
 
 		// Check if context is still valid
 		select {
-		case <-req.ctx.Done():
-			req.resultChan <- acquireScannerResult{err: req.ctx.Err()}
+		case <-req.shutdownChan:
+			req.resultChan <- acquireScannerResult{err: context.Canceled}
 			close(req.resultChan)
 			pendingRequests = pendingRequests[1:]
 			continue
 		default:
 		}
-
-		scanner, err := mgr.clusterHelper.PickLeastLoadedScanner(mgr.scannerHealthChecker)
+		scanner, err := mgr.clusterHelper.PickLeastLoadedScanner(mgr.ScannerHealthChecker)
 
 		if err != nil {
 			// Retry - add backoff and keep it in queue for next iteration
 			req.attempts++
-			time.Sleep(mgr.backoffDelay(req.attempts))
+			time.Sleep(req.backoff.NextBackOff())
 			continue
-		} else {
-			pendingRequests = pendingRequests[1:]
-			req.resultChan <- acquireScannerResult{scannerID: scanner.ID, err: nil}
-			close(req.resultChan)
 		}
+		pendingRequests = pendingRequests[1:]
+		req.resultChan <- acquireScannerResult{scannerID: scanner.ID, err: nil}
+		close(req.resultChan)
 	}
 }
 
 // acquireScanner acquires a scanner using priority queue to maintain pull order
 func (mgr *ScannerAcquisitionManager) acquireScanner(ctx context.Context) (string, error) {
-	mgr.startWorker()
+	// Initialize backoff with default values
+	backoff := backoff.NewExponentialBackOff()
+	backoff.InitialInterval = BaseDelay
+	backoff.MaxInterval = MaxDelay
+	backoff.RandomizationFactor = JitterFactor
+
 	req := &acquireScannerRequest{
-		pullTime:   time.Now(),
-		ctx:        ctx,
-		resultChan: make(chan acquireScannerResult, 1),
-		attempts:   0,
+		pullTime:     time.Now(),
+		resultChan:   make(chan acquireScannerResult, 1),
+		attempts:     0,
+		shutdownChan: make(chan struct{}),
+		backoff:      backoff,
 	}
 
 	mgr.requestChan <- req
@@ -174,6 +151,20 @@ func (mgr *ScannerAcquisitionManager) acquireScanner(ctx context.Context) (strin
 	case result := <-req.resultChan:
 		return result.scannerID, result.err
 	case <-ctx.Done():
+		close(req.shutdownChan)
+
+		select {
+		case result := <-req.resultChan:
+			// If the scanner is acquired but timeout, release it.
+			if result.scannerID != "" {
+				err := mgr.releaseScanner(result.scannerID)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "scanner": result.scannerID}).Error("Failed to release scanner credit in Consul")
+				}
+			}
+		default:
+		}
+
 		return "", ctx.Err()
 	}
 }
@@ -195,7 +186,7 @@ func (mgr *ScannerAcquisitionManager) CleanUpScannerResources(scanner *share.CLU
 }
 
 func (mgr *ScannerAcquisitionManager) getScannerEndpoint(scanner *share.CLUSScanner) string {
-	return fmt.Sprintf("%s:%v", scanner.RPCServer, scanner.RPCServerPort)
+	return net.JoinHostPort(scanner.RPCServer, strconv.Itoa(int(scanner.RPCServerPort)))
 }
 
 func (mgr *ScannerAcquisitionManager) createScannerServiceWrapper(conn *grpc.ClientConn) cluster.Service {
@@ -362,8 +353,6 @@ func ScanPlatform(scanner string, k8sVersion, ocVersion string, timeout time.Dur
 
 // ScanImage can  come from CI plugins or from the scanner service.
 func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest) (*share.ScanResult, error) {
-	hasAcquiredScanner := false
-
 	// When scanner is empty, it indicates that the CI plugins are calling the scan.
 	// In this case, we set shouldIncrementTask to false to avoid double counting.
 	if scanner == "" {
@@ -373,11 +362,8 @@ func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest)
 			// Return result with error code to enable retry mechanism in REST API
 			return &share.ScanResult{Error: share.ScanErrorCode_ScanErrAcquireScannerTimeout}, err
 		}
-		hasAcquiredScanner = true
-	}
 
-	// Ensure that resources are properly released or task counts are decremented when the function exits
-	if hasAcquiredScanner {
+		// Ensure that resources are properly released or task counts are decremented when the function exits
 		defer func() {
 			if err := ScannerAcquisitionMgr.releaseScanner(scanner); err != nil {
 				log.WithFields(log.Fields{"error": err, "scanner": scanner}).Error("failed to release scan credit")
@@ -393,7 +379,7 @@ func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest)
 	result, err := client.ScanImage(ctx, req)
 	if err == nil {
 		if result == nil {
-			return nil, fmt.Errorf("scan image returned nil result")
+			return nil, fmt.Errorf("scan image returned nil result from scanner %s", scanner)
 		}
 
 		if result.Labels == nil {
@@ -405,81 +391,6 @@ func ScanImage(scanner string, ctx context.Context, req *share.ScanImageRequest)
 	clusHelper := kv.GetClusterHelper()
 	if err2 := clusHelper.PutScannerStats(scanner, share.ScanObjectType_IMAGE, result); err2 != nil {
 		log.WithFields(log.Fields{"error": err2}).Error("PutScannerStats")
-	}
-
-	return result, err
-}
-
-func ScanPackage(ctx context.Context, pkgs []*share.ScanAppPackage) (*share.ScanResult, error) {
-	scanner, err := ScannerAcquisitionMgr.acquireScanner(ctx)
-	if err != nil {
-		return &share.ScanResult{Error: share.ScanErrorCode_ScanErrAcquireScannerTimeout}, err
-	}
-
-	client, scanner, err := ScannerAcquisitionMgr.getScannerServiceClient(scanner)
-	defer func() {
-		if err := ScannerAcquisitionMgr.releaseScanner(scanner); err != nil {
-			log.WithFields(log.Fields{"error": err, "scanner": scanner}).Error("failed to release scan credit")
-		}
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	req := &share.ScanAppRequest{
-		Packages: pkgs,
-	}
-
-	result, err := client.ScanAppPackage(ctx, req)
-
-	clusHelper := kv.GetClusterHelper()
-	if err2 := clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result); err2 != nil {
-		log.WithFields(log.Fields{"err": err2}).Error("PutScannerStats")
-	}
-
-	return result, err
-}
-
-func ScanAwsLambdaFunc(ctx context.Context, funcInput *share.CLUSAwsFuncScanInput) (*share.ScanResult, error) {
-	scanner, err := ScannerAcquisitionMgr.acquireScanner(ctx)
-	if err != nil {
-		return &share.ScanResult{Error: share.ScanErrorCode_ScanErrAcquireScannerTimeout}, err
-	}
-
-	req := &share.ScanAwsLambdaRequest{
-		ResType:     share.AwsLambdaFunc,
-		FuncName:    funcInput.FuncName,
-		Region:      funcInput.Region,
-		FuncLink:    funcInput.FuncLink,
-		ScanSecrets: true, // default: always
-	}
-
-	client, scanner, err := ScannerAcquisitionMgr.getScannerServiceClient(scanner)
-	defer func() {
-		if err := ScannerAcquisitionMgr.releaseScanner(scanner); err != nil {
-			log.WithFields(log.Fields{"error": err, "scanner": scanner}).Error("failed to release scan credit")
-		}
-	}()
-	if err != nil {
-		err := fmt.Errorf("no scan client available")
-		log.WithFields(log.Fields{"error": err}).Error()
-		return nil, err
-	}
-
-	result, err := client.ScanAwsLambda(ctx, req)
-	if err != nil {
-		err := fmt.Errorf("scan return error")
-		log.WithFields(log.Fields{"error": err}).Error()
-	} else {
-		if result.Labels == nil {
-			// grpc convert zero-length map to nil, fix it here.
-			result.Labels = make(map[string]string)
-		}
-	}
-
-	clusHelper := kv.GetClusterHelper()
-	if err2 := clusHelper.PutScannerStats(scanner, share.ScanObjectType_SERVERLESS, result); err2 != nil {
-		log.WithFields(log.Fields{"err": err2}).Error("PutScannerStats")
 	}
 
 	return result, err
