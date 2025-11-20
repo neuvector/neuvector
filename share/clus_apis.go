@@ -337,6 +337,10 @@ func CLUSAuditLogKey(hostID string, devID string) string {
 	return fmt.Sprintf("%s%s/%s", CLUSAuditLogStore, hostID, devID)
 }
 
+func CLUSScannerCreditOwnerKey(controllerID string) string {
+	return fmt.Sprintf("%scontroller/%s/scan_credits", CLUSStateStore, controllerID)
+}
+
 func CLUSAgentEventLogKey(hostID string, devID string) string {
 	return fmt.Sprintf("%s/agent", eventLogStore(hostID, devID))
 }
@@ -1941,6 +1945,10 @@ type CLUSScanner struct {
 	RPCServerPort   uint16    `json:"rpc_port"`
 	BuiltIn         bool      `json:"builtin"`
 	CVEDBEntries    int       `json:"db_entries"`
+	// ScanCredit represents the number of scan tasks that can still be assigned to this scanner
+	ScanCredit int `json:"scan_credit"`
+	// MaxConcurrentScansPerScanner represents the maximum number of scan tasks that can be assigned to this scanner
+	MaxConcurrentScansPerScanner int `json:"max_concurrent_scans_per_scanner"`
 }
 
 type CLUSScannerStats struct {
