@@ -337,6 +337,10 @@ func CLUSAuditLogKey(hostID string, devID string) string {
 	return fmt.Sprintf("%s%s/%s", CLUSAuditLogStore, hostID, devID)
 }
 
+func CLUSScannerCreditOwnerKey(controllerID string) string {
+	return fmt.Sprintf("%scontroller/%s/scan_credits", CLUSStateStore, controllerID)
+}
+
 func CLUSAgentEventLogKey(hostID string, devID string) string {
 	return fmt.Sprintf("%s/agent", eventLogStore(hostID, devID))
 }

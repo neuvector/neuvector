@@ -10,7 +10,6 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
-	log "github.com/sirupsen/logrus"
 )
 
 type mockLock struct {
@@ -67,7 +66,9 @@ type MockCluster struct {
 	mockKvSystemConfigUpdateFunc MockKvConfigUpdateFunc
 	kv                           map[string]string
 
-	scanners map[string]*share.CLUSScanner
+	id           string
+	scanners     map[string]*share.CLUSScanner
+	creditOwners map[string]map[string]int
 }
 
 func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGroup) {
@@ -109,12 +110,18 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 	m.awsCloudResource = make(map[string]*share.CLUSAwsResource)
 	m.awsProjectCfg = make(map[string]*share.CLUSAwsProjectCfg)
 	m.kv = make(map[string]string)
+	m.creditOwners = make(map[string]map[string]int)
 
 	m.scanners = make(map[string]*share.CLUSScanner)
+	m.id = "host-1"
 }
 
 func (m *MockCluster) AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error) {
 	return &mockLock{}, nil
+}
+
+func (m *MockCluster) SetID(id string) {
+	m.id = id
 }
 
 func (m *MockCluster) ReleaseLock(lock cluster.LockInterface) {
@@ -519,7 +526,7 @@ func (m *MockCluster) GetScannerRev(id string) (*share.CLUSScanner, uint64, erro
 	return nil, 0, common.ErrObjectNotFound
 }
 
-func (m *MockCluster) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string, time.Duration) error) (*share.CLUSScanner, error) {
+func (m *MockCluster) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -530,13 +537,6 @@ func (m *MockCluster) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string,
 	maxScanCredits := -1
 	var selectedScanner *share.CLUSScanner
 	for _, scanner := range m.scanners {
-		if ScannerHealthCheckFunc != nil {
-			if err := ScannerHealthCheckFunc(scanner.ID, time.Second*10); err != nil {
-				log.WithFields(log.Fields{"scanner": scanner.ID, "error": err}).Error("Failed to ping scanner")
-				continue
-			}
-		}
-
 		if scanner.ScanCredit <= 0 {
 			continue
 		}
@@ -555,11 +555,15 @@ func (m *MockCluster) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string,
 
 	// Increment the scan credit (assign a new task)
 	selectedScanner.ScanCredit = max(0, selectedScanner.ScanCredit-1)
-
+	if err := m.TrackCreditAcquisition(m.id, selectedScanner.ID, selectedScanner.MaxConcurrentScansPerScanner, true); err != nil {
+		// revert the scan credit
+		selectedScanner.ScanCredit = min(selectedScanner.ScanCredit+1, selectedScanner.MaxConcurrentScansPerScanner)
+		return nil, err
+	}
 	return selectedScanner, nil
 }
 
-func (m *MockCluster) ReleaseScanCredit(scannerId string) error {
+func (m *MockCluster) ReleaseScanCredit(scannerId string, releaseCredit int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -569,7 +573,10 @@ func (m *MockCluster) ReleaseScanCredit(scannerId string) error {
 	}
 
 	// Decrement credit (release a task), ensuring it doesn't go below 0
-	scanner.ScanCredit = min(scanner.ScanCredit+1, scanner.MaxConcurrentScansPerScanner)
+	scanner.ScanCredit = min(scanner.ScanCredit+releaseCredit, scanner.MaxConcurrentScansPerScanner)
+	if err := m.TrackCreditAcquisition(m.id, scannerId, scanner.MaxConcurrentScansPerScanner, false); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -708,4 +715,52 @@ func (m *MockCluster) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, 
 		return nil, 0, errors.New("failed to unmarshal")
 	}
 	return &out, 1, nil
+}
+
+func (m *MockCluster) GetCreditOwners(controllerId string) map[string]int {
+	return m.creditOwners[controllerId]
+}
+
+func (m *MockCluster) TrackCreditAcquisition(controllerId, scannerID string, maxConcurrentScansPerScanner int, acquire bool) error {
+	// Initialize the map if it doesn't exist
+	if m.creditOwners[controllerId] == nil {
+		m.creditOwners[controllerId] = make(map[string]int)
+	}
+	scanners := m.creditOwners[controllerId]
+
+	if acquire {
+		scanners[scannerID] = min(scanners[scannerID]+1, maxConcurrentScansPerScanner)
+	} else {
+		scanners[scannerID] = max(scanners[scannerID]-1, 0)
+	}
+
+	return nil
+}
+
+// RecoverOrphanedCredits implements the ClusterHelper interface
+// It simulates recovering orphaned credits when a controller fails
+func (m *MockCluster) RecoverOrphanedCredits(controllerId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	scanners, ok := m.creditOwners[controllerId]
+	if !ok {
+		return nil
+	}
+
+	// Return the ownership to the scanner
+	for scannerId, releaseCredit := range scanners {
+		// Avoid deadlock by unlocking the mutex before calling ReleaseScanCredit
+		scanner, ok := m.scanners[scannerId]
+		if !ok {
+			continue
+		}
+
+		// Decrement credit (release a task), ensuring it doesn't go below 0
+		scanner.ScanCredit = min(scanner.ScanCredit+releaseCredit, scanner.MaxConcurrentScansPerScanner)
+	}
+
+	// Delete the orphaned credit ownership record (simulating cluster.Delete)
+	delete(m.creditOwners, controllerId)
+	return nil
 }
