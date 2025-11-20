@@ -398,6 +398,11 @@ func deleteControllerFromCluster(hostID string, ctrlID string, clusterIP string)
 		log.WithFields(log.Fields{"error": err}).Error("")
 	}
 
+	err := clusHelper.RecoverOrphanedCredits(ctrlID)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to recover orphaned credits")
+	}
+
 	/* Force leave the node to avoid controller node in fail state */
 	cluster.ForceLeave(clusterIP, true)
 }
