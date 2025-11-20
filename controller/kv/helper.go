@@ -141,13 +141,15 @@ type ClusterHelper interface {
 	GetAvailableScanners() []*share.CLUSScanner
 
 	// PickLeastLoadedScanner selects the scanner with the least active tasks, scanCredit means the number of available tasks, the scanner with the most scanCredit will be selected.
-	// The ScannerHealthCheckFunc is used to ensure the scanner is available.
 	// Expected outcome: The least loaded scanner or an error if none are available.
-	PickLeastLoadedScanner(ScannerHealthCheckFunc func(string, time.Duration) error) (*share.CLUSScanner, error)
+	PickLeastLoadedScanner() (*share.CLUSScanner, error)
 
 	// ReleaseScanCredit releases a scan credit for a specific scanner, identified by scannerId.
 	// Expected outcome: Return an error if the release fails, or nil on success.
-	ReleaseScanCredit(scannerId string) error
+	ReleaseScanCredit(scannerId string, releaseCredit int) error
+
+	// RecoverOrphanedCredits releases the ownership of a scan credit for a specific controller, identified by controllerId.
+	RecoverOrphanedCredits(controllerId string) error
 
 	// GetScannerRev retrieves a scanner along with its revision number for internal operations without authentication checks.
 	// Expected outcome: The scanner and its revision number or an error if retrieval fails.
@@ -1641,7 +1643,7 @@ func (m clusterHelper) GetAvailableScanners() []*share.CLUSScanner {
 	return scanners
 }
 
-func (m clusterHelper) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string, time.Duration) error) (*share.CLUSScanner, error) {
+func (m clusterHelper) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 	scanners := m.GetAvailableScanners()
 	if len(scanners) == 0 {
 		return nil, share.ErrNoScannerFound
@@ -1657,13 +1659,6 @@ func (m clusterHelper) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string
 		if scanner == nil {
 			log.Error("scanner is nil, skipping")
 			continue
-		}
-
-		if ScannerHealthCheckFunc != nil {
-			if err := ScannerHealthCheckFunc(scanner.ID, time.Second*10); err != nil {
-				log.WithFields(log.Fields{"scanner": scanner.ID, "error": err}).Error("Failed to ping scanner")
-				continue
-			}
 		}
 
 		selectedScanner, rev, err := m.GetScannerRev(scanner.ID)
@@ -1691,13 +1686,24 @@ func (m clusterHelper) PickLeastLoadedScanner(ScannerHealthCheckFunc func(string
 			continue
 		}
 
+		if err := m.TrackCreditAcquisition(m.id, selectedScanner.ID, selectedScanner.MaxConcurrentScansPerScanner, true); err != nil {
+			log.WithFields(log.Fields{"error": err, "scanner": selectedScanner.ID}).Error("Failed to track credit acquisition")
+
+			// Release the credit back to the scanner
+			releaseCreditErr := m.ReleaseScanCredit(selectedScanner.ID, 1)
+			if releaseCreditErr != nil {
+				log.WithFields(log.Fields{"error": releaseCreditErr, "scanner": selectedScanner.ID}).Error("Failed to release scanner credit")
+			}
+			return nil, releaseCreditErr
+		}
+
 		return selectedScanner, nil
 	}
 
 	return nil, share.ErrNoScannerAvailable
 }
 
-func (m clusterHelper) ReleaseScanCredit(scannerId string) error {
+func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) error {
 	// Infinite retry loop to ensure credit is never lost
 	// This is critical because losing credits would cause scanner starvation
 	key := share.CLUSScannerKey(scannerId)
@@ -1719,7 +1725,7 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string) error {
 		}
 
 		// Increment credit, ensuring it doesn't exceed max
-		scanner.ScanCredit = min(scanner.ScanCredit+1, scanner.MaxConcurrentScansPerScanner)
+		scanner.ScanCredit = min(scanner.ScanCredit+releaseCredit, scanner.MaxConcurrentScansPerScanner)
 
 		// Attempt to update using CAS (PutRev)
 		value, err := json.Marshal(scanner)
@@ -1739,10 +1745,73 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string) error {
 			return err
 		}
 
+		if err := m.TrackCreditAcquisition(m.id, scannerId, scanner.MaxConcurrentScansPerScanner, false); err != nil {
+			log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Error("Failed to track credit acquisition")
+			return err
+		}
+
 		return nil
 	}
 
 	return fmt.Errorf("failed to release scanner credit after %d retries", maxRetries)
+}
+
+// TrackCreditAcquisition records or removes a controller's ownership of scanner credits.
+func (m clusterHelper) TrackCreditAcquisition(controllerID, scannerID string, maxConcurrentScansPerScanner int, acquire bool) error {
+	key := share.CLUSScannerCreditOwnerKey(controllerID)
+	maxRetries := 10
+
+	for i := 0; i < maxRetries; i++ {
+		scanners := make(map[string]int)
+		value, rev, err := m.get(key)
+		if err == nil && value != nil {
+			err = json.Unmarshal(value, &scanners)
+			if err != nil {
+				return err
+			}
+		}
+
+		if acquire {
+			// Acquire credit: increment credit count for given scanner, up to the max allowed
+			scanners[scannerID] = min(scanners[scannerID]+1, maxConcurrentScansPerScanner)
+		} else {
+			// Release credit: decrement credit count for given scanner, not going below zero
+			scanners[scannerID] = max(scanners[scannerID]-1, 0)
+		}
+
+		value, err = json.Marshal(scanners)
+		if err != nil {
+			return err
+		}
+
+		if err := cluster.PutRev(key, value, rev); err == nil {
+			return nil
+		}
+	}
+	return common.ErrAtomicWriteFail
+}
+
+func (m clusterHelper) RecoverOrphanedCredits(controllerId string) error {
+	key := share.CLUSScannerCreditOwnerKey(controllerId)
+
+	scanners := make(map[string]int)
+	value, _, err := m.get(key)
+	if err == nil && value != nil {
+		err = json.Unmarshal(value, &scanners)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Return the ownership to the scanner
+	for scannerID, credit := range scanners {
+		err = m.ReleaseScanCredit(scannerID, credit)
+		if err != nil {
+			return err
+		}
+	}
+
+	return cluster.Delete(key)
 }
 
 // Compliance Profile

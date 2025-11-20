@@ -34,7 +34,6 @@ func setupTestManager(maxConns, maxConcurrentRepoScanTasks int) (*ScannerAcquisi
 	mockHelper := &kv.MockCluster{}
 	mockHelper.Init(nil, nil)
 	mgr := NewScannerAcquisitionManager(maxConns, maxConcurrentRepoScanTasks, mockHelper)
-	mgr.ScannerHealthChecker = nil // Disable health check for most tests
 	return mgr, mockHelper
 }
 
@@ -46,7 +45,6 @@ func TestNewScannerAcquisitionManager(t *testing.T) {
 
 	assert.NotNil(t, mgr, "ScannerAcquisitionManager should be created")
 	assert.Equal(t, maxConns, mgr.maxConcurrentScansPerScanner, "maxConcurrentScansPerScanner should match")
-	assert.NotNil(t, mgr.ScannerHealthChecker, "ScannerHealthChecker should be initialized")
 }
 
 // TestGetMaxConcurrentScansPerScanner verifies the getter method
@@ -310,52 +308,6 @@ func TestCountScanners(t *testing.T) {
 	// One scanner should be idle (ScanCredit = 0, fully utilized)
 	assert.Equal(t, uint32(1), busy, "Should count 1 busy scanner (ScanCredit > 0)")
 	assert.Equal(t, uint32(2), idle, "Should count 2 idle scanners (ScanCredit = 0)")
-}
-
-// TestHealthCheckIntegration verifies health check is called during acquire
-func TestHealthCheckIntegration(t *testing.T) {
-	maxConns := 2
-	maxConcurrentRepoScanTasks := 6
-	mgr, mockHelper := setupTestManager(maxConns, maxConcurrentRepoScanTasks)
-
-	scanner := newMockScanner(1, maxConns)
-	require.NoError(t, mockHelper.AddScanner(scanner))
-
-	healthCheckCalled := false
-	mgr.ScannerHealthChecker = func(scannerID string, timeout time.Duration) error {
-		healthCheckCalled = true
-		assert.Equal(t, scanner.ID, scannerID, "Health check should be called with correct scanner ID")
-		return nil
-	}
-
-	ctx := context.Background()
-	scannerID, err := mgr.acquireScanner(ctx)
-	require.NoError(t, err)
-	require.Equal(t, scanner.ID, scannerID)
-
-	assert.True(t, healthCheckCalled, "Health check should have been called")
-
-	require.NoError(t, mgr.releaseScanner(scannerID))
-}
-
-// TestHealthCheckFailure verifies behavior when health check fails
-func TestHealthCheckFailure(t *testing.T) {
-	maxConns := 2
-	maxConcurrentRepoScanTasks := 6
-	mgr, mockHelper := setupTestManager(maxConns, maxConcurrentRepoScanTasks)
-
-	scanner := newMockScanner(1, maxConns)
-	require.NoError(t, mockHelper.AddScanner(scanner))
-
-	mgr.ScannerHealthChecker = func(scannerID string, timeout time.Duration) error {
-		return fmt.Errorf("health check failed")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	_, err := mgr.acquireScanner(ctx)
-	assert.Error(t, err, "Should fail when health check always fails")
 }
 
 // TestEdgeCaseMaxCreditCap verifies credit count doesn't exceed max on extra releases

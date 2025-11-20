@@ -36,7 +36,6 @@ type acquireScannerRequest struct {
 // ScannerAcquisitionManager is responsible for managing the scan credit for the scanners.
 type ScannerAcquisitionManager struct {
 	maxConcurrentScansPerScanner int
-	ScannerHealthChecker         ScannerHealthCheckFunc
 	clusterHelper                kv.ClusterHelper
 	requestChan                  chan *acquireScannerRequest
 	workerStartedOnce            sync.Once
@@ -50,10 +49,6 @@ const (
 	MaxDelay     = time.Second * 5
 )
 
-// ScannerHealthCheckFunc defines the signature for a scanner health check function
-// It pings a scanner to verify it's available before assigning scan tasks to it
-type ScannerHealthCheckFunc func(scannerID string, timeout time.Duration) error
-
 func NewScannerAcquisitionManager(maxConcurrentScansPerScanner, maxConcurrentRepoScanTasks int, clusterHelper kv.ClusterHelper) *ScannerAcquisitionManager {
 	mgr := &ScannerAcquisitionManager{
 		maxConcurrentScansPerScanner: maxConcurrentScansPerScanner,
@@ -61,7 +56,6 @@ func NewScannerAcquisitionManager(maxConcurrentScansPerScanner, maxConcurrentRep
 		requestChan:                  make(chan *acquireScannerRequest, maxConcurrentRepoScanTasks*2), // Buffer for up to maxConcurrentRepoScanTasks * 2 pending requests,
 	}
 
-	mgr.ScannerHealthChecker = mgr.Ping
 	mgr.workerStartedOnce.Do(func() {
 		go mgr.requestProcessLoop()
 	})
@@ -81,7 +75,12 @@ func (mgr *ScannerAcquisitionManager) collectPendingRequests() []*acquireScanner
 	for {
 		select {
 		case req := <-mgr.requestChan:
-			pendingRequests = append(pendingRequests, req)
+			select {
+			case <-req.shutdownChan:
+				req.resultChan <- acquireScannerResult{err: context.Canceled}
+			default:
+				pendingRequests = append(pendingRequests, req)
+			}
 		default:
 			return pendingRequests
 		}
@@ -110,12 +109,11 @@ func (mgr *ScannerAcquisitionManager) requestProcessLoop() {
 		select {
 		case <-req.shutdownChan:
 			req.resultChan <- acquireScannerResult{err: context.Canceled}
-			close(req.resultChan)
 			pendingRequests = pendingRequests[1:]
 			continue
 		default:
 		}
-		scanner, err := mgr.clusterHelper.PickLeastLoadedScanner(mgr.ScannerHealthChecker)
+		scanner, err := mgr.clusterHelper.PickLeastLoadedScanner()
 
 		if err != nil {
 			// Retry - add backoff and keep it in queue for next iteration
@@ -125,7 +123,6 @@ func (mgr *ScannerAcquisitionManager) requestProcessLoop() {
 		}
 		pendingRequests = pendingRequests[1:]
 		req.resultChan <- acquireScannerResult{scannerID: scanner.ID, err: nil}
-		close(req.resultChan)
 	}
 }
 
@@ -144,25 +141,24 @@ func (mgr *ScannerAcquisitionManager) acquireScanner(ctx context.Context) (strin
 		shutdownChan: make(chan struct{}),
 		backoff:      backoff,
 	}
+	defer close(req.resultChan)
 
 	mgr.requestChan <- req
 
 	select {
 	case result := <-req.resultChan:
+		close(req.shutdownChan)
 		return result.scannerID, result.err
 	case <-ctx.Done():
 		close(req.shutdownChan)
 
-		select {
-		case result := <-req.resultChan:
-			// If the scanner is acquired but timeout, release it.
-			if result.scannerID != "" {
-				err := mgr.releaseScanner(result.scannerID)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err, "scanner": result.scannerID}).Error("Failed to release scanner credit in Consul")
-				}
+		result := <-req.resultChan
+		// If the scanner is acquired but timeout, release it.
+		if result.scannerID != "" {
+			err := mgr.releaseScanner(result.scannerID)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "scanner": result.scannerID}).Error("Failed to release scanner credit in Consul")
 			}
-		default:
 		}
 
 		return "", ctx.Err()
@@ -172,7 +168,7 @@ func (mgr *ScannerAcquisitionManager) acquireScanner(ctx context.Context) (strin
 // releaseScanner releases a scanner and its scan credit.
 // Expected outcome: Error if release fails, nil on success.
 func (mgr *ScannerAcquisitionManager) releaseScanner(scannerId string) error {
-	err := mgr.clusterHelper.ReleaseScanCredit(scannerId)
+	err := mgr.clusterHelper.ReleaseScanCredit(scannerId, 1)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "scanner": scannerId}).Error("Failed to release scanner credit in Consul")
 	}
