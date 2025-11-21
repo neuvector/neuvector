@@ -83,11 +83,11 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 			BranchName:          getStrValue(azureDevopsCfg.BranchName),
 			PersonalAccessToken: getStrValue(azureDevopsCfg.PersonalAccessToken),
 		}
-
-		if !repo.AzureDevopsConfiguration.IsValid() {
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "all fields are required for azure devops remote repository configuration")
-			return
-		}
+	}
+	if !repo.IsValid() {
+		msg := fmt.Sprintf("all fields are required for %s remote repository configuration", remoteRepository.Provider)
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
+		return
 	}
 
 	lock, err := clusHelper.AcquireLock(share.CLUSLockServerKey, clusterLockWait)
