@@ -23,6 +23,7 @@ import (
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerWafSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -439,7 +440,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	conf := rconf.Config
-	tcfgtype := cfgTypeMapping[conf.CfgType]
+	tcfgtype := utils.ApiCfgTypeToTCfgType[conf.CfgType]
 
 	//check user permission before creation
 	if !acc.Authorize(&share.CLUSWafSensor{Name: conf.Name}, nil) {
@@ -1641,7 +1642,7 @@ func fedWafSensorPromote(cs *api.RESTWafSensor, acc *access.AccessControl, login
 		conf.Rules = &rules
 	}
 
-	if err := fedCreateWafSensor(conf, cfgTypeMapping[conf.CfgType]); err == nil {
+	if err := fedCreateWafSensor(conf, utils.ApiCfgTypeToTCfgType[conf.CfgType]); err == nil {
 		updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
 	}
 }

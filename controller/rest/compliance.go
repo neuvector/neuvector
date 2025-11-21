@@ -563,7 +563,7 @@ func handlerCompProfileImport(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	tid := r.Header.Get("X-Transaction-ID")
-	_importHandler(w, r, tid, share.IMPORT_TYPE_COMP_PROFILE, share.PREFIX_IMPORT_COMP_PROFILE, 0, acc, login)
+	_importHandler(w, r, tid, share.IMPORT_TYPE_COMP_PROFILE, share.PREFIX_IMPORT_COMP_PROFILE, noFedImportPermission, acc, login)
 }
 
 func importCompProfile(scope string, loginDomainRoles access.DomainRole, importTask share.CLUSImportTask, postImportOp kv.PostImportFunc) error {

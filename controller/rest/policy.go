@@ -27,14 +27,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-var cfgTypeMapping = map[string]share.TCfgType{
-	api.CfgTypeLearned:     share.Learned,
-	api.CfgTypeUserCreated: share.UserCreated,
-	api.CfgTypeGround:      share.GroundCfg,
-	api.CfgTypeFederal:     share.FederalCfg,
-	api.CfgSystemDefined:   share.SystemDefined,
-}
-
 func compareRESTRules(r1, r2 *api.RESTPolicyRule) bool {
 	e := *r1
 	r := *r2
@@ -498,7 +490,7 @@ func policyRule2Cluster(r *api.RESTPolicyRule) *share.CLUSPolicyRule {
 		Applications: appNames2IDs(r.Applications),
 		Action:       r.Action,
 		Disable:      r.Disable,
-		CfgType:      cfgTypeMapping[r.CfgType],
+		CfgType:      utils.ApiCfgTypeToTCfgType[r.CfgType],
 	}
 	return rule
 }
@@ -768,7 +760,7 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 				rr.CfgType = api.CfgTypeUserCreated
 			}
 		}
-		cfgType := cfgTypeMapping[rr.CfgType]
+		cfgType := utils.ApiCfgTypeToTCfgType[rr.CfgType]
 		if (cfgType == share.FederalCfg && scope == share.ScopeLocal) || (cfgType != share.FederalCfg && scope == share.ScopeFed) {
 			e := "Mismatched rule CfgType with request"
 			log.WithFields(log.Fields{"id": rr.ID}).Error(e)
@@ -1037,8 +1029,8 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		}
 	}
 	sort.SliceStable(rules, func(i, j int) bool {
-		iCfgType := cfgTypeMapping[rules[i].CfgType]
-		jCfgType := cfgTypeMapping[rules[j].CfgType]
+		iCfgType := utils.ApiCfgTypeToTCfgType[rules[i].CfgType]
+		jCfgType := utils.ApiCfgTypeToTCfgType[rules[j].CfgType]
 		switch iCfgType {
 		case share.FederalCfg:
 			if jCfgType != share.FederalCfg {
@@ -1179,7 +1171,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 				return err
 			}
 			if rr.ID == api.PolicyAutoID {
-				cfgType := cfgTypeMapping[rr.CfgType]
+				cfgType := utils.ApiCfgTypeToTCfgType[rr.CfgType]
 				rr.ID = common.GetAvailablePolicyID(idInUse, cfgType)
 				if rr.ID == 0 {
 					err = fmt.Errorf("Failed to locate available rule ID")
@@ -1201,7 +1193,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 			if !nsUser { // re-append learned/user-created rh if login user is admin/fedAdmin (we didn't append to 'keep' in step 3)
 				new = append(new, &share.CLUSRuleHead{
 					ID:      rr.ID,
-					CfgType: cfgTypeMapping[rr.CfgType],
+					CfgType: utils.ApiCfgTypeToTCfgType[rr.CfgType],
 				})
 			} else { // for namespace user (we did append to 'keep' already in step 3)
 				if rr.CfgType == api.CfgTypeLearned { // if it's accessible learned rule, we re-use the accessible rh spots in 'keep'
@@ -1217,7 +1209,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 						// use up all the accessible rh spots in keep. so append a new rh to 'new'
 						new = append(new, &share.CLUSRuleHead{
 							ID:      rr.ID,
-							CfgType: cfgTypeMapping[rr.CfgType],
+							CfgType: utils.ApiCfgTypeToTCfgType[rr.CfgType],
 						})
 					}
 				}
@@ -1488,7 +1480,7 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 	fedRole := cacher.GetFedMembershipRoleNoAuth()
 	if scope == share.ScopeFed && fedRole != api.FedRoleMaster {
-		log.WithFields(log.Fields{"scope": scope, "fedRole": fedRole, "error": err}).Error("Request error")
+		log.WithFields(log.Fields{"scope": scope, "fedRole": fedRole}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}

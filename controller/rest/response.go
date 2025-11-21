@@ -388,7 +388,7 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 		}
 	}
 
-	grpCfgType := cfgTypeMapping[r.CfgType]
+	grpCfgType := utils.ApiCfgTypeToTCfgType[r.CfgType]
 	if r.Group != "" {
 		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
 		if grpMustExist && grp == nil {
@@ -428,7 +428,7 @@ func responseRule2Cluster(r *api.RESTResponseRule) *share.CLUSResponseRule {
 		Actions:    r.Actions,    // Actions    []string             `json:"actions"`
 		Webhooks:   r.Webhooks,
 		Disable:    r.Disable,
-		CfgType:    cfgTypeMapping[r.CfgType],
+		CfgType:    utils.ApiCfgTypeToTCfgType[r.CfgType],
 	}
 	return ret
 }
@@ -668,7 +668,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 		}
 
 		if rr.ID == api.PolicyAutoID {
-			cfgType := cfgTypeMapping[rr.CfgType]
+			cfgType := utils.ApiCfgTypeToTCfgType[rr.CfgType]
 			rr.ID = getAvailableRuleID(ruleTypeRespRule, ids, cfgType)
 			if rr.ID == 0 {
 				err := errors.New("Failed to locate available rule ID")
@@ -702,7 +702,7 @@ func insertResponseRule(policyName string, w http.ResponseWriter, insert *api.RE
 	for i, r := range insert.Rules {
 		news[i] = &share.CLUSRuleHead{
 			ID:      r.ID,
-			CfgType: cfgTypeMapping[insert.Rules[0].CfgType],
+			CfgType: utils.ApiCfgTypeToTCfgType[insert.Rules[0].CfgType],
 		}
 	}
 
@@ -777,7 +777,7 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 		} else {
 			policyName = share.DefaultPolicyName
 		}
-		_, err = insertResponseRule(policyName, w, rconf.Insert, false, true, cfgTypeMapping[firstCfgType], acc)
+		_, err = insertResponseRule(policyName, w, rconf.Insert, false, true, utils.ApiCfgTypeToTCfgType[firstCfgType], acc)
 		if err == nil {
 			if policyName == share.FedPolicyName {
 				updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)

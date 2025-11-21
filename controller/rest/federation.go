@@ -1077,7 +1077,6 @@ func cleanFedRules() {
 		RuleHeads: make([]*share.CLUSRuleHead, 0),
 	}
 	replaceFedResponseRules(resRulesData.Rules, resRulesData.RuleHeads)
-	deleteFedConfig(access.NewFedAdminAccessControl())
 
 	deleteFedGroupPolicy()
 	deleteFedDlpGroupSensors()

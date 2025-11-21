@@ -538,7 +538,7 @@ func validateGroupConfigCriteria(rg *api.RESTGroupConfig, acc *access.AccessCont
 
 		if ct.Key == share.CriteriaKeyNamespace || ct.Key == share.CriteriaKeyDomain {
 			var grp *share.CLUSGroup
-			cfgType := cfgTypeMapping[rg.CfgType]
+			cfgType := utils.ApiCfgTypeToTCfgType[rg.CfgType]
 			if ct.Op != share.CriteriaOpEqual {
 				grp = &share.CLUSGroup{CfgType: cfgType}
 			} else {
@@ -609,7 +609,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		CreaterDomains: acc.GetAdminDomains(share.PERMS_RUNTIME_POLICIES),
 		Kind:           share.GroupKindContainer,
 	}
-	cg.CfgType = cfgTypeMapping[rg.CfgType]
+	cg.CfgType = utils.ApiCfgTypeToTCfgType[rg.CfgType]
 	if !acc.Authorize(&cg, nil) {
 		restRespAccessDenied(w, login)
 		return

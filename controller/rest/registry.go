@@ -992,20 +992,19 @@ func handlerRegistryList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
 		return
-	} else {
-		query := restParseQuery(r)
-		scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
-		if err != nil {
-			return
-		}
-
-		list := scanner.GetAllRegistrySummary(scope, acc)
-		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
-		log.WithFields(log.Fields{"entries": len(list)}).Debug("Response")
-
-		resp := api.RESTRegistrySummaryListData{Summarys: list}
-		restRespSuccess(w, r, &resp, acc, login, nil, "Get registry summary list")
 	}
+	query := restParseQuery(r)
+	scope, err := checkScopeParameter(w, query, share.ScopeAll, enumScopeLocal+enumScopeFed+enumScopeAll)
+	if err != nil {
+		return
+	}
+
+	list := scanner.GetAllRegistrySummary(scope, acc)
+	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
+	log.WithFields(log.Fields{"entries": len(list)}).Debug("Response")
+
+	resp := api.RESTRegistrySummaryListData{Summarys: list}
+	restRespSuccess(w, r, &resp, acc, login, nil, "Get registry summary list")
 }
 
 func handlerRegistryImageReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
