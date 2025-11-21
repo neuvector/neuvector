@@ -9,8 +9,6 @@ import (
 )
 
 func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
-	rego := []string{}
-
 	// has custom criteria
 	hasCusomCriteria := false
 	for _, c := range rule.Criteria {
@@ -32,6 +30,38 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 
 	log.WithFields(log.Fields{"rule": rule}).Debug("ConvertToRego")
 
+	// print header
+	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
+
+	regoStr := GenerateRegoCode(rule)
+	policyUrl := formatPolicyUrl(rule.ID)
+
+	success := AddPolicy(policyUrl, regoStr)
+	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success}).Debug("Add Policy")
+
+	if !success {
+		// unable to add the rego
+		// write another version of Rego of all comment to ensure it will success
+
+		rego2 := []string{}
+		rego2 = append(rego2, packageName)
+		rego2 = append(rego2, "############# THIS IS DEBUG VERSION #############")
+
+		items := strings.Split(regoStr, "\n")
+		for _, v := range items {
+			rego2 = append(rego2, "#! "+v)
+		}
+
+		AddPolicy(policyUrl, strings.Join(rego2, "\n"))
+
+		log.WithFields(log.Fields{"policyUrl": policyUrl}).Error("Add Policy with all comments")
+	}
+
+	return regoStr
+}
+
+func GenerateRegoCode(rule *share.CLUSAdmissionRule) string {
+	rego := []string{}
 	// print header
 	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
 	rego = append(rego, packageName)
@@ -102,31 +132,7 @@ violationmsgs[msg]{
 	// helper functions
 	rego = append(rego, printHelperFunctions())
 
-	regoStr := strings.Join(rego, "\n")
-
-	policyUrl := formatPolicyUrl(rule.ID)
-	success := AddPolicy(policyUrl, regoStr)
-	log.WithFields(log.Fields{"policyUrl": policyUrl, "success": success}).Debug("Add Policy")
-
-	if !success {
-		// unable to add the rego
-		// write another version of Rego of all comment to ensure it will success
-
-		rego2 := []string{}
-		rego2 = append(rego2, packageName)
-		rego2 = append(rego2, "############# THIS IS DEBUG VERSION #############")
-
-		items := strings.Split(regoStr, "\n")
-		for _, v := range items {
-			rego2 = append(rego2, "#! "+v)
-		}
-
-		AddPolicy(policyUrl, strings.Join(rego2, "\n"))
-
-		log.WithFields(log.Fields{"policyUrl": policyUrl}).Error("Add Policy with all comments")
-	}
-
-	return regoStr
+	return strings.Join(rego, "\n")
 }
 
 func formatPolicyUrl(ruleID uint32) string {
@@ -296,7 +302,7 @@ _get_input(w) := x {
 	supportedKind = ["Deployment", "DaemonSet", "Job", "ReplicaSet", "ReplicationController", "StatefulSet"]
 	input.request.kind.kind == supportedKind[_]
 
-    input.request.object.spec.template	
+    input.request.object.spec.template
     x := input.request.object.spec.template
 }
 
@@ -307,7 +313,7 @@ _get_input(w) := x {
 	supportedKind = ["CronJob"]
 	input.request.kind.kind == supportedKind[_]
 
-	input.request.object.spec.jobTemplate.spec.template		
+	input.request.object.spec.jobTemplate.spec.template
     x :=  input.request.object.spec.jobTemplate.spec.template
 }
 
@@ -345,7 +351,7 @@ _get_input(w) := x {
 	supportedKind = ["CronJob"]
 	input.input.request.kind.kind == supportedKind[_]
 
-	input.input.request.object.spec.jobTemplate.spec.template		
+	input.input.request.object.spec.jobTemplate.spec.template
     x := input.input.request.object.spec.jobTemplate.spec.template
 }
 
@@ -423,13 +429,13 @@ operator_contains_any(criteria_values, item){
 operator_not_contains_any(criteria_values, items){
 	is_array(items)
 	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
-	count(matched)==0    
+	count(matched)==0
 }
 
 ## operator -- not contains any (single value)
 operator_not_contains_any(criteria_values, item){
 	is_string(item)
-	not check_contains(criteria_values, item)  
+	not check_contains(criteria_values, item)
 }
 
 ## operator -- contains other than  (array)
@@ -452,7 +458,7 @@ check_contains(patterns, value) {
 }
 
 inSidecarContainerList(image){
-	sidecarImages := ["docker.io/istio/proxyv2","https://docker.io/istio/proxyv2", 
+	sidecarImages := ["docker.io/istio/proxyv2","https://docker.io/istio/proxyv2",
 						"linkerd-io/proxy","https://gcr.io/linkerd-io/proxy",
 						"istio-release/proxyv2", "https://gcr.io/istio-release/proxyv2"]
     startswith(image, sidecarImages[_])
