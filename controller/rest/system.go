@@ -52,6 +52,8 @@ const hostSessionIDBase uint64 = 0x100000000
 const multipartConfigName = "configuration"
 const importBackupDir = "/etc/neuvector/"
 
+const noFedImportPermission = 0x00000000
+
 func parseWebUrl(l string) error {
 	u, err := url.Parse(l)
 	if err != nil {
@@ -2787,7 +2789,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 		return
 	}
 	fedRole := cacher.GetFedMembershipRoleNoAuth()
-	if requiredPermissions != 0 && scope == share.ScopeFed {
+	if requiredPermissions != noFedImportPermission && scope == share.ScopeFed {
 		if fedRole == api.FedRoleMaster {
 			requiredPermissions = requiredPermissions | share.PERM_FED
 			if !acc.HasGlobalPermissions(requiredPermissions, requiredPermissions) {
@@ -3338,29 +3340,6 @@ func handlerFedConfigExport(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	doExport("cfgFedConfigExport.yaml", "federal config", rconf.RemoteExportOptions, resp, w, r, acc, login)
-}
-
-func deleteFedConfig(acc *access.AccessControl) {
-	var cconf *share.CLUSSystemConfig
-	var rev uint64
-	// Retrieve from the cluster
-	cconf, rev = clusHelper.GetFedSystemConfigRev(acc)
-	if cconf == nil {
-		return
-	}
-
-	webhooks := make([]share.CLUSWebhook, 0, len(cconf.Webhooks))
-	for i := range cconf.Webhooks {
-		if cconf.Webhooks[i].CfgType == share.FederalCfg {
-			webhooks = append(webhooks, cconf.Webhooks[i])
-		}
-	}
-	cconf.Webhooks = webhooks
-
-	err := clusHelper.PutFedSystemConfigRev(cconf, rev)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err, "rev": rev}).Error()
-	}
 }
 
 func importFedConfig(loginDomainRoles access.DomainRole, importTask share.CLUSImportTask,

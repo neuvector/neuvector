@@ -85,7 +85,7 @@ func (m *mockCache) Group2CLUS(group *api.RESTGroup) *share.CLUSGroup {
 		Kind:           group.Kind,
 		PlatformRole:   group.PlatformRole,
 		Criteria:       make([]share.CLUSCriteriaEntry, len(group.Criteria)),
-		CfgType:        cfgTypeMapping[group.CfgType],
+		CfgType:        utils.ApiCfgTypeToTCfgType[group.CfgType],
 	}
 	copy(c.CreaterDomains, group.CreaterDomains)
 
@@ -112,7 +112,7 @@ func (m *mockCache) Policy2CLUS(rule *api.RESTPolicyRule) *share.CLUSPolicyRule 
 		LastModAt:      time.Unix(rule.LastModTS, 0),
 		Priority:       rule.Priority,
 		Applications:   appNames2IDs(rule.Applications),
-		CfgType:        cfgTypeMapping[rule.CfgType],
+		CfgType:        utils.ApiCfgTypeToTCfgType[rule.CfgType],
 	}
 
 	return &c
@@ -209,7 +209,7 @@ func (m *mockCache) GetPolicyRuleCache(id uint32, acc *access.AccessControl) (*s
 			Disable:      rule.Disable,
 			CreatedAt:    time.Unix(rule.CreatedTS, 0),
 			LastModAt:    time.Unix(rule.LastModTS, 0),
-			CfgType:      cfgTypeMapping[rule.CfgType],
+			CfgType:      utils.ApiCfgTypeToTCfgType[rule.CfgType],
 		}
 		return r, nil
 	} else if !acc.Authorize(&share.CLUSPolicyRule{}, nil) {

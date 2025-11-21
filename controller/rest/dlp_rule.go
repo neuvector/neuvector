@@ -27,6 +27,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 func handlerDlpSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -559,7 +560,7 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	conf := rconf.Config
-	tcfgtype := cfgTypeMapping[conf.CfgType]
+	tcfgtype := utils.ApiCfgTypeToTCfgType[conf.CfgType]
 
 	//check user permission before creation
 	if !acc.Authorize(&share.CLUSDlpSensor{Name: conf.Name}, nil) {
@@ -2223,7 +2224,7 @@ func fedDlpSensorPromote(cs *api.RESTDlpSensor, acc *access.AccessControl, login
 		rules := make([]api.RESTDlpRule, 0)
 		conf.Rules = &rules
 	}
-	if err := fedCreateDlpSensor(conf, cfgTypeMapping[conf.CfgType]); err == nil {
+	if err := fedCreateDlpSensor(conf, utils.ApiCfgTypeToTCfgType[conf.CfgType]); err == nil {
 		updateFedRulesRevision([]string{share.FedDlpSensorGrpType}, acc, login)
 	}
 }

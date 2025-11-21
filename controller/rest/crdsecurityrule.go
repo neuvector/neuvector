@@ -1295,7 +1295,7 @@ func (h *nvCrdHandler) isSameFwRuleContent(cr *share.CLUSPolicyRule, ruleConf *a
 	}
 	if (cr.From == rule.From) && (cr.To == rule.To) && (cr.Ports == rule.Ports) && (cr.Action == rule.Action) &&
 		(cr.Comment == rule.Comment) && (cr.Priority == ruleConf.Priority) && (cr.Disable == rule.Disable) {
-		if cfgType := cfgTypeMapping[ruleConf.CfgType]; cr.CfgType != cfgType {
+		if cfgType := utils.ApiCfgTypeToTCfgType[ruleConf.CfgType]; cr.CfgType != cfgType {
 			return false
 		}
 	} else {

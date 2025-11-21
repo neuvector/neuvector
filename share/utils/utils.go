@@ -1216,6 +1216,14 @@ var CfgTypeToApiMapping = map[share.TCfgType]string{
 	share.SystemDefined: api.CfgSystemDefined,
 }
 
+var ApiCfgTypeToTCfgType = map[string]share.TCfgType{
+	api.CfgTypeLearned:     share.Learned,
+	api.CfgTypeUserCreated: share.UserCreated,
+	api.CfgTypeGround:      share.GroundCfg,
+	api.CfgTypeFederal:     share.FederalCfg,
+	api.CfgSystemDefined:   share.SystemDefined,
+}
+
 func IsGroupLearned(name string) bool {
 	return name == api.AllHostGroup || strings.HasPrefix(name, api.LearnedGroupPrefix)
 }

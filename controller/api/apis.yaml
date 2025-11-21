@@ -1199,7 +1199,7 @@ paths:
     post:
       tags:
         - File
-      summary: Export admission control configuration as a yaml format. The exported yaml file can be imported by CRD(non-fed scope only) or REST API to update the admission control settings.
+      summary: Export admission control configuration as a yaml format. The exported yaml file can be imported by CRD (non-fed scope only) or REST API to update the admission control settings.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -1261,7 +1261,7 @@ paths:
     post:
       tags:
         - File
-      summary: Export non-group-dependent (federated) response rules as a yaml format. The exported yaml file can be imported by CRD(non-fed scope only) or REST API to update the response rules.
+      summary: Export non-group-dependent (federated) response rules as a yaml format. The exported yaml file can be imported by CRD (non-fed scope only) or REST API to update the response rules.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -1389,7 +1389,7 @@ paths:
     post:
       tags:
         - File
-      summary: Export (federated) DLP configuration as a yaml format. The exported yaml file can be imported by CRD(non-fed scope only) or REST API to update the DLP configurations.
+      summary: Export (federated) DLP configuration as a yaml format. The exported yaml file can be imported by CRD (non-fed scope only) or REST API to update the DLP configurations.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -1503,7 +1503,7 @@ paths:
     post:
       tags:
         - File
-      summary: Export (federated) WAF configuration as a yaml format. The exported yaml file can be imported by CRD(non-fed scope only) or REST API to update the WAF configurations.
+      summary: Export (federated) WAF configuration as a yaml format. The exported yaml file can be imported by CRD (non-fed scope only) or REST API to update the WAF configurations.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
@@ -1584,7 +1584,7 @@ paths:
     post:
       tags:
         - File
-      summary: Export (federated) group configuration as a yaml format. The exported yaml file can be imported by CRD(non-fed scope only) or REST API to update the group policy.
+      summary: Export (federated) group configuration as a yaml format. The exported yaml file can be imported by CRD (non-fed scope only) or REST API to update the group policy.
       security:
         - ApiKeyAuth: []
         - TokenAuth: []

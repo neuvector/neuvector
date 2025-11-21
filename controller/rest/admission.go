@@ -997,7 +997,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 	ruleCfg := confData.Config
-	cfgType := cfgTypeMapping[ruleCfg.CfgType]
+	cfgType := utils.ApiCfgTypeToTCfgType[ruleCfg.CfgType]
 	modes := utils.NewSet("", share.AdmCtrlModeMonitor, share.AdmCtrlModeProtect)
 	if (cfgType != share.UserCreated && cfgType != share.FederalCfg) ||
 		(ruleCfg.RuleType != api.ValidatingExceptRuleType && ruleCfg.RuleType != api.ValidatingDenyRuleType) ||

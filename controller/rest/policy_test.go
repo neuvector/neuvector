@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/utils"
 )
 
 func initKvAndCache(mockCluster *kv.MockCluster, initRules []*share.CLUSPolicyRule, initGroups []*share.CLUSGroup) {
@@ -1221,7 +1222,7 @@ func TestPolicyRuleInsert(t *testing.T) {
 
 		expcrhs := []*share.CLUSRuleHead{
 			{ID: rule1.ID, CfgType: rule1.CfgType},
-			{ID: ri1.ID, CfgType: cfgTypeMapping[ri1.CfgType]},
+			{ID: ri1.ID, CfgType: utils.ApiCfgTypeToTCfgType[ri1.CfgType]},
 			{ID: rule2.ID, CfgType: rule2.CfgType},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
@@ -1286,7 +1287,7 @@ func TestPolicyRuleInsert(t *testing.T) {
 		expcrhs := []*share.CLUSRuleHead{
 			{ID: rule1.ID, CfgType: rule1.CfgType},
 			{ID: rule2.ID, CfgType: rule2.CfgType},
-			{ID: ri1.ID, CfgType: cfgTypeMapping[ri1.CfgType]},
+			{ID: ri1.ID, CfgType: utils.ApiCfgTypeToTCfgType[ri1.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1691,7 +1692,7 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1734,8 +1735,8 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: 11, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: 11, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1782,8 +1783,8 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: 2, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: 1, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: 2, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: 1, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1830,8 +1831,8 @@ func TestPolicyRuleReplace(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -1948,8 +1949,8 @@ func TestFedPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the impro
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
 			{ID: rule1.ID, CfgType: rule1.CfgType},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
@@ -2315,7 +2316,7 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 
 		expcrhs := []*share.CLUSRuleHead{
 			{ID: rule1.ID, CfgType: rule1.CfgType},
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2360,8 +2361,8 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			{ID: 11, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
+			{ID: 11, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2415,10 +2416,10 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: 12, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: 1, CfgType: cfgTypeMapping[rr3.CfgType]},
-			{ID: rr4.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			{ID: rr5.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 12, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: 1, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
+			{ID: rr4.ID, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
+			{ID: rr5.ID, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2464,10 +2465,10 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: 11, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			{ID: 10, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			{ID: 12, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			{ID: 1, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
+			{ID: 11, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
+			{ID: 10, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
+			{ID: 12, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
+			{ID: 1, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2519,10 +2520,10 @@ func TestPolicyRuleReplaceWithSmallerPayload(t *testing.T) { // for the improvem
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr1.ID, CfgType: cfgTypeMapping[api.CfgTypeUserCreated]},
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			{ID: rr4.ID, CfgType: cfgTypeMapping[rr4.CfgType]},
+			{ID: rr1.ID, CfgType: utils.ApiCfgTypeToTCfgType[api.CfgTypeUserCreated]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
+			{ID: rr4.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr4.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2745,11 +2746,11 @@ func TestPolicyRuleReplaceDeleteCount(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
-			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			{ID: rr11.ID, CfgType: cfgTypeMapping[rr11.CfgType]},
+			{ID: rr0.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr0.CfgType]},
+			{ID: rr1.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr1.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
+			{ID: rr11.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr11.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2833,9 +2834,9 @@ func TestPolicyRuleReplaceOrder(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr1.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr1.CfgType]},
+			{ID: rr0.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr0.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -2933,10 +2934,10 @@ func TestPolicyRuleReplaceFedRuleOrder(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]}, // position of fed policy is not changed
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]}, // position of fed policy is not changed
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr1.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr1.CfgType]},
+			{ID: rr0.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr0.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3007,7 +3008,7 @@ func TestPolicyRuleReplaceWrongID(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3087,8 +3088,8 @@ func TestPolicyRuleReplaceWrongLearned(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3354,11 +3355,11 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 		}
 
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rNew100001.ID, CfgType: cfgTypeMapping[rNew100001.CfgType]},
-			{ID: rNew100002.ID, CfgType: cfgTypeMapping[rNew100002.CfgType]},
-			{ID: rNew10.ID, CfgType: cfgTypeMapping[rNew10.CfgType]},
-			{ID: rNew11.ID, CfgType: cfgTypeMapping[rNew11.CfgType]},
-			{ID: rNew15.ID, CfgType: cfgTypeMapping[rNew15.CfgType]},
+			{ID: rNew100001.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew100001.CfgType]},
+			{ID: rNew100002.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew100002.CfgType]},
+			{ID: rNew10.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew10.CfgType]},
+			{ID: rNew11.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew11.CfgType]},
+			{ID: rNew15.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew15.CfgType]},
 			// Because rule13 cannot be seen by this ns user, its position in the whole list is always the same !
 			// Initially:
 			//		whole list : 100001, 100002, 10, 11, 12, 13, 14, 15, ....
@@ -3373,12 +3374,12 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 			// ->	100001, 100002, 10, 11, [15], 13, [14], [], ....
 			// That's why the final expected order is:
 			//		whole list : 100001, 100002, 10, 11, 15, 13, 14, ....
-			{ID: rNew13.ID, CfgType: cfgTypeMapping[rNew13.CfgType]},
-			{ID: rNew14.ID, CfgType: cfgTypeMapping[rNew14.CfgType]},
-			{ID: rNew10001.ID, CfgType: cfgTypeMapping[rNew10001.CfgType]},
-			{ID: rNew10002.ID, CfgType: cfgTypeMapping[rNew10002.CfgType]},
-			{ID: rNew10004.ID, CfgType: cfgTypeMapping[rNew10004.CfgType]},
-			{ID: rNew10005.ID, CfgType: cfgTypeMapping[rNew10005.CfgType]},
+			{ID: rNew13.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew13.CfgType]},
+			{ID: rNew14.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew14.CfgType]},
+			{ID: rNew10001.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew10001.CfgType]},
+			{ID: rNew10002.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew10002.CfgType]},
+			{ID: rNew10004.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew10004.CfgType]},
+			{ID: rNew10005.ID, CfgType: utils.ApiCfgTypeToTCfgType[rNew10005.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
@@ -3518,15 +3519,15 @@ func TestPolicyRuleAddRuleAssignID(t *testing.T) {
 		rr3.ID = 13
 		rr4.ID = 14
 		expcrhs := []*share.CLUSRuleHead{
-			{ID: rr21.ID, CfgType: cfgTypeMapping[rr21.CfgType]},
-			{ID: rr22.ID, CfgType: cfgTypeMapping[rr22.CfgType]},
-			{ID: rr0.ID, CfgType: cfgTypeMapping[rr0.CfgType]},
-			{ID: rr1.ID, CfgType: cfgTypeMapping[rr1.CfgType]},
-			{ID: rr2.ID, CfgType: cfgTypeMapping[rr2.CfgType]},
-			{ID: rr11.ID, CfgType: cfgTypeMapping[rr11.CfgType]},
-			{ID: rr3.ID, CfgType: cfgTypeMapping[rr3.CfgType]},
-			{ID: rr12.ID, CfgType: cfgTypeMapping[rr12.CfgType]},
-			{ID: rr4.ID, CfgType: cfgTypeMapping[rr4.CfgType]},
+			{ID: rr21.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr21.CfgType]},
+			{ID: rr22.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr22.CfgType]},
+			{ID: rr0.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr0.CfgType]},
+			{ID: rr1.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr1.CfgType]},
+			{ID: rr2.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr2.CfgType]},
+			{ID: rr11.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr11.CfgType]},
+			{ID: rr3.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr3.CfgType]},
+			{ID: rr12.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr12.CfgType]},
+			{ID: rr4.ID, CfgType: utils.ApiCfgTypeToTCfgType[rr4.CfgType]},
 		}
 		crhs := clusHelper.GetPolicyRuleList()
 		if !reflect.DeepEqual(expcrhs, crhs) {
