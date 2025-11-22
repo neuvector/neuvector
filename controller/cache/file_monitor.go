@@ -242,9 +242,8 @@ func (m CacheMethod) GetAllFileMonitorProfile(scope string, acc *access.AccessCo
 					Behavior:         filter.behavior,
 					CreatedTimeStamp: filter.createdAt.Unix(),
 					UpdatedTimeStamp: filter.updatedAt.Unix(),
+					CfgType:          common.TCfgTypeToApi(filter.CfgType),
 				}
-
-				mf.CfgType = cfgTypeMapping[filter.CfgType]
 				if filter.customerAdd {
 					mf.Apps = filter.apps.ToStringSlice()
 				}
@@ -299,9 +298,8 @@ func (m CacheMethod) GetFileMonitorProfile(name string, acc *access.AccessContro
 			Behavior:         filter.behavior,
 			CreatedTimeStamp: filter.createdAt.Unix(),
 			UpdatedTimeStamp: filter.updatedAt.Unix(),
+			CfgType:          common.TCfgTypeToApi(filter.CfgType),
 		}
-
-		mf.CfgType = cfgTypeMapping[filter.CfgType]
 		if filter.customerAdd {
 			mf.Apps = filter.apps.ToStringSlice()
 		}

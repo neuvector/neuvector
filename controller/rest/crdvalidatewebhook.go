@@ -16,6 +16,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -271,9 +272,12 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 			var lockKey string
 			var crdHandler nvCrdHandler
 			record := crdProcRecord.CrdRecord
-			if record.Request.Kind.Kind == resource.NvAdmCtrlSecurityRuleKind {
+			switch record.Request.Kind.Kind {
+			case resource.NvAdmCtrlSecurityRuleKind:
 				lockKey = share.CLUSLockAdmCtrlKey
-			} else {
+			case resource.NvConfigSecurityRuleKind:
+				lockKey = share.CLUSLockServerKey
+			default:
 				lockKey = share.CLUSLockPolicyKey
 			}
 			crdHandler.Init(lockKey, importCallerK8s)
@@ -485,22 +489,31 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 
 		if len(sizeErrMsg) == 0 && (reqOp == admissionv1beta1.Create || reqUpdateByK8sGC) {
 			mdName := ""
-			allowedName := ""
+			allowedNames := []string{}
 			var secRulePartial resource.NvSecurityRulePartial
 			req := ar.Request
 			if err := json.Unmarshal(req.Object.Raw, &secRulePartial); err == nil {
 				mdName = secRulePartial.GetName()
 			}
 			if reqOp == admissionv1beta1.Create {
+				found := false
 				switch req.Kind.Kind {
 				case resource.NvAdmCtrlSecurityRuleKind:
-					allowedName = share.ScopeLocal
+					allowedNames = []string{share.ScopeFed, share.ScopeLocal}
+				case resource.NvConfigSecurityRuleKind:
+					allowedNames = []string{share.ScopeFed}
 				case resource.NvVulnProfileSecurityRuleKind:
-					allowedName = share.DefaultVulnerabilityProfileName
+					allowedNames = []string{share.DefaultVulnerabilityProfileName}
 				case resource.NvCompProfileSecurityRuleKind:
-					allowedName = share.DefaultComplianceProfileName
+					allowedNames = []string{share.DefaultComplianceProfileName}
 				}
-				if allowedName != "" && mdName != allowedName {
+				for _, allowedName := range allowedNames {
+					if mdName == allowedName {
+						found = true
+						break
+					}
+				}
+				if len(allowedNames) > 0 && !found {
 					sizeErrMsg = fmt.Sprintf("CRD resource metadata name(%s) is not allowed", mdName)
 				}
 			} else if reqUpdateByK8sGC {
@@ -598,7 +611,8 @@ func (whsvr *WebhookServer) crdServeNvGroupDef(ar *admissionv1beta1.AdmissionRev
 		if crdSecRule, err := resource.CreateNvCrdObject(req.Resource.Resource); crdSecRule != nil {
 			if err = json.Unmarshal(req.Object.Raw, crdSecRule); err == nil {
 				if grpDef, ok := crdSecRule.(*resource.NvGroupDefinition); ok {
-					if isReservedNvGroupDefName(grpDef.GetName()) {
+					gName := grpDef.GetName()
+					if isReservedNvGroupDefName(gName) || strings.HasPrefix(gName, api.FederalGroupPrefix) {
 						errMsg = fmt.Sprintf("group %s cannot be defined by cr", grpDef.GetName())
 					} else {
 						_, _, errMsg, _, _, _ = crdHandler.crdSecRuleHandler(req, kind, "", crdSecRule, nil)

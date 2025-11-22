@@ -518,7 +518,7 @@ func CLUSRootToRESTRoot_GET(clusRoot *share.CLUSSigstoreRootOfTrust) api.REST_Si
 		RekorPublicKey:       clusRoot.RekorPublicKey,
 		RootCert:             clusRoot.RootCert,
 		SCTPublicKey:         clusRoot.SCTPublicKey,
-		CfgType:              cfgTypeMap2Api[clusRoot.CfgType],
+		CfgType:              common.TCfgTypeToApi(clusRoot.CfgType),
 		Comment:              clusRoot.Comment,
 	}
 }

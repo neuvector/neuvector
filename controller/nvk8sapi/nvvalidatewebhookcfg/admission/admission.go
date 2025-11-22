@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/neuvector/neuvector/controller/api"
-	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
 
@@ -692,16 +691,13 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 
 func GetAdmRuleTypeOptions(ruleType string) *api.RESTAdmCatOptions {
 	if admRuleTypeOptions == nil {
+		denyRuleOptions := &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sDenyRuleOptions()}
+		allowRuleOptions := &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sExceptRuleOptions()}
 		admRuleTypeOptions = map[string]*api.RESTAdmCatOptions{
-			api.ValidatingDenyRuleType:   {},
-			api.ValidatingExceptRuleType: {},
-		}
-		for _, admType := range admission.GetAdmissionCtrlTypes(share.PlatformKubernetes) {
-			switch admType {
-			case admission.NvAdmValidateType:
-				admRuleTypeOptions[api.ValidatingDenyRuleType].K8sOptions = &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sDenyRuleOptions()}
-				admRuleTypeOptions[api.ValidatingExceptRuleType].K8sOptions = &api.RESTAdmRuleOptions{RuleOptions: getAdmK8sExceptRuleOptions()}
-			}
+			api.ValidatingDenyRuleType:      {K8sOptions: denyRuleOptions},
+			share.FedAdmCtrlDenyRulesType:   {K8sOptions: denyRuleOptions},
+			api.ValidatingExceptRuleType:    {K8sOptions: allowRuleOptions},
+			share.FedAdmCtrlExceptRulesType: {K8sOptions: allowRuleOptions},
 		}
 	}
 	return admRuleTypeOptions[ruleType]

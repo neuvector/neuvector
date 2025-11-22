@@ -1009,3 +1009,11 @@ OUTER:
 	}
 	return true
 }
+
+func TCfgTypeToApi(cfgType share.TCfgType) string {
+	cType, ok := utils.CfgTypeToApiMapping[cfgType]
+	if !ok {
+		cType = api.CfgTypeUserCreated
+	}
+	return cType
+}

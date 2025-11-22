@@ -718,7 +718,7 @@ func (m *CacheMethod) GetWafRule(rulename string, acc *access.AccessControl) (*a
 		rdre := &api.RESTWafRule{
 			Name:    cdre.Name,
 			ID:      cdre.ID,
-			CfgType: cfgTypeMapping[cdre.CfgType],
+			CfgType: common.TCfgTypeToApi(cdre.CfgType),
 		}
 		for _, cpt := range cdre.Patterns {
 			if cpt.Context == "" {
@@ -744,7 +744,7 @@ func (m *CacheMethod) GetWafRule(rulename string, acc *access.AccessControl) (*a
 			rdre := &api.RESTWafRule{
 				Name:    cdre.Name,
 				ID:      cdre.ID,
-				CfgType: cfgTypeMapping[cdre.CfgType],
+				CfgType: common.TCfgTypeToApi(cdre.CfgType),
 			}
 			for _, cpt := range cdre.Patterns {
 				if cpt.Context == "" {
@@ -783,7 +783,7 @@ func (m *CacheMethod) GetWafSensor(sensor string, acc *access.AccessControl) (*a
 			RuleList:  make([]*api.RESTWafRule, 0),
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
-			CfgType:   cfgTypeMapping[cdr.CfgType],
+			CfgType:   common.TCfgTypeToApi(cdr.CfgType),
 		}
 
 		for name := range cdr.Groups {
@@ -796,7 +796,7 @@ func (m *CacheMethod) GetWafSensor(sensor string, acc *access.AccessControl) (*a
 				rdre := &api.RESTWafRule{
 					Name:    cdre.Name,
 					ID:      cdre.ID,
-					CfgType: cfgTypeMapping[cdre.CfgType],
+					CfgType: common.TCfgTypeToApi(cdre.CfgType),
 				}
 				for _, cpt := range cdre.Patterns {
 					if cpt.Context == "" {
@@ -817,7 +817,7 @@ func (m *CacheMethod) GetWafSensor(sensor string, acc *access.AccessControl) (*a
 					rdre := &api.RESTWafRule{
 						Name:    cdre.Name,
 						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
+						CfgType: common.TCfgTypeToApi(cdre.CfgType),
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -840,7 +840,7 @@ func (m *CacheMethod) GetWafSensor(sensor string, acc *access.AccessControl) (*a
 					rdre := &api.RESTWafRule{
 						Name:    common.GetOrigWafRuleName(cdrename),
 						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
+						CfgType: common.TCfgTypeToApi(cdre.CfgType),
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -860,7 +860,7 @@ func (m *CacheMethod) GetWafSensor(sensor string, acc *access.AccessControl) (*a
 						rdre := &api.RESTWafRule{
 							Name:    common.GetOrigWafRuleName(cdre.Name),
 							ID:      cdre.ID,
-							CfgType: cfgTypeMapping[cdre.CfgType],
+							CfgType: common.TCfgTypeToApi(cdre.CfgType),
 						}
 						for _, cpt := range cdre.Patterns {
 							if cpt.Context == "" {
@@ -933,7 +933,7 @@ func (m *CacheMethod) GetAllWafSensors(scope string, acc *access.AccessControl) 
 			RuleList:  make([]*api.RESTWafRule, 0),
 			Comment:   cdr.Comment,
 			Predefine: cdr.Predefine,
-			CfgType:   cfgTypeMapping[cdr.CfgType],
+			CfgType:   common.TCfgTypeToApi(cdr.CfgType),
 		}
 		for name := range cdr.Groups {
 			resp.GroupList = append(resp.GroupList, name)
@@ -944,7 +944,7 @@ func (m *CacheMethod) GetAllWafSensors(scope string, acc *access.AccessControl) 
 				rdre := &api.RESTWafRule{
 					Name:    common.GetOrigWafRuleName(cdre.Name),
 					ID:      cdre.ID,
-					CfgType: cfgTypeMapping[cdre.CfgType],
+					CfgType: common.TCfgTypeToApi(cdre.CfgType),
 				}
 				for _, cpt := range cdre.Patterns {
 					if cpt.Context == "" {
@@ -964,7 +964,7 @@ func (m *CacheMethod) GetAllWafSensors(scope string, acc *access.AccessControl) 
 					rdre := &api.RESTWafRule{
 						Name:    common.GetOrigWafRuleName(cdre.Name),
 						ID:      cdre.ID,
-						CfgType: cfgTypeMapping[cdre.CfgType],
+						CfgType: common.TCfgTypeToApi(cdre.CfgType),
 					}
 					for _, cpt := range cdre.Patterns {
 						if cpt.Context == "" {
@@ -1048,8 +1048,8 @@ func (m *CacheMethod) GetWafGroup(group string, acc *access.AccessControl) (*api
 				Name:    cg.Name,
 				Status:  cg.Status,
 				Sensors: make([]*api.RESTWafSetting, 0),
+				CfgType: common.TCfgTypeToApi(cg.CfgType),
 			}
-			resp.CfgType = cfgTypeMapping[cg.CfgType]
 
 			for _, cs := range cg.Sensors {
 				rdsa := &api.RESTWafSetting{
@@ -1058,7 +1058,7 @@ func (m *CacheMethod) GetWafGroup(group string, acc *access.AccessControl) (*api
 				}
 				if wafsensor, ok1 := wafSensors[cs.Name]; ok1 {
 					rdsa.Comment = wafsensor.Comment
-					rdsa.CfgType = cfgTypeMapping[wafsensor.CfgType]
+					rdsa.CfgType = common.TCfgTypeToApi(wafsensor.CfgType)
 					rdsa.Exist = true
 				} else {
 					rdsa.Exist = false
@@ -1106,8 +1106,8 @@ func (m *CacheMethod) GetAllWafGroup(scope string, acc *access.AccessControl) []
 			Name:    cg.Name,
 			Status:  cg.Status,
 			Sensors: make([]*api.RESTWafSetting, 0),
+			CfgType: common.TCfgTypeToApi(cg.CfgType),
 		}
-		resp.CfgType = cfgTypeMapping[cg.CfgType]
 
 		for _, cs := range cg.Sensors {
 			rdsa := &api.RESTWafSetting{
@@ -1116,7 +1116,7 @@ func (m *CacheMethod) GetAllWafGroup(scope string, acc *access.AccessControl) []
 			}
 			if wafsensor, ok1 := wafSensors[cs.Name]; ok1 {
 				rdsa.Comment = wafsensor.Comment
-				rdsa.CfgType = cfgTypeMapping[wafsensor.CfgType]
+				rdsa.CfgType = common.TCfgTypeToApi(wafsensor.CfgType)
 				rdsa.Exist = true
 			} else {
 				rdsa.Exist = false

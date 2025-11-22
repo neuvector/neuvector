@@ -23,14 +23,6 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-var cfgTypeMapping = map[share.TCfgType]string{
-	share.Learned:       api.CfgTypeLearned,
-	share.UserCreated:   api.CfgTypeUserCreated,
-	share.GroundCfg:     api.CfgTypeGround,
-	share.FederalCfg:    api.CfgTypeFederal,
-	share.SystemDefined: api.CfgSystemDefined,
-}
-
 type policyCacheType struct {
 	ruleMap      map[uint32]*share.CLUSPolicyRule
 	ruleHeads    []*share.CLUSRuleHead
@@ -87,11 +79,11 @@ func policyRule2REST(rule *share.CLUSPolicyRule) *api.RESTPolicyRule {
 		Priority:     rule.Priority,
 		MatchCntr:    rule.MatchCntr,
 		LastMatchTS:  rule.LastMatchAt.Unix(),
+		CfgType:      common.TCfgTypeToApi(rule.CfgType),
 	}
 	if r.MatchCntr == 0 {
 		r.LastMatchTS = 0
 	}
-	r.CfgType = cfgTypeMapping[rule.CfgType]
 
 	return &r
 }
