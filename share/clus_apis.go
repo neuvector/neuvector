@@ -2059,34 +2059,34 @@ type CLUSAdmissionStats struct { // see type RESTAdmissionStats
 }
 
 type CLUSAdmRuleCriterion struct { // see type RESTAdmRuleCriterion
-	Name        string                  `json:"name"`
-	Op          string                  `json:"op"`
-	Value       string                  `json:"value"`
-	ValueSlice  []string                `json:"value_slice"`
-	SubCriteria []*CLUSAdmRuleCriterion `json:"sub_criteria,omitempty"`
-	Type        string                  `json:"type,omitempty"`
-	Kind        string                  `json:"template_kind,omitempty"`
-	Path        string                  `json:"path,omitempty"`
-	ValueType   string                  `json:"value_type,omitempty"`
+	Name        string                  `json:"name" yaml:"name"`
+	Op          string                  `json:"op" yaml:"op"`
+	Value       string                  `json:"value" yaml:"value"`
+	ValueSlice  []string                `json:"value_slice" yaml:"value_slice"`
+	SubCriteria []*CLUSAdmRuleCriterion `json:"sub_criteria,omitempty" yaml:"sub_criteria,omitempty"`
+	Type        string                  `json:"type,omitempty" yaml:"type,omitempty"`
+	Kind        string                  `json:"template_kind,omitempty" yaml:"template_kind,omitempty"`
+	Path        string                  `json:"path,omitempty" yaml:"path,omitempty"`
+	ValueType   string                  `json:"value_type,omitempty" yaml:"value_type,omitempty"`
 }
 
 type CLUSAdmissionRule struct { // see type RESTAdmissionRule
-	ID                uint32                  `json:"id"`
-	Category          string                  `json:"category"`
-	Comment           string                  `json:"comment"`
-	Criteria          []*CLUSAdmRuleCriterion `json:"criteria"`
-	Disable           bool                    `json:"disable"`
-	Critical          bool                    `json:"critical"`
-	CfgType           TCfgType                `json:"cfg_type"`
-	RuleType          string                  `json:"rule_type"` // "exception", "deny"
-	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag"`
-	RuleMode          string                  `json:"rule_mode"`  // "", "monitor", "protect"
-	Containers        uint8                   `json:"containers"` // 0 for all containers, 1 for containers, 2 for initContainers, 4 for ephemeralContainers (OR of supported types)
+	ID                uint32                  `json:"id" yaml:"id"`
+	Category          string                  `json:"category" yaml:"category"`
+	Comment           string                  `json:"comment" yaml:"comment"`
+	Criteria          []*CLUSAdmRuleCriterion `json:"criteria" yaml:"criteria"`
+	Disable           bool                    `json:"disable" yaml:"disable"`
+	Critical          bool                    `json:"critical" yaml:"critical"`
+	CfgType           TCfgType                `json:"cfg_type" yaml:"cfg_type"`
+	RuleType          string                  `json:"rule_type" yaml:"rule_type"` // "exception", "deny"
+	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag" yaml:"use_as_risky_role_tag"`
+	RuleMode          string                  `json:"rule_mode" yaml:"rule_mode"`   // "", "monitor", "protect"
+	Containers        uint8                   `json:"containers" yaml:"containers"` // 0 for all containers, 1 for containers, 2 for initContainers, 4 for ephemeralContainers (OR of supported types)
 }
 
 type CLUSAdmissionRules struct {
-	RuleMap   map[uint32]*CLUSAdmissionRule `json:"rule_map"` // key is rule ID
-	RuleHeads []*CLUSRuleHead               `json:"rule_heads"`
+	RuleMap   map[uint32]*CLUSAdmissionRule `json:"rule_map" yaml:"rule_map"` // key is rule ID
+	RuleHeads []*CLUSRuleHead               `json:"rule_heads" yaml:"rule_heads"`
 }
 
 const (
