@@ -217,7 +217,7 @@ func (mgr *ScannerAcquisitionManager) getAllAvailableScanners() map[string]share
 	ret := map[string]share.CLUSScanner{}
 
 	for _, scanner := range mgr.clusterHelper.GetAvailableScanners() {
-		ret[scanner.ID] = *scanner
+		ret[scanner.ID] = scanner
 	}
 
 	return ret

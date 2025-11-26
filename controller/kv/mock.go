@@ -508,10 +508,10 @@ func (m *MockCluster) SetCacheMockCallback(keyStore string, mockFunc MockKvConfi
 }
 
 // Scanner-related mock methods
-func (m *MockCluster) GetAvailableScanners() []*share.CLUSScanner {
-	var result []*share.CLUSScanner
+func (m *MockCluster) GetAvailableScanners() []share.CLUSScanner {
+	var result []share.CLUSScanner
 	for _, scanner := range m.scanners {
-		result = append(result, scanner)
+		result = append(result, *scanner)
 	}
 	return result
 }

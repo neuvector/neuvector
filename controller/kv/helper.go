@@ -2,6 +2,7 @@ package kv
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
@@ -10,7 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -138,7 +139,7 @@ type ClusterHelper interface {
 
 	// GetAvailableScanners returns a list of all available scanners.
 	// Expected outcome: []*share.CLUSScanner representing all registered scanners in the cluster.
-	GetAvailableScanners() []*share.CLUSScanner
+	GetAvailableScanners() []share.CLUSScanner
 
 	// PickLeastLoadedScanner selects the scanner with the least active tasks, scanCredit means the number of available tasks, the scanner with the most scanCredit will be selected.
 	// Expected outcome: The least loaded scanner or an error if none are available.
@@ -336,21 +337,29 @@ var (
 )
 
 type clusterHelper struct {
-	id                  string
-	version             string
-	persist             bool
-	keyRotationDuration time.Duration
+	id                         string
+	version                    string
+	persist                    bool
+	keyRotationDuration        time.Duration
+	maxClusterOperationRetries int
 }
 
 var clusHelperImpl *clusterHelper
 var clusHelper ClusterHelper
 
-func newClusterHelper(id, version string, persist bool, keyRotationDuration time.Duration) ClusterHelper {
+func newClusterHelper(id, version string, persist bool, keyRotationDuration time.Duration, maxClusterOperationRetries int) ClusterHelper {
 	clusHelperImpl = new(clusterHelper)
 	clusHelperImpl.id = id
 	clusHelperImpl.version = version
 	clusHelperImpl.persist = persist
 	clusHelperImpl.keyRotationDuration = keyRotationDuration
+	clusHelperImpl.maxClusterOperationRetries = maxClusterOperationRetries
+
+	err := clusHelperImpl.initCreditOwners()
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to initialize credit owners")
+		os.Exit(1)
+	}
 	return clusHelperImpl
 }
 
@@ -1618,8 +1627,8 @@ func (m clusterHelper) GetScannerDB(store string) []*share.CLUSScannerDB {
 	return dbs
 }
 
-func (m clusterHelper) GetAvailableScanners() []*share.CLUSScanner {
-	scanners := make([]*share.CLUSScanner, 0)
+func (m clusterHelper) GetAvailableScanners() []share.CLUSScanner {
+	scanners := make([]share.CLUSScanner, 0)
 	if keys, err := cluster.GetStoreKeys(share.CLUSScannerStore); err == nil {
 		for _, key := range keys {
 			var scanner share.CLUSScanner
@@ -1634,7 +1643,7 @@ func (m clusterHelper) GetAvailableScanners() []*share.CLUSScanner {
 					continue
 				}
 				if scanner.ID != share.CLUSScannerDBVersionID {
-					scanners = append(scanners, &scanner)
+					scanners = append(scanners, scanner)
 				}
 			}
 		}
@@ -1651,16 +1660,11 @@ func (m clusterHelper) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 
 	// To minimize CAS conflicts and improve fairness, sort scanners by ScanCredit (descending).
 	// This ensures we try to consume credits from the most available scanner first.
-	sort.Slice(scanners, func(i, j int) bool {
-		return scanners[i].ScanCredit > scanners[j].ScanCredit
+	slices.SortFunc(scanners, func(a, b share.CLUSScanner) int {
+		return cmp.Compare(b.ScanCredit, a.ScanCredit)
 	})
 
 	for _, scanner := range scanners {
-		if scanner == nil {
-			log.Error("scanner is nil, skipping")
-			continue
-		}
-
 		selectedScanner, rev, err := m.GetScannerRev(scanner.ID)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err, "scanner": scanner.ID}).Error("Failed to get scanner")
@@ -1704,11 +1708,8 @@ func (m clusterHelper) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 }
 
 func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) error {
-	// Infinite retry loop to ensure credit is never lost
-	// This is critical because losing credits would cause scanner starvation
 	key := share.CLUSScannerKey(scannerId)
-	maxRetries := 10
-	for retry := 0; retry < maxRetries; retry++ {
+	for retry := 0; retry < m.maxClusterOperationRetries; retry++ {
 		// Get current scanner state with revision
 		scanner, rev, err := m.GetScannerRev(scannerId)
 		if err != nil {
@@ -1753,30 +1754,63 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) er
 		return nil
 	}
 
-	return fmt.Errorf("failed to release scanner credit after %d retries", maxRetries)
+	return fmt.Errorf("failed to release scanner credit after %d retries", m.maxClusterOperationRetries)
+}
+
+func (m clusterHelper) initCreditOwners() error {
+	key := share.CLUSScannerCreditOwnerKey(m.id)
+	scanners := make(map[string]int)
+
+	var value []byte
+	var err error
+	value, err = json.Marshal(scanners)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < m.maxClusterOperationRetries; i++ {
+		if err = cluster.PutRev(key, value, 0); err == cluster.ErrPutCAS {
+			continue
+		}
+		break
+	}
+	return nil
 }
 
 // TrackCreditAcquisition records or removes a controller's ownership of scanner credits.
 func (m clusterHelper) TrackCreditAcquisition(controllerID, scannerID string, maxConcurrentScansPerScanner int, acquire bool) error {
 	key := share.CLUSScannerCreditOwnerKey(controllerID)
-	maxRetries := 10
 
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < m.maxClusterOperationRetries; i++ {
 		scanners := make(map[string]int)
 		value, rev, err := m.get(key)
-		if err == nil && value != nil {
-			err = json.Unmarshal(value, &scanners)
-			if err != nil {
+		if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+			return err
+		}
+
+		if len(value) > 0 {
+			if err := json.Unmarshal(value, &scanners); err != nil {
 				return err
 			}
+		} else if !acquire {
+			// Nothing has been recorded for this controller yet, so releasing is a no-op.
+			return nil
 		}
 
 		if acquire {
 			// Acquire credit: increment credit count for given scanner, up to the max allowed
-			scanners[scannerID] = min(scanners[scannerID]+1, maxConcurrentScansPerScanner)
+			if current, ok := scanners[scannerID]; ok {
+				scanners[scannerID] = min(current+1, maxConcurrentScansPerScanner)
+			} else {
+				scanners[scannerID] = 1
+			}
 		} else {
-			// Release credit: decrement credit count for given scanner, not going below zero
-			scanners[scannerID] = max(scanners[scannerID]-1, 0)
+			// Release credit: decrement credit count for given scanner, remove entry when it reaches zero
+			if current, ok := scanners[scannerID]; ok {
+				scanners[scannerID] = max(current-1, 0)
+			} else {
+				return nil
+			}
 		}
 
 		value, err = json.Marshal(scanners)
