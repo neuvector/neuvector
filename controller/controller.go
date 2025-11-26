@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -622,8 +623,15 @@ func main() {
 		}
 	}
 
+	maxClusterOperationRetries := 10
+	if os.Getenv("MAX_CLUSTER_OPERATION_RETRIES") != "" {
+		if retries, err := strconv.Atoi(os.Getenv("MAX_CLUSTER_OPERATION_RETRIES")); err == nil {
+			maxClusterOperationRetries = retries
+		}
+	}
+
 	kv.Init(Ctrler.ID, dev.Ctrler.Ver, Host.Platform, Host.Flavor, *persistConfig, isGroupMember,
-		getConfigKvData, evqueue, keyRotationDuration)
+		getConfigKvData, evqueue, keyRotationDuration, maxClusterOperationRetries)
 	ruleid.Init()
 
 	// Initialize after kv.Init() to ensure clusterHelper is available

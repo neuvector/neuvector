@@ -92,7 +92,7 @@ func GetConfigHelper() ConfigHelper {
 }
 
 func Init(id, version, platform, flavor string, persist bool, isGroupMember FuncIsGroupMember, getConfigData FuncGetConfigKVData,
-	evQueue cluster.ObjectQueueInterface, keyRotationDuration time.Duration) {
+	evQueue cluster.ObjectQueueInterface, keyRotationDuration time.Duration, maxClusterOperationRetries int) {
 
 	evqueue = evQueue
 	for _, ep := range cfgEndpoints {
@@ -100,7 +100,7 @@ func Init(id, version, platform, flavor string, persist bool, isGroupMember Func
 	}
 
 	newConfigHelper(id, version, persist)
-	clusHelper = newClusterHelper(id, version, persist, keyRotationDuration)
+	clusHelper = newClusterHelper(id, version, persist, keyRotationDuration, maxClusterOperationRetries)
 
 	orchPlatform = platform
 	orchFlavor = flavor

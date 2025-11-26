@@ -734,6 +734,7 @@ golang.org/x/crypto/pbkdf2
 # golang.org/x/net v0.47.0
 ## explicit; go 1.24.0
 golang.org/x/net/bpf
+golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/http/httpguts
