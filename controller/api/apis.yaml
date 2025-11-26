@@ -620,7 +620,9 @@ paths:
             $ref: '#/definitions/RESTCompProfilesExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/compliance/profile/config:
     post:
       tags:
@@ -1222,7 +1224,9 @@ paths:
             $ref: '#/definitions/RESTAdmCtrlRulesExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/admission/config:
     post:
       tags:
@@ -1284,7 +1288,9 @@ paths:
             $ref: '#/definitions/RESTResponseRulesExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/response/rule/config:
     post:
       tags:
@@ -1384,7 +1390,9 @@ paths:
             $ref: '#/definitions/RESTFedConfigExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/dlp:
     post:
       tags:
@@ -1412,7 +1420,9 @@ paths:
             $ref: '#/definitions/RESTDlpSensorExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/dlp/config:
     post:
       tags:
@@ -1469,7 +1479,9 @@ paths:
             $ref: '#/definitions/RESTVulnProfilesExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/vulnerability/profile/config:
     post:
       tags:
@@ -1526,7 +1538,9 @@ paths:
             $ref: '#/definitions/RESTWafSensorExport'
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/waf/config:
     post:
       tags:
@@ -1607,7 +1621,9 @@ paths:
           description: "It exports the federated group configurations when the scope is fed. Otherwise it's for exporting local group configurations."
       responses:
         '200':
-          description: Success. Get a yaml file.
+          description: Success. (1) Get a yaml file when export to local. (2) Get RESTRemoteExportData payload when export to remote repository.
+          schema:
+            $ref: '#/definitions/RESTRemoteExportData'
   /v1/file/group/config:
     get:
       tags:
@@ -5370,6 +5386,12 @@ definitions:
       message:
         type: string
         example: "dns tunneling"
+  RESTRemoteExportData:
+    type: object
+    properties:
+      file_path:
+        type: string
+        description: the destination file path when exported to remote repository
   RESTAdmCatOptions:
     type: object
     properties:

@@ -2304,8 +2304,11 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 			log.WithFields(log.Fields{"error": err}).Error("could not do remote export")
 			return
 		}
+		resp := api.RESTRemoteExportData{
+			FilePath: remoteExport.ExportedFilePath,
+		}
 		msg := fmt.Sprintf("Export %s to remote repository", exportType)
-		restRespSuccess(w, r, nil, acc, login, nil, msg)
+		restRespSuccess(w, r, &resp, acc, login, nil, msg)
 	} else {
 		// tell the browser the returned content should be downloaded
 		w.Header().Set("Content-Disposition", "Attachment; filename="+filename)
