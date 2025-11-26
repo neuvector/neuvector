@@ -13,11 +13,12 @@ import (
 )
 
 type Export struct {
-	DefaultFilePath string
-	Options         *api.RESTRemoteExportOptions
-	Content         []byte
-	Cacher          cache.CacheInterface
-	AccessControl   *access.AccessControl
+	DefaultFilePath  string
+	ExportedFilePath string
+	Options          *api.RESTRemoteExportOptions
+	Content          []byte
+	Cacher           cache.CacheInterface
+	AccessControl    *access.AccessControl
 }
 
 func (exp *Export) Do() error {
@@ -63,17 +64,17 @@ func (exp *Export) Do() error {
 		return errors.New("azure devops configuration cannot be nil for azure devops provider")
 	}
 
-	exportFilePath := exp.DefaultFilePath
-	if exp.Options.FilePath != "" {
-		exportFilePath = exp.Options.FilePath
+	if exp.Options.FilePath == "" {
+		exp.Options.FilePath = exp.DefaultFilePath
 	}
-	commitMessage := exportFilePath
+	exp.ExportedFilePath = exp.Options.FilePath
+	commitMessage := exp.Options.FilePath
 	if exp.Options.Comment != "" {
 		commitMessage = exp.Options.Comment
 	}
 
 	if remoteRepository.Provider == share.RemoteRepositoryProvider_GitHub {
-		githubExport, err := NewGitHubExport(exportFilePath, exp.Content, commitMessage, *remoteRepository.GitHubConfiguration)
+		githubExport, err := NewGitHubExport(exp.Options.FilePath, exp.Content, commitMessage, *remoteRepository.GitHubConfiguration)
 		if err != nil {
 			return fmt.Errorf("could not initialize github export object: %s", err.Error())
 		}

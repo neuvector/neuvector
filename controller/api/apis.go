@@ -4122,6 +4122,10 @@ type RESTRemoteExportOptions struct {
 	Comment                  string `json:"comment"`
 }
 
+type RESTRemoteExportData struct {
+	FilePath string `json:"file_path"`
+}
+
 func (config *RESTRemoteExportOptions) IsValid() bool {
 	return config.RemoteRepositoryNickname != ""
 }
