@@ -370,8 +370,9 @@ func newClusterHelper(id, version string, persist bool, keyRotationDuration time
 		retries, err := strconv.Atoi(os.Getenv("MAX_CLUSTER_OPERATION_RETRIES"))
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to parse MAX_CLUSTER_OPERATION_RETRIES as int")
+		} else {
+			maxScanCreditRetries = retries
 		}
-		maxScanCreditRetries = retries
 	}
 	clusHelperImpl.maxScanCreditRetries = maxScanCreditRetries
 
