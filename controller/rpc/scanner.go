@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sort"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -100,9 +100,10 @@ func (mgr *ScannerAcquisitionManager) requestProcessLoop() {
 		pendingRequests = append(pendingRequests, mgr.collectPendingRequests()...)
 
 		// Sort by pullTime to get earliest request first
-		sort.Slice(pendingRequests, func(i, j int) bool {
-			return pendingRequests[i].pullTime.Before(pendingRequests[j].pullTime)
+		slices.SortFunc(pendingRequests, func(req1, req2 *acquireScannerRequest) int {
+			return req1.pullTime.Compare(req2.pullTime)
 		})
+
 		req := pendingRequests[0]
 
 		// Check if context is still valid
