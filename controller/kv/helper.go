@@ -1759,17 +1759,10 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) er
 
 func (m clusterHelper) initCreditOwners() error {
 	key := share.CLUSScannerCreditOwnerKey(m.id)
-	scanners := make(map[string]int)
-
-	var value []byte
 	var err error
-	value, err = json.Marshal(scanners)
-	if err != nil {
-		return err
-	}
 
 	for i := 0; i < m.maxClusterOperationRetries; i++ {
-		if err = cluster.PutRev(key, value, 0); err == cluster.ErrPutCAS {
+		if err = cluster.PutRev(key, []byte("{}"), 0); err == cluster.ErrPutCAS {
 			continue
 		}
 		break
