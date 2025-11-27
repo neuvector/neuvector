@@ -189,14 +189,16 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	newVer, _ := utils.NewVersion(data.CVEDBVersion)
 
 	newScanner := share.CLUSScanner{
-		ID:              data.ID,
-		CVEDBVersion:    data.CVEDBVersion,
-		CVEDBCreateTime: data.CVEDBCreateTime,
-		JoinedAt:        time.Now().UTC(),
-		RPCServer:       data.RPCServer,
-		RPCServerPort:   uint16(data.RPCServerPort),
-		BuiltIn:         data.RPCServer == "127.0.0.1",
-		CVEDBEntries:    len(data.CVEDB),
+		ID:                           data.ID,
+		CVEDBVersion:                 data.CVEDBVersion,
+		CVEDBCreateTime:              data.CVEDBCreateTime,
+		JoinedAt:                     time.Now().UTC(),
+		RPCServer:                    data.RPCServer,
+		RPCServerPort:                uint16(data.RPCServerPort),
+		BuiltIn:                      data.RPCServer == "127.0.0.1",
+		CVEDBEntries:                 len(data.CVEDB),
+		MaxConcurrentScansPerScanner: rpc.ScannerAcquisitionMgr.GetMaxConcurrentScansPerScanner(),
+		ScanCredit:                   rpc.ScannerAcquisitionMgr.GetMaxConcurrentScansPerScanner(),
 	}
 	if newScanner.BuiltIn {
 		// If scanner running in container, the ID should already by controller's ID.
@@ -297,7 +299,6 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	if err := clusHelper.CreateScannerStats(newScanner.ID); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("CreateScannerStats")
 	}
-
 	return nil
 }
 
@@ -350,7 +351,7 @@ func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*sh
 	acc := access.NewReaderAccessControl()
 	cfg := cacher.GetSystemConfig(acc)
 
-	busy, idle := rpc.ScanCreditMgr.CountScanners()
+	busy, idle := rpc.ScannerAcquisitionMgr.CountScanners()
 	scanners, dbTime, dbVer := cacher.GetScannerCount(acc)
 	c.Scanners = uint32(scanners)
 	c.IdleScanners = idle
