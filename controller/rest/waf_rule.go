@@ -433,11 +433,16 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTWafSensorConfigData
 	err := json.Unmarshal(body, &rconf)
-	if err == nil && rconf.Config != nil && rconf.Config.CfgType == "" {
+	if err != nil || rconf.Config == nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+	if rconf.Config.CfgType == "" {
 		rconf.Config.CfgType = api.CfgTypeUserCreated
 	}
-	if err != nil || rconf.Config == nil {
-		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
+	if rconf.Config.CfgType != api.CfgTypeUserCreated && rconf.Config.CfgType != api.CfgTypeFederal {
+		log.WithFields(log.Fields{"rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
