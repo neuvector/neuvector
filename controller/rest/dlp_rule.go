@@ -552,6 +552,9 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	body, _ := io.ReadAll(r.Body)
 	var rconf api.RESTDlpSensorConfigData
 	err := json.Unmarshal(body, &rconf)
+	if err == nil && rconf.Config != nil && rconf.Config.CfgType == "" {
+		rconf.Config.CfgType = api.CfgTypeUserCreated
+	}
 	if err != nil || rconf.Config == nil ||
 		(rconf.Config.CfgType != api.CfgTypeUserCreated && rconf.Config.CfgType != api.CfgTypeFederal) {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
