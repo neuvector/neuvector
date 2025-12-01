@@ -113,7 +113,7 @@ require (
 )
 
 require (
-	github.com/alitto/pond v1.9.2
+	github.com/alitto/pond/v2 v2.6.0
 	github.com/dmachard/go-clientsyslog v1.0.1
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/go-ldap/ldap/v3 v3.4.11
