@@ -5,6 +5,7 @@
 Package share is a generated protocol buffer package.
 
 It is generated from these files:
+
 	common.proto
 	controller_service.proto
 	enforcer_service.proto
@@ -12,6 +13,7 @@ It is generated from these files:
 	scanner_service.proto
 
 It has these top-level messages:
+
 	RPCVoid
 	CLUSProfilingRequest
 	CLUSBoolean
