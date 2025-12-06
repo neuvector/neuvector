@@ -197,11 +197,6 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	profConf, profRev := clusHelper.GetFileMonitorProfile(group)
 	ruleConf, ruleRev := clusHelper.GetFileAccessRule(group)
 
-	if profConf != nil && profConf.CfgType == share.GroundCfg {
-		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return
-	}
-
 	tm := time.Now().UTC()
 	// delete filters
 	if config.DelFilters != nil {
