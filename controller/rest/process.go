@@ -282,11 +282,6 @@ func handlerProcessProfileConfig(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if profile.CfgType == share.GroundCfg {
-		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
-		return
-	}
-
 	// --
 	if conf.HashEnable != nil {
 		profile.HashEnable = *conf.HashEnable
