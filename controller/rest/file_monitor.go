@@ -197,8 +197,9 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	profConf, profRev := clusHelper.GetFileMonitorProfile(group)
 	ruleConf, ruleRev := clusHelper.GetFileAccessRule(group)
 
-	if profConf != nil && profConf.CfgType == share.GroundCfg {
-		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
+	if profConf == nil || ruleConf == nil {
+		log.WithFields(log.Fields{"group": group, "profConf": profConf, "ruleConf": ruleConf}).Error("Get profile from cluster failed")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrObjectNotFound)
 		return
 	}
 
