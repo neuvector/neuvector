@@ -60,15 +60,8 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 	return regoStr
 }
 
-func GenerateRegoCode(rule *share.CLUSAdmissionRule) string {
+func PrintMainFunction(rule *share.CLUSAdmissionRule) []string {
 	rego := []string{}
-	// print header
-	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
-	rego = append(rego, packageName)
-
-	rego = append(rego, printSpec())
-
-	// main
 	mainFunc := `
 violation[result]{
 	request := _get_input("get")
@@ -89,6 +82,19 @@ violation[result]{
 }
 	`
 	rego = append(rego, mainFunc)
+	return rego
+}
+
+func GenerateRegoCode(rule *share.CLUSAdmissionRule) string {
+	rego := []string{}
+	// print header
+	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
+	rego = append(rego, packageName)
+
+	rego = append(rego, printSpec())
+
+	mainFunc := PrintMainFunction(rule)
+	rego = append(rego, mainFunc...)
 
 	// handling type=1 (general) individual criteria conversion
 	for j, c := range rule.Criteria {
