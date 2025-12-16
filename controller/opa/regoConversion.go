@@ -3,12 +3,42 @@ package opa
 import (
 	"fmt"
 	"strings"
+	"text/template"
 
 	"github.com/neuvector/neuvector/share"
 	log "github.com/sirupsen/logrus"
 )
 
+// RegoConversionOptions configures how Rego code is generated.
+// This allows customization of package name and violation function generation
+// without requiring string replacement in downstream code.
+type RegoConversionOptions struct {
+	PackageName            string
+	GenerateKubewardenMode bool
+}
+
+// GeneratedRego represent the generated result would filled into the tmpl
+type GeneratedRego struct {
+	PackageName       string
+	CustomChecks      []string
+	ViolationMessages []string
+	DebugMessages     []string
+}
+
+// DefaultRegoGenConfig returns the default configuration for NeuVector compatibility.
+func DefaultRegoGenConfig(ruleID uint32) *RegoConversionOptions {
+	return &RegoConversionOptions{
+		PackageName:            fmt.Sprintf("neuvector_policy_%d", ruleID),
+		GenerateKubewardenMode: false,
+	}
+}
+
 func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
+	defaultOptions := DefaultRegoGenConfig(rule.ID)
+	return ConvertToRegoRuleWithOptions(rule, defaultOptions)
+}
+
+func ConvertToRegoRuleWithOptions(rule *share.CLUSAdmissionRule, options *RegoConversionOptions) string {
 	// has custom criteria
 	hasCusomCriteria := false
 	for _, c := range rule.Criteria {
@@ -33,7 +63,13 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 	// print header
 	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
 
-	regoStr := GenerateRegoCode(rule)
+	if options == nil {
+		options = DefaultRegoGenConfig(rule.ID)
+	}
+	regoStr, err := GenerateRegoCode(rule, options)
+	if err != nil {
+		return ""
+	}
 	policyUrl := formatPolicyUrl(rule.ID)
 
 	success := AddPolicy(policyUrl, regoStr)
@@ -60,7 +96,90 @@ func ConvertToRegoRule(rule *share.CLUSAdmissionRule) string {
 	return regoStr
 }
 
-func PrintMainFunction(rule *share.CLUSAdmissionRule) []string {
+func GenerateRegoCode(rule *share.CLUSAdmissionRule, options *RegoConversionOptions) (string, error) {
+	generatedRego := GeneratedRego{
+		PackageName:       options.PackageName,
+		CustomChecks:      []string{},
+		ViolationMessages: []string{},
+		DebugMessages:     []string{},
+	}
+
+	if options.GenerateKubewardenMode {
+		generatedRego.ViolationMessages = GenerateSeparateDenyRules(rule)
+	} else {
+		generatedRego.CustomChecks = GenerateViolationFunction(rule)
+	}
+
+	// handling type=1 (general) individual criteria conversion
+	for j, c := range rule.Criteria {
+		log.WithFields(log.Fields{"criteria": c}).Debug("ConvertToRego-Criteria")
+
+		if c.Type == "" {
+			// if it's predefined then the type is empty string, we don't need to handle it
+			continue
+		}
+
+		if c.Type == "customPath" {
+			c_rego := convertGenericCriteria(j, c)
+			generatedRego.CustomChecks = append(generatedRego.CustomChecks, c_rego...)
+		}
+	}
+
+	generatedRego.DebugMessages = GenerateDebugMessages(rule)
+
+	tmpl, err := template.New("regoTemplate").Parse(regoTemplate)
+	if err != nil {
+		return "", err
+	}
+
+	var regoStr strings.Builder
+	err = tmpl.Execute(&regoStr, generatedRego)
+	if err != nil {
+		return "", err
+	}
+
+	return regoStr.String(), nil
+}
+
+func GenerateDebugMessages(rule *share.CLUSAdmissionRule) []string {
+	rego := []string{}
+	// generate troubleshooting code
+	// handling type=1 (general) keep track each individual criteria result
+	for j, c := range rule.Criteria {
+		if c.Type == "customPath" {
+			info := fmt.Sprintf("check [%s] with [%s] op", c.Path, c.Op)
+
+			rego = append(rego, `
+violationmsgs[msg]{
+	request := _get_input("get")
+`)
+			rego = append(rego, "\t"+convertCriteriaFunctionCall(j, c, true))
+			rego = append(rego, fmt.Sprintf(`	msg:="criteria_%d met. (%s)"`, j, info))
+			rego = append(rego, "}")
+
+			rego = append(rego, `
+violationmsgs[msg]{
+	request := _get_input("get")
+`)
+			rego = append(rego, "	not "+convertCriteriaFunctionCall(j, c, true))
+			rego = append(rego, fmt.Sprintf(`	msg:="criteria_%d not met. (%s)"`, j, info))
+			rego = append(rego, "}")
+		}
+	}
+	return rego
+}
+
+// GenerateViolationFunction generates the main violation rule that combines all criteria.
+// The generated function uses AND logic: all criteria must be met for a violation.
+// Example output:
+//
+//	violation[result]{
+//	    request := _get_input("get")
+//	    criteria_0(request)    # check [path] with [op]
+//	    criteria_1(request)    # check [path] with [op]
+//	    result:={"message": "all criteria have been met"}
+//	}
+func GenerateViolationFunction(rule *share.CLUSAdmissionRule) []string {
 	rego := []string{}
 	mainFunc := `
 violation[result]{
@@ -85,60 +204,36 @@ violation[result]{
 	return rego
 }
 
-func GenerateRegoCode(rule *share.CLUSAdmissionRule) string {
+// GenerateSeparateDenyRules generates individual deny/violation rules for each criterion (OR logic).
+// This is used when ViolationLogic is "or" - any criterion can trigger a violation.
+// only for kubewarden mode
+// Example output:
+//
+//	deny[msg] {
+//	    request := _get_input("get")
+//	    criteria_0(request)
+//	    msg := "Denied by NeuVector rule #1001: [path op value]"
+//	}
+func GenerateSeparateDenyRules(rule *share.CLUSAdmissionRule) []string {
 	rego := []string{}
-	// print header
-	packageName := fmt.Sprintf("package neuvector_policy_%d", rule.ID)
-	rego = append(rego, packageName)
+	ruleName := "deny"
 
-	rego = append(rego, printSpec())
-
-	mainFunc := PrintMainFunction(rule)
-	rego = append(rego, mainFunc...)
-
-	// handling type=1 (general) individual criteria conversion
 	for j, c := range rule.Criteria {
-		log.WithFields(log.Fields{"criteria": c}).Debug("ConvertToRego-Criteria")
-
-		if c.Type == "" {
-			// if it's predefined then the type is empty string, we don't need to handle it
-			continue
-		}
-
 		if c.Type == "customPath" {
-			c_rego := convertGenericCriteria(j, c)
-			rego = append(rego, c_rego...)
+			msg := fmt.Sprintf("Denied by NeuVector rule #%d: [%s %s %s]",
+				rule.ID, c.Path, c.Op, c.Value)
+
+			rego = append(rego, fmt.Sprintf(`
+%s[msg] {
+	request := _get_input("get")
+	criteria_%d(request)
+	msg := %q
+}
+`, ruleName, j, msg))
 		}
 	}
 
-	// generate troubleshooting code
-	// handling type=1 (general) keep track each individual criteria result
-	for j, c := range rule.Criteria {
-		if c.Type == "customPath" {
-			info := fmt.Sprintf("check [%s] with [%s] op", c.Path, c.Op)
-
-			rego = append(rego, `
-violationmsgs[msg]{
-	request := _get_input("get")
-`)
-			rego = append(rego, "\t"+convertCriteriaFunctionCall(j, c, true))
-			rego = append(rego, fmt.Sprintf(`	msg:="criteria_%d met. (%s)"`, j, info))
-			rego = append(rego, "}")
-
-			rego = append(rego, `
-violationmsgs[msg]{
-	request := _get_input("get")
-`)
-			rego = append(rego, "	not "+convertCriteriaFunctionCall(j, c, true))
-			rego = append(rego, fmt.Sprintf(`	msg:="criteria_%d not met. (%s)"`, j, info))
-			rego = append(rego, "}")
-		}
-	}
-
-	// helper functions
-	rego = append(rego, printHelperFunctions())
-
-	return strings.Join(rego, "\n")
+	return rego
 }
 
 func formatPolicyUrl(ruleID uint32) string {
@@ -279,212 +374,6 @@ func parseQuotedSimpleRegexString(input string) []string {
 	}
 
 	return quotedString
-}
-
-func printSpec() string {
-
-	rego := `
-specification = spec {
-	spec:={
-		"version": "v1",
-		"description": "NeuVector generated"
-	}
-}
-	`
-	return rego
-}
-
-func printHelperFunctions() string {
-	rego := `
-rawInput[msg]{
-	1==2
-	msg := input
-}
-
-# type-1: for regular workload, get it's spec.template
-_get_input(w) := x {
-	w == "get"
-
-	supportedKind = ["Deployment", "DaemonSet", "Job", "ReplicaSet", "ReplicationController", "StatefulSet"]
-	input.request.kind.kind == supportedKind[_]
-
-    input.request.object.spec.template
-    x := input.request.object.spec.template
-}
-
-# type-2: for cronjob workload, the format is different from major workload
-_get_input(w) := x {
-	w == "get"
-
-	supportedKind = ["CronJob"]
-	input.request.kind.kind == supportedKind[_]
-
-	input.request.object.spec.jobTemplate.spec.template
-    x :=  input.request.object.spec.jobTemplate.spec.template
-}
-
-# type-3: for pod workload, the format is different from major workload
-# We cannot use the [input.request.object] here because this will also generate output as [input.request.object.spec.template]
-# this cause Rego runtime error
-# 	"message": "functions must not produce multiple outputs for same inputs",
-# need to add addition helper to check like kind==Pod
-_get_input(w) := x {
-	w == "get"
-	input.request.kind.kind == "Pod"
-	input.request.object
-   x :=  input.request.object
-}
-
-# type-1a: [for testing in Rego Playground], same as type-1. comment out the false statement (1==2) for testing.
-_get_input(w) := x {
-	1==2
-
-	w == "get"
-
-	supportedKind = ["Deployment", "DaemonSet", "Job", "ReplicaSet", "ReplicationController", "StatefulSet"]
-	input.input.request.kind.kind == supportedKind[_]
-
-    input.input.request.object.spec.template		# used in Rego Playground (add prefix input)
-    x := input.input.request.object.spec.template
-}
-
-# type-2a: [for testing in Rego Playground], same as type-2. comment out the false statement (1==2) for testing.
-_get_input(w) := x {
-	1==2
-
-	w == "get"
-
-	supportedKind = ["CronJob"]
-	input.input.request.kind.kind == supportedKind[_]
-
-	input.input.request.object.spec.jobTemplate.spec.template
-    x := input.input.request.object.spec.jobTemplate.spec.template
-}
-
-# type-3a: [for testing in Rego Playground], same as type-3. comment out the false statement (1==2) for testing.
-_get_input(w) := x {
-	1==2
-
-	w == "get"
-	input.input.request.kind.kind == "Pod"
-	input.input.request.object
-    x := input.input.request.object
-}
-
-_get_namespace(w) := x{
-	w == "get"
-	x := input.request.namespace
-}
-
-_get_namespace(w) := x{
-	w == "get"
-	not input.request.namespace
-    x := "default"
-}
-
-
-getSubjects(binding):=subjects
-{
-	subjects := binding.request.object.subjects		# for data generated by admission review
-}
-
-getSubjects(binding):=subjects
-{
-	subjects := binding.subjects		# for data generated by xlate2()
-}
-
-getRoleRef(binding):=rolRef
-{
-    rolRef := binding.request.object.roleRef		# for data generated by admission review
-}
-
-getRoleRef(binding):=rolRef
-{
-    rolRef := binding.roleRef		# for data generated by xlate2()
-}
-
-## operator -- contains all (array)
-operator_contains_all(criteria_values, items){
-	is_array(items)
-	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
-	count(matched) == count(criteria_values)
-}
-
-## operator -- contains all (single value)
-operator_contains_all(criteria_values, item){
-    is_string(item)
-    uniq_items := { x | x = criteria_values[_]}
-    count(uniq_items)==1
-    check_contains(criteria_values, item)
-}
-
-## operator -- contains any (array)
-operator_contains_any(criteria_values, items){
-	is_array(items)
-	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
-	count(matched)>=1
-}
-
-## operator -- contains any (single value)
-operator_contains_any(criteria_values, item){
-	is_string(item)
-	check_contains(criteria_values, item)
-}
-
-## operator -- not contains any (array)
-operator_not_contains_any(criteria_values, items){
-	is_array(items)
-	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
-	count(matched)==0
-}
-
-## operator -- not contains any (single value)
-operator_not_contains_any(criteria_values, item){
-	is_string(item)
-	not check_contains(criteria_values, item)
-}
-
-## operator -- contains other than  (array)
-operator_contains_other_than(criteria_values, items){
-	is_array(items)
-	matched := [name | regex.match(criteria_values[j], items[i]); name = items[i]]
-	count(items) != count(matched)
-}
-
-## operator -- contains other than (single value)
-operator_contains_other_than(criteria_values, item){
-	is_string(item)
-	not check_contains(criteria_values, item)
-}
-
-has_key(x, k) { _ = x[k] }
-
-check_contains(patterns, value) {
-    regex.match(patterns[_], value)
-}
-
-inSidecarContainerList(image){
-	sidecarImages := ["docker.io/istio/proxyv2","https://docker.io/istio/proxyv2",
-						"linkerd-io/proxy","https://gcr.io/linkerd-io/proxy",
-						"istio-release/proxyv2", "https://gcr.io/istio-release/proxyv2"]
-    startswith(image, sidecarImages[_])
-}else = false{
-	true
-}
-
-get_serviceAccountName(request) := sa {
-    not has_key(request.spec, "serviceAccountName")
-    sa = "default"
-}
-
-get_serviceAccountName(request) := sa {
-    has_key(request.spec, "serviceAccountName")
-    sa = request.spec.serviceAccountName
-}
-
-	`
-
-	return rego
 }
 
 func splitPathKey(path string) (string, string) {
