@@ -17,8 +17,8 @@ type RegoConversionOptions struct {
 	GenerateKubewardenMode bool
 }
 
-// GeneratedRego represent the generated result would filled into the tmpl
-type GeneratedRego struct {
+// RegoTemplateInput represent the generated result would filled into the tmpl
+type RegoTemplateInput struct {
 	PackageName       string
 	CustomChecks      []string
 	ViolationMessages []string
@@ -97,7 +97,7 @@ func ConvertToRegoRuleWithOptions(rule *share.CLUSAdmissionRule, options *RegoCo
 }
 
 func GenerateRegoCode(rule *share.CLUSAdmissionRule, options *RegoConversionOptions) (string, error) {
-	generatedRego := GeneratedRego{
+	tmplData := RegoTemplateInput{
 		PackageName:       options.PackageName,
 		CustomChecks:      []string{},
 		ViolationMessages: []string{},
@@ -105,9 +105,9 @@ func GenerateRegoCode(rule *share.CLUSAdmissionRule, options *RegoConversionOpti
 	}
 
 	if options.GenerateKubewardenMode {
-		generatedRego.ViolationMessages = GenerateSeparateDenyRules(rule)
+		tmplData.ViolationMessages = GenerateSeparateDenyRules(rule)
 	} else {
-		generatedRego.CustomChecks = GenerateViolationFunction(rule)
+		tmplData.ViolationMessages = GenerateViolationFunction(rule)
 	}
 
 	// handling type=1 (general) individual criteria conversion
@@ -121,11 +121,11 @@ func GenerateRegoCode(rule *share.CLUSAdmissionRule, options *RegoConversionOpti
 
 		if c.Type == "customPath" {
 			c_rego := convertGenericCriteria(j, c)
-			generatedRego.CustomChecks = append(generatedRego.CustomChecks, c_rego...)
+			tmplData.CustomChecks = append(tmplData.CustomChecks, c_rego...)
 		}
 	}
 
-	generatedRego.DebugMessages = GenerateDebugMessages(rule)
+	tmplData.DebugMessages = GenerateDebugMessages(rule)
 
 	tmpl, err := template.New("regoTemplate").Parse(regoTemplate)
 	if err != nil {
@@ -133,7 +133,7 @@ func GenerateRegoCode(rule *share.CLUSAdmissionRule, options *RegoConversionOpti
 	}
 
 	var regoStr strings.Builder
-	err = tmpl.Execute(&regoStr, generatedRego)
+	err = tmpl.Execute(&regoStr, tmplData)
 	if err != nil {
 		return "", err
 	}
