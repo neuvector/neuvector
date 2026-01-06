@@ -742,6 +742,9 @@ func getCISStatusFromCluster(bench share.BenchType, id string) (int, string) {
 
 func getCISReportFromCluster(bench share.BenchType, id string, cpf *complianceProfileFilter, acc *access.AccessControl) (*api.RESTBenchReport, int, string) {
 	rpt, code, errMsg := _getCISReportFromCluster(bench, id, true, cpf)
+	if code == api.RESTErrFailReadCluster {
+		triggerBenchRescan(bench, id, acc)
+	}
 	if code == 0 {
 		rpt.Items = filterComplianceChecks(rpt.Items, cpf)
 	}
@@ -765,6 +768,31 @@ func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *a
 		rpt1.Items = append(rpt1.Items, rpt2.Items...)
 
 		return rpt1, 0, ""
+	}
+}
+
+func triggerBenchRescan(bench share.BenchType, id string, acc *access.AccessControl) {
+	var invokeBench func(string) error
+	switch bench {
+	case share.BenchDockerHost:
+		invokeBench = rpc.RunDockerBench
+	case share.BenchKubeMaster, share.BenchKubeWorker:
+		invokeBench = rpc.RunKubernetesBench
+	default:
+		return
+	}
+
+	agents, err := cacher.GetAgentsbyHost(id, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"host": id, "error": err}).Error("Cannot get agents to rescan")
+		return
+	} else if len(agents) == 0 {
+		log.WithFields(log.Fields{"host": id}).Debug("No agents found to rescan")
+		return
+	}
+
+	if err := invokeBench(agents[0]); err != nil {
+		log.WithFields(log.Fields{"host": id, "error": err, "bench": bench}).Error("Failed to trigger benchmark scan")
 	}
 }
 
