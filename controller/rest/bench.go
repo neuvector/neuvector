@@ -781,6 +781,10 @@ func triggerBenchRescan(bench share.BenchType, id string, acc *access.AccessCont
 		invokeBench = rpc.RunKubernetesBench
 	case share.BenchDockerHost, share.BenchContainer, share.BenchContainerSecret, share.BenchContainerSetID:
 		invokeBench = rpc.RunDockerBench
+	case share.BenchCustomHost:
+		invokeBench = rpc.RunCustomHostBench
+	case share.BenchCustomContainer:
+		invokeBench = rpc.RunCustomContainerBench
 	default:
 		log.WithFields(log.Fields{
 			"id":    id,

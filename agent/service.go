@@ -968,6 +968,20 @@ func (rs *RPCService) RunKubernetesBench(ctx context.Context, v *share.RPCVoid) 
 	return &share.RPCVoid{}, nil
 }
 
+func (rs *RPCService) RunCustomHostBench(ctx context.Context, v *share.RPCVoid) (*share.RPCVoid, error) {
+	if agentEnv.customBenchmark {
+		bench.triggerHostCustomCheck(bench.hostScript)
+	}
+	return &share.RPCVoid{}, nil
+}
+
+func (rs *RPCService) RunCustomContainerBench(ctx context.Context, v *share.RPCVoid) (*share.RPCVoid, error) {
+	if agentEnv.customBenchmark {
+		bench.triggerContainerCustomCheck()
+	}
+	return &share.RPCVoid{}, nil
+}
+
 func (rs *RPCService) GetFileMonitorFile(ctx context.Context, f *share.CLUSFilter) (*share.CLUSFileMonitorFileArray, error) {
 	log.WithFields(log.Fields{"filter": f}).Debug("")
 
