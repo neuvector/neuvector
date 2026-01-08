@@ -375,6 +375,32 @@ func RunKubernetesBench(agentID string) error {
 	return err
 }
 
+func RunCustomHostBench(agentID string) error {
+	client, err := findEnforcerServiceClient(agentID)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultReqTimeout)
+	defer cancel()
+
+	_, err = client.RunCustomHostBench(ctx, &share.RPCVoid{})
+	return err
+}
+
+func RunCustomContainerBench(agentID string) error {
+	client, err := findEnforcerServiceClient(agentID)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultReqTimeout)
+	defer cancel()
+
+	_, err = client.RunCustomContainerBench(ctx, &share.RPCVoid{})
+	return err
+}
+
 func GetFileMonitorFile(agentID string, f *share.CLUSFilter) ([]*share.CLUSFileMonitorFile, error) {
 	client, err := findEnforcerServiceClient(agentID)
 	if err != nil {

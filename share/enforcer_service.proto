@@ -424,6 +424,8 @@ service EnforcerService {
   rpc GetContainerLogs(CLUSContainerLogReq) returns (stream CLUSContainerLogRes);
   rpc RunDockerBench(RPCVoid) returns (RPCVoid);
   rpc RunKubernetesBench(RPCVoid) returns (RPCVoid);
+  rpc RunCustomHostBench(RPCVoid) returns (RPCVoid);
+  rpc RunCustomContainerBench(RPCVoid) returns (RPCVoid);
   rpc GetFileMonitorFile(CLUSFilter) returns (CLUSFileMonitorFileArray);
   rpc GetProcess(CLUSFilter) returns (CLUSProcessArray);
   rpc GetProcessHistory(CLUSFilter) returns (CLUSProcessArray);
