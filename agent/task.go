@@ -468,6 +468,10 @@ func logContainerAudit(name, id string, items []share.CLUSAuditBenchItem, lid sh
 }
 
 func logHostAudit(items []share.CLUSAuditBenchItem, auditId share.TLogAudit) {
+	if len(items) == 0 {
+		return
+	}
+
 	alog := &share.CLUSAuditLog{
 		ID:         auditId,
 		HostID:     Host.ID,
