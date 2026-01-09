@@ -134,6 +134,7 @@ func (mgr *ScannerAcquisitionManager) acquireScanner(ctx context.Context) (strin
 	backoff.InitialInterval = BaseDelay
 	backoff.MaxInterval = MaxDelay
 	backoff.RandomizationFactor = JitterFactor
+	backoff.Reset()
 
 	req := &acquireScannerRequest{
 		pullTime:     time.Now(),
