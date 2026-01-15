@@ -3512,6 +3512,10 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	acc := accCaller
 	id := ps.ByName("id")
 	request := ps.ByName("request")
+	reqPath := request
+	if u, err := url.ParseRequestURI(request); err == nil {
+		reqPath = u.Path
+	}
 	forbidden := false
 	regScanTest := false
 	txnID := ""
@@ -3530,7 +3534,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				"/v1/assetvul",
 				"/v2/workload",
 			})
-			if exportURIs.Contains(request) {
+			if exportURIs.Contains(reqPath) {
 				allowedPost = true
 			}
 		}
@@ -3587,7 +3591,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					"/v1/file/compliance/profile/config",
 					"/v1/file/vulnerability/profile/config",
 				})
-				if importURIs.Contains(request) {
+				if importURIs.Contains(reqPath) {
 					query := restParseQuery(r)
 					if scope, _ := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal); scope != share.ScopeLocal {
 						log.WithFields(log.Fields{"scope": scope}).Error()
@@ -3692,7 +3696,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 					"/v1/file/compliance/profile",
 					"/v1/file/vulnerability/profile",
 				})
-				if exportURIs.Contains(request) {
+				if exportURIs.Contains(reqPath) {
 					remoteExport = true
 				}
 			}
