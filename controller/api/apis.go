@@ -2620,6 +2620,15 @@ type RESTScanRepoSubmitData struct {
 	Result *share.ScanResult `json:"result"`
 }
 
+type RESTScanRepoStatusReq struct {
+	Registry *string          `json:"registry"`
+	Request  *RESTScanRepoReq `json:"request"`
+}
+
+type RESTScanRepoStatusData struct {
+	Scanned bool                            `json:"scanned"`
+	Summary *share.CLUSRegistryImageSummary `json:"summary"`
+}
 type RESTScanAppPackage struct {
 	AppName    string `json:"app_name"`
 	ModuleName string `json:"module_name"`

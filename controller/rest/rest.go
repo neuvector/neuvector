@@ -1848,8 +1848,9 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.POST("/v1/scan/platform/platform", handlerScanPlatformReq)
 	r.GET("/v1/scan/platform", handlerScanPlatformSummary)
 	r.GET("/v1/scan/platform/platform", handlerScanPlatformReport)
-	r.POST("/v1/scan/result/repository", handlerScanRepositorySubmit) // Used by CI-integration, for scanner submit scan result. Skip API
-	r.POST("/v1/scan/repository", handlerScanRepositoryReq)           // Used by CI-integration, for scanning container image
+	r.POST("/v1/scan/result/repository", handlerScanRepositorySubmit)    // Used by CI-integration, for scanner submit scan result. Skip API
+	r.POST("/v1/scan/repository", handlerScanRepositoryReq)              // Used by CI-integration, for scanning container image
+	r.GET("/v1/scan/repository/status", handleCheckRepositoryScanStatus) // Used to check the repository scan status by registry/repository/tag
 	r.POST("/v1/scan/registry", handlerRegistryCreate)
 	r.POST("/v2/scan/registry", handlerRegistryCreate)
 	r.PATCH("/v1/scan/registry/:name", handlerRegistryConfig)
