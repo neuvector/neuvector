@@ -2946,6 +2946,31 @@ paths:
           description: Success
           schema:
             $ref: '#/definitions/RESTScanRepoReportData'
+  /v1/scan/repository/status:
+    get:
+      tags:
+        - Scan
+      summary: Check repository scan status
+      description: Check if a repository image has been scanned by registry, repository, and tag
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Repository scan status request
+          required: true
+          schema:
+            $ref: '#/definitions/RESTScanRepoStatusReq'
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTScanRepoStatusData'
   /v1/scan/status:
     get:
       tags:
@@ -9361,7 +9386,7 @@ definitions:
       - config
     properties:
       config:
-        $ref: '#/definitions/RESTScanConfig'        
+        $ref: '#/definitions/RESTScanConfig'
   RESTScanImageSummaryData:
     type: object
     required:
@@ -9506,7 +9531,7 @@ definitions:
         example: openssl
       file:
         type: string
-        example: example.jar 
+        example: example.jar
       version:
         type: string
         example: "1.011"
@@ -9867,6 +9892,18 @@ definitions:
     properties:
       request:
         $ref: '#/definitions/RESTScanRepoReq'
+  RESTScanRepoStatusReq:
+    type: object
+    required:
+      - request
+    properties:
+      registry:
+        type: string
+        description: Optional. For registry scans, set this to the registry name as configured in the NeuVector Registry UI; otherwise the default registry is used. For CI scan results, leave this empty or omit it.
+        example: "registry.hub.docker.com"
+      request:
+        $ref: '#/definitions/RESTScanRepoReq'
+        description: Repository scan request details
   RESTScanSchedule:
     type: object
     required:
@@ -10074,6 +10111,135 @@ definitions:
     properties:
       status:
         $ref: '#/definitions/RESTScanStatus'
+  RESTScanRepoStatusData:
+    type: object
+    required:
+      - scanned
+    properties:
+      scanned:
+        type: boolean
+        description: Whether the repository image has been scanned
+        example: true
+      summary:
+        $ref: '#/definitions/RESTCLUSRegistryImageSummary'
+        nullable: true
+        description: Registry image summary. Null if the image has not been scanned.
+  RESTCLUSImage:
+    type: object
+    properties:
+      domain:
+        type: string
+        example: ""
+      repo:
+        type: string
+        example: "library/redis"
+      tag:
+        type: string
+        example: "latest"
+      reg_mod:
+        type: string
+        example: ""
+  RESTCLUSRegistryImageSummary:
+    type: object
+    properties:
+      image_id:
+        type: string
+        description: Image ID (Docker config digest)
+        example: "sha256:63e868dc880e93d92619b88395d578ea5ab37f15f873ecf4dc58aac7666582c8"
+      registry:
+        type: string
+        description: Registry URL
+        example: "https://registry.hub.docker.com/"
+      reg_name:
+        type: string
+        description: Registry name
+        example: "repo_scan"
+      repo_tag:
+        type: array
+        description: List of repository images
+        items:
+          $ref: '#/definitions/RESTCLUSImage'
+      digest:
+        type: string
+        description: Image digest
+        example: "sha256:bd8ffa77cf1c910b7a90935ca4828472e1c3e303e7cd5260f13d1e09995f173a"
+      scanned_at:
+        type: string
+        format: date-time
+        description: When the image was scanned
+        example: "2024-01-15T10:00:00Z"
+      created_at:
+        type: string
+        format: date-time
+        description: When the image was created
+        example: "2024-01-15T10:00:00Z"
+      base_os:
+        type: string
+        description: Base operating system
+        example: "alpine:3.18"
+      version:
+        type: string
+        description: CVE database version
+        example: "1.0"
+      result:
+        type: integer
+        format: int32
+        description: Scan error code (0 = success)
+        example: 0
+      status:
+        type: string
+        description: Scan status
+        example: "finished"
+      author:
+        type: string
+        description: Image author
+        example: ""
+      run_as_root:
+        type: boolean
+        description: Whether the image runs as root
+        example: false
+      signed:
+        type: boolean
+        description: Whether the image is signed
+        example: false
+      scan_flags:
+        type: integer
+        format: uint32
+        description: Scan flags (bitmask)
+        example: 1
+      provider:
+        type: integer
+        format: int32
+        description: Scan provider (0 = Neuvector, 1 = JFrogXray)
+        example: 0
+      size:
+        type: integer
+        format: int64
+        description: Image size in bytes
+        example: 123456789
+      verifiers:
+        type: array
+        description: List of signature verifiers
+        items:
+          type: string
+        example: []
+      signature_digest:
+        type: string
+        description: Signature digest
+        example: ""
+      sigstore_timestamp:
+        type: string
+        description: Sigstore timestamp
+        example: ""
+      signature_result:
+        type: integer
+        format: int32
+        description: Signature verification error code
+        example: 0
+      signature_status:
+        type: string
+        description: Signature verification status
+        example: ""
   RESTScanCacheStat:
     type: object
     required:
@@ -12197,7 +12363,7 @@ definitions:
         example: "The setup_env function in group.c in sshd in OpenSSH allows local users to gain privileges."
       file_name:
         type: string
-        example: "usr/lib/python3.9" 
+        example: "usr/lib/python3.9"
       package_name:
         type: string
         example: openssh

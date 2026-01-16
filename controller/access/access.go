@@ -771,6 +771,7 @@ func CompileUriPermitsMapping() {
 				"v1/scan/sigstore/root_of_trust/*",
 				"v1/scan/sigstore/root_of_trust/*/verifier",
 				"v1/scan/sigstore/root_of_trust/*/verifier/*",
+				"v1/scan/repository/status",
 			},
 			CONST_API_INFRA: {
 				"v1/host",

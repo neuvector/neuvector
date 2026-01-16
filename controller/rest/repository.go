@@ -15,16 +15,20 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
 	"github.com/neuvector/neuvector/share"
+	"github.com/neuvector/neuvector/share/httptrace"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
+	"github.com/neuvector/neuvector/share/scan/registry"
 )
 
 const (
-	repositoryDefaultTag      = "latest"
-	repoScanTimeout           = time.Minute * 20
-	repoScanLingeringDuration = time.Second * 30
+	repositoryDefaultTag                   = "latest"
+	checkRepositoryScanResultExistsTimeout = time.Second * 30
+	repoScanTimeout                        = time.Minute * 20
+	repoScanLingeringDuration              = time.Second * 30
 )
 
 var RepoScanMgr *longpollOnceMgr
@@ -341,6 +345,87 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	restRespSuccess(w, r, nil, acc, login, &data, "Summit repository scan result")
+}
+
+func handleCheckRepositoryScanStatus(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	} else if !acc.Authorize(&share.CLUSCIScanDummy{}, nil) {
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	if !licenseAllowScan() {
+		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
+		return
+	}
+
+	body, _ := io.ReadAll(r.Body)
+
+	var data api.RESTScanRepoStatusReq
+	err := json.Unmarshal(body, &data)
+	if err != nil || data.Request == nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	// reg.Request.Registry == "", scan local image
+	req := data.Request
+	if req.Registry != "" {
+		u, err := scanUtils.ParseRegistryURI(req.Registry)
+		if err != nil {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest,
+				"Invalid Registry URL")
+			return
+		}
+		req.Registry = u
+	}
+	if req.Repository == "" {
+		log.WithFields(log.Fields{"error": err}).Error("No repository name provided")
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest,
+			"No repository name provided")
+		return
+	}
+	// Add "library" for dockerhub if not exist
+	if dockerRegistries.Contains(req.Registry) && !strings.Contains(req.Repository, "/") {
+		req.Repository = fmt.Sprintf("library/%s", req.Repository)
+	}
+	if req.Tag == "" {
+		req.Tag = repositoryDefaultTag
+	}
+
+	var proxy string
+	if req.Registry != "" {
+		proxy = scan.GetProxy(req.Registry)
+	}
+	token := login.getToken()
+
+	ctx, cancel := context.WithTimeout(context.Background(), checkRepositoryScanResultExistsTimeout)
+	defer cancel()
+
+	rc := scanUtils.NewRegClient(req.Registry, token, req.Username, req.Password, proxy, new(httptrace.NopTracer))
+	info, errCode := rc.GetImageInfo(ctx, req.Repository, req.Tag, registry.ManifestRequest_Default)
+
+	if errCode != share.ScanErrorCode_ScanErrNone {
+		log.WithFields(log.Fields{"error": errCode}).Error("Get image info error")
+		restRespErrorMessage(w, http.StatusBadGateway, api.RESTErrFailRepoScan,
+			fmt.Sprintf("Failed to get image info from registry: %s", scanUtils.ScanErrorToStr(errCode)))
+		return
+	}
+
+	registry := common.RegistryRepoScanName
+	if data.Registry != nil {
+		registry = *data.Registry
+	}
+
+	summary := clusHelper.GetRegistryImageSummary(registry, info.ID)
+	resp := &api.RESTScanRepoStatusData{Scanned: summary != nil, Summary: summary}
+	restRespSuccess(w, r, resp, acc, login, &data, "Repository scan request completed successfully")
 }
 
 func getScanReqRootsOfTrust() (scanReqRootsOfTrust []*share.SigstoreRootOfTrust, err error) {
