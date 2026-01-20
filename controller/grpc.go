@@ -246,13 +246,26 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 			return err
 		}
 
+		res := make(chan error)
 		for i, zb := range zbs {
 			key := fmt.Sprintf("%s%d", newStore, i)
-			if err = cluster.PutBinary(key, zb); err != nil {
-				log.WithFields(log.Fields{"error": err, "slot": i, "size": len(zb)}).Error()
-				ss.registerFailureCleanup(newStore)
-				return err
+			go func() {
+				res <- cluster.PutBinary(key, zb)
+			}()
+		}
+
+		var lastError error
+		for i := 0; i < len(zbs); i++ {
+			if err := <- res; err != nil {
+				lastError = err
+				log.WithFields(log.Fields{"error": err}).Error()
 			}
+		}
+		close(res)
+
+		if lastError != nil {
+			ss.registerFailureCleanup(newStore)
+			return err
 		}
 
 		// The idea is to use a dummy scanner to indicate the new database has been written.
