@@ -3354,26 +3354,21 @@ func (p *Probe) IsAllowedShieldProcess(id, mode, svcGroup string, proc *procInte
 			}
 		}
 	} else {
-		switch ppe.Action {
-		case share.PolicyActionLearn, share.PolicyActionOpen:
-			ppe.Action = share.PolicyActionViolate
+		if ppe.Action == share.PolicyActionDeny {
 			ppe.Uuid = share.CLUSReservedUuidShieldMode
-		case share.PolicyActionAllow:
-			bPass = true
-			if ppe.CfgType == share.Learned { // user needs to allow the process manually
-				// TODO: how about the learned rule's translation from GroundCfg-CRD?
-				bPass = false
-				ppe.Action = negativeResByMode(mode)
+		} else { // other actions
+			if bFromPmon && ppe.CfgType <= share.Learned {
+				ppe.Action = share.PolicyActionViolate
 				ppe.Uuid = share.CLUSReservedUuidShieldMode
-			} else if !ppe.AllowFileUpdate && !bNotImageButNewlyAdded {
-				if bModified {
-					bPass = false
-					ppe.Action = negativeResByMode(mode)
+			} else { // a defined rule from custom/crd groups
+				if bModified && !ppe.AllowFileUpdate {
+					ppe.Action = share.PolicyActionViolate
 					ppe.Uuid = share.CLUSReservedUuidAnchorMode
+				} else {
+					bPass = true
+					ppe.Action = share.PolicyActionAllow // allowed
 				}
 			}
-		case share.PolicyActionDeny:
-			ppe.Uuid = share.CLUSReservedUuidShieldMode
 		}
 	}
 	mLog.WithFields(log.Fields{"bModified": bModified, "bImageFile": bImageFile, "bNotImageButNewlyAdded": bNotImageButNewlyAdded}).Debug("SHD:")
