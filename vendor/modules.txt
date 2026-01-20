@@ -100,8 +100,8 @@ github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/ssooidc
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/beevik/etree v1.5.1
-## explicit; go 1.21.0
+# github.com/beevik/etree v1.6.0
+## explicit; go 1.23.0
 github.com/beevik/etree
 # github.com/cenkalti/backoff/v5 v5.0.3
 ## explicit; go 1.23
