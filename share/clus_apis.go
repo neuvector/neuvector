@@ -2415,6 +2415,7 @@ type CLUSFedJointClusterInfo struct {
 	ClientCert    string             `json:"client_cert,cloak"`      // base64 encoded
 	User          string             `json:"user,omitempty"`         // the user who joins this cluster to federation
 	RestVersion   string             `json:"rest_version,omitempty"` // rest version in the code of joint cluster
+	K8sUID        string             `json:"k8s_uid"`
 	RestInfo      CLUSRestServerInfo `json:"rest_info"`
 	ProxyRequired bool               `json:"proxy_required"` // a joint cluster may be reachable without proxy even master cluster is configured to use proxy. decided when it joins fed
 }
