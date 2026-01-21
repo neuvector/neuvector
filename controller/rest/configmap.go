@@ -1025,6 +1025,7 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 			log.WithFields(log.Fields{"fedRole": membership.FedRole, "i": i}).Info()
 			if membership.FedRole == api.FedRoleMaster {
 				_fixedJoinToken = rconf.JoinToken
+				_allowSameK8sUidRejoin = rconf.AllowSameK8sUidRejoin
 				return "", nil
 			}
 			time.Sleep(10 * time.Second)
@@ -1090,6 +1091,7 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 				}
 			}
 			_fixedJoinToken = rconf.JoinToken
+			_allowSameK8sUidRejoin = rconf.AllowSameK8sUidRejoin
 		} else if membership.FedRole == api.FedRoleJoint {
 			// change from joint role to master role. leave original fed and then promote as master cluster
 			reqData := api.RESTFedLeaveReq{Force: true}
@@ -1122,6 +1124,9 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 				}
 				if _, _, _, err = promoteToMaster(nil, acc, &login, reqData); err != nil {
 					log.WithFields(log.Fields{"err": err}).Debug("promote")
+				} else {
+					_fixedJoinToken = rconf.JoinToken
+					_allowSameK8sUidRejoin = rconf.AllowSameK8sUidRejoin
 				}
 			}
 		}

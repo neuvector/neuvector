@@ -2615,3 +2615,16 @@ func GetNvControllerPodsNumber() {
 	}
 	log.WithFields(log.Fields{"pods": strings.Join(podsIP, ","), "requests": requestMemory, "limits": limitMemory, "err": err}).Info()
 }
+
+func GetK8sUID() string {
+	nsName := "kube-system"
+	if obj, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
+		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
+	} else {
+		if nsObj, ok := obj.(*corev1.Namespace); ok {
+			return string(nsObj.UID)
+		}
+	}
+
+	return ""
+}

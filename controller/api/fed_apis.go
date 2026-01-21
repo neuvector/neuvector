@@ -57,6 +57,7 @@ type RESTFedJointClusterInfo struct {
 	User          string                   `json:"user"`         // the user who joins this cluster to federation
 	Status        string                   `json:"status"`       // ex: FedStatusClusterSynced/FedStatusClusterOutOfSync (see above)
 	RestVersion   string                   `json:"rest_version"` // joint cluster's kv.GetRestVer()
+	K8sUID        string                   `json:"k8s_uid"`      // uid of k8s kube-system namespace
 	RestInfo      share.CLUSRestServerInfo `json:"rest_info"`
 	ProxyRequired bool                     `json:"proxy_required"` // a joint cluster may be reachable without proxy even master cluster is configured to use proxy. decided when it joins fed.
 }
@@ -151,12 +152,13 @@ type RESTFedTokenResp struct {
 }
 
 type RESTFedDataCfgMap struct {
-	ClusterName        string                    `json:"cluster_name"`                    // this cluster's unique name in federation
-	PrimaryRestInfo    share.CLUSRestServerInfo  `json:"primary_rest_info"`               // rest info about primary cluster
-	ManagedRestInfo    *share.CLUSRestServerInfo `json:"managed_rest_info,omitempty"`     // rest info about managed cluster (for managed clusters only)
-	UseProxy           string                    `json:"use_proxy"`                       // "" / https
-	JoinToken          string                    `json:"join_token"`                      // must be in a format that is 36 characters long, i.e., 32 hexadecimal characters grouped as 8-4-4-4-12 and separated by four hyphens
-	DeployRepoScanData *bool                     `json:"deploy_repo_scan_data,omitempty"` // whether fed repo scan data deployment is enabled (for master cluster only)
+	ClusterName           string                    `json:"cluster_name"`                    // this cluster's unique name in federation
+	PrimaryRestInfo       share.CLUSRestServerInfo  `json:"primary_rest_info"`               // rest info about primary cluster
+	ManagedRestInfo       *share.CLUSRestServerInfo `json:"managed_rest_info,omitempty"`     // rest info about managed cluster (for managed clusters only)
+	UseProxy              string                    `json:"use_proxy"`                       // "" / https
+	JoinToken             string                    `json:"join_token"`                      // must be in a format that is 36 characters long, i.e., 32 hexadecimal characters grouped as 8-4-4-4-12 and separated by four hyphens
+	AllowSameK8sUidRejoin bool                      `json:"allow_same_k8s_uid_rejoin"`       // allow a cluster with the same k8s uid to re-join fed even a same-name cluster exists in fed
+	DeployRepoScanData    *bool                     `json:"deploy_repo_scan_data,omitempty"` // whether fed repo scan data deployment is enabled (for master cluster only)
 }
 
 // for deploying fed settings to joint clusters

@@ -145,6 +145,7 @@ var _fedPingTimer *time.Timer = time.NewTimer(time.Minute * time.Duration(_fedPi
 var _lastFedMemberPingTime time.Time = time.Now()
 var _masterClusterIP string
 var _fixedJoinToken string
+var _allowSameK8sUidRejoin bool
 
 var _sysHttpsProxy share.CLUSProxy
 var _sysHttpProxy share.CLUSProxy
@@ -1984,6 +1985,9 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 		CspType: nvUsage.LocalClusterUsage.CspType, // joint cluster's billing csp type
 		Nodes:   nvUsage.LocalClusterUsage.Nodes,
 	}
+	if k8sPlatform {
+		reqTo.JointCluster.K8sUID = resource.GetK8sUID()
+	}
 
 	bodyTo, _ := json.Marshal(&reqTo)
 	var data []byte
@@ -2282,6 +2286,21 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 		// join request contains fed kv version for the joining cluster. if it's different from this cluster's fed kv version, it means they are not compatible
 		met, result, err := kv.CheckFedKvVersion("master", reqData.FedKvVersion)
 		if met {
+			if reqData.JointCluster.K8sUID != "" && _allowSameK8sUidRejoin {
+				// a cluster with the same cluster name as an existing fed member cluster tries to join fed. remove the old entry first and let it re-join
+				for id := range cacher.GetFedJoinedClusterIdMap(accReadAll) {
+					joinedCluster := cacher.GetFedJoinedCluster(id, accReadAll)
+					if joinedCluster.Name == reqData.JointCluster.Name && joinedCluster.K8sUID == reqData.JointCluster.K8sUID {
+						status, code := removeFromFederation(&joinedCluster, access.NewFedAdminAccessControl()) // remove the joint cluster's entry from master cluster
+						log.WithFields(log.Fields{"ID": joinedCluster.ID, "Name": joinedCluster.Name, "status": status, "code": code}).Info("re-join")
+						if status == http.StatusOK {
+							msg := fmt.Sprintf("Dismiss cluster %s(%s) from federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
+							_ = cacheFedEvent(share.CLUSEvFedKick, msg, reqData.User, reqData.Remote, "", reqData.UserRoles)
+						}
+						break
+					}
+				}
+			}
 			for _, joinedName := range cacher.GetFedJoinedClusterNameList(accReadAll) {
 				if joinedName == reqData.JointCluster.Name {
 					log.WithFields(log.Fields{"joined": joinedName, "joint": reqData.JointCluster.Name}).Error("non-unique managed cluster name")
@@ -2374,6 +2393,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 		RestInfo:      reqData.JointCluster.RestInfo,
 		ProxyRequired: proxyUsed,
 		RestVersion:   reqData.RestVersion,
+		K8sUID:        reqData.JointCluster.K8sUID,
 	}
 	if err := clusHelper.PutFedJointCluster(joinedCluster); err != nil {
 		msg := fmt.Sprintf("Fail to join federation: %s", err.Error())
