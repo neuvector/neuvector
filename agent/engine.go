@@ -469,7 +469,7 @@ func notifyDPContainerApps(c *containerData) {
 	for i, pair := range c.intcpPairs {
 		macs[i] = pair.MAC.String()
 	}
-	if gInfo.tapProxymesh && isProxyMesh(c) {
+	if gInfo.tapProxymesh && isProxyMesh(c, false) {
 		lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
 		macs = append(macs, lomac_str)
 	}
@@ -550,7 +550,7 @@ func changeContainerWire(c *containerData, inline bool, quar bool, quarReason *s
 	updatePods(c, quarReason)
 }
 
-func isProxyMesh(c *containerData) bool {
+func isProxyMesh(c *containerData, withlock bool) bool {
 	//ProxyMesh==true also indicate it is parent,
 	//but we also need to check pid since oc4.9+
 	if c.info.ProxyMesh && c.pid != 0 {
@@ -559,7 +559,13 @@ func isProxyMesh(c *containerData) bool {
 	//in case parent's pid is zero we need to use child's pid,
 	//but we need to make sure to exclude non-mesh case.
 	if c.parentNS != "" && c.hasDatapath && c.pid != 0 { //has parent
+		if !withlock {
+			gInfoRLock()
+		}
 		p, ok := gInfo.activeContainers[c.parentNS]
+		if !withlock {
+			gInfoRUnlock()
+		}
 		if ok { //parent exist
 			if p.info.ProxyMesh && p.pid == 0 { //parent is mesh and pid=0
 				return true
@@ -570,7 +576,7 @@ func isProxyMesh(c *containerData) bool {
 }
 
 func updateProxyMeshMac(c *containerData, withlock bool) {
-	if !isProxyMesh(c) {
+	if !isProxyMesh(c, withlock) {
 		return
 	}
 	//POD with proxy injection
@@ -592,7 +598,7 @@ func updateProxyMeshMac(c *containerData, withlock bool) {
 }
 
 func delProxyMeshMac(c *containerData, withlock bool) {
-	if !isProxyMesh(c) {
+	if !isProxyMesh(c, withlock) {
 		return
 	}
 	lomac_str := fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
@@ -614,6 +620,8 @@ func getProxyMeshAppMap(c *containerData, listenAll bool) map[share.CLUSProtoPor
 	for port, app := range c.appMap {
 		proxyMeshApp[port] = app
 	}
+	gInfoRLock()
+	defer gInfoRUnlock()
 	for podID := range c.pods.Iter() { //c is parent
 		if pod, ok := gInfo.activeContainers[podID.(string)]; ok && !pod.info.Sidecar {
 			for port, app := range pod.appMap {
@@ -628,7 +636,7 @@ func getProxyMeshAppMap(c *containerData, listenAll bool) map[share.CLUSProtoPor
 }
 
 func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
-	if !isProxyMesh(c) {
+	if !isProxyMesh(c, false) {
 		return
 	}
 	log.WithFields(log.Fields{"container": c.id}).Debug("proxymesh")
@@ -706,7 +714,7 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 }
 
 func programDelProxyMeshDP(c *containerData, ns string) {
-	if !isProxyMesh(c) {
+	if !isProxyMesh(c, false) {
 		return
 	}
 	var netns string
@@ -749,6 +757,7 @@ func disableTapProxymesh(c *containerData, withlock bool) {
 	delProxyMeshMac(c, withlock)
 }
 
+// with gInfoRLock held
 func getContainerIDByName(name string) string {
 	for id, c := range gInfo.activeContainers {
 		if c.name == name {
@@ -775,6 +784,7 @@ func getIPAddrScope(mac net.HardwareAddr, ip net.IP) (string, string) {
 }
 
 // Return if container is child and its parent container.
+// with gInfoRLock held
 func getSharedContainerWithLock(info *container.ContainerMetaExtra) (bool, *containerData) {
 	if isChild, parent_cid := global.RT.GetParent(info, gInfo.activePid2ID); parent_cid != "" {
 		var parent *containerData
@@ -2237,7 +2247,13 @@ func taskDPConnect() {
 		jumboFrame := gInfo.jumboFrameMTU
 		dp.DPCtrlAddSrvcPort(nvSvcPort, &jumboFrame)
 	}
+	gInfoRLock()
+	containers := make([]*containerData, 0, len(gInfo.activeContainers))
 	for _, c := range gInfo.activeContainers {
+		containers = append(containers, c)
+	}
+	gInfoRUnlock()
+	for _, c := range containers {
 		programDP(c, true, nil)
 		if gInfo.tapProxymesh {
 			programProxyMeshDP(c, false, false)
@@ -2409,7 +2425,13 @@ func containerTaskExit() {
 	}
 
 	// As we are exiting, try to push the ports back first
+	gInfoRLock()
+	containers := make([]*containerData, 0, len(gInfo.activeContainers))
 	for _, c := range gInfo.activeContainers {
+		containers = append(containers, c)
+	}
+	gInfoRUnlock()
+	for _, c := range containers {
 		if c.hostMode || !c.hasDatapath {
 			continue
 		}
@@ -2425,7 +2447,7 @@ func containerTaskExit() {
 		}
 	}
 	// The following operations are optional
-	for _, c := range gInfo.activeContainers {
+	for _, c := range containers {
 		if c.pid == 0 {
 			continue
 		}

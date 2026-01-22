@@ -236,6 +236,7 @@ func updateAgentStats(cpuSystem uint64) {
 	system.UpdateStats(&gInfo.agentStats, mem, cpu, cpuSystem)
 }
 
+// with gInfoRLock held
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
 		var mem, cpu uint64 = 0, 0
