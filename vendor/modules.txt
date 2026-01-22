@@ -624,8 +624,8 @@ github.com/russross/blackfriday/v2
 # github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 ## explicit; go 1.18
 github.com/s3rj1k/go-fanotify/fanotify
-# github.com/sirupsen/logrus v1.9.3
-## explicit; go 1.13
+# github.com/sirupsen/logrus v1.9.4
+## explicit; go 1.17
 github.com/sirupsen/logrus
 # github.com/spaolacci/murmur3 v1.1.0
 ## explicit
