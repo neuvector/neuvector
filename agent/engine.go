@@ -559,7 +559,9 @@ func isProxyMesh(c *containerData) bool {
 	//in case parent's pid is zero we need to use child's pid,
 	//but we need to make sure to exclude non-mesh case.
 	if c.parentNS != "" && c.hasDatapath && c.pid != 0 { //has parent
+		gInfoRLock()
 		p, ok := gInfo.activeContainers[c.parentNS]
+		gInfoRUnlock()
 		if ok { //parent exist
 			if p.info.ProxyMesh && p.pid == 0 { //parent is mesh and pid=0
 				return true
@@ -762,10 +764,20 @@ func getContainerIDByName(name string) string {
 // Get IP scope by workload MAC and ip address
 func getIPAddrScope(mac net.HardwareAddr, ip net.IP) (string, string) {
 	gInfoRLock()
-	defer gInfoRUnlock()
-	if pair, ok := gInfo.macPortPairMap[mac.String()]; ok {
-		for _, addr := range pair.Addrs {
-			if ip.String() == addr.IPNet.IP.String() {
+	pair, ok := gInfo.macPortPairMap[mac.String()]
+	var addrs []share.CLUSIPAddr
+	if ok && pair != nil {
+		// Copy the Addrs slice to avoid holding the lock during iteration
+		// and to prevent race conditions if the map entry is modified
+		addrs = make([]share.CLUSIPAddr, len(pair.Addrs))
+		copy(addrs, pair.Addrs)
+	}
+	gInfoRUnlock()
+
+	if ok && len(addrs) > 0 {
+		ipStr := ip.String()
+		for _, addr := range addrs {
+			if ipStr == addr.IPNet.IP.String() {
 				return addr.Scope, addr.NetworkName
 			}
 		}
