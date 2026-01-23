@@ -46,7 +46,7 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/streadway/simpleuuid v0.0.0-20130420165545-6617b501e485
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v2 v2.27.7
+	github.com/urfave/cli/v3 v3.6.2
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/net v0.47.0
