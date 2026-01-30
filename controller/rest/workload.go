@@ -226,6 +226,76 @@ func workloadV1ToV2(wlV1 *api.RESTWorkload) *api.RESTWorkloadV2 {
 	return wlV2
 }
 
+func getWorkloads(query *restQuery, idlist utils.Set, acc *access.AccessControl) []*api.RESTWorkload {
+	var view string
+	var wls []*api.RESTWorkload
+
+	if value, ok := query.pairs[api.QueryKeyView]; ok && value == api.QueryValueViewPod {
+		view = api.QueryValueViewPod
+	}
+
+	cached := cacher.GetAllWorkloads(view, acc, idlist)
+
+	// Sort
+	if len(cached) > 1 && len(query.sorts) > 0 {
+		// Convert struct slice to interface slice
+		var data []interface{} = make([]interface{}, len(cached))
+		for i, d := range cached {
+			data[i] = d
+		}
+
+		// Sort
+		restNewSorter(data, query.sorts).Sort()
+
+		// Copy the result
+		wls = make([]*api.RESTWorkload, len(cached))
+		for i, d := range data {
+			wls[i] = d.(*api.RESTWorkload)
+		}
+	} else {
+		wls = cached
+		sort.Slice(wls, func(i, j int) bool { return wls[i].Name < wls[j].Name })
+	}
+
+	retWorkloads := make([]*api.RESTWorkload, 0)
+
+	// Filter
+	if len(wls) <= query.start {
+		return retWorkloads
+	}
+
+	if len(query.filters) > 0 {
+		var dummy api.RESTWorkload
+		rf := restNewFilter(&dummy, query.filters)
+
+		for _, wl := range wls[query.start:] {
+			if !rf.Filter(wl) {
+				continue
+			}
+
+			retWorkloads = append(retWorkloads, wl)
+
+			if query.limit > 0 && len(retWorkloads) >= query.limit {
+				break
+			}
+		}
+	} else if query.limit == 0 {
+		retWorkloads = wls[query.start:]
+	} else {
+		var end int
+		if query.start+query.limit > len(wls) {
+			end = len(wls)
+		} else {
+			end = query.start + query.limit
+		}
+		retWorkloads = wls[query.start:end]
+	}
+
+	log.WithFields(log.Fields{"entries": len(retWorkloads)}).Debug("Response")
+
+	return retWorkloads
+}
+
 func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	query := restParseQuery(r)
 	if query.brief {
@@ -248,12 +318,6 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var view string
-	if value, ok := query.pairs[api.QueryKeyView]; ok && value == api.QueryValueViewPod {
-		view = api.QueryValueViewPod
-	}
-
-	var wls []*api.RESTWorkload
 	var respV1 api.RESTWorkloadsData
 	var respV2 api.RESTWorkloadsDataV2
 	var resp interface{} = &respV2
@@ -284,63 +348,7 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 		idlist = utils.NewSetFromStringSlice(idListData.IDs)
 	}
 
-	cached := cacher.GetAllWorkloads(view, acc, idlist)
-
-	// Sort
-	if len(cached) > 1 && len(query.sorts) > 0 {
-		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
-		for i, d := range cached {
-			data[i] = d
-		}
-
-		// Sort
-		restNewSorter(data, query.sorts).Sort()
-
-		// Copy the result
-		wls = make([]*api.RESTWorkload, len(cached))
-		for i, d := range data {
-			wls[i] = d.(*api.RESTWorkload)
-		}
-	} else {
-		wls = cached
-		sort.Slice(wls, func(i, j int) bool { return wls[i].Name < wls[j].Name })
-	}
-
-	// Filter
-	if len(wls) <= query.start {
-		restRespSuccess(w, r, resp, acc, login, nil, "Get container list")
-		return
-	}
-
-	if len(query.filters) > 0 {
-		var dummy api.RESTWorkload
-		rf := restNewFilter(&dummy, query.filters)
-
-		for _, wl := range wls[query.start:] {
-			if !rf.Filter(wl) {
-				continue
-			}
-
-			respV1.Workloads = append(respV1.Workloads, wl)
-
-			if query.limit > 0 && len(respV1.Workloads) >= query.limit {
-				break
-			}
-		}
-	} else if query.limit == 0 {
-		respV1.Workloads = wls[query.start:]
-	} else {
-		var end int
-		if query.start+query.limit > len(wls) {
-			end = len(wls)
-		} else {
-			end = query.start + query.limit
-		}
-		respV1.Workloads = wls[query.start:end]
-	}
-
-	log.WithFields(log.Fields{"entries": len(respV1.Workloads)}).Debug("Response")
+	respV1.Workloads = getWorkloads(query, idlist, acc)
 
 	if apiVer == "v2" {
 		respV2.Workloads = make([]*api.RESTWorkloadV2, 0, len(respV1.Workloads))

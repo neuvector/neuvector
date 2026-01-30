@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.4.8'
+  version: '5.4.9'
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -2552,6 +2552,21 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/scan/hosts/scan_report:
+    get:
+      tags:
+        - Scan
+      summary: Get hosts scan report
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTHostScanReportData'
   /v1/scan/host/{id}:
     get:
       tags:
@@ -3042,6 +3057,21 @@ paths:
       responses:
         '200':
           description: Success
+  /v1/scan/workloads/scan_report:
+    get:
+      tags:
+        - Scan
+      summary: Get containers scan report
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/RESTWorkloadsScanReportData'
   /v1/scan/sigstore/root_of_trust:
     get:
       tags:
@@ -9728,6 +9758,56 @@ definitions:
         items:
           type: string
           example: ""
+  RESTWorkloadScanData:
+    type: object
+    required:
+      - workload_name
+      - workload_domain
+      - workload_host_name
+    properties:
+      workload_name:
+        type: string
+      workload_domain:
+        type: string
+      workload_host_name:
+        type: string
+      vulnerabilities:
+        type: array
+        items:
+          $ref: '#/definitions/RESTVulnerability'
+      modules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTScanModule'
+  RESTWorkloadsScanReportData:
+    type: object
+    properties:
+      workloads_scan_data:
+        type: array
+        items:
+          $ref: '#/definitions/RESTWorkloadScanData'
+  RESTHostScanData:
+    type: object
+    required:
+      - host_name
+    properties:
+      host_name:
+        type: string
+      vulnerabilities:
+        type: array
+        items:
+          $ref: '#/definitions/RESTVulnerability'
+      modules:
+        type: array
+        items:
+          $ref: '#/definitions/RESTScanModule'
+  RESTHostScanReportData:
+    type: object
+    properties:
+      hosts_scan_data:
+        type: array
+        items:
+          $ref: '#/definitions/RESTHostScanData'
   RESTScanReportData:
     type: object
     required:

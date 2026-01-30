@@ -115,6 +115,23 @@ func TestFilterStrIn(t *testing.T) {
 	}
 }
 
+func TestFilterStrNotIn(t *testing.T) {
+	var filters []restFieldFilter
+	filters = append(filters,
+		restFieldFilter{
+			tag:   "name",
+			op:    api.OPnotin,
+			value: "Sunday|Monday",
+		})
+
+	var star Star
+	rf := restNewFilter(&star, filters)
+
+	if !rf.Filter(&sun) {
+		t.Fatalf("Should be accepted.")
+	}
+}
+
 func TestFilterStrGte(t *testing.T) {
 	var filters []restFieldFilter
 	filters = append(filters,
