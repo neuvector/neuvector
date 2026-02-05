@@ -362,6 +362,89 @@ func TestEdgeCaseReleaseScannerWithDeletedScanner(t *testing.T) {
 	}
 }
 
+func TestTaskCount(t *testing.T) {
+	tests := []struct {
+		name        string
+		maxConns    int
+		scanCredits []int
+		expected    int
+	}{
+		{
+			name:        "no scanners",
+			maxConns:    3,
+			scanCredits: nil,
+			expected:    0,
+		},
+		{
+			name:        "all scanners idle (full credit)",
+			maxConns:    3,
+			scanCredits: []int{3, 3, 3},
+			expected:    0,
+		},
+		{
+			name:        "all scanners fully busy (zero credit)",
+			maxConns:    3,
+			scanCredits: []int{0, 0, 0},
+			expected:    9, // 3 scanners * 3 max each
+		},
+		{
+			name:        "partially busy scanners",
+			maxConns:    3,
+			scanCredits: []int{2, 1, 3},
+			expected:    3, // (3-2) + (3-1) + (3-3) = 1+2+0
+		},
+		{
+			name:        "single scanner partially busy",
+			maxConns:    5,
+			scanCredits: []int{2},
+			expected:    3, // 5-2
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			maxConcurrentRepoScanTasks := 6
+			mgr, mockHelper := setupTestManager(tc.maxConns, maxConcurrentRepoScanTasks)
+
+			for i, credit := range tc.scanCredits {
+				scanner := newMockScanner(i, tc.maxConns)
+				scanner.ScanCredit = credit
+				require.NoError(t, mockHelper.AddScanner(scanner))
+			}
+
+			assert.Equal(t, tc.expected, mgr.TaskCount())
+		})
+	}
+}
+
+func TestTaskCountAfterAcquireAndRelease(t *testing.T) {
+	maxConns := 3
+	maxConcurrentRepoScanTasks := 6
+	mgr, mockHelper := setupTestManager(maxConns, maxConcurrentRepoScanTasks)
+
+	scanner := newMockScanner(1, maxConns)
+	require.NoError(t, mockHelper.AddScanner(scanner))
+
+	// Initially no tasks
+	assert.Equal(t, 0, mgr.TaskCount(), "should be 0 before any acquire")
+
+	ctx := context.Background()
+
+	// Acquire one scanner slot
+	scannerID, err := mgr.acquireScanner(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, mgr.TaskCount(), "should be 1 after one acquire")
+
+	// Acquire another
+	_, err = mgr.acquireScanner(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 2, mgr.TaskCount(), "should be 2 after two acquires")
+
+	// Release one
+	require.NoError(t, mgr.releaseScanner(scannerID))
+	assert.Equal(t, 1, mgr.TaskCount(), "should be 1 after one release")
+}
+
 func TestAcquireAndReleaseAllScanners(t *testing.T) {
 	maxConns := 2
 	scannerCount := 3
