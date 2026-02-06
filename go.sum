@@ -88,8 +88,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8Yc
 github.com/denisenkom/go-mssqldb v0.10.0/go.mod h1:xbL0rPBG9cCiLr28tMa8zpbdarY27NDyej4t/EjAShU=
 github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=
 github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
-github.com/dmachard/go-clientsyslog v1.0.1 h1:Ph9YBUiAWeyH7048qGyJrYOBrpAge9o3t8JxctYacK8=
-github.com/dmachard/go-clientsyslog v1.0.1/go.mod h1:lDVvlzEcEnOPq8DavCoWMdQrZQRE8OMMiYm02MGkA70=
+github.com/dmachard/go-clientsyslog v1.0.3 h1:i/7dx3FEeg/LQFJt9MIT7qd5kI4VlIUiDW16vrQgAMg=
+github.com/dmachard/go-clientsyslog v1.0.3/go.mod h1:lDVvlzEcEnOPq8DavCoWMdQrZQRE8OMMiYm02MGkA70=
 github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBirtxJnzDrHLEKxTAYk=
 github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/docker v28.1.1+incompatible h1:49M11BFLsVO1gxY9UX9p/zwkE/rswggs8AdFmXQw51I=
