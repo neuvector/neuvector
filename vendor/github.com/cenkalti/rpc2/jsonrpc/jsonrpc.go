@@ -130,7 +130,14 @@ func (c *jsonCodec) ReadHeader(req *rpc2.Request, resp *rpc2.Response) error {
 		if c.clientResponse.Error != nil || c.clientResponse.Result == nil {
 			x, ok := c.clientResponse.Error.(string)
 			if !ok {
-				return fmt.Errorf("invalid error %v", c.clientResponse.Error)
+				// According to the JSON-RPC spec, the error field can be an object.
+				// Marshal non-string errors to JSON to handle structured error responses.
+				// https://www.jsonrpc.org/specification_v1
+				errBytes, err := json.Marshal(c.clientResponse.Error)
+				if err != nil {
+					return fmt.Errorf("error marshaling error object: %v", err)
+				}
+				x = string(errBytes)
 			}
 			if x == "" {
 				x = "unspecified error"

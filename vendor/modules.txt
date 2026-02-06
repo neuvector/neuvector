@@ -109,7 +109,7 @@ github.com/cenkalti/backoff/v5
 # github.com/cenkalti/hub v1.0.2
 ## explicit; go 1.20
 github.com/cenkalti/hub
-# github.com/cenkalti/rpc2 v1.0.4
+# github.com/cenkalti/rpc2 v1.0.5
 ## explicit; go 1.20
 github.com/cenkalti/rpc2
 github.com/cenkalti/rpc2/jsonrpc
