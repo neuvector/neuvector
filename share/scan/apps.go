@@ -175,6 +175,12 @@ func (s *ScanApps) marshal() []byte {
 	return buf.Bytes()
 }
 
+func (s *ScanApps) AddPkgs(pkgs []AppPackage) {
+	for _, pkg := range pkgs {
+		s.pkgs[pkg.FileName] = append(s.pkgs[pkg.FileName], pkg)
+	}
+}
+
 func (s *ScanApps) ExtractAppPkg(filename, fullpath string) {
 	if _, ok := s.pkgs[filename]; ok && !s.replace {
 		return
