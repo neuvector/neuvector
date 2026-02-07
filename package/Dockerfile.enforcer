@@ -2,7 +2,7 @@
 # Builder
 #
 FROM registry.suse.com/bci/golang:1.24 AS builder
-
+ENV GOTOOLCHAIN=1.25.7
 ARG VERSION
 ARG TARGETOS
 ARG TARGETARCH
@@ -32,7 +32,7 @@ RUN bash package/build_enforcer.sh
 
 #
 # Base image
-# 
+#
 FROM registry.suse.com/bci/bci-micro:15.7 AS micro
 FROM registry.suse.com/bci/bci-base:15.7 AS base
 
@@ -45,7 +45,7 @@ COPY --from=micro / /chroot/
 RUN zypper refresh && zypper --installroot /chroot -n in --no-recommends \
     ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk tcpdump sed kmod wget unzip \
     libnetfilter_queue-devel liburcu-devel libpcap-devel pcre2-devel libjansson-devel libmnl-devel jemalloc-devel
- 
+
 # Install yq and vectorscan
 RUN zypper addrepo https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/isv:SUSE:neuvector.repo && \
     rpm --import https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/repodata/repomd.xml.key && \
