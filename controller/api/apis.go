@@ -97,6 +97,7 @@ const QueryDuration string = "token_duration"
 const OPeq string = "eq"
 const OPneq string = "neq"
 const OPin string = "in"
+const OPnotin string = "notin"
 const OPgt string = "gt"
 const OPgte string = "gte"
 const OPlt string = "lt"
@@ -2533,6 +2534,53 @@ type RESTScanReportData struct {
 	Report *RESTScanReport `json:"report"`
 }
 
+type RESTAssetsScanReportFilter struct {
+	Name  string   `json:"name"`
+	Op    string   `json:"op"`
+	Value []string `json:"value"`
+}
+
+type RESTVulScoreFilter struct {
+	ScoreVersion string  `json:"score_version"`
+	ScoreBottom  float32 `json:"score_bottom"`
+	ScoreTop     float32 `json:"score_top"`
+}
+
+type RESTScanReportCursor struct {
+	Name       string `json:"name"`
+	HostName   string `json:"host_name"`
+	Domain     string `json:"domain"`
+	CVEName    string `json:"cve_name"`
+	CVEPackage string `json:"cve_package"`
+}
+
+func (a *RESTScanReportCursor) String() string {
+	return a.HostName + "/" + a.Domain + "/" + a.Name + "/" + a.CVEName + "/" + a.CVEPackage
+}
+
+type RESTAssetsScanReportQuery struct {
+	ShowAccepted   bool                         `json:"show_accepted"`
+	MaxCveRecords  int                          `json:"max_cve_records"`    // one cve per-record
+	Cursor         RESTScanReportCursor         `json:"cursor"`             // last query stopped
+	ViewPod        *string                      `json:"view_pod,omitempty"` // for workloads only
+	VulScoreFilter *RESTVulScoreFilter          `json:"vul_score_filter,omitempty"`
+	Filters        []RESTAssetsScanReportFilter `json:"filters,omitempty"`
+}
+
+type RESTAssetScanData struct {
+	HostName         string `json:"host_name"`
+	WorkloadName     string `json:"workload_name"`
+	WorkloadDomain   string `json:"workload_domain"`
+	WorkloadHostName string `json:"workload_host_name"`
+	RESTVulnerability
+}
+
+type RESTAssetScanReportData struct {
+	AssetsLeft int                  `json:"assets_left"` // number of workloads not done yet for this page
+	Cursor     RESTScanReportCursor `json:"cursor"`
+	ScanData   []*RESTAssetScanData `json:"scan_data"` // each cve for each asset has an entry
+}
+
 type RESTScanReport struct {
 	Vuls          []*RESTVulnerability   `json:"vulnerabilities"`
 	Modules       []*RESTScanModule      `json:"modules,omitempty"`
@@ -4319,4 +4367,46 @@ type AssetCVECount struct {
 
 type RESTAssetIDList struct {
 	IDs []string `json:"ids"`
+}
+
+type AssetScanReportInterface interface {
+	GetID() string
+	GetCursor() RESTScanReportCursor
+	GetScanData() RESTAssetScanData
+}
+
+func (a *RESTWorkload) GetID() string {
+	return a.ID
+}
+
+func (a *RESTWorkload) GetCursor() RESTScanReportCursor {
+	return RESTScanReportCursor{
+		Name:     a.Name,
+		Domain:   a.Domain,
+		HostName: a.HostName,
+	}
+}
+
+func (a *RESTWorkload) GetScanData() RESTAssetScanData {
+	return RESTAssetScanData{
+		HostName:         "",
+		WorkloadName:     a.Name,
+		WorkloadDomain:   a.Domain,
+		WorkloadHostName: a.HostName,
+	}
+}
+func (h *RESTHost) GetID() string {
+	return h.ID
+}
+
+func (h *RESTHost) GetCursor() RESTScanReportCursor {
+	return RESTScanReportCursor{
+		Name: h.Name,
+	}
+}
+
+func (h *RESTHost) GetScanData() RESTAssetScanData {
+	return RESTAssetScanData{
+		HostName: h.Name,
+	}
 }

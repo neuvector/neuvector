@@ -1385,7 +1385,9 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 		},
 		CONST_API_RT_SCAN: {
 			"v1/scan/workload/*",
+			"v1/scan/workloads/scan_report",
 			"v1/scan/host/*",
+			"v1/scan/hosts/scan_report",
 			"v1/scan/platform/platform",
 			"v1/vulasset",
 			"v1/assetvul",
