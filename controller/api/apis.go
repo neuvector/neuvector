@@ -97,6 +97,7 @@ const QueryDuration string = "token_duration"
 const OPeq string = "eq"
 const OPneq string = "neq"
 const OPin string = "in"
+const OPnotin string = "notin"
 const OPgt string = "gt"
 const OPgte string = "gte"
 const OPlt string = "lt"
@@ -2531,6 +2532,26 @@ type RESTImageAsset struct {
 
 type RESTScanReportData struct {
 	Report *RESTScanReport `json:"report"`
+}
+
+type RESTHostScanData struct {
+	HostName string `json:"host_name"`
+	RESTScanReport
+}
+
+type RESTHostScanReportData struct {
+	HostsScanData []*RESTHostScanData `json:"hosts_scan_data"`
+}
+
+type RESTWorkloadScanData struct {
+	WorkloadName     string `json:"workload_name"`
+	WorkloadDomain   string `json:"workload_domain"`
+	WorkloadHostName string `json:"workload_host_name"`
+	RESTScanReport
+}
+
+type RESTWorkloadsScanReportData struct {
+	WorkloadsScanData []*RESTWorkloadScanData `json:"workloads_scan_data"`
 }
 
 type RESTScanReport struct {
