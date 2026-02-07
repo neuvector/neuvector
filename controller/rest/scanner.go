@@ -268,6 +268,116 @@ func handlerScanWorkloadReport(w http.ResponseWriter, r *http.Request, ps httpro
 	restRespSuccess(w, r, resp, acc, login, nil, "Get container scan report")
 }
 
+func getWorkloads(query *restQuery, idlist utils.Set, acc *access.AccessControl) []*api.RESTWorkload {
+	var view string
+	var wls []*api.RESTWorkload
+
+	if value, ok := query.pairs[api.QueryKeyView]; ok && value == api.QueryValueViewPod {
+		view = api.QueryValueViewPod
+	}
+
+	cached := cacher.GetAllWorkloads(view, acc, idlist)
+
+	// Sort
+	if len(cached) > 1 && len(query.sorts) > 0 {
+		// Convert struct slice to interface slice
+		var data []interface{} = make([]interface{}, len(cached))
+		for i, d := range cached {
+			data[i] = d
+		}
+
+		// Sort
+		restNewSorter(data, query.sorts).Sort()
+
+		// Copy the result
+		wls = make([]*api.RESTWorkload, 0, len(data))
+		for _, d := range data {
+			wl, ok := d.(*api.RESTWorkload)
+			if ok {
+				wls = append(wls, wl)
+			}
+		}
+	} else {
+		wls = cached
+		sort.Slice(wls, func(i, j int) bool { return wls[i].Name < wls[j].Name })
+	}
+
+	retWorkloads := make([]*api.RESTWorkload, 0)
+
+	// Filter
+	if len(wls) <= query.start {
+		return retWorkloads
+	}
+
+	if len(query.filters) > 0 {
+		var dummy api.RESTWorkload
+		rf := restNewFilter(&dummy, query.filters)
+
+		for _, wl := range wls[query.start:] {
+			if !rf.Filter(wl) {
+				continue
+			}
+
+			retWorkloads = append(retWorkloads, wl)
+
+			if query.limit > 0 && len(retWorkloads) >= query.limit {
+				break
+			}
+		}
+	} else if query.limit == 0 {
+		retWorkloads = wls[query.start:]
+	} else {
+		var end int
+		if query.start+query.limit > len(wls) {
+			end = len(wls)
+		} else {
+			end = query.start + query.limit
+		}
+		retWorkloads = wls[query.start:end]
+	}
+
+	log.WithFields(log.Fields{"entries": len(retWorkloads)}).Debug("Response")
+
+	return retWorkloads
+}
+
+func handlerWorkloadsScanReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	var resp api.RESTWorkloadsScanReportData
+
+	query := restParseQuery(r)
+	var showTag string
+	if value, ok := query.pairs[api.QueryKeyShow]; ok && value == api.QueryValueShowAccepted {
+		showTag = api.QueryValueShowAccepted
+	}
+
+	wls := getWorkloads(query, utils.NewSet(), acc)
+
+	resp.WorkloadsScanData = make([]*api.RESTWorkloadScanData, 0, len(wls))
+	for _, wl := range wls {
+		vuls, modules, _ := cacher.GetVulnerabilityReport(wl.ID, showTag)
+		if len(vuls) == 0 {
+			continue
+		}
+		scanData := &api.RESTWorkloadScanData{
+			WorkloadName:     wl.Name,
+			WorkloadDomain:   wl.Domain,
+			WorkloadHostName: wl.HostName,
+			RESTScanReport:   api.RESTScanReport{Vuls: vuls, Modules: modules},
+		}
+		resp.WorkloadsScanData = append(resp.WorkloadsScanData, scanData)
+	}
+
+	restRespSuccess(w, r, resp, acc, login, nil, "Get containers scan report")
+}
+
 func handlerScanImageReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -475,6 +585,45 @@ func handlerScanHostReport(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	restRespSuccess(w, r, resp, acc, login, nil, "Get host scan report")
+}
+
+func handlerHostsScanReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	} else if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
+		return
+	}
+
+	query := restParseQuery(r)
+
+	var showTag string
+	if value, ok := query.pairs[api.QueryKeyShow]; ok && value == api.QueryValueShowAccepted {
+		showTag = api.QueryValueShowAccepted
+	}
+
+	hosts := getHosts(query, acc)
+
+	var resp api.RESTHostScanReportData
+
+	resp.HostsScanData = make([]*api.RESTHostScanData, 0, len(hosts))
+	for _, host := range hosts {
+		vuls, _, _ := cacher.GetVulnerabilityReport(host.ID, showTag)
+		if len(vuls) == 0 {
+			continue
+		}
+		scanData := &api.RESTHostScanData{
+			HostName:       host.Name,
+			RESTScanReport: api.RESTScanReport{Vuls: vuls},
+		}
+		resp.HostsScanData = append(resp.HostsScanData, scanData)
+	}
+
+	restRespSuccess(w, r, resp, acc, login, nil, "Get hosts scan report")
 }
 
 func handlerScanPlatformReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
