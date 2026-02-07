@@ -57,6 +57,8 @@ const DEFAULT_TLSCERT_VALIDITY_DAYS = 365
 const DEFAULT_CERTMANAGER_EXPIRY_CHECK_PERIOD = time.Minute * 30
 const DEFAULT_CERTMANAGER_RENEW_THRESHOLD = time.Hour * 24 * 30
 
+const MAX_REQUEST_BODY_SIZE = 2 * 1024 * 1024 // 2MB
+
 type ApiVersion int
 
 const (
@@ -534,13 +536,12 @@ func restParseQuery(r *http.Request) *restQuery {
 				var op string
 
 				switch v[0] {
-				case api.OPeq, api.OPneq, api.OPin,
+				case api.OPeq, api.OPneq, api.OPin, api.OPnotin,
 					api.OPgt, api.OPgte, api.OPlt, api.OPlte, api.OPprefix:
 					op = v[0]
 				default:
 					op = api.OPeq
 				}
-
 				rq.filters = append(rq.filters,
 					restFieldFilter{
 						tag:   tag,
@@ -576,6 +577,16 @@ type restFilter struct {
 	tags    map[string]string
 }
 
+func filterOpIn(value string, filter *restFieldFilter) bool {
+	ss := strings.Split(filter.value, "|")
+	for _, s := range ss {
+		if strings.Contains(value, s) {
+			return true
+		}
+	}
+	return false
+}
+
 func filterString(value string, filter *restFieldFilter) bool {
 	switch filter.op {
 	case api.OPeq:
@@ -583,13 +594,9 @@ func filterString(value string, filter *restFieldFilter) bool {
 	case api.OPneq:
 		return value != filter.value
 	case api.OPin:
-		ss := strings.Split(filter.value, "|")
-		for _, s := range ss {
-			if strings.Contains(value, s) {
-				return true
-			}
-		}
-		return false
+		return filterOpIn(value, filter)
+	case api.OPnotin:
+		return !filterOpIn(value, filter)
 	case api.OPgt:
 		return value > filter.value
 	case api.OPgte:
@@ -1844,10 +1851,12 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.GET("/v1/scan/cache_data/:id", handlerScanCacheData)
 	r.POST("/v1/scan/workload/:id", handlerScanWorkloadReq)
 	r.GET("/v1/scan/workload/:id", handlerScanWorkloadReport)
-	r.GET("/v1/scan/image", handlerScanImageSummary)    // Returns all workload's scan result summary by images
-	r.GET("/v1/scan/image/:id", handlerScanImageReport) // Returns workload scan result by workload's image ID
+	r.POST("/v1/scan/workloads/scan_report", handlerWorkloadsScanReport) // Returns scan report of all queried workloads' scan result
+	r.GET("/v1/scan/image", handlerScanImageSummary)                     // Returns all workload's scan result summary by images
+	r.GET("/v1/scan/image/:id", handlerScanImageReport)                  // Returns workload scan result by workload's image ID
 	r.POST("/v1/scan/host/:id", handlerScanHostReq)
 	r.GET("/v1/scan/host/:id", handlerScanHostReport)
+	r.POST("/v1/scan/hosts/scan_report", handlerHostsScanReport) // Returns scan report of all queried hosts' scan result
 	r.POST("/v1/scan/platform/platform", handlerScanPlatformReq)
 	r.GET("/v1/scan/platform", handlerScanPlatformSummary)
 	r.GET("/v1/scan/platform/platform", handlerScanPlatformReport)
