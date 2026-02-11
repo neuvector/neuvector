@@ -705,7 +705,7 @@ func ConfigK8sAdmissionControl(k8sResInfo *ValidatingWebhookConfigInfo, ctrlStat
 	retry := 0
 	for _, whInfo := range k8sResInfo.WebhooksInfo {
 		if whInfo.ClientConfig.ClientMode == share.AdmClientModeUrl {
-			_, svcInfo := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
+			svcInfo, _ := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
 			whInfo.ClientConfig.Port = svcInfo.SvcNodePort
 		}
 	}
@@ -763,7 +763,7 @@ func UnregK8sAdmissionControl(admType, nvAdmName string) error {
 	return configK8sAdmCtrlValidateResource(K8sResOpDelete, "", &k8sResInfo)
 }
 
-func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) {
+func GetValidateWebhookSvcInfo(svcname string) (*ValidateWebhookSvcInfo, error) {
 	svcInfo := &ValidateWebhookSvcInfo{
 		SvcNodePort: 443,
 		Status:      api.RESTErrWebhookSvcForAdmCtrl,
@@ -792,7 +792,7 @@ func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) 
 					if ports.NodePort != 0 {
 						svcInfo.SvcNodePort = ports.NodePort
 						svcInfo.SvcType = resource.ServiceTypeNodePort
-						return nil, svcInfo
+						return svcInfo, nil
 					}
 				}
 			}
@@ -802,7 +802,7 @@ func GetValidateWebhookSvcInfo(svcname string) (error, *ValidateWebhookSvcInfo) 
 	}
 	log.WithFields(log.Fields{"namespace": resource.NvAdmSvcNamespace, "service": svcname}).Debug("NodePort not found")
 
-	return err, svcInfo
+	return svcInfo, err
 }
 
 func TestAdmWebhookConnection(svcname string) (int, error) {
@@ -836,7 +836,7 @@ func TestAdmWebhookConnection(svcname string) (int, error) {
 				for i := 0; i < 10; i++ {
 					select {
 					case <-ticker.C:
-						if err, svcInfo := GetValidateWebhookSvcInfo(svcname); err == nil {
+						if svcInfo, err := GetValidateWebhookSvcInfo(svcname); err == nil {
 							if svcInfo.LabelTag == tag && svcInfo.LabelEcho == tag {
 								// one nv controller processed our UPDATE svc request
 								log.WithFields(log.Fields{"tag": tag}).Debug("detected test result")
