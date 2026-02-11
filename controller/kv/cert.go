@@ -50,6 +50,10 @@ func init() {
 			RSAKeySize = v
 		}
 	}
+	if RSAKeySize < DefaultRSAKeySize {
+		log.WithFields(log.Fields{"value": RSAKeySize}).Errorf("RSA_KEYSIZE needs to be >= %d", DefaultRSAKeySize)
+		os.Exit(-3)
+	}
 }
 
 func pemBlockForKey(priv interface{}) *pem.Block {
