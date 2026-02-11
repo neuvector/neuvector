@@ -37,6 +37,10 @@ linters:
         text: 'SA1019: grpc.WithDialer is deprecated: use WithContextDialer'
       - path: (.+)\.go$
         text: 'SA1019: grpc.WithTimeout is deprecated: use DialContext instead of Dial and context.WithTimeout'
+      - path: (.+)\.go$
+        text: 'ST1005: error strings should not be capitalized'
+      - path: (.+)\.go$
+        text: 'ST1005: error strings should not end with punctuation or newlines'
     paths:
       - third_party$
       - builtin$
