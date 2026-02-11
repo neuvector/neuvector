@@ -25,7 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	admregv1b1 "k8s.io/api/admissionregistration/v1beta1"
-	apiv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1b1 "k8s.io/api/batch/v1beta1"
@@ -280,25 +279,25 @@ var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Create),
 		Resources:  admResForCreateSet,
-		Scope:      string(apiv1beta1.NamespacedScope),
+		Scope:      string(admregv1b1.NamespacedScope),
 	},
 	{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Update),
 		Resources:  admResForUpdateSet,
-		Scope:      string(apiv1beta1.NamespacedScope),
+		Scope:      string(admregv1b1.NamespacedScope),
 	},
 	{
 		ApiGroups:  rbacApiGroups,
 		Operations: opCreateDelete,
 		Resources:  admRbacResForCreateUpdate1,
-		Scope:      string(apiv1beta1.NamespacedScope),
+		Scope:      string(admregv1b1.NamespacedScope),
 	},
 	{
 		ApiGroups:  rbacApiGroups,
 		Operations: opCreateDelete,
 		Resources:  admRbacResForCreateUpdate2,
-		Scope:      string(apiv1beta1.AllScopes),
+		Scope:      string(admregv1b1.AllScopes),
 	},
 }
 
@@ -310,7 +309,7 @@ var CrdResForOpsSettings = []*NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Create, Update, Delete),
 		Resources:  crdResForAllOpSet,
-		Scope:      string(apiv1beta1.AllScopes),
+		Scope:      string(admregv1b1.AllScopes),
 	},
 }
 
@@ -321,13 +320,13 @@ var StatusResForOpsSettings = []*NvAdmRegRuleSetting{
 		ApiGroups:  allApiGroups,
 		Operations: opCreateDelete,
 		Resources:  statusResForCreateUpdateSet,
-		Scope:      string(apiv1beta1.NamespacedScope),
+		Scope:      string(admregv1b1.NamespacedScope),
 	},
 	{
 		ApiGroups:  allApiGroups,
 		Operations: utils.NewSet(Delete),
 		Resources:  statusResForDeleteSet,
-		Scope:      string(apiv1beta1.NamespacedScope),
+		Scope:      string(admregv1b1.NamespacedScope),
 	},
 }
 
