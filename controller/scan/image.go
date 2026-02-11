@@ -166,7 +166,7 @@ func deregisterImageBank(source, name string) {
 // --
 
 type registryDriver interface {
-	Login(cfg *share.CLUSRegistryConfig) (error, string)
+	Login(cfg *share.CLUSRegistryConfig) error
 	Logout(force bool)
 	GetRepoList(org, repo string, limit int) ([]*share.CLUSImage, error)
 	GetTagList(doamin, repo, tag string) ([]string, error)
@@ -228,17 +228,17 @@ func (r *base) SetTracer(tracer httptrace.HTTPTrace) {
 	r.tracer = tracer
 }
 
-func (r *base) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *base) Login(cfg *share.CLUSRegistryConfig) error {
 	if err := r.newRegClient(cfg.Registry, cfg.Username, cfg.Password); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if code, err := r.rc.Alive(); err != nil {
 		if code != registryUtils.ErrorAuthentication || cfg.Username != "" {
-			return err, err.Error()
+			return err
 		}
 	}
-	return nil, ""
+	return nil
 }
 
 func (r *base) Logout(force bool) {

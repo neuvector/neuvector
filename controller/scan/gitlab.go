@@ -95,21 +95,21 @@ func (r *gitlab) newGitlabClient() {
 	r.gitlabClient = newHttpClient(proxy)
 }
 
-func (r *gitlab) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *gitlab) Login(cfg *share.CLUSRegistryConfig) error {
 	r.apiUrl = cfg.GitlabApiUrl
 	r.privateToken = cfg.GitlabPrivateToken
 
 	r.newGitlabClient()
 	if err := r.newRegClient(cfg.Registry, cfg.Username, cfg.Password); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if _, err := r.rc.Alive(); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	r.repoIdMap = make(map[string]*gitRepo)
-	return nil, ""
+	return nil
 }
 
 func (r *gitlab) getData(ur string) ([]byte, string, error) {

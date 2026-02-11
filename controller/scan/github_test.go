@@ -19,9 +19,9 @@ func TestGithubApiGetAllRepos(t *testing.T) {
 		IgnoreProxy: true,
 	}
 	githubDriver := newRegistryDriver(cfg, true, new(httptrace.NopTracer))
-	err, errMsg := githubDriver.Login(cfg)
+	err := githubDriver.Login(cfg)
 	if err != nil {
-		t.Errorf("received error during login: %s with message %s", err.Error(), errMsg)
+		t.Errorf("received error during login: %s", err.Error())
 	}
 
 	repoList, err := githubDriver.GetRepoList("rancher", "*", 0)

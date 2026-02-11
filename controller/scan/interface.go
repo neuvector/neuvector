@@ -888,7 +888,7 @@ func (m *scanMethod) TestRegistry(ctx context.Context, config *share.CLUSRegistr
 	rs.driver.SetTracer(tracer)
 
 	rs.driver.GetTracer().SetPhase("Test registry connection")
-	err, _ := rs.driver.Login(rs.config)
+	err := rs.driver.Login(rs.config)
 	if err != nil {
 		rs.driver.GetTracer().GotError(fmt.Sprintf("Test registry connection failed: %s", err.Error()))
 		return err

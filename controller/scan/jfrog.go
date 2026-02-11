@@ -62,20 +62,20 @@ type aqlFolderResult struct {
 	// Range   aqlRange    `json:"range"`
 }
 
-func (r *jfrog) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *jfrog) Login(cfg *share.CLUSRegistryConfig) error {
 	r.mode = cfg.JfrogMode
 	if r.mode == share.JFrogModeSubdomain {
 		r.subdomainURL = make(map[string]string)
 	}
 
 	if err := r.newRegClient(cfg.Registry, cfg.Username, cfg.Password); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if _, err := r.rc.Alive(); err != nil {
-		return err, err.Error()
+		return err
 	}
-	return nil, ""
+	return nil
 }
 
 func (r *jfrog) shouldSkipDir(dir jfrogDir, org, repositoryKey string) bool {
