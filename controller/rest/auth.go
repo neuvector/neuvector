@@ -2,6 +2,7 @@ package rest
 
 import (
 	"crypto/rsa"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -304,6 +305,12 @@ func (s *loginSession) getToken() string {
 	return s.token
 }
 
+func composeTokenKey(mainSessionID, token string) string {
+	adjusted := fmt.Sprintf("%s@%s", mainSessionID, token)
+	b := sha512.Sum512([]byte(adjusted))
+	return share.CLUSExpiredTokenKey(hex.EncodeToString(b[:]))
+}
+
 // caller must own userMutex before calling this function
 func _deleteSessionToken(s *loginSession) {
 	if s.timer != nil {
@@ -332,7 +339,7 @@ func _deleteSessionToken(s *loginSession) {
 		}
 	}
 
-	key := share.CLUSExpiredTokenKey(s.token)
+	key := composeTokenKey(s.mainSessionID, s.token)
 	err := jwtLastExpiredTokenSession.Associate(key)
 	if err != nil {
 		log.WithFields(log.Fields{"id": s.id, "err": err}).Error()
@@ -700,7 +707,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	}
 
 	// Check whether the token has been kicked by another controller or expired
-	key := share.CLUSExpiredTokenKey(token[0])
+	key := composeTokenKey(claims.MainSessionID, token[0])
 	if _, err := cluster.Get(key); err == nil {
 		if s, ok := loginSessions[token[0]]; ok {
 			if s != nil {
@@ -1218,7 +1225,7 @@ func KickLoginSessions(kickInfo *share.CLUSKickLoginSessionsRequest) {
 // for one controller to call other controllers' grpc service, which calls this function, to reset a login session
 func ResetLoginTokenTimer(tokenInfo *share.CLUSLoginTokenInfo) {
 	if tokenInfo.CtrlerID != localDev.Ctrler.ID {
-		key := share.CLUSExpiredTokenKey(tokenInfo.LoginToken)
+		key := composeTokenKey(tokenInfo.LoginID, tokenInfo.LoginToken)
 		if _, err := cluster.Get(key); err == nil {
 			// one controller has set this token to be expired!
 			return
@@ -1342,7 +1349,7 @@ func reloadJointPubPrivKey(callerFedRole, clusterID string) {
 }
 
 // Validate a JWT token.
-// If secret is not specified, default secret and default JWT key will be used.
+// If secret is not specified, it's for local cluster and we don't encrypt jwt token anymore
 // If secret is specified, specified secret and rsaPublicKey/FedJoint JWT key will be used.
 func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey) (*tokenClaim, error) {
 	// rsaPublicKey being non-nil is for validating new public/private keys purpose
@@ -1351,18 +1358,8 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	var alternativeKey *rsa.PublicKey
 
 	jwtCert := GetJWTSigningKey()
-	installID, err := clusHelper.GetInstallationID()
-	if err != nil {
-		log.WithError(err).Error("failed to get installation ID")
-		return nil, fmt.Errorf("failed to get installation ID: %w", err)
-	}
-
 	if secret == "" {
-		if tokenString, err = utils.DecryptUserToken(encryptedToken, []byte(installID)); err != nil {
-			err = fmt.Errorf("failed to decrypt token: %w", err)
-			log.WithError(err).Error()
-			return nil, err
-		}
+		tokenString = encryptedToken
 	} else {
 		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
 	}
@@ -1506,10 +1503,6 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	tokenString, err := token.SignedString(jwtCert.jwtPrivateKey)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("failed to sign token")
-		return "", "", nil, err
-	}
-	if tokenString, err = utils.EncryptUserToken(tokenString, []byte(installID)); err != nil {
-		log.WithError(err).Error("failed to encrypt token")
 		return "", "", nil, err
 	}
 	return id, tokenString, &c, nil
