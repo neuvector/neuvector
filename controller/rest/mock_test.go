@@ -300,7 +300,7 @@ func appIDs2Names(ids []uint32) []string {
 		return []string{api.PolicyAppAny}
 	}
 
-	var names []string = make([]string, 0)
+	var names = make([]string, 0)
 	for _, id := range ids {
 		if name, ok := common.AppNameMap[id]; ok {
 			names = append(names, name)

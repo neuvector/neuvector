@@ -420,10 +420,7 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 func (fsn *FileNotificationCtr) monitorEvents() {
 	defer fsn.Close()
 	defer log.Info("FSN: exit")
-	for {
-		if !fsn.bEnabled {
-			break
-		}
+	for fsn.bEnabled {
 
 		select {
 		case event, ok := <-fsn.watcher.Events:

@@ -287,8 +287,8 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([3][]*nv
 	}
 
 	for _, vol := range spec.Volumes {
-		if vol.VolumeSource.HostPath != nil {
-			vols[vol.Name] = vol.VolumeSource.HostPath.Path
+		if vol.HostPath != nil {
+			vols[vol.Name] = vol.HostPath.Path
 		}
 	}
 
@@ -697,8 +697,8 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 		switch ps := podSpec.(type) {
 		case *corev1.PodTemplateSpec:
 			allContainers, _ = parsePodSpec(objectMeta, &ps.Spec)
-			specLabels = ps.ObjectMeta.Labels
-			specAnnotations = ps.ObjectMeta.Annotations
+			specLabels = ps.Labels
+			specAnnotations = ps.Annotations
 			saName = ps.Spec.ServiceAccountName
 		case *corev1.PodSpec:
 			allContainers, _ = parsePodSpec(objectMeta, ps)
@@ -1070,21 +1070,22 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 		podTemplateSpec = &replicaSet.Spec.Template
 	case k8sKindService:
 		if req.Namespace == resource.NvAdmSvcNamespace && (req.Name == resource.NvAdmSvcName || req.Name == resource.NvCrdSvcName) {
-			if op == OPERATION_CREATE {
+			switch op {
+			case OPERATION_CREATE:
 				cacher.SetNvDeployStatusInCluster(req.Name, true)
-			} else if op == OPERATION_UPDATE {
+			case OPERATION_UPDATE:
 				var svc corev1.Service
-				if err := json.Unmarshal(req.Object.Raw, &svc); err == nil && svc.ObjectMeta.Labels != nil {
+				if err := json.Unmarshal(req.Object.Raw, &svc); err == nil && svc.Labels != nil {
 					tagKey, echoKey := admission.GetSvcLabelKeysForTest(resource.NvAdmSvcName)
-					if tag, ok := svc.ObjectMeta.Labels[tagKey]; ok && tag != "" {
+					if tag, ok := svc.Labels[tagKey]; ok && tag != "" {
 						// if label 'echo-neuvector-svc-admission-webhook' has the same value as label 'tag-neuvector-svc-admission-webhook',
 						// it means this UPDATE request is triggered by EchoAdmWebhookConnection(). Otherwise skip to avoid looping
-						if _, exist := svc.ObjectMeta.Labels[echoKey]; !exist {
+						if _, exist := svc.Labels[echoKey]; !exist {
 							go admission.EchoAdmWebhookConnection(tag, req.Name)
 						}
 					}
 				}
-			} else { // OPERATION_DELETE
+			default: // OPERATION_DELETE
 				log.WithFields(log.Fields{"Name": req.Name, "Namespace": req.Namespace}).Info("Critical service deleted")
 				cacher.SetNvDeployStatusInCluster(req.Name, false)
 			}
@@ -1112,7 +1113,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
 		// if pod is middle resource(i.e. has owner) & it's already at running phase(i.e. this is an UPDATE pod request), skip handling this request
-		if len(pod.ObjectMeta.OwnerReferences) != 0 && pod.Status.Phase == "Running" {
+		if len(pod.OwnerReferences) != 0 && pod.Status.Phase == "Running" {
 			return composeResponse(nil), nil, reqIgnored
 		}
 		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
@@ -1221,7 +1222,7 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 	}
 
 	if forTesting {
-		var actioMsg string = "allowed"
+		var actioMsg = "allowed"
 		var ruleIdMsg string
 		if reqEvalResult.ReqAction == share.AdmCtrlActionDeny {
 			actioMsg = "denied"
@@ -1548,9 +1549,10 @@ func restartWebhookServer(svcName string) error {
 			}
 		}
 
-		if svcName == resource.NvAdmSvcName {
+		switch svcName {
+		case resource.NvAdmSvcName:
 			AdmissionRestServer(whsvr.port, whsvr.clientAuth, whsvr.debug)
-		} else if svcName == resource.NvCrdSvcName {
+		case resource.NvCrdSvcName:
 			CrdValidateRestServer(whsvr.port, whsvr.clientAuth, whsvr.debug)
 		}
 

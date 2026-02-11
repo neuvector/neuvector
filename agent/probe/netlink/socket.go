@@ -26,7 +26,7 @@ func NewNetlinkSocket(protocol NetlinkProtocol, bufSize uint, groups ...uint) (*
 		return nil, err
 	}
 
-	var option int = 1
+	var option = 1
 	err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, option)
 	if err != nil {
 		syscall.Close(fd)

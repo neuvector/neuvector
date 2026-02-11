@@ -80,7 +80,7 @@ func (exp GitHubExport) Do() error {
 
 	if githubVer == "github.v3" {
 		hasher := sha1.New()
-		hasher.Write([]byte(fmt.Sprintf("blob %d\x00%s", len(exp.fileContents), exp.fileContents)))
+		fmt.Fprintf(hasher, "blob %d\x00%s", len(exp.fileContents), exp.fileContents)
 		newFileSha := hex.EncodeToString(hasher.Sum(nil))
 		if existingFileSha != "" && newFileSha == existingFileSha {
 			return fmt.Errorf("exported content is same as the file content on remote repository")

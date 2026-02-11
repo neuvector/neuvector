@@ -661,11 +661,12 @@ func buildWhereClauseForWorkload(allowedID []string, queryFilter *api.VulQueryFi
 	part3_domain_equals := goqu.Ex{}
 	domain_contains := make([]exp.Expression, 0)
 	if queryFilter.MatchType4Ns != "" && len(queryFilter.SelectedDomains) > 0 {
-		if queryFilter.MatchType4Ns == "equals" {
+		switch queryFilter.MatchType4Ns {
+		case "equals":
 			part3_domain_equals = goqu.Ex{
 				"w_domain": queryFilter.SelectedDomains,
 			}
-		} else if queryFilter.MatchType4Ns == "contains" {
+		case "contains":
 			for _, d := range queryFilter.SelectedDomains {
 				domain_contains = append(domain_contains, goqu.C("w_domain").Like(fmt.Sprintf("%%%s%%", d)))
 			}
@@ -676,11 +677,12 @@ func buildWhereClauseForWorkload(allowedID []string, queryFilter *api.VulQueryFi
 	part_service_equal := goqu.Ex{}
 	part_service_contains := make([]exp.Expression, 0)
 	if queryFilter.ServiceNameMatchType != "" && queryFilter.ServiceName != "" {
-		if queryFilter.ServiceNameMatchType == "equals" {
+		switch queryFilter.ServiceNameMatchType {
+		case "equals":
 			part_service_equal = goqu.Ex{
 				"w_service_group": queryFilter.ServiceName,
 			}
-		} else if queryFilter.ServiceNameMatchType == "contains" {
+		case "contains":
 			part_service_contains = append(part_service_contains, goqu.C("w_service_group").Like(fmt.Sprintf("%%%s%%", queryFilter.ServiceName)))
 		}
 	}
@@ -689,11 +691,12 @@ func buildWhereClauseForWorkload(allowedID []string, queryFilter *api.VulQueryFi
 	part_container_equal := goqu.Ex{}
 	part_container_contains := make([]exp.Expression, 0)
 	if queryFilter.ContainerNameMatchType != "" && queryFilter.ContainerName != "" {
-		if queryFilter.ContainerNameMatchType == "equals" {
+		switch queryFilter.ContainerNameMatchType {
+		case "equals":
 			part_container_equal = goqu.Ex{
 				"name": queryFilter.ContainerName,
 			}
-		} else if queryFilter.ContainerNameMatchType == "contains" {
+		case "contains":
 			part_container_contains = append(part_container_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.ContainerName)))
 		}
 	}
@@ -719,11 +722,12 @@ func buildWhereClauseForImage(allowedID []string, queryFilter *api.VulQueryFilte
 	part_image_equal := goqu.Ex{}
 	part_image_contains := make([]exp.Expression, 0)
 	if queryFilter.ImageNameMatchType != "" && queryFilter.ImageName != "" {
-		if queryFilter.ImageNameMatchType == "equals" {
+		switch queryFilter.ImageNameMatchType {
+		case "equals":
 			part_image_equal = goqu.Ex{
 				"name": queryFilter.ImageName,
 			}
-		} else if queryFilter.ImageNameMatchType == "contains" {
+		case "contains":
 			part_image_contains = append(part_image_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.ImageName)))
 		}
 	}
@@ -748,11 +752,12 @@ func buildWhereClauseForNode(allowedID []string, queryFilter *api.VulQueryFilter
 	part_node_equal := goqu.Ex{}
 	part_node_contains := make([]exp.Expression, 0)
 	if queryFilter.NodeNameMatchType != "" && queryFilter.NodeName != "" {
-		if queryFilter.NodeNameMatchType == "equals" {
+		switch queryFilter.NodeNameMatchType {
+		case "equals":
 			part_node_equal = goqu.Ex{
 				"name": queryFilter.NodeName,
 			}
-		} else if queryFilter.NodeNameMatchType == "contains" {
+		case "contains":
 			part_node_contains = append(part_node_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.NodeName)))
 		}
 	}

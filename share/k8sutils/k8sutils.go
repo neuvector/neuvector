@@ -15,9 +15,10 @@ const ALL_NAMESPACE = "{all_namespace}"
 
 func CanI(clientset *kubernetes.Clientset, ra authorizationv1.ResourceAttributes, namespace string) (bool, error) {
 
-	if ra.Namespace == NV_NAMESPACE {
+	switch ra.Namespace {
+	case NV_NAMESPACE:
 		ra.Namespace = namespace
-	} else if ra.Namespace == ALL_NAMESPACE {
+	case ALL_NAMESPACE:
 		ra.Namespace = ""
 	}
 

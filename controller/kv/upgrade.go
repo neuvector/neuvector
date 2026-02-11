@@ -519,19 +519,20 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 					}
 				} else {
 					if config == share.CFGEndpointAdmissionControl {
-						if token == share.CLUSAdmissionCfgRule {
+						switch token {
+						case share.CLUSAdmissionCfgRule:
 							var rule share.CLUSAdmissionRule
 							_ = nvJsonUnmarshal(key, value, &rule)
 							if upd, wrtForUpgrade := upgradeAdmCtrlRule(&rule); upd {
 								return &rule, wrtForUpgrade, false, nil, nil
 							}
-						} else if token == share.CLUSAdmissionCfgRuleList {
+						case share.CLUSAdmissionCfgRuleList:
 							var cfg []*share.CLUSRuleHead
 							_ = nvJsonUnmarshal(key, value, &cfg)
 							if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
 								return &cfg, wrtForUpgrade, false, nil, nil
 							}
-						} else if token == share.CLUSAdmissionCfgCert {
+						case share.CLUSAdmissionCfgCert:
 							var cert share.CLUSAdmissionCertCloaked
 							var dec common.MigrateDecryptUnmarshaller
 							err2 := dec.Unmarshal(value, &cert)
@@ -1062,7 +1063,7 @@ func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int, error) {
 	if GetFedKvVer() == reqFedKvVer {
 		return true, _fedSuccess, nil
 	} else {
-		var retCode int = -1
+		var retCode = -1
 		for i := 0; i < len(phases); i++ {
 			if reqFedKvVer == phases[i].version {
 				if verifier == "master" {
@@ -1075,9 +1076,10 @@ func CheckFedKvVersion(verifier, reqFedKvVer string) (bool, int, error) {
 			}
 		}
 		if retCode == -1 {
-			if verifier == "master" {
+			switch verifier {
+			case "master":
 				retCode = _fedMasterUpgradeRequired
-			} else if verifier == "joint" {
+			case "joint":
 				retCode = _fedJointUpgradeRequired
 			}
 		}
@@ -1555,17 +1557,18 @@ func ConvertRoleGroupsToGroupRoleDomains(roleGroups map[string][]string) ([]*sha
 		}
 	}
 	sort.Slice(groupRoleMappings, func(p, q int) bool {
-		if groupRoleMappings[p].GlobalRole == api.UserRoleAdmin {
+		switch groupRoleMappings[p].GlobalRole {
+		case api.UserRoleAdmin:
 			if groupRoleMappings[q].GlobalRole != api.UserRoleAdmin {
 				return true
 			}
-		} else if groupRoleMappings[p].GlobalRole == api.UserRoleReader {
+		case api.UserRoleReader:
 			if groupRoleMappings[q].GlobalRole == api.UserRoleAdmin {
 				return false
 			} else if groupRoleMappings[q].GlobalRole != api.UserRoleReader {
 				return true
 			}
-		} else {
+		default:
 			if groupRoleMappings[q].GlobalRole == api.UserRoleAdmin || groupRoleMappings[q].GlobalRole == api.UserRoleReader {
 				return false
 			}

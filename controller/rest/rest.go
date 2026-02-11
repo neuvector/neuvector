@@ -231,7 +231,7 @@ func restRespPartial(w http.ResponseWriter, r *http.Request, resp interface{}) {
 func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 	acc *access.AccessControl, login *loginSession, req interface{}, msg string) {
 
-	var ct string = jsonContentType
+	var ct = jsonContentType
 	var data []byte
 	if resp != nil {
 		if restIsSupportReq(r) {
@@ -409,15 +409,16 @@ func restRespNotFoundLogAccessDenied(w http.ResponseWriter, login *loginSession,
 	if w == nil {
 		return
 	}
-	if err == common.ErrObjectAccessDenied {
+	switch err {
+	case common.ErrObjectAccessDenied:
 		restRespAccessDenied(w, login)
-	} else if err == common.ErrObjectNotFound {
+	case common.ErrObjectNotFound:
 		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, "Object not found")
 		log.WithFields(log.Fields{"roles": login.domainRoles}).Error(err.Error())
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
-	} else if err == restErrNeedAgentWorkloadFilter || err == restErrNeedAgentFilter {
+	case restErrNeedAgentWorkloadFilter, restErrNeedAgentFilter:
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrNotEnoughFilter, err.Error())
-	} else {
+	default:
 		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
 	}
 }
@@ -1217,21 +1218,23 @@ const (
 func getAvailableRuleID(ruleType string, ids utils.Set, cfgType share.TCfgType) uint32 {
 	var id, max uint32
 	var idMax, idMin uint32
-	if cfgType == share.FederalCfg {
+	switch cfgType {
+	case share.FederalCfg:
 		idMax = api.MaxFedAdmRespRuleID
 		idMin = api.StartingFedAdmRespRuleID + 1
-	} else if cfgType == share.GroundCfg {
+	case share.GroundCfg:
 		idMax = api.AdmCtrlCrdRuleIDMax
 		idMin = api.AdmCtrlCrdRuleIDBase
-	} else {
+	default:
 		idMax = api.StartingFedAdmRespRuleID
-		if ruleType == ruleTypeAdmCtrl {
+		switch ruleType {
+		case ruleTypeAdmCtrl:
 			idMin = uint32(api.StartingLocalAdmCtrlRuleID)
-		} else if ruleType == ruleTypeRespRule {
+		case ruleTypeRespRule:
 			idMin = uint32(api.StartingLocalResponseRuleID)
-		} else if ruleType == ruleTypeVulProf {
+		case ruleTypeVulProf:
 			idMin = uint32(api.StartingLocalVulProfRuleID)
-		} else {
+		default:
 			idMin = 1
 		}
 	}
@@ -2181,9 +2184,10 @@ func StartStopFedPingPoll(cmd, interval uint32, param1 interface{}) error {
 	case share.JointLoadOwnKeys, share.MasterLoadJointKeys:
 		if param1 != nil {
 			var callerFedRole string
-			if cmd == share.JointLoadOwnKeys {
+			switch cmd {
+			case share.JointLoadOwnKeys:
 				callerFedRole = api.FedRoleJoint
-			} else if cmd == share.MasterLoadJointKeys {
+			case share.MasterLoadJointKeys:
 				callerFedRole = api.FedRoleMaster
 			}
 			if cluster, ok := param1.(*share.CLUSFedJointClusterInfo); ok && cluster != nil {

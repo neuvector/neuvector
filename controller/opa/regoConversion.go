@@ -50,7 +50,7 @@ func ConvertToRegoRuleWithOptions(rule *share.CLUSAdmissionRule, options *RegoCo
 			hasCusomCriteria = true
 
 			// normalize the path
-			c.Path = strings.Replace(c.Path, ".0", "[_]", -1)
+			c.Path = strings.ReplaceAll(c.Path, ".0", "[_]")
 		}
 	}
 
@@ -301,13 +301,14 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 
 		rego = append(rego, fmt.Sprintf("	value = %s", strings.TrimSuffix(path, "[_]")))
 
-		if c.Op == "containsAll" {
+		switch c.Op {
+		case "containsAll":
 			rego = append(rego, "	operator_contains_all(user_provided_data, value)")
-		} else if c.Op == "containsAny" {
+		case "containsAny":
 			rego = append(rego, "	operator_contains_any(user_provided_data, value)")
-		} else if c.Op == "notContainsAny" {
+		case "notContainsAny":
 			rego = append(rego, "	operator_not_contains_any(user_provided_data, value)")
-		} else if c.Op == "containsOtherThan" {
+		case "containsOtherThan":
 			rego = append(rego, "	operator_contains_other_than(user_provided_data, value)")
 		}
 
@@ -319,15 +320,16 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		path = replacePerContainerPath(path)
 
 		opStr := "=="
-		if c.Op == "=" {
+		switch c.Op {
+		case "=":
 			opStr = "=="
-		} else if c.Op == "!=" {
+		case "!=":
 			opStr = "!="
-		} else if c.Op == ">=" {
+		case ">=":
 			opStr = ">="
-		} else if c.Op == ">" {
+		case ">":
 			opStr = ">"
-		} else if c.Op == "<=" {
+		case "<=":
 			opStr = "<="
 		}
 
@@ -361,9 +363,9 @@ func parseQuotedSimpleRegexString(input string) []string {
 
 		v = strings.TrimSpace(v)
 		if strings.ContainsAny(v, "?*") {
-			v = strings.Replace(v, ".", "\\.", -1)
-			v = strings.Replace(v, "?", ".", -1)
-			v = strings.Replace(v, "*", ".*", -1)
+			v = strings.ReplaceAll(v, ".", "\\.")
+			v = strings.ReplaceAll(v, "?", ".")
+			v = strings.ReplaceAll(v, "*", ".*")
 
 			v = fmt.Sprintf("^%s$", v)
 		} else {

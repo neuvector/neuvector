@@ -52,7 +52,7 @@ func handlerWafSensorList(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	if len(wafsensors) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(wafsensors))
+		var data = make([]interface{}, len(wafsensors))
 		for i, d := range wafsensors {
 			data[i] = d
 		}
@@ -130,7 +130,7 @@ func handlerWafRuleList(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	if len(rules) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(rules))
+		var data = make([]interface{}, len(rules))
 		for i, d := range rules {
 			data[i] = d
 		}
@@ -184,7 +184,7 @@ func handlerWafGroupList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	if len(wafgroups) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(wafgroups))
+		var data = make([]interface{}, len(wafgroups))
 		for i, d := range wafgroups {
 			data[i] = d
 		}
@@ -599,8 +599,8 @@ func updateWafSensor(w http.ResponseWriter, conf *api.RESTWafSensorConfig, revie
 	}
 
 	if conf.Rules != nil { //used by GUI
-		var newRuleListNames map[string]string = make(map[string]string)
-		var delRuleListNames map[string]string = make(map[string]string)
+		var newRuleListNames = make(map[string]string)
+		var delRuleListNames = make(map[string]string)
 
 		//newly created list
 		for _, rdr := range *conf.Rules {
@@ -1522,7 +1522,7 @@ func fedCreateWafSensor(conf *api.RESTWafSensorConfig, cfgType share.TCfgType) e
 		sensor.Comment = *conf.Comment
 	}
 
-	var defsensor *share.CLUSWafSensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
+	var defsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
 
 	if defsensor == nil {
 		e := "sensor cannot be created in cluster!"

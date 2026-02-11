@@ -56,27 +56,28 @@ func TestAliasEndpoint(t *testing.T) {
 
 	eps := cacher.GetAllConverEndpoints("", accReadAll)
 	for _, ep := range eps {
-		if ep.ID == "1" {
+		switch ep.ID {
+		case "1":
 			if ep.DisplayName != "c1-x" {
 				t.Errorf("Unexpected endpoint display name: %+v\n", ep)
 			}
-		} else if ep.ID == "host:h1" {
+		case "host:h1":
 			if ep.DisplayName != "host:h1-x" {
 				t.Errorf("Unexpected endpoint display name: %+v\n", ep)
 			}
-		} else if ep.ID == "nv.sg1" {
+		case "nv.sg1":
 			if ep.DisplayName != "nv.sg1-x" {
 				t.Errorf("Unexpected endpoint display name: %+v\n", ep)
 			}
-		} else if ep.ID == "ag1" {
+		case "ag1":
 			if ep.DisplayName != "ag1-x" {
 				t.Errorf("Unexpected endpoint display name: %+v\n", ep)
 			}
-		} else if ep.ID == "ex1" {
+		case "ex1":
 			if ep.DisplayName != "ex1-x" {
 				t.Errorf("Unexpected endpoint display name: %+v\n", ep)
 			}
-		} else {
+		default:
 			t.Errorf("Unexpected endpoint: %+v\n", ep.ID)
 		}
 	}

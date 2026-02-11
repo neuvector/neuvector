@@ -1044,7 +1044,8 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 		// to be a master cluster
 		fedOp = "promote"
 		promote := true
-		if membership.FedRole == api.FedRoleMaster {
+		switch membership.FedRole {
+		case api.FedRoleMaster:
 			if membership.UseProxy != rconf.UseProxy {
 				membership.UseProxy = rconf.UseProxy
 				if err := clusHelper.PutFedMembership(membership); err != nil {
@@ -1052,7 +1053,7 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 				}
 			}
 			if rconf.DeployRepoScanData != nil && fedSettings.DeployRepoScanData != *rconf.DeployRepoScanData {
-				var cfg share.CLUSFedSettings = share.CLUSFedSettings{DeployRepoScanData: *rconf.DeployRepoScanData}
+				var cfg = share.CLUSFedSettings{DeployRepoScanData: *rconf.DeployRepoScanData}
 				if err := clusHelper.PutFedSettings(nil, cfg); err != nil {
 					return "", err
 				}
@@ -1092,7 +1093,7 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 			}
 			_fixedJoinToken = rconf.JoinToken
 			_allowSameK8sUidRejoin = rconf.AllowSameK8sUidRejoin
-		} else if membership.FedRole == api.FedRoleJoint {
+		case api.FedRoleJoint:
 			// change from joint role to master role. leave original fed and then promote as master cluster
 			reqData := api.RESTFedLeaveReq{Force: true}
 			masterCluster := api.RESTFedMasterClusterInfo{
@@ -1143,13 +1144,14 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 		// to be a managed cluster
 		fedOp = "join"
 		join := true
-		if membership.FedRole == api.FedRoleMaster {
+		switch membership.FedRole {
+		case api.FedRoleMaster:
 			// change from master role to joint role. demote from master cluster and then join another fed
 			login.domainRoles[access.AccessDomainGlobal] = api.UserRoleFedAdmin
 			if _, _, _, err = demoteFromMaster(nil, access.NewFedAdminAccessControl(), &login); err == nil {
 				waitForFedRoleChange(api.FedRoleNone)
 			}
-		} else if membership.FedRole == api.FedRoleJoint {
+		case api.FedRoleJoint:
 			if membership.MasterCluster.RestInfo != rconf.PrimaryRestInfo || membership.JointCluster.RestInfo != *rconf.ManagedRestInfo {
 				reqData := api.RESTFedLeaveReq{Force: true}
 				masterCluster := api.RESTFedMasterClusterInfo{

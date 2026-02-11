@@ -100,7 +100,7 @@ func handlerWorkloadBrief(w http.ResponseWriter, r *http.Request, ps httprouter.
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
+		var data = make([]interface{}, len(cached))
 		for i, d := range cached {
 			data[i] = d
 		}
@@ -289,7 +289,7 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
+		var data = make([]interface{}, len(cached))
 		for i, d := range cached {
 			data[i] = d
 		}

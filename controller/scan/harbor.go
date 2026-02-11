@@ -126,7 +126,7 @@ func (h *harbor) getAllRepositories() ([]HarborApiRepository, error) {
 }
 
 func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int, error) {
-	rawUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/repositories")
+	rawUrl, err := url.JoinPath(h.regURL, "api/v2.0/repositories")
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not join repository request url: %w", err)
 	}
@@ -142,7 +142,7 @@ func (h *harbor) getPageOfRepositories(pageNum int) ([]HarborApiRepository, int,
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not make request object: %w", err)
 	}
-	req.SetBasicAuth(h.base.username, h.base.password)
+	req.SetBasicAuth(h.username, h.password)
 	req.Header.Add("accept", "application/json")
 	resp, err := h.rc.Client.DoWithRetry(req, 3)
 	if err != nil {
@@ -194,7 +194,7 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 	// the harbor api requires the repo name (which tends to contain a slash) to be url encoded twice
 	// example: a/b -> a%2Fb -> a%252Fb
 	encodedRepoName := url.PathEscape(url.PathEscape(repository.repoName()))
-	reqUrl, err := url.JoinPath(h.base.regURL, "api/v2.0/projects", projectName, "repositories", encodedRepoName, "artifacts")
+	reqUrl, err := url.JoinPath(h.regURL, "api/v2.0/projects", projectName, "repositories", encodedRepoName, "artifacts")
 	if err != nil {
 		return nil, fmt.Errorf("could not generate artifact request url: %w", err)
 	}
@@ -203,7 +203,7 @@ func (h *harbor) getTagsForRepository(repository HarborApiRepository) ([]string,
 		return nil, fmt.Errorf("could not make request object: %w", err)
 	}
 	req.URL.RawQuery = "with_tag=true" // required to include image tags in response
-	req.SetBasicAuth(h.base.username, h.base.password)
+	req.SetBasicAuth(h.username, h.password)
 	req.Header.Add("accept", "application/json")
 	resp, err := h.rc.Client.DoWithRetry(req, 3)
 	if err != nil {

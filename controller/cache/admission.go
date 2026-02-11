@@ -274,13 +274,14 @@ func admCacheMutexRUnlock() {
 
 func selectAdminPolicyCache(admType, ruleType string) *share.CLUSAdmissionRules {
 	if admType == admission.NvAdmValidateType {
-		if ruleType == api.ValidatingDenyRuleType {
+		switch ruleType {
+		case api.ValidatingDenyRuleType:
 			return &admValidateDenyCache
-		} else if ruleType == api.ValidatingExceptRuleType {
+		case api.ValidatingExceptRuleType:
 			return &admValidateExceptCache
-		} else if ruleType == share.FedAdmCtrlExceptRulesType {
+		case share.FedAdmCtrlExceptRulesType:
 			return &admFedValidateExceptionCache
-		} else if ruleType == share.FedAdmCtrlDenyRulesType {
+		case share.FedAdmCtrlDenyRulesType:
 			return &admFedValidateDenyCache
 		}
 	}
@@ -325,9 +326,10 @@ func AdmissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 	}
 	r.CfgType = common.TCfgTypeToApi(rule.CfgType)
 	if rule.CfgType == share.FederalCfg {
-		if r.RuleType == share.FedAdmCtrlExceptRulesType {
+		switch r.RuleType {
+		case share.FedAdmCtrlExceptRulesType:
 			r.RuleType = api.ValidatingExceptRuleType
-		} else if r.RuleType == share.FedAdmCtrlDenyRulesType {
+		case share.FedAdmCtrlDenyRulesType:
 			r.RuleType = api.ValidatingDenyRuleType
 		}
 	}
@@ -1272,7 +1274,7 @@ func isImageCriterionMet(crt *share.CLUSAdmRuleCriterion, c *nvsysadmission.AdmC
 }
 
 func isModulesCriterionMet(crt *share.CLUSAdmRuleCriterion, modules []*share.ScanModule) (bool, bool) {
-	var nameVersionMap map[string][]string = make(map[string][]string)
+	var nameVersionMap = make(map[string][]string)
 	for _, module := range modules {
 		nameVersionMap[module.Name] = append(nameVersionMap[module.Name], module.Version)
 	}
@@ -1344,8 +1346,8 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 	criteria []*share.CLUSAdmRuleCriterion, rootAvail bool, ar *admissionv1beta1.AdmissionReview, ruleID uint32) (bool, string) { // return (matched, matched data source)
 	var met, positive bool
 	var matchedSource string
-	var mets map[string]bool = make(map[string]bool)
-	var poss map[string]bool = make(map[string]bool)
+	var mets = make(map[string]bool)
+	var poss = make(map[string]bool)
 	var hasCustomCriteria bool
 	var kind string
 
@@ -2633,8 +2635,8 @@ func formatRiskyRoleCriteriaMsg(critValue string) string {
 func isStorageClassNameCriterionMet(crt *share.CLUSAdmRuleCriterion, namespace string, c *nvsysadmission.AdmContainerInfo) (bool, bool) {
 	claimeNames := make([]string, 0)
 	for _, v := range c.Volumes {
-		if v.VolumeSource.PersistentVolumeClaim != nil {
-			claimName := v.VolumeSource.PersistentVolumeClaim.ClaimName
+		if v.PersistentVolumeClaim != nil {
+			claimName := v.PersistentVolumeClaim.ClaimName
 			claimeNames = append(claimeNames, claimName)
 		}
 	}
@@ -2735,8 +2737,8 @@ func matchK8sAdmissionRulesForPVC(admType, ruleType string, matchCfgType int, ns
 
 func isAdmissionPVCRuleMet(criteria []*share.CLUSAdmRuleCriterion, ns, name, scName string) bool {
 	var met, positive bool
-	var mets map[string]bool = make(map[string]bool)
-	var poss map[string]bool = make(map[string]bool)
+	var mets = make(map[string]bool)
+	var poss = make(map[string]bool)
 
 	for _, crt := range criteria {
 		key := crt.Name

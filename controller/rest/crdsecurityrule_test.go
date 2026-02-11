@@ -887,9 +887,10 @@ metadata: {}
 				nvClusterSecurityRules := 0
 				expectedGroupCfgsNumber := []int{3, 1}
 				for _, r := range secRules {
-					if r.Kind == "NvSecurityRule" {
+					switch r.Kind {
+					case "NvSecurityRule":
 						nvSecurityRules++
-					} else if r.Kind == "NvClusterSecurityRule" {
+					case "NvClusterSecurityRule":
 						nvClusterSecurityRules++
 					}
 				}

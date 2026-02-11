@@ -305,18 +305,19 @@ func FedPollingClient(leader, purgeFedRulesOnJoint bool) {
 		atomic.StoreUint32(&_isLeader, 0)
 	}
 	if m := clusHelper.GetFedMembership(); m != nil {
-		if m.FedRole == api.FedRoleMaster {
+		switch m.FedRole {
+		case api.FedRoleMaster:
 			_fedPollingTimer.Stop()
 			if leader {
 				go pingJointClusters()
 			}
-		} else if m.FedRole == api.FedRoleJoint {
+		case api.FedRoleJoint:
 			_fedPingTimer.Stop()
 			if purgeFedRulesOnJoint {
 				purgeFedRules()
 			}
 			pollFedRules(false, 1)
-		} else {
+		default:
 			_fedPingTimer.Stop()
 			_fedPollingTimer.Stop()
 		}
@@ -573,7 +574,7 @@ func sendRestRequest(idTarget string, method, urlStr, token, cntType, jointTicke
 
 func sendRestReqInternal(nvHttpClient *tNvHttpClient, idTarget, method, urlStr, token, cntType, jointTicket, jointID string,
 	proxyOption int8, cookie *http.Cookie, body []byte, logError bool) ([]byte, int, error) {
-	var httpClient *http.Client = nvHttpClient.insecureHttpClient
+	var httpClient = nvHttpClient.insecureHttpClient
 	var req *http.Request
 	var gzipped bool
 	var err error
@@ -813,7 +814,7 @@ func sendReqToJointCluster(rc share.CLUSRestServerInfo, clusterID, token, method
 func sendReqToJointClusterInternal(nvHttpClient *tNvHttpClient, method, urlStr, token, contentType, tag, txnID string,
 	proxyOption int8, body []byte, gzipped, forward, remoteExport, logError bool) (map[string]string, int, []byte, error) {
 
-	var httpClient *http.Client = nvHttpClient.insecureHttpClient
+	var httpClient = nvHttpClient.insecureHttpClient
 
 	req, err := http.NewRequest(method, urlStr, bytes.NewBuffer(body))
 	if err != nil {
@@ -881,9 +882,10 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 
 	var remoteRolePermits share.CLUSRemoteRolePermits
 	if user.RemoteRolePermits == nil {
-		if user.Role == api.UserRoleFedAdmin {
+		switch user.Role {
+		case api.UserRoleFedAdmin:
 			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleAdmin}
-		} else if user.Role == api.UserRoleFedReader {
+		case api.UserRoleFedReader:
 			remoteRolePermits.DomainRole = map[string]string{access.AccessDomainGlobal: api.UserRoleReader}
 		}
 		/* fed access for namespaces is not supported yet
@@ -1014,9 +1016,10 @@ func informFedDismissed(joinedCluster share.CLUSFedJointClusterInfo, bodyTo []by
 
 func revertMappedFedRoles(groupRoleMappings []*share.GroupRoleMapping) {
 	for _, groupRoleMapping := range groupRoleMappings {
-		if groupRoleMapping.GlobalRole == api.UserRoleFedAdmin {
+		switch groupRoleMapping.GlobalRole {
+		case api.UserRoleFedAdmin:
 			groupRoleMapping.GlobalRole = api.UserRoleAdmin
-		} else if groupRoleMapping.GlobalRole == api.UserRoleFedReader {
+		case api.UserRoleFedReader:
 			groupRoleMapping.GlobalRole = api.UserRoleReader
 		}
 		if groupRoleMapping.RoleDomains != nil {
@@ -1386,9 +1389,10 @@ func pingJointClusters() bool {
 						updateClusterState(deployResult.id, "", _fedClusterDisconnected, nil, acc)
 					}
 				} else {
-					if state == _fedMasterUpgradeRequired {
+					switch state {
+					case _fedMasterUpgradeRequired:
 						state = _fedJointVersionTooNew
-					} else if state == _fedSuccess {
+					case _fedSuccess:
 						if old := cacher.GetFedJoinedClusterStatus(deployResult.id, acc); old.Status == _fedClusterDisconnected {
 							state = _fedClusterConnected
 						}
@@ -1595,8 +1599,8 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 	var useProxy string
 	var msg string
 	var membership share.CLUSFedMembership
-	var status int = http.StatusInternalServerError
-	var code int = api.RESTErrFedOperationFailed
+	var status = http.StatusInternalServerError
+	var code = api.RESTErrFedOperationFailed
 
 	cacheRestInfo, cacheUseProxy := cacher.GetFedLocalRestInfo(acc)
 	if reqData.MasterRestInfo != nil {
@@ -1882,7 +1886,7 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 	if duration <= 0 { // in minute
 		duration = 60
 	}
-	var jwtFedJoinTokenLife time.Duration = time.Minute * time.Duration(duration)
+	var jwtFedJoinTokenLife = time.Minute * time.Duration(duration)
 	resp := api.RESTFedJoinToken{JoinToken: base64.StdEncoding.EncodeToString(jwtGenFedJoinToken(&masterCluster, jwtFedJoinTokenLife))}
 	if resp.JoinToken == "" {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrRemoteUnauthorized,
@@ -1904,8 +1908,8 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 	var joinToken joinToken
 	var msgProxy string
 	var membership share.CLUSFedMembership
-	var status int = http.StatusInternalServerError
-	var code int = api.RESTErrFedOperationFailed
+	var status = http.StatusInternalServerError
+	var code = api.RESTErrFedOperationFailed
 
 	fedRestInfo, fedUseProxy := cacher.GetFedLocalRestInfo(acc)
 	if req.JointRestInfo != nil {
@@ -2064,9 +2068,10 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 		var restErr api.RESTError
 		if json.Unmarshal(data, &restErr) == nil {
 			code := restErr.Code
-			if restErr.Code == _fedMasterUpgradeRequired {
+			switch restErr.Code {
+			case _fedMasterUpgradeRequired:
 				code = api.RESTErrMasterUpgradeRequired
-			} else if restErr.Code == _fedJointUpgradeRequired {
+			case _fedJointUpgradeRequired:
 				code = api.RESTErrJointUpgradeRequired
 			}
 			return membership, statusCode, code, errors.New(restErrMessage[code])
@@ -2124,8 +2129,8 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSession, req api.RESTFedLeaveReq,
 	masterCluster api.RESTFedMasterClusterInfo, jointCluster api.RESTFedJointClusterInfo) (share.CLUSFedMembership, int, int, error) {
 
-	var code int = api.RESTErrFedOperationFailed
-	var httpStatus int = http.StatusInternalServerError
+	var code = api.RESTErrFedOperationFailed
+	var httpStatus = http.StatusInternalServerError
 	var membership share.CLUSFedMembership
 
 	if masterCluster.ID == "" || jointCluster.ID == "" {
@@ -2898,7 +2903,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		var respData []byte
 		var statusCode int
 		var proxyUsed bool
-		var err error = common.ErrObjectAccessDenied
+		var err = common.ErrObjectAccessDenied
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/poll_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		for i := 0; i < tryTimes; i++ {
 			if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
@@ -2975,9 +2980,10 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 					log.WithFields(log.Fields{"err": err, "msg": respErr, "proxyUsed": proxyUsed}).Error("Request failed")
 				}
 			}
-			if statusCode == http.StatusGone {
+			switch statusCode {
+			case http.StatusGone:
 				updateClusterState(jointCluster.ID, "", _fedClusterKicked, nil, accReadAll)
-			} else if statusCode == http.StatusNotFound {
+			case http.StatusNotFound:
 				var restErr api.RESTError
 				if json.Unmarshal(respData, &restErr) == nil {
 					if restErr.Code == api.RESTErrLicenseFail {
@@ -3137,7 +3143,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	var respData []byte
 	var statusCode int
 	var proxyUsed bool
-	var err error = common.ErrObjectAccessDenied
+	var err = common.ErrObjectAccessDenied
 	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/scan_data_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 	for i := 0; i < tryTimes; i++ {
 		if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
@@ -3682,7 +3688,8 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 			}
 
 			// for export-related APIs thru remote console, we don't override the response header or they cannot be exported successfully
-			if method == http.MethodGet {
+			switch method {
+			case http.MethodGet:
 				if i := strings.Index(r.URL.String(), "/v1/file/config"); i > len("/v1/file/config") {
 					remoteExport = true
 				} else if request == "/v1/file/group" {
@@ -3694,7 +3701,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 						}
 					}
 				}
-			} else if method == http.MethodPatch {
+			case http.MethodPatch:
 				if i := strings.Index(r.URL.String(), "/v1/system/config"); i > 0 {
 					var rconf api.RESTSystemConfigConfigData
 					if err := json.Unmarshal(body, &rconf); err == nil {
@@ -3707,7 +3714,7 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 						}
 					}
 				}
-			} else if method == http.MethodPost {
+			case http.MethodPost:
 				exportURIs := utils.NewSetFromStringSlice([]string{
 					"/v1/file/group",
 					"/v1/file/admission",

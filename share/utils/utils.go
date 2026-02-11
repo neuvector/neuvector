@@ -114,7 +114,7 @@ func ResolveAddrList(addr string, skipLoopback bool) ([]string, bool) {
 			if skipLoopback && ips[i].IsLoopback() {
 				continue
 			}
-			var dup bool = false
+			var dup = false
 			for _, exist := range ipList {
 				if exist == ips[i].String() {
 					dup = true
@@ -151,7 +151,7 @@ func GzipBytes(buf []byte) []byte {
 }
 
 func GetGuid() (string, error) {
-	return strings.Replace(uuid.NewString(), "-", "", -1), nil
+	return strings.ReplaceAll(uuid.NewString(), "-", ""), nil
 }
 
 func GetTimeUUID(t time.Time) string {
@@ -309,7 +309,7 @@ func NewEnvironParser(envs []string) *EnvironParser {
 					tokens := strings.Split(v, ";")
 					for _, t := range tokens {
 						t = strings.TrimSpace(t)
-						t = strings.Replace(t, "*", ".*", -1)
+						t = strings.ReplaceAll(t, "*", ".*")
 						if r, err := regexp.Compile(fmt.Sprintf("^%s$", t)); err != nil {
 							log.WithFields(log.Fields{"value": v}).Error("Failed to parse system group")
 						} else {
@@ -765,10 +765,11 @@ func MergeSubnet(subnets map[string]share.CLUSSubnet, snet share.CLUSSubnet) boo
 		// such as 172.16.60.0/24, 172.16.14.0/24; and flannel IP has a bigger subnets,
 		// 172.16.0.0/16. Here, we check if new subnet and existing subnets containers each other.
 		if inc, v := SubnetContains(&sn.Subnet, &snet.Subnet); inc {
-			if v == 1 {
+			switch v {
+			case 1:
 				// existing subnet is bigger, ignore new one
 				return false
-			} else if v == -1 {
+			case -1:
 				// new subnet is bigger, remove the existing one
 				delete(subnets, key)
 			}
@@ -785,10 +786,11 @@ func MergeSpecialSubnet(subnets map[string]share.CLUSSpecSubnet, snet share.CLUS
 		// such as 172.16.60.0/24, 172.16.14.0/24; and flannel IP has a bigger subnets,
 		// 172.16.0.0/16. Here, we check if new subnet and existing subnets containers each other.
 		if inc, v := SubnetContains(&sn.Subnet, &snet.Subnet); inc {
-			if v == 1 {
+			switch v {
+			case 1:
 				// existing subnet is bigger, ignore new one
 				return false
-			} else if v == -1 {
+			case -1:
 				// new subnet is bigger, remove the existing one
 				delete(subnets, key)
 			}
@@ -872,7 +874,7 @@ func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	// Skip 2, 0: callers(), 1: GetCaller, 2: LogFormatter()
 	fn := GetCaller(3, []string{"logrus"})
 
-	var keys []string = make([]string, 0, len(entry.Data))
+	var keys = make([]string, 0, len(entry.Data))
 	for k := range entry.Data {
 		keys = append(keys, k)
 	}
@@ -1381,7 +1383,7 @@ func Dns1123NameChg(name string) string {
 				name = replaceAtIndex(name, '0', i)
 			} else if !regDns1122.MatchString(string(char)) {
 				fmt.Println("char:", string(char), "failed regex")
-				name = strings.Replace(name, string(char), "-", -1)
+				name = strings.ReplaceAll(name, string(char), "-")
 			}
 		}
 	}
@@ -1391,7 +1393,7 @@ func Dns1123NameChg(name string) string {
 func RandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz"
 
-	var seededRand *mathrand.Rand = mathrand.New(
+	var seededRand = mathrand.New(
 		mathrand.NewSource(time.Now().UnixNano()))
 
 	b := make([]byte, length)

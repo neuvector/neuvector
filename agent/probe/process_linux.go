@@ -320,10 +320,7 @@ func (p *Probe) netlinkProcWorker() {
 	go func() {
 		var ok bool
 		var event *netlinkProcEvent
-		for {
-			if !p.pidNetlink {
-				break
-			}
+		for p.pidNetlink {
 
 			if event, ok = <-procEventQueue; ok {
 				p.netLinkHandler(event)

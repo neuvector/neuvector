@@ -1426,7 +1426,7 @@ func TestPolicyRuleReplaceTime(t *testing.T) {
 			if nrule.CreatedAt != createdAt {
 				t.Errorf("Replace policy rules positive: rule1 created time should not be changed. %+v", nrule)
 			}
-			if nrule.LastModAt == lastModAt {
+			if nrule.LastModAt.Equal(lastModAt) {
 				t.Errorf("Replace policy rules positive: rule1 last modify time should be updated. %+v", nrule)
 			}
 		}

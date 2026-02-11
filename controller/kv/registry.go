@@ -86,10 +86,7 @@ func deleteRegistryDir(name string) error {
 }
 
 func restoreToCluster(reg, fedRole string) string {
-	isFedReg := false
-	if strings.HasPrefix(reg, api.FederalGroupPrefix) {
-		isFedReg = true
-	}
+	isFedReg := strings.HasPrefix(reg, api.FederalGroupPrefix)
 
 	var restored int // # of restored image scan results
 	var scanNotFinished int

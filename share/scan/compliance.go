@@ -2952,19 +2952,19 @@ func updateComplianceMetasFromMap(metas *[]api.RESTBenchMeta, metaMap map[string
 	for id, item := range metaMapV2 {
 		*metasV2 = append(*metasV2, item)
 		var tags []string
-		for compliance := range item.RESTBenchCheck.TagsV2 {
+		for compliance := range item.TagsV2 {
 			tags = append(tags, compliance)
 		}
 		benchMeta = api.RESTBenchMeta{
 			RESTBenchCheck: api.RESTBenchCheck{
-				TestNum:     item.RESTBenchCheck.TestNum,
-				Type:        item.RESTBenchCheck.Type,
-				Category:    item.RESTBenchCheck.Category,
-				Scored:      item.RESTBenchCheck.Scored,
-				Profile:     item.RESTBenchCheck.Profile,
-				Automated:   item.RESTBenchCheck.Automated,
-				Description: item.RESTBenchCheck.Description,
-				Remediation: item.RESTBenchCheck.Remediation,
+				TestNum:     item.TestNum,
+				Type:        item.Type,
+				Category:    item.Category,
+				Scored:      item.Scored,
+				Profile:     item.Profile,
+				Automated:   item.Automated,
+				Description: item.Description,
+				Remediation: item.Remediation,
 				Tags:        tags,
 			},
 		}

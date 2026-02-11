@@ -290,7 +290,7 @@ func TestFilterTwoFiltersNeg(t *testing.T) {
 
 func TestSortStrAsc(t *testing.T) {
 	stars := []*Star{&sun, &sirius, &gliese}
-	var data []interface{} = make([]interface{}, len(stars))
+	var data = make([]interface{}, len(stars))
 	for i, d := range stars {
 		data[i] = d
 	}
@@ -308,7 +308,7 @@ func TestSortStrAsc(t *testing.T) {
 
 func TestSortInt32Desc(t *testing.T) {
 	stars := []*Star{&sun, &sirius, &gliese}
-	var data []interface{} = make([]interface{}, len(stars))
+	var data = make([]interface{}, len(stars))
 	for i, d := range stars {
 		data[i] = d
 	}
@@ -326,7 +326,7 @@ func TestSortInt32Desc(t *testing.T) {
 
 func TestSortFloatAsc(t *testing.T) {
 	stars := []*Star{&sun, &sirius, &gliese}
-	var data []interface{} = make([]interface{}, len(stars))
+	var data = make([]interface{}, len(stars))
 	for i, d := range stars {
 		data[i] = d
 	}
@@ -344,7 +344,7 @@ func TestSortFloatAsc(t *testing.T) {
 
 func TestSortBoolDesc(t *testing.T) {
 	stars := []*Star{&sun, &sirius, &gliese}
-	var data []interface{} = make([]interface{}, len(stars))
+	var data = make([]interface{}, len(stars))
 	for i, d := range stars {
 		data[i] = d
 	}
@@ -364,7 +364,7 @@ func TestSortArrayNotSupport(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 
 	stars := []*Star{&sun, &sirius, &gliese}
-	var data []interface{} = make([]interface{}, len(stars))
+	var data = make([]interface{}, len(stars))
 	for i, d := range stars {
 		data[i] = d
 	}
@@ -386,7 +386,7 @@ func TestSortFieldNotExist(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 
 	stars := []*Star{&sun, &sirius, &gliese}
-	var data []interface{} = make([]interface{}, len(stars))
+	var data = make([]interface{}, len(stars))
 	for i, d := range stars {
 		data[i] = d
 	}

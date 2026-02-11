@@ -73,7 +73,7 @@ func handlerActivityList(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	acts := cacher.GetActivities(acc)
 
-	var data []interface{} = make([]interface{}, len(acts))
+	var data = make([]interface{}, len(acts))
 	for i, d := range acts {
 		data[i] = d
 	}
@@ -106,7 +106,7 @@ func handlerEventList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	events := cacher.GetEvents(login.fullname, acc)
 
-	var data []interface{} = make([]interface{}, len(events))
+	var data = make([]interface{}, len(events))
 	for i, d := range events {
 		data[i] = d
 	}
@@ -166,7 +166,7 @@ func getThreatList(query *restQuery, acc *access.AccessControl) []*api.Threat {
 
 	threats := cacher.GetThreats(acc)
 
-	var data []interface{} = make([]interface{}, len(threats))
+	var data = make([]interface{}, len(threats))
 	for i, d := range threats {
 		// Not to send packet for threat list
 		t := *d
@@ -227,7 +227,7 @@ func getViolationList(query *restQuery, acc *access.AccessControl) []*api.Violat
 
 	violations := cacher.GetViolations(acc)
 
-	var data []interface{} = make([]interface{}, len(violations))
+	var data = make([]interface{}, len(violations))
 	for i, d := range violations {
 		data[i] = d
 	}
@@ -263,7 +263,7 @@ func getIncidentList(query *restQuery, acc *access.AccessControl) []*api.Inciden
 
 	incidents := cacher.GetIncidents(acc)
 
-	var data []interface{} = make([]interface{}, len(incidents))
+	var data = make([]interface{}, len(incidents))
 	for i, d := range incidents {
 		data[i] = d
 	}
@@ -310,7 +310,7 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	var client bool = false
+	var client = false
 	if len(query.sorts) != 1 {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -353,13 +353,13 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	// Convert struct slice to interface slice
-	var data []interface{} = make([]interface{}, len(violationMap))
+	var data = make([]interface{}, len(violationMap))
 	var i uint = 0
 	for _, d := range violationMap {
 		data[i] = d
 		i++
 	}
-	var asc bool = query.sorts[0].asc
+	var asc = query.sorts[0].asc
 
 	sortField := []restFieldSort{{tag: "count", asc: asc}}
 	restNewSorter(data, sortField).Sort()
@@ -408,7 +408,7 @@ func handlerAuditList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	audits := cacher.GetAudits(acc)
 
-	var data []interface{} = make([]interface{}, len(audits))
+	var data = make([]interface{}, len(audits))
 	for i, d := range audits {
 		data[i] = d
 	}

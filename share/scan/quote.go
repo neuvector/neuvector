@@ -117,7 +117,7 @@ func unquote(in string, unescape bool) (out, rem string, err error) {
 		}
 
 		// Verify that the string ends with a terminating quote.
-		if !(len(in) > 0 && in[0] == quote) {
+		if len(in) <= 0 || in[0] != quote {
 			return "", in0, strconv.ErrSyntax
 		}
 		in = in[1:] // skip terminating quote

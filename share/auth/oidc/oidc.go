@@ -259,10 +259,11 @@ func GetAzureGroupInfo(ctx context.Context, allClaims map[string]interface{}, to
 		return nil, fmt.Errorf("failed to parse group url: %w", err)
 	}
 
-	if urlParsed.Host == oidcGraphWindowsNet {
+	switch urlParsed.Host {
+	case oidcGraphWindowsNet:
 		urlParsed.Host = oidcGraphMicrosoftCom
 		urlParsed.Path = "/v1.0" + urlParsed.Path
-	} else if urlParsed.Host == oidcGraphMicrosoftAzureUs {
+	case oidcGraphMicrosoftAzureUs:
 		urlParsed.Host = oidcGraphMicrosoftUs
 		urlParsed.Path = "/v1.0" + urlParsed.Path
 	}

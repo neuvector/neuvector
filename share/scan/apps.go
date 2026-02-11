@@ -162,13 +162,13 @@ func (s *ScanApps) marshal() []byte {
 		// write by 64-entry chunk, so we don't hit the scanner limit when reading it
 		for len(pkg) > 64 {
 			if b, err := json.Marshal(pkg[:64]); err == nil {
-				buf.WriteString(fmt.Sprintf("%s\n", string(b)))
+				fmt.Fprintf(buf, "%s\n", string(b))
 			}
 			pkg = pkg[64:]
 		}
 		if len(pkg) > 0 {
 			if b, err := json.Marshal(pkg); err == nil {
-				buf.WriteString(fmt.Sprintf("%s\n", string(b)))
+				fmt.Fprintf(buf, "%s\n", string(b))
 			}
 		}
 	}
@@ -419,9 +419,10 @@ func parseJarManifestFile(path string, rc io.Reader) (*AppPackage, error) {
 	}
 
 	// NVSHAS-9942
-	if title == "org.elasticsearch#server" {
+	switch title {
+	case "org.elasticsearch#server":
 		title = "elasticsearch"
-	} else if title == "Spring Boot" {
+	case "Spring Boot":
 		title = "spring-boot"
 	}
 

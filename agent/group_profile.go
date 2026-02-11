@@ -540,8 +540,8 @@ func mergeFileMonitorProfile(filters []share.CLUSFileMonitorFilter) []share.CLUS
 		m[key] = ff
 	}
 
-	var list []share.CLUSFileMonitorFilter = make([]share.CLUSFileMonitorFilter, 0, len(m)) // single allocation
-	for _, item := range m {                                                                // map enumeration
+	var list = make([]share.CLUSFileMonitorFilter, 0, len(m)) // single allocation
+	for _, item := range m {                                  // map enumeration
 		list = append(list, item)
 	}
 
@@ -566,8 +566,8 @@ func mergeStringSlices(bSort bool, s1, s2 []string) []string {
 		m[key] = true
 	}
 
-	var list []string = make([]string, 0, len(m)) // single allocation
-	for v := range m {                            // map enumeration                                                              // map enumeration
+	var list = make([]string, 0, len(m)) // single allocation
+	for v := range m {                   // map enumeration                                                              // map enumeration
 		list = append(list, v)
 	}
 

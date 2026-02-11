@@ -194,14 +194,15 @@ func fileAccessRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, val
 func (m CacheMethod) GetAllFileMonitorProfile(scope string, acc *access.AccessControl, predefined bool) []*api.RESTFileMonitorProfile {
 	var getLocal, getFed bool
 	var localGrpsCount, fedGrpsCount int
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getFed = true
 		getLocal = true
-	} else {
+	default:
 		return nil
 	}
 

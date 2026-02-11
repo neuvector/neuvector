@@ -300,7 +300,7 @@ func main() {
 		}
 	}
 	if debug && *debug_level != "" {
-		var validLevelSet utils.Set = utils.NewSet("conn", "mutex", "scan", "cluster", "k8s_monitor")
+		var validLevelSet = utils.NewSet("conn", "mutex", "scan", "cluster", "k8s_monitor")
 		splitLevels := strings.Split(*debug_level, " ")
 		var validLevels []string
 		for _, level := range splitLevels {
@@ -715,7 +715,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var dekSeedEvent share.TLogEvent = share.CLUSEvDEKSeedUnavailable
+	var dekSeedEvent = share.CLUSEvDEKSeedUnavailable
 	var dekSeedEventMsg string
 	if platform == share.PlatformKubernetes {
 		var err error
@@ -1141,7 +1141,7 @@ func main() {
 		memSnapshotMark := ctrlEnv.memoryLimit * 3 / 5             // 60% as starting point
 		memStatsControllerResetMark := ctrlEnv.memoryLimit * 3 / 4 // 75% as starting point
 		if ctrlEnv.autoProfieCapture > 1 {
-			var mark uint64 = (uint64)(ctrlEnv.autoProfieCapture * 1024 * 1024) // into mega bytes
+			var mark = (uint64)(ctrlEnv.autoProfieCapture * 1024 * 1024) // into mega bytes
 			memSnapshotMark = mark * 3 / 5
 			ctrlEnv.snapshotMemStep = mark / 10
 		}

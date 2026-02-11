@@ -327,7 +327,7 @@ func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprout
 	cached := cacher.GetAllWorkloadsBrief("", acc)
 
 	// remove duplicate results for the same image
-	var imageMap map[string]*api.RESTScanImageSummary = make(map[string]*api.RESTScanImageSummary)
+	var imageMap = make(map[string]*api.RESTScanImageSummary)
 	for _, wl := range cached {
 		if wl.ScanSummary == nil || wl.ScanSummary.Status != api.ScanStatusFinished {
 			continue
@@ -354,15 +354,15 @@ func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprout
 	var result []*api.RESTScanImageSummary
 	if len(imageMap) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(imageMap))
-		var i int = 0
+		var data = make([]interface{}, len(imageMap))
+		var i = 0
 		for _, d := range imageMap {
 			data[i] = d
 			i++
 		}
 
-		var hasSeverity bool = false
-		var asc bool = false
+		var hasSeverity = false
+		var asc = false
 		for i, s := range query.sorts {
 			if s.tag == "severity" {
 				query.sorts[i].tag = "high"
@@ -386,7 +386,7 @@ func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprout
 			result[i] = d.(*api.RESTScanImageSummary)
 		}
 	} else {
-		var i int = 0
+		var i = 0
 		result = make([]*api.RESTScanImageSummary, len(imageMap))
 		for _, d := range imageMap {
 			result[i] = d

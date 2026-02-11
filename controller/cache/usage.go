@@ -86,9 +86,10 @@ func getUsageReport() *share.CLUSSystemUsageReport {
 		}
 	}
 	for _, cache := range groupCacheMap {
-		if cache.group.PolicyMode == share.PolicyModeEvaluate {
+		switch cache.group.PolicyMode {
+		case share.PolicyModeEvaluate:
 			r.MonitorGroups++
-		} else if cache.group.PolicyMode == share.PolicyModeEnforce {
+		case share.PolicyModeEnforce:
 			r.ProtectGroups++
 		}
 	}

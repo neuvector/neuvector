@@ -66,7 +66,7 @@ func InitStubRtDriver(sys *system.SystemTools) (Runtime, error) {
 		podname = strings.TrimSpace(string(dat))
 		if dat, err = os.ReadFile("/etc/hosts"); err == nil {
 			for _, line := range strings.Split(strings.Trim(string(dat), " \t\r\n"), "\n") {
-				line = strings.Replace(strings.Trim(line, " \t"), "\t", " ", -1)
+				line = strings.ReplaceAll(strings.Trim(line, " \t"), "\t", " ")
 				if len(line) == 0 || line[0] == ';' || line[0] == '#' {
 					continue
 				}

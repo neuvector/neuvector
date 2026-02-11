@@ -299,13 +299,14 @@ func CreateQuerySession(qsr *api.QuerySessionRequest) error {
 	}
 
 	// create query session
-	if qsr.Type == 0 {
+	switch qsr.Type {
+	case 0:
 		err = _createVulQuerySession(qsr)
 		if err != nil {
 			log.WithFields(log.Fields{"qsr": qsr, "err": err}).Error("_createVulQuerySession() error")
 			return err
 		}
-	} else if qsr.Type == 1 {
+	case 1:
 		// asset pagination
 		err = _createAssetQuerySession(qsr)
 		if err != nil {
@@ -463,11 +464,12 @@ func getCVEDistribution(vulAssets []*db.DbVulAsset) (*api.VulAssetCountDist, int
 		}
 		nMatchedRecordCount++
 
-		if r.Severity == "High" {
+		switch r.Severity {
+		case "High":
 			dist.High++
-		} else if r.Severity == "Medium" {
+		case "Medium":
 			dist.Medium++
-		} else {
+		default:
 			dist.Low++
 		}
 

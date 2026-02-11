@@ -2042,7 +2042,7 @@ func CheckCrdSchema(leader, init, crossCheck bool, cspType share.TCspType) []str
 
 		if crdInfo.RscType == resource.RscTypeCrdNvCspUsage {
 			clusHelper := kv.GetClusterHelper()
-			var fedRole string = api.FedRoleNone
+			var fedRole = api.FedRoleNone
 			var masterClusterID string
 			if m := clusHelper.GetFedMembership(); m != nil {
 				fedRole = m.FedRole

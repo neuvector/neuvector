@@ -10,7 +10,7 @@ func NewTransactArgs(database string, operations ...Operation) []interface{} {
 	var dbSlice = make([]interface{}, 1)
 	dbSlice[0] = database
 
-	var opsSlice []interface{} = make([]interface{}, len(operations))
+	var opsSlice = make([]interface{}, len(operations))
 	for i, d := range operations {
 		opsSlice[i] = d
 	}

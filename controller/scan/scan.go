@@ -72,19 +72,20 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 			continue
 		}
 
-		if v.Severity == share.VulnSeverityCritical {
+		switch v.Severity {
+		case share.VulnSeverityCritical:
 			criticals = append(criticals, v.Name)
 			if v.FixedVersion != "" {
 				criticalWithFix++
 			}
-		} else if v.Severity == share.VulnSeverityHigh {
+		case share.VulnSeverityHigh:
 			highs = append(highs, v.Name)
 			if v.FixedVersion != "" {
 				highWithFix++
 			}
-		} else if v.Severity == share.VulnSeverityMedium {
+		case share.VulnSeverityMedium:
 			meds = append(meds, v.Name)
-		} else {
+		default:
 			others++
 		}
 		scoreTemp += int(10 * v.Score)
@@ -125,13 +126,14 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 		if v.ScoreV3 > v.Score {
 			score = v.ScoreV3
 		}
-		if v.Severity == share.VulnSeverityCritical {
+		switch v.Severity {
+		case share.VulnSeverityCritical:
 			targetMap = criticalVulPublishDate
-		} else if v.Severity == share.VulnSeverityHigh {
+		case share.VulnSeverityHigh:
 			targetMap = highVulPublishDate
-		} else if v.Severity == share.VulnSeverityMedium {
+		case share.VulnSeverityMedium:
 			targetMap = mediumVulPublishDate
-		} else {
+		default:
 			low = true
 		}
 		if targetMap != nil {
@@ -395,7 +397,7 @@ func GetProxy(registry string) string {
 		noProxyHosts := strings.Split(noProxy, ",")
 		for _, noProxyHost := range noProxyHosts {
 			if noProxyHost != "" {
-				noProxyHost = strings.Replace(noProxyHost, "*", ".*", -1)
+				noProxyHost = strings.ReplaceAll(noProxyHost, "*", ".*")
 				if regx, err := regexp.Compile(noProxyHost); err == nil && regx.MatchString(u.Hostname()) {
 					smd.scanLog.WithFields(log.Fields{"hostname": u.Hostname(), "noProxyHost": noProxyHost}).Debug("No need proxy")
 					return ""

@@ -343,7 +343,8 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	// aws ecr
-	if rconf.Type == share.RegistryTypeAWSECR {
+	switch rconf.Type {
+	case share.RegistryTypeAWSECR:
 		if rconf.AwsKey == nil {
 			log.Error("Missing AWS key")
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Missing AWS keys")
@@ -380,7 +381,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		config.Username = auth.Username
 		config.Password = auth.Password
 		log.WithFields(log.Fields{"URL": config.Registry}).Debug("AWS registry")
-	} else if rconf.Type == share.RegistryTypeGCR {
+	case share.RegistryTypeGCR:
 		if rconf.GcrKey == nil {
 			log.Error("No GCR json key provided")
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "No GCR json key provided")
@@ -402,7 +403,7 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 				return
 			}
 		}
-	} else {
+	default:
 		if rconf.Registry == nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Missing registry URL")
 			return
@@ -667,7 +668,8 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		}
 
 		// aws ecr
-		if config.Type == share.RegistryTypeAWSECR {
+		switch config.Type {
+		case share.RegistryTypeAWSECR:
 			if rconf.AwsKey != nil {
 				if config.AwsKey == nil {
 					config.AwsKey = &share.CLUSAWSAccountKey{}
@@ -702,7 +704,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 				config.Password = auth.Password
 				log.WithFields(log.Fields{"URL": config.Registry}).Debug("AWS registry")
 			}
-		} else if config.Type == share.RegistryTypeGCR {
+		case share.RegistryTypeGCR:
 			if rconf.GcrKey != nil {
 				if config.GcrKey == nil {
 					config.GcrKey = &share.CLUSGCRKey{}
@@ -721,7 +723,7 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 					return
 				}
 			}
-		} else {
+		default:
 			var err error
 			if rconf.Registry != nil {
 				config.Registry, err = scanUtils.ParseRegistryURI(*rconf.Registry)

@@ -64,7 +64,7 @@ func getRouteListFiltered(family int, filter *netlink.Route, filterMask uint64) 
 				}
 				aMaskLen, aMaskBits := route.Dst.Mask.Size()
 				bMaskLen, bMaskBits := filter.Dst.Mask.Size()
-				if !(route.Dst.IP.Equal(filter.Dst.IP) && aMaskLen == bMaskLen && aMaskBits == bMaskBits) {
+				if !route.Dst.IP.Equal(filter.Dst.IP) || aMaskLen != bMaskLen || aMaskBits != bMaskBits {
 					continue
 				}
 			}

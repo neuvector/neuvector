@@ -7,8 +7,8 @@ import (
 )
 
 func calculateCPU(prevCPU, prevCPUSystem uint64, cpu, cpuSystem uint64) float64 {
-	var cDelta float64 = float64(cpu - prevCPU)
-	var sDelta float64 = float64(cpuSystem - prevCPUSystem)
+	var cDelta = float64(cpu - prevCPU)
+	var sDelta = float64(cpuSystem - prevCPUSystem)
 
 	if sDelta > 0.0 {
 		if cDelta > sDelta {

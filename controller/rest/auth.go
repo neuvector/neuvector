@@ -482,7 +482,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 	var err error
 	var statusCode int
 	var proxyUsed bool
-	var rancherUser tRancherUser = tRancherUser{
+	var rancherUser = tRancherUser{
 		domainRoles:       make(map[string]string),
 		domainPermissions: make(map[string]share.NvFedPermissions),
 	}
@@ -494,7 +494,7 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 	urlStr := fmt.Sprintf("%s/v3/users?me=true", cfg.RancherEP)
 	data, statusCode, proxyUsed, err = sendRestRequest("rancher", http.MethodGet, urlStr, "", "", "", "", cookie, []byte{}, true, nil, acc)
 	if err == nil {
-		var domainPermissions map[string]share.NvFedPermissions = make(map[string]share.NvFedPermissions)
+		var domainPermissions = make(map[string]share.NvFedPermissions)
 		var rancherUsers api.UserCollection
 		if err = json.Unmarshal(data, &rancherUsers); err == nil {
 			idx := -1
@@ -548,9 +548,10 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 								// collect mapped roles for each domain
 								for d, r := range pripDomainRoles {
 									if fedRole != api.FedRoleMaster || d != access.AccessDomainGlobal {
-										if r == api.UserRoleFedAdmin {
+										switch r {
+										case api.UserRoleFedAdmin:
 											r = api.UserRoleAdmin
-										} else if r == api.UserRoleFedReader {
+										case api.UserRoleFedReader:
 											r = api.UserRoleReader
 										}
 									} else if r == api.UserRoleAdmin && rancherUser.name == common.DefaultAdminUser {
@@ -1321,7 +1322,8 @@ func reloadJointPubPrivKey(callerFedRole, clusterID string) {
 	var data []byte
 
 	log.WithFields(log.Fields{"clusterID": clusterID, "callerFedRole": callerFedRole}).Info()
-	if callerFedRole == api.FedRoleJoint {
+	switch callerFedRole {
+	case api.FedRoleJoint:
 		// meaning joint cluster wants to reload its public key
 		m := clusHelper.GetFedMembership()
 		if m != nil && m.FedRole == api.FedRoleJoint {
@@ -1332,7 +1334,7 @@ func reloadJointPubPrivKey(callerFedRole, clusterID string) {
 				}
 			}
 		}
-	} else if callerFedRole == api.FedRoleMaster {
+	case api.FedRoleMaster:
 		// meaning master cluster wants to reload a joint cluster's private key
 		if jointCluster := clusHelper.GetFedJointCluster(clusterID); jointCluster != nil {
 			if data, err = base64.StdEncoding.DecodeString(jointCluster.ClientKey); err == nil {
@@ -1489,13 +1491,13 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	if r, ok := domainRoles[access.AccessDomainGlobal]; ok && (r == api.UserRoleIBMSA || r == api.UserRoleImportStatus) && len(domainRoles) == 1 {
 		if r == api.UserRoleIBMSA {
 			c.Timeout = uint32(30 * 60) // jwtIbmSaTokenLife, 30 minutes
-			c.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(jwtIbmSaTokenLife))
+			c.ExpiresAt = jwt.NewNumericDate(now.Add(jwtIbmSaTokenLife))
 		} else {
 			c.Timeout = uint32(10 * 60) // jwtImportStatusTokenLife, 10 minutes
-			c.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(jwtImportStatusTokenLife))
+			c.ExpiresAt = jwt.NewNumericDate(now.Add(jwtImportStatusTokenLife))
 		}
 	}
-	c.RegisteredClaims.IssuedAt = jwt.NewNumericDate(now.Add(_halfHourBefore)) // so that token won't be invalidated among controllers because of system time diff & iat
+	c.IssuedAt = jwt.NewNumericDate(now.Add(_halfHourBefore)) // so that token won't be invalidated among controllers because of system time diff & iat
 
 	// Validate token
 	jwtCert := GetJWTSigningKey()
@@ -1836,9 +1838,10 @@ func rbac2UserRole(rbacDomainRole map[string]string, rbacDomainPermits map[strin
 		// now calculate for remote cluster access
 		if fedRole == api.FedRoleMaster {
 			var rAdjusted string
-			if role == api.UserRoleFedAdmin {
+			switch role {
+			case api.UserRoleFedAdmin:
 				rAdjusted = api.UserRoleAdmin
-			} else if role == api.UserRoleFedReader {
+			case api.UserRoleFedReader:
 				rAdjusted = api.UserRoleReader
 			}
 			if rAdjusted != api.UserRoleNone {
@@ -2435,7 +2438,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 		if user == nil {
 			code := api.RESTErrUnauthorized
-			var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
+			var ev = share.CLUSEvAuthLoginFailed
 			var msg string
 			if localAuthResult.userFound {
 				if errLocalAuth != nil {
@@ -2720,14 +2723,15 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		username := data.Password.Username
 
 		log.WithFields(log.Fields{"server": server}).Debug()
-		if server == api.AuthServerLocal {
+		switch server {
+		case api.AuthServerLocal:
 			user, localAuthResult, err = localPasswordAuth(data.Password, accReadAll)
 			if user != nil && err == nil {
 				localAuthed = true
 			}
-		} else if server == api.AuthServerPlatform {
+		case api.AuthServerPlatform:
 			user, err = platformPasswordAuth(data.Password)
-		} else {
+		default:
 			cs, _, _ := clusHelper.GetServerRev(server, accReadAll)
 			if cs == nil {
 				e := "Server not found"
@@ -2745,7 +2749,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, localAuthResult.newPwdError, localAuthResult.pwdProfileBasic)
 			} else {
 				code := api.RESTErrUnauthorized
-				var ev share.TLogEvent = share.CLUSEvAuthLoginFailed
+				var ev = share.CLUSEvAuthLoginFailed
 				var msg string
 				if localAuthResult.userFound {
 					msg = err.Error()

@@ -460,9 +460,10 @@ func adjustNvRolePermits(rbacRoleName, nvRole string, nvPermits share.NvPermissi
 	if nvRole == api.UserRoleAdmin && (nvPermits.WriteValue&share.PERM_FED != 0) {
 		nvRole = api.UserRoleFedAdmin
 	}
-	if nvRole == api.UserRoleFedAdmin {
+	switch nvRole {
+	case api.UserRoleFedAdmin:
 		nvPermits = share.NvPermissions{}
-	} else if nvRole == api.UserRoleAdmin {
+	case api.UserRoleAdmin:
 		// It's possible to have local admin role + fed read permissions
 		nvPermits.ReadValue &= share.PERMS_FED_READ
 		nvPermits.WriteValue = 0
@@ -540,9 +541,10 @@ func k8s2NVRolePermits(k8sFlavor, rbacRoleName string, rscs, readVerbs, writeVer
 		// So we treat every non-GlobalRole k8s clusterrole the same in this function (i.e. federation resource is not ignored in this function).
 		// The actual user role/permission will be adjusted in rbacEvaluateUser() by leveraging k8s (cluster)rolebinding to know it's Project/Nameapce Role or not
 		if strings.HasPrefix(rbacRoleName, globalRolePrefix) {
-			if nvRole == api.UserRoleAdmin {
+			switch nvRole {
+			case api.UserRoleAdmin:
 				nvRole = api.UserRoleFedAdmin
-			} else if nvRole == api.UserRoleReader {
+			case api.UserRoleReader:
 				nvRole = api.UserRoleFedReader
 			}
 		}
@@ -627,11 +629,11 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 		}
 	}
 	if len(ag2r2v) > 0 {
-		var nvRole string                                 // deduced nv reserved role
-		var nvPermits share.NvPermissions                 // deduced nv permissions
-		var rscsMap map[string]utils.Set = ocAdminRscsMap // apiGroup -> set of resources
-		var readVerbs utils.Set = ocReaderVerbs
-		var writeVerbs utils.Set = ocAdminVerbs // users who has these verbs on specified resources are nv admin
+		var nvRole string                 // deduced nv reserved role
+		var nvPermits share.NvPermissions // deduced nv permissions
+		var rscsMap = ocAdminRscsMap      // apiGroup -> set of resources
+		var readVerbs = ocReaderVerbs
+		var writeVerbs = ocAdminVerbs // users who has these verbs on specified resources are nv admin
 		if k8sFlavor == share.FlavorRancher {
 			rscsMap = nvRscMapSSO
 			readVerbs = nvReadVerbSSO
@@ -651,17 +653,19 @@ func deduceRoleRules(k8sFlavor, rbacRoleName, rbacRoleDomain string, objs interf
 							nvRole = api.UserRoleFedAdmin
 							nvPermits.Reset()
 						case api.UserRoleFedReader:
-							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
+							switch nvRole {
+							case api.UserRoleReader, api.UserRoleNone:
 								nvRole = api.UserRoleFedReader
-							} else if nvRole == api.UserRoleAdmin {
+							case api.UserRoleAdmin:
 								// This Rancher role maps to admin & fedReader roles.
 								// Take admin role as nvRole and move PERMS_FED_READ to nvPermits.ReadValue
 								nvPermits.ReadValue = share.PERMS_FED_READ
 							}
 						case api.UserRoleAdmin:
-							if nvRole == api.UserRoleReader || nvRole == api.UserRoleNone {
+							switch nvRole {
+							case api.UserRoleReader, api.UserRoleNone:
 								nvRole = api.UserRoleAdmin
-							} else if nvRole == api.UserRoleFedReader {
+							case api.UserRoleFedReader:
 								// This Rancher role maps to admin & fedReader roles.
 								// Take admin role as nvRole and PERMS_FED_READ to nvPermits.ReadValue
 								nvRole = api.UserRoleAdmin
@@ -1379,7 +1383,7 @@ func (d *kubernetes) cbResourceRoleBinding(rt string, event string, res interfac
 func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainPermits map[string]share.NvFedPermissions, fedRole string) (
 	map[string]string, map[string]share.NvFedPermissions) {
 
-	var domainRole map[string]string = make(map[string]string)
+	var domainRole = make(map[string]string)
 
 	for d, nvRoles := range allDomainRoles {
 		if d != access.AccessDomainGlobal || fedRole != api.FedRoleMaster {
@@ -1437,9 +1441,10 @@ func RemoveRedundant(allDomainRoles map[string]share.NvReservedUserRole, domainP
 	for d, r := range domainRole {
 		if d != access.AccessDomainGlobal {
 			rAdjusted := r
-			if r == api.UserRoleFedAdmin {
+			switch r {
+			case api.UserRoleFedAdmin:
 				rAdjusted = api.UserRoleAdmin
-			} else if r == api.UserRoleFedReader {
+			case api.UserRoleFedReader:
 				rAdjusted = api.UserRoleReader
 			}
 			if ((nvGlobalRole == api.UserRoleFedReader || nvGlobalRole == api.UserRoleReader) && (rAdjusted == api.UserRoleReader)) ||
@@ -1541,7 +1546,7 @@ func (d *kubernetes) rbacEvaluateUser(user k8sSubjectObjRef) {
 	} else {
 		// found an entry in userCache for this user
 		var permitFed uint32 = share.PERM_FED
-		var noPermitFed uint32 = ^permitFed
+		var noPermitFed = ^permitFed
 		var domainRole map[string]string
 		fedRole := api.FedRoleMaster // always assume it's on fed master now
 		allDomainRoles := make(map[string]share.NvReservedUserRole)
@@ -1701,7 +1706,7 @@ func (d *kubernetes) ListUsers() []orchAPI.UserRBAC {
 
 	for userRef, rbac := range d.rbacCache {
 		// rbac is replaced as a whole -> no need to clone
-		var domainRole map[string]string = map[string]string{}
+		var domainRole = map[string]string{}
 		for d, r := range rbac {
 			if r != api.UserRoleNone {
 				domainRole[d] = r

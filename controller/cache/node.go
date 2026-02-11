@@ -28,7 +28,7 @@ func agentStopEventHandler(ev *share.CLUSEventLog) {
 	// respond to agent stop event explicitly (instead of waiting for consul
 	// detection) so that agent record can be removed quickly. Check the time
 	// to avoid responding to past event for multi-controller case
-	var notify bool = false
+	var notify = false
 	cacheMutexRLock()
 	if cache, ok := agentCacheMap[ev.AgentID]; ok {
 		if ev.ReportedAt.After(cache.agent.JoinedAt) {
@@ -512,7 +512,7 @@ func AgentAdmissionRequest(req *share.CLUSAdmissionRequest) *share.CLUSAdmission
 	}).Info("Receive connect request")
 
 	var ac *agentCache
-	var allowConnect bool = true
+	var allowConnect = true
 	var onlineEnforcers int
 	var disallowMsg string
 	cacheMutexLock()

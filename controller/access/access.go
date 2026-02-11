@@ -577,7 +577,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 	// 2. collect all top-level permissions from roleDomains/extraPermitsDomains for domains
 	allDomains := make(map[string]interface{})
 	// 2-1. get all roles for each domain
-	var domainRoles map[string][]string = make(map[string][]string)
+	var domainRoles = make(map[string][]string)
 	for role, domains := range roleDomains {
 		if role == api.UserRoleNone {
 			continue
@@ -592,7 +592,7 @@ func GetUserPermissions(role string, roleDomains map[string][]string, extraPermi
 	}
 
 	// 2-2. get all extra permissions for each domain
-	var domainPermits map[string][]share.NvPermissions = make(map[string][]share.NvPermissions)
+	var domainPermits = make(map[string][]share.NvPermissions)
 	for _, permitsDomains := range extraPermitsDomains {
 		if permitsDomains.Permits.IsEmpty() || len(permitsDomains.Domains) == 0 {
 			continue
@@ -1539,11 +1539,12 @@ func (acc *AccessControl) isDomainRoleAllowedToAccess(role, domain string, readP
 		readPermits |= acc.boostPermissions
 		writePermits |= acc.boostPermissions
 	}
-	if acc.op == AccessOPRead {
+	switch acc.op {
+	case AccessOPRead:
 		if (readPermitsRequired != 0 || accNotFromCaller) && (readPermitsRequired == (readPermits & readPermitsRequired)) {
 			return true
 		}
-	} else if acc.op == AccessOPWrite {
+	case AccessOPWrite:
 		if (writePermitsRequired != 0 || accNotFromCaller) && (writePermitsRequired == (writePermits & writePermitsRequired)) {
 			return true
 		}
@@ -1560,11 +1561,12 @@ func (acc *AccessControl) isDomainPermAllowedToAccess(perms share.NvPermissions,
 		readPermits |= acc.boostPermissions
 		writePermits |= acc.boostPermissions
 	}
-	if acc.op == AccessOPRead {
+	switch acc.op {
+	case AccessOPRead:
 		if (readPermitsRequired != 0 || accNotFromCaller) && (readPermitsRequired == (readPermits & readPermitsRequired)) {
 			return true
 		}
-	} else if acc.op == AccessOPWrite {
+	case AccessOPWrite:
 		if (writePermitsRequired != 0 || accNotFromCaller) && (writePermitsRequired == (writePermits & writePermitsRequired)) {
 			return true
 		}
@@ -1582,10 +1584,7 @@ func (acc *AccessControl) isDomainPermAllowedToAccess(perms share.NvPermissions,
 // See TestWildcardDomainAccess*() & TestWildcardOwnAccess*() in access_test.go about the examples
 func (acc *AccessControl) isOneAccessAllowed(domain string, readPermitsRequired, writePermitsRequired uint32) bool {
 	// domain argument may contain wildcard character
-	accNotFromCaller := false
-	if acc.apiCategoryID == CONST_API_SKIP {
-		accNotFromCaller = true
-	}
+	accNotFromCaller := acc.apiCategoryID == CONST_API_SKIP
 
 	// eg. return []string{AccessAllAsReader}, nil
 	if domain == share.AccessAllAsReader {
@@ -1596,11 +1595,12 @@ func (acc *AccessControl) isOneAccessAllowed(domain string, readPermitsRequired,
 			writePermits |= acc.boostPermissions
 			if d == AccessDomainGlobal {
 				// Global user follow role/permission definition
-				if acc.op == AccessOPRead {
+				switch acc.op {
+				case AccessOPRead:
 					if (readPermitsRequired != 0 || accNotFromCaller) && (readPermitsRequired == (readPermits & readPermitsRequired)) {
 						return true
 					}
-				} else if acc.op == AccessOPWrite {
+				case AccessOPWrite:
 					if (writePermitsRequired != 0 || accNotFromCaller) && (writePermitsRequired == (writePermits & writePermitsRequired)) {
 						return true
 					}

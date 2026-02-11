@@ -759,14 +759,15 @@ func (m *scanMethod) GetRegistrySummary(name string, acc *access.AccessControl) 
 func (m *scanMethod) GetAllRegistrySummary(scope string, acc *access.AccessControl) []*api.RESTRegistrySummary {
 	var getLocal, getFed bool
 
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 

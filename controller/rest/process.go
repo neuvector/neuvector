@@ -118,7 +118,7 @@ func handlerProcessProfileList(w http.ResponseWriter, r *http.Request, ps httpro
 	for _, cached := range allCached {
 		if len(cached) > 1 && len(query.sorts) > 0 {
 			// Convert struct slice to interface slice
-			var data []interface{} = make([]interface{}, len(cached))
+			var data = make([]interface{}, len(cached))
 			for i, d := range cached {
 				data[i] = d
 			}

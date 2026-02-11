@@ -138,8 +138,8 @@ func VerifyK8sNs(admCtrlEnabled bool, nsName string, nsLabels map[string]string)
 		nsLabels = make(map[string]string)
 	}
 
-	var shouldExist bool = true
-	var shouldNotExist bool = false
+	var shouldExist = true
+	var shouldNotExist = false
 
 	labelKeys := map[string]*bool{ // map key is label key, map value means the label key should exist in k8s ns resource object's metadata or not
 		resource.NsSelectorKeySkipNV:   &shouldNotExist,
@@ -321,10 +321,10 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 				config.Webhooks[idx].Rules[j] = &resource.K8sAdmRegRuleWithOperations{
 					Operations: convertOperationsToStrings(rops.Operations),
 					Rule: &resource.K8sAdmRegRule{
-						ApiGroups:   rops.Rule.APIGroups,
-						ApiVersions: rops.Rule.APIVersions,
-						Resources:   rops.Rule.Resources,
-						Scope:       (*string)(rops.Rule.Scope),
+						ApiGroups:   rops.APIGroups,
+						ApiVersions: rops.APIVersions,
+						Resources:   rops.Resources,
+						Scope:       (*string)(rops.Scope),
 					},
 				}
 			}
@@ -362,10 +362,10 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 				config.Webhooks[idx].Rules[j] = &resource.K8sAdmRegRuleWithOperations{
 					Operations: convertOperationsToStrings(rops.Operations),
 					Rule: &resource.K8sAdmRegRule{
-						ApiGroups:   rops.Rule.APIGroups,
-						ApiVersions: rops.Rule.APIVersions,
-						Resources:   rops.Rule.Resources,
-						Scope:       (*string)(rops.Rule.Scope),
+						ApiGroups:   rops.APIGroups,
+						ApiVersions: rops.APIVersions,
+						Resources:   rops.Resources,
+						Scope:       (*string)(rops.Scope),
 					},
 				}
 			}
@@ -393,7 +393,7 @@ func isK8sConfiguredAsExpected(k8sResInfo *ValidatingWebhookConfigInfo) (bool, b
 				if (!clientInUrlMode && clientCfg.Service != nil) || (clientInUrlMode && clientCfg.Url != nil) {
 					// ClientConfig has the same mode as what should be for neuvector-svc-admission-webhook's type
 					// SideEffects is supported starting from K8s 1.12. In admissionregistration/v1, sideEffects must be None or NoneOnDryRun
-					var sideEffects string = resource.SideEffectNone
+					var sideEffects = resource.SideEffectNone
 					if k8sResInfo.Name == resource.NvCrdValidatingName {
 						if k8sVersionMajor == 1 && k8sVersionMinor >= 22 {
 							sideEffects = resource.SideEffectNoneOnDryRun
@@ -470,7 +470,8 @@ func convertOperationsV1B1(operations utils.Set) []admregv1b1.OperationType {
 func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *ValidatingWebhookConfigInfo) error {
 	var err error
 	k8sVersionMajor, k8sVersionMinor := resource.GetK8sVersion()
-	if op == K8sResOpDelete {
+	switch op {
+	case K8sResOpDelete:
 		// delete resource when admission control is configured in k8s & we are asked to disable admission control
 		if k8sVersionMajor == 1 && k8sVersionMinor >= 22 {
 			res := &admregv1.ValidatingWebhookConfiguration{
@@ -487,7 +488,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 			}
 			err = global.ORCH.DeleteResource(resource.RscTypeValidatingWebhookConfiguration, res)
 		}
-	} else if (op == K8sResOpCreate) || (op == K8sResOpUpdate) {
+	case K8sResOpCreate, K8sResOpUpdate:
 		v1b1b2ApiVersions := []string{resource.K8sApiVersionV1, resource.K8sApiVersionV1Beta1, resource.K8sApiVersionV1Beta2}
 		if k8sVersionMajor == 1 && k8sVersionMinor >= 22 {
 			// https://kubernetes.io/docs/reference/using-api/deprecation-guide/
@@ -502,7 +503,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 					return errors.New("empty caBundle")
 				}
 				var nvOpResources []*resource.NvAdmRegRuleSetting
-				var sideEffects string = resource.SideEffectNone
+				var sideEffects = resource.SideEffectNone
 				var nsSelectorKey, nsSelectorOp, failurePolicy string
 
 				switch whInfo.Name {
@@ -545,7 +546,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 							Scope:       (*admregv1.ScopeType)(&opRes.Scope), // Scope is supported starting from K8s 1.14
 						},
 					}
-					sort.Strings(ro.Rule.Resources)
+					sort.Strings(ro.Resources)
 					webhooks[i].Rules = append(webhooks[i].Rules, ro)
 				}
 				// NamespaceSelector is supported starting from K8s 1.14
@@ -576,10 +577,11 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 				},
 				Webhooks: webhooks,
 			}
-			if op == K8sResOpCreate {
+			switch op {
+			case K8sResOpCreate:
 				// add resource when admission control is not configured in k8s  & we are asked to enable admission control
 				err = global.ORCH.AddResource(resource.RscTypeValidatingWebhookConfiguration, res)
-			} else if op == K8sResOpUpdate {
+			case K8sResOpUpdate:
 				// update resource when admission control is configured in k8s with different setting & admission control is enabled in NV
 				res.ResourceVersion = resVersion
 				err = global.ORCH.UpdateResource(resource.RscTypeValidatingWebhookConfiguration, res)
@@ -593,7 +595,7 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 					return errors.New("empty caBundle")
 				}
 				var nvOpResources []*resource.NvAdmRegRuleSetting
-				var sideEffects string = resource.SideEffectNone
+				var sideEffects = resource.SideEffectNone
 				var nsSelectorKey, nsSelectorOp, failurePolicy string
 
 				switch whInfo.Name {
@@ -631,10 +633,10 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 							Resources:   opRes.Resources.ToStringSlice(),
 						},
 					}
-					sort.Strings(ro.Rule.Resources)
+					sort.Strings(ro.Resources)
 					if IsNsSelectorSupported() {
 						// Scope is supported starting from K8s 1.14
-						ro.Rule.Scope = (*admregv1b1.ScopeType)(&opRes.Scope)
+						ro.Scope = (*admregv1b1.ScopeType)(&opRes.Scope)
 					}
 					webhooks[i].Rules = append(webhooks[i].Rules, ro)
 				}
@@ -674,16 +676,17 @@ func configK8sAdmCtrlValidateResource(op, resVersion string, k8sResInfo *Validat
 				},
 				Webhooks: webhooks,
 			}
-			if op == K8sResOpCreate {
+			switch op {
+			case K8sResOpCreate:
 				// add resource when admission control is not configured in k8s  & we are asked to enable admission control
 				err = global.ORCH.AddResource(resource.RscTypeValidatingWebhookConfiguration, res)
-			} else if op == K8sResOpUpdate {
+			case K8sResOpUpdate:
 				// update resource when admission control is configured in k8s with different setting & admission control is enabled in NV
 				res.ResourceVersion = resVersion
 				err = global.ORCH.UpdateResource(resource.RscTypeValidatingWebhookConfiguration, res)
 			}
 		}
-	} else {
+	default:
 		err = errors.New("unsupported k8s resource operation")
 	}
 

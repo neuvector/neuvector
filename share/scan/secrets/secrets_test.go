@@ -18,18 +18,18 @@ func TestSampleFiles(t *testing.T) {
 	// path, _ := filepath.Abs("/etc")
 
 	/////
-	var myFileSpec []FileType = []FileType{
+	var myFileSpec = []FileType{
 		{Description: "test files", Expression: `(.*?)(yaml|key|txt)`},
 	}
 
 	////
-	var myRules []Rule = []Rule{
+	var myRules = []Rule{
 		{Description: "AWS.Manager.ID", Expression: `(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}`, Tags: []string{"key", "AWs"}},
 	}
 
 	_, _ = myRules, myFileSpec
 	////// default
-	var config Config = Config{
+	var config = Config{
 		//	RuleList:   DefaultRules, // myRules, DefaultSecretRules
 		Whitelist:  myFileSpec, // myFileSpec, DefaultSecretFileType
 		MiniWeight: 0.0001,     // Some other texts can dilute the weight result, so it is better to stay at a smaller weight

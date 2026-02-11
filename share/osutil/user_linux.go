@@ -65,7 +65,7 @@ func CheckUidAuthority(user string, pid int) (bool, error) {
 
 // get the non-privileged user uid start value
 func getUserStartUid(pid int) int {
-	var uidStart int = UserUidMin
+	var uidStart = UserUidMin
 	dat, err := global.SYS.ReadContainerFile("/etc/login.defs", pid, 0, 0)
 	if err != nil {
 		//log.WithFields(log.Fields{"err": err, "pid": pid}).Debug("Get login.defs fail")
@@ -75,7 +75,7 @@ func getUserStartUid(pid int) int {
 	scanner := bufio.NewScanner(strings.NewReader(string(dat)))
 	for scanner.Scan() {
 		line := scanner.Text()
-		line = strings.Replace(line, "\t", " ", -1)
+		line = strings.ReplaceAll(line, "\t", " ")
 		fields := strings.Split(line, " ")
 		if len(fields) > 1 && strings.HasPrefix(fields[0], "UID_MIN") {
 			for _, field := range fields[1:] {

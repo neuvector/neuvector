@@ -60,7 +60,7 @@ func GetGlobalAddrs() map[string]NetIface {
 
 		for _, addr := range addrs {
 			// Don't check addr.flags, such as PERMANENT, interface flags on vagrant VM maybe different
-			if addr.Scope == syscall.RT_SCOPE_UNIVERSE || (addr.Scope == syscall.RT_SCOPE_LINK && utils.IsIPv4(addr.IPNet.IP)) {
+			if addr.Scope == syscall.RT_SCOPE_UNIVERSE || (addr.Scope == syscall.RT_SCOPE_LINK && utils.IsIPv4(addr.IP)) {
 				iface.Addrs = append(iface.Addrs, NetAddr{IPNet: *addr.IPNet, Scope: addr.Scope})
 				//log.WithFields(log.Fields{"link": attrs.Name, "ip": addr.IP}).Debug("Add")
 			}

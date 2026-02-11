@@ -39,7 +39,7 @@ func getDebugIP2Workload(hostID string, query *restQuery) ([]*api.RESTDebugIP2Wo
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
+		var data = make([]interface{}, len(cached))
 		for i, d := range cached {
 			data[i] = d
 		}
@@ -449,7 +449,7 @@ func handlerProbeProcessMap(w http.ResponseWriter, r *http.Request, ps httproute
 		restRespError(w, http.StatusInternalServerError, api.RESTErrClusterRPCError)
 		return
 	}
-	var data []interface{} = make([]interface{}, len(procs))
+	var data = make([]interface{}, len(procs))
 	for i, d := range procs {
 		data[i] = d
 	}

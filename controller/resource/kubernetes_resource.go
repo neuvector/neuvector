@@ -1053,7 +1053,7 @@ func xlateStatefulSet(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCronJob(obj metav1.Object) (string, interface{}) {
-	var r *CronJob = &CronJob{
+	var r = &CronJob{
 		UID:    string(obj.GetUID()),
 		Name:   obj.GetName(),
 		Domain: obj.GetNamespace(),
@@ -1337,7 +1337,7 @@ exit_watcher:
 						continue
 					}
 					newLastModTime := info.ModTime()
-					if newLastModTime == d.lastTokenModTime {
+					if newLastModTime.Equal(d.lastTokenModTime) {
 						continue
 					}
 					d.lastTokenModTime = newLastModTime
@@ -2303,13 +2303,14 @@ func getNeuvectorSvcAccount() {
 		var sa string
 		obj, err := global.ORCH.GetResource(rt, NvAdmSvcNamespace, objName)
 		if err != nil {
-			if objName == "neuvector-registry-adapter-pod" {
+			switch objName {
+			case "neuvector-registry-adapter-pod":
 				// registry_adapter is not deployed. do not include its sa in the rbac checking/alert
 				regAdapterSubjectWanted = ""
-			} else if objName == "neuvector-scanner-pod" {
+			case "neuvector-scanner-pod":
 				// scanner is not deployed. do not include its sa in the rbac checking/alert
 				scannerSubjectWanted = ""
-			} else if objName == "neuvector-enforcer-pod" {
+			case "neuvector-enforcer-pod":
 				// enforcer is not deployed. do not include its sa in the rbac checking/alert
 				enforcerSubjectWanted = ""
 			}
@@ -2450,12 +2451,12 @@ func RetrieveBootstrapPassword() (string, error) {
 		obj, err := global.ORCH.GetResource(RscTypeDeployment, NvAdmSvcNamespace, "neuvector-controller-pod")
 		if err == nil {
 			if deployObj, ok := obj.(*appsv1.Deployment); ok {
-				objSecret.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+				objSecret.OwnerReferences = []metav1.OwnerReference{
 					{
 						APIVersion: "apps/v1",
 						Kind:       "Deployment",
-						Name:       deployObj.ObjectMeta.Name,
-						UID:        deployObj.ObjectMeta.UID,
+						Name:       deployObj.Name,
+						UID:        deployObj.UID,
 					},
 				}
 			}

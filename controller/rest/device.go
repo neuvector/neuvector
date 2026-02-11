@@ -44,7 +44,7 @@ func handlerControllerList(w http.ResponseWriter, r *http.Request, ps httprouter
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
+		var data = make([]interface{}, len(cached))
 		for i, d := range cached {
 			data[i] = d
 		}
@@ -150,7 +150,7 @@ func handlerAgentList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
+		var data = make([]interface{}, len(cached))
 		for i, d := range cached {
 			data[i] = d
 		}
@@ -422,11 +422,10 @@ func handlerControllerConfig(w http.ResponseWriter, r *http.Request, ps httprout
 
 		if rconf.Config.LogLevel != nil {
 			cconf.LogLevel = *rconf.Config.LogLevel
-			if cconf.LogLevel == share.LogLevel_Error ||
-				cconf.LogLevel == share.LogLevel_Warn ||
-				cconf.LogLevel == share.LogLevel_Info {
+			switch cconf.LogLevel {
+			case share.LogLevel_Error, share.LogLevel_Warn, share.LogLevel_Info:
 				cconf.Debug = nil
-			} else if cconf.LogLevel == share.LogLevel_Debug {
+			case share.LogLevel_Debug:
 				if cconf.Debug == nil {
 					cconf.Debug = make([]string, 0)
 					cconf.Debug = append(cconf.Debug, "cpath")
@@ -546,11 +545,10 @@ func handlerAgentConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 		if rconf.Config.LogLevel != nil {
 			cconf.LogLevel = *rconf.Config.LogLevel
-			if cconf.LogLevel == share.LogLevel_Error ||
-				cconf.LogLevel == share.LogLevel_Warn ||
-				cconf.LogLevel == share.LogLevel_Info {
+			switch cconf.LogLevel {
+			case share.LogLevel_Error, share.LogLevel_Warn, share.LogLevel_Info:
 				cconf.Debug = nil
-			} else if cconf.LogLevel == share.LogLevel_Debug {
+			case share.LogLevel_Debug:
 				if cconf.Debug == nil {
 					cconf.Debug = make([]string, 0)
 					cconf.Debug = append(cconf.Debug, "cpath")

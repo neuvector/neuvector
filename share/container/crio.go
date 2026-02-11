@@ -63,11 +63,11 @@ func getPauseImageRepoDigests(sys *system.SystemTools) (string, error) {
 		scanner := bufio.NewScanner(strings.NewReader(string(dat)))
 		for scanner.Scan() {
 			// removing whitespaces, tabs and quote
-			line := strings.Replace(scanner.Text(), " ", "", -1)
-			line = strings.Replace(line, "\t", "", -1)
+			line := strings.ReplaceAll(scanner.Text(), " ", "")
+			line = strings.ReplaceAll(line, "\t", "")
 			// log.WithFields(log.Fields{"line": line}).Debug("CRIO:")
 			if strings.HasPrefix(line, "pause_image=") {
-				line = strings.Replace(line, "\"", "", -1)
+				line = strings.ReplaceAll(line, "\"", "")
 				return line[len("pause_image="):], nil
 			}
 		}

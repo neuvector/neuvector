@@ -266,11 +266,11 @@ func wafProcessGroup(group *share.CLUSWafGroup) {
 
 func assocWafWl2PolicyIds(grp string, senset utils.Set, outside_wl2sensor map[string]map[string]string,
 	wl2policies, outside_wl2policies map[string]utils.Set) {
-	var inside_grps utils.Set = utils.NewSet()
-	var outside_grps utils.Set = utils.NewSet()
-	var inside_ruleids utils.Set = utils.NewSet()
-	var outside_ruleids utils.Set = utils.NewSet()
-	var out2ingrp map[string]map[string]string = make(map[string]map[string]string)
+	var inside_grps = utils.NewSet()
+	var outside_grps = utils.NewSet()
+	var inside_ruleids = utils.NewSet()
+	var outside_ruleids = utils.NewSet()
+	var out2ingrp = make(map[string]map[string]string)
 
 	if grpcache, ok := groupCacheMap[grp]; ok {
 		for _, m := range grpcache.members.ToSlice() {
@@ -607,14 +607,14 @@ func printDefaultWafRules(cgdrs *share.CLUSWorkloadDlpRules) {
 func calculateGroupWafRulesFromCache() share.CLUSWorkloadDlpRules {
 	log.Debug("")
 
-	var wl2sensors map[string]map[string]string = make(map[string]map[string]string)
-	var outside_wl2sensors map[string]map[string]string = make(map[string]map[string]string)
-	var wl2policies map[string]utils.Set = make(map[string]utils.Set)
-	var outside_wl2policies map[string]utils.Set = make(map[string]utils.Set)
-	var dsensors utils.Set = utils.NewSet()
-	var wl2rules map[string]map[string]string = make(map[string]map[string]string)
-	var outside_wl2rules map[string]map[string]string = make(map[string]map[string]string)
-	var wafrulemap map[string][]*share.CLUSWafRule = make(map[string][]*share.CLUSWafRule)
+	var wl2sensors = make(map[string]map[string]string)
+	var outside_wl2sensors = make(map[string]map[string]string)
+	var wl2policies = make(map[string]utils.Set)
+	var outside_wl2policies = make(map[string]utils.Set)
+	var dsensors = utils.NewSet()
+	var wl2rules = make(map[string]map[string]string)
+	var outside_wl2rules = make(map[string]map[string]string)
+	var wafrulemap = make(map[string][]*share.CLUSWafRule)
 
 	//associate workload to sensors and get union of all sensors
 	processWafGroupPolicy(wl2sensors, outside_wl2sensors, wl2policies, outside_wl2policies, &dsensors)
@@ -688,7 +688,7 @@ func getPreWafRuleFromDefaultSensor(entry string) []*share.CLUSWafRule {
 }
 
 func getCombinedWafSensorRuleName(rname string) string {
-	var sname string = ""
+	var sname = ""
 	if sens, ok := wafRuleSensors[rname]; ok {
 		if sens.Cardinality() > 0 { //sensor and rule are one <=> one mapping
 			sname = sens.ToStringSlice()[0]
@@ -898,14 +898,15 @@ func (m *CacheMethod) GetWafRules(acc *access.AccessControl) ([]*api.RESTWafRule
 func (m *CacheMethod) GetAllWafSensors(scope string, acc *access.AccessControl) []*api.RESTWafSensor {
 	log.Debug("")
 	var getLocal, getFed bool
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 	cacheMutexRLock()
@@ -1076,14 +1077,15 @@ func (m *CacheMethod) GetWafGroup(group string, acc *access.AccessControl) (*api
 func (m *CacheMethod) GetAllWafGroup(scope string, acc *access.AccessControl) []*api.RESTWafGroup {
 	log.Debug("")
 	var getLocal, getFed bool
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 	cacheMutexRLock()
@@ -1166,8 +1168,8 @@ func (m CacheMethod) WafSensorInGroups(sensor string) bool {
 func (m CacheMethod) GetWafRuleSensorGroupById(id uint32) (string, string, *[]string) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
-	var rname, sname string = "", ""
-	var grpname []string = make([]string, 0)
+	var rname, sname = "", ""
+	var grpname = make([]string, 0)
 	if rn, ok := wafIdRule[id]; ok {
 		rname = rn
 		if sens, ok1 := wafRuleSensors[rname]; ok1 {
@@ -1189,7 +1191,7 @@ func (m CacheMethod) GetWafRuleSensorGroupById(id uint32) (string, string, *[]st
 func (m CacheMethod) GetWafRuleNames() *[]string {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
-	var wafrulenames []string = make([]string, 0)
+	var wafrulenames = make([]string, 0)
 
 	if cdr, ok := wafSensors[share.CLUSWafDefaultSensor]; ok {
 		//user created rule

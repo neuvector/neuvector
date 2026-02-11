@@ -204,7 +204,8 @@ func ctlrMemberUpdateHandler(nType cluster.ClusterNotifyType, memberAddr string,
 		"type": cluster.ClusterNotifyName[nType], "member": memberAddr,
 	}).Info()
 
-	if nType == cluster.ClusterNotifyAdd {
+	switch nType {
+	case cluster.ClusterNotifyAdd:
 		if !ClusterConnected {
 			ClusterConnected = true
 		}
@@ -218,7 +219,7 @@ func ctlrMemberUpdateHandler(nType cluster.ClusterNotifyType, memberAddr string,
 			ctlrPutLocalInfo()
 			logController(share.CLUSEvControllerJoin, "")
 		}
-	} else if nType == cluster.ClusterNotifyDelete {
+	case cluster.ClusterNotifyDelete:
 		if Ctrler.ClusterIP == memberAddr {
 			log.Info("Left")
 

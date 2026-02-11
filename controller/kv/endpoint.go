@@ -235,7 +235,7 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 			if key == share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName) {
 				var rhs []*share.CLUSRuleHead
 				var uzb []byte
-				var tmpvalue []byte = value
+				var tmpvalue = value
 
 				//for backup case unzip rulelist before save to file
 				if !restore {

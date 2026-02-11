@@ -112,7 +112,7 @@ func (g *github) getPageOfPackagesInNamespace(namespaceType string, namespace st
 		return nil, 0, fmt.Errorf("could not make request object: %w", err)
 	}
 
-	req.SetBasicAuth(g.base.username, g.base.password)
+	req.SetBasicAuth(g.username, g.password)
 	req.Header.Add(_githubApiVersionHeaderKey, _gitHubApiVersion)
 	req.Header.Add(_githubApiAcceptHeaderName, _githubApiMediaType)
 

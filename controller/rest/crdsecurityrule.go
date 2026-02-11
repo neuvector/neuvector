@@ -1122,9 +1122,10 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 
 		var monFilters []share.CLUSFileMonitorFilter
 		var farFilters map[string]*share.CLUSFileAccessFilterRule
-		if reviewType == share.ReviewTypeCRD {
+		switch reviewType {
+		case share.ReviewTypeCRD:
 			farFilters = far.FiltersCRD
-		} else if reviewType == share.ReviewTypeImportGroup {
+		case share.ReviewTypeImportGroup:
 			monFilters = mon.Filters
 			farFilters = far.Filters
 		}
@@ -1191,10 +1192,11 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 			}
 		}
 
-		if reviewType == share.ReviewTypeCRD {
+		switch reviewType {
+		case share.ReviewTypeCRD:
 			mon.FiltersCRD = monFilters
 			far.FiltersCRD = farFilters
-		} else if reviewType == share.ReviewTypeImportGroup {
+		case share.ReviewTypeImportGroup:
 			mon.Filters = monFilters
 			far.Filters = farFilters
 		}
@@ -1219,7 +1221,7 @@ func (h *nvCrdHandler) crdHandlePolicyMode(groupName, policyMode, profileMode, b
 			return
 		}
 
-		var changed bool = false
+		var changed = false
 		if profileMode != "" {
 			if grp.ProfileMode != profileMode {
 				grp.ProfileMode = profileMode
@@ -3514,7 +3516,7 @@ func (h *nvCrdHandler) parseCurCrdVulnProfileContent(vulnProfileSecRule *resourc
 	}
 	h.mdName = vulnProfileSecRule.GetName()
 
-	var cfgType string = api.CfgTypeUserCreated
+	var cfgType = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
 		cfgType = api.CfgTypeGround
 	}
@@ -3578,7 +3580,7 @@ func (h *nvCrdHandler) parseCurCrdCompProfileContent(compProfileSecRule *resourc
 	}
 	h.mdName = compProfileSecRule.GetName()
 
-	var cfgType string = api.CfgTypeUserCreated
+	var cfgType = api.CfgTypeUserCreated
 	if reviewType == share.ReviewTypeCRD {
 		cfgType = api.CfgTypeGround
 	}
@@ -3756,7 +3758,7 @@ func (h *nvCrdHandler) crdAdmCtrlRuleRecord(crdCfgRet *resource.NvSecurityParse,
 
 	var crInfo string
 	var crWarning string
-	var subMsgs []string = make([]string, 0, 2)
+	var subMsgs = make([]string, 0, 2)
 
 	if !h.crossCheck && crdRecord.Uid != "" && crdRecord.Uid != h.crUid {
 		crWarning = fmt.Sprintf("UID in record is %s but UID in request is %s", crdRecord.Uid, h.crUid)
@@ -3935,8 +3937,8 @@ func (h *nvCrdHandler) crdSecRuleHandler(req *admissionv1beta1.AdmissionRequest,
 
 	switch req.Operation {
 	case "DELETE":
-		var ruleNs string = "default"
-		var kvCrdKind string = req.Kind.Kind
+		var ruleNs = "default"
+		var kvCrdKind = req.Kind.Kind
 
 		if kind == resource.NvSecurityRuleKind || kind == resource.NvClusterSecurityRuleKind {
 			kvCrdKind = resource.NvSecurityRuleKind
@@ -4256,7 +4258,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 			},
 		}
 		if isFedScope && tgroup.Name == api.LearnedExternal {
-			resptmp.ObjectMeta.Name = api.FedExternalGroup
+			resptmp.Name = api.FedExternalGroup
 		}
 		if rconf.UseNameReferral {
 			resptmp.Spec.Target.Selector.Comment = ""
@@ -4369,7 +4371,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				}
 				if rconf.UseNameReferral && nvGroupDefCfg.Name != "" && !isDefaultGroup(nvGroupDefCfg.Name) &&
 					!nvGrpDefSet.Contains(nvGroupDefCfg.Name) {
-					nvGrpDefItem.ObjectMeta.Name = nvGroupDefCfg.Name
+					nvGrpDefItem.Name = nvGroupDefCfg.Name
 					nvGrpDefItem.Spec.Selector.Name = nvGroupDefCfg.Name
 					nvGrpDefItem.Spec.Selector.Criteria = nvGroupDefCfg.Criteria
 					respGroupDefs.Items = append(respGroupDefs.Items, nvGrpDefItem)

@@ -144,7 +144,7 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 	log.WithFields(log.Fields{"lead": lead}).Info()
 
 	// Monitor cluster lead
-	var noLeadChan chan interface{} = make(chan interface{}, 1)
+	var noLeadChan = make(chan interface{}, 1)
 	RegisterLeadChangeWatcher(func(newLead, oldLead string) {
 		log.WithFields(log.Fields{"newLead": newLead, "oldLead": oldLead}).Info()
 		if newLead == "" {
@@ -351,7 +351,7 @@ Wait:
 type LeadChangeCallback func(string, string)
 
 func RegisterLeadChangeWatcher(fn LeadChangeCallback, lead string) {
-	var leaveChan chan string = make(chan string, 1)
+	var leaveChan = make(chan string, 1)
 
 	RegisterNodeWatcher(func(nType ClusterNotifyType, memberAddr string, member string) {
 		if nType == ClusterNotifyDelete {

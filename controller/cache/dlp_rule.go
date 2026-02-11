@@ -255,11 +255,11 @@ func dlpProcessGroup(group *share.CLUSDlpGroup) {
 
 func assocWl2PolicyIds(grp string, senset utils.Set, outside_wl2sensor map[string]map[string]string,
 	wl2policies, outside_wl2policies map[string]utils.Set) {
-	var inside_grps utils.Set = utils.NewSet()
-	var outside_grps utils.Set = utils.NewSet()
-	var inside_ruleids utils.Set = utils.NewSet()
-	var outside_ruleids utils.Set = utils.NewSet()
-	var out2ingrp map[string]map[string]string = make(map[string]map[string]string)
+	var inside_grps = utils.NewSet()
+	var outside_grps = utils.NewSet()
+	var inside_ruleids = utils.NewSet()
+	var outside_ruleids = utils.NewSet()
+	var out2ingrp = make(map[string]map[string]string)
 	if grpcache, ok := groupCacheMap[grp]; ok {
 		for _, m := range grpcache.members.ToSlice() {
 			wlid := m.(string)
@@ -620,14 +620,14 @@ func printDefaultDlpRules(cgdrs *share.CLUSWorkloadDlpRules) {
 func calculateGroupDlpRulesFromCache() share.CLUSWorkloadDlpRules {
 	log.Debug("")
 
-	var wl2sensors map[string]map[string]string = make(map[string]map[string]string)
-	var outside_wl2sensors map[string]map[string]string = make(map[string]map[string]string)
-	var wl2policies map[string]utils.Set = make(map[string]utils.Set)
-	var outside_wl2policies map[string]utils.Set = make(map[string]utils.Set)
-	var dsensors utils.Set = utils.NewSet()
-	var wl2rules map[string]map[string]string = make(map[string]map[string]string)
-	var outside_wl2rules map[string]map[string]string = make(map[string]map[string]string)
-	var dlprulemap map[string][]*share.CLUSDlpRule = make(map[string][]*share.CLUSDlpRule)
+	var wl2sensors = make(map[string]map[string]string)
+	var outside_wl2sensors = make(map[string]map[string]string)
+	var wl2policies = make(map[string]utils.Set)
+	var outside_wl2policies = make(map[string]utils.Set)
+	var dsensors = utils.NewSet()
+	var wl2rules = make(map[string]map[string]string)
+	var outside_wl2rules = make(map[string]map[string]string)
+	var dlprulemap = make(map[string][]*share.CLUSDlpRule)
 
 	//associate workload to sensors and get union of all sensors
 	processDlpGroupPolicy(wl2sensors, outside_wl2sensors, wl2policies, outside_wl2policies, &dsensors)
@@ -858,7 +858,7 @@ func getPreDlpRuleFromDefaultSensor(entry string) []*share.CLUSDlpRule {
 }
 
 func getCombinedDlpSensorRuleName(rname string) string {
-	var sname string = ""
+	var sname = ""
 	if sens, ok := dlpRuleSensors[rname]; ok {
 		if sens.Cardinality() > 0 { //sensor and rule are one <=> one mapping
 			sname = sens.ToStringSlice()[0]
@@ -1068,14 +1068,15 @@ func (m *CacheMethod) GetDlpRules(acc *access.AccessControl) ([]*api.RESTDlpRule
 func (m *CacheMethod) GetAllDlpSensors(scope string, acc *access.AccessControl) []*api.RESTDlpSensor {
 	log.Debug("")
 	var getLocal, getFed bool
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 	cacheMutexRLock()
@@ -1240,14 +1241,15 @@ func (m *CacheMethod) GetDlpGroup(group string, acc *access.AccessControl) (*api
 func (m *CacheMethod) GetAllDlpGroup(scope string, acc *access.AccessControl) []*api.RESTDlpGroup {
 	log.Debug("")
 	var getLocal, getFed bool
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 	cacheMutexRLock()
@@ -1333,8 +1335,8 @@ func (m CacheMethod) DlpSensorInGroups(sensor string) bool {
 func (m CacheMethod) GetDlpRuleSensorGroupById(id uint32) (string, string, *[]string) {
 	cacheMutexLock()
 	defer cacheMutexUnlock()
-	var rname, sname string = "", ""
-	var grpname []string = make([]string, 0)
+	var rname, sname = "", ""
+	var grpname = make([]string, 0)
 	if rn, ok := dlpIdRule[id]; ok {
 		rname = rn
 		if sens, ok1 := dlpRuleSensors[rname]; ok1 {
@@ -1356,7 +1358,7 @@ func (m CacheMethod) GetDlpRuleSensorGroupById(id uint32) (string, string, *[]st
 func (m CacheMethod) GetDlpRuleNames() *[]string {
 	cacheMutexLock()
 	defer cacheMutexUnlock()
-	var dlprulenames []string = make([]string, 0)
+	var dlprulenames = make([]string, 0)
 
 	if cdr, ok := dlpSensors[share.CLUSDlpDefaultSensor]; ok {
 		//user created rule

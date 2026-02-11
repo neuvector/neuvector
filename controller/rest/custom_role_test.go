@@ -400,8 +400,8 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 		for _, mapURIs := range adminURIs {
 			for verb, uris := range mapURIs {
 				for _, uri := range uris {
-					uriStr := strings.Replace(uri, ":", "", -1)
-					uriStr = strings.Replace(uriStr, "*", "", -1)
+					uriStr := strings.ReplaceAll(uri, ":", "")
+					uriStr = strings.ReplaceAll(uriStr, "*", "")
 					w = restCallToken(verb, uriStr, nil, token2)
 					if w.status != http.StatusForbidden {
 						t.Fatalf("Surprised to authorize successfully: user=%s, verb=%s, URI=%v, status=%+v.", dataNonAdminUsers[idx].User.Fullname, verb, uriStr, w.status)
@@ -449,7 +449,7 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 	token1 := getLoginToken(w)
 	for verb, uris := range nvURIs {
 		for _, uri := range uris {
-			uriStr := strings.Replace(uri, ":", "", -1)
+			uriStr := strings.ReplaceAll(uri, ":", "")
 			w = restCallToken(verb, uriStr, nil, token1)
 			if w.status != http.StatusForbidden {
 				t.Fatalf("Surprised to authorize successfully: user=%s, verb=%s, URI=%v.", dataUserAllConfigurableWrite.User.Fullname, verb, uriStr)
@@ -459,8 +459,8 @@ func TestRoleAllPermissionsEnabledCustomRole(t *testing.T) {
 	mockCluster.FedMembership.FedRole = "master"
 	for verb, uris := range fedURIs2 { // these APIs require fedAdmin role
 		for _, uri := range uris {
-			uriStr := strings.Replace(uri, ":", "", -1)
-			uriStr = strings.Replace(uriStr, "*", "", -1)
+			uriStr := strings.ReplaceAll(uri, ":", "")
+			uriStr = strings.ReplaceAll(uriStr, "*", "")
 			w = restCallToken(verb, uriStr, nil, token1)
 			if w.status != http.StatusForbidden {
 				t.Fatalf("Surprised to authorize successfully: user=%s, verb=%s, URI=%v, status=%+v.", dataUserAllConfigurableWrite.User.Fullname, verb, uriStr, w.status)

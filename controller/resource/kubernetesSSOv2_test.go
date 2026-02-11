@@ -19,7 +19,7 @@ func TestRBACRancherSSOv2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOv2",
@@ -639,7 +639,7 @@ func TestRBACRancherSSOFedAdminReaderV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOFedAdminReaderV2",
@@ -909,7 +909,7 @@ func TestRBACRancherSSOMixedClusterRoleV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOMixedClusterRoleV2",
@@ -1218,7 +1218,7 @@ func TestRBACRancherSSOAdminV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOAdminV2",
@@ -1354,7 +1354,7 @@ func TestRBACRancherSSOProjectRolesV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOProjectRolesV2",
@@ -1475,7 +1475,7 @@ func TestRBACRancherSSOK8sroleV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOK8sroleV2",
@@ -1736,7 +1736,7 @@ func TestConsolidateNvRolePermitsV2(t *testing.T) {
 	d := new_k8s_unittest()
 	//IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestConsolidateNvRolePermitsV2",
@@ -1953,7 +1953,7 @@ func TestRancherMultiplePrinciplesV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRancherMultiplePrinciplesV2",
@@ -2232,7 +2232,7 @@ func TestRBACRancherSSOFedPermitV2(t *testing.T) {
 	d := new_k8s_unittest()
 	IsRancherFlavor()
 
-	var rbacRancherSSO tRbacRancherSSO = tRbacRancherSSO{
+	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
 		d:        d,
 		caseName: "TestRBACRancherSSOFedPermitV2",

@@ -310,7 +310,7 @@ func main() {
 	}
 
 	if debug && *debug_level != "" {
-		var validLevelSet utils.Set = utils.NewSet("conn", "error", "ctrl", "packet", "session", "timer", "tcp", "parser", "log", "ddos", "cluster", "policy", "dlp", "monitor")
+		var validLevelSet = utils.NewSet("conn", "error", "ctrl", "packet", "session", "timer", "tcp", "parser", "log", "ddos", "cluster", "policy", "dlp", "monitor")
 		splitLevels := strings.Split(*debug_level, " ")
 		var validLevels []string
 		for _, level := range splitLevels {
@@ -607,11 +607,12 @@ func main() {
 	// messenger = cluster.NewMessenger(Host.ID, Agent.ID)
 
 	//var driver string
-	if *pipeType == "ovs" {
+	switch *pipeType {
+	case "ovs":
 		driver = pipe.PIPE_OVS
-	} else if *pipeType == "no_tc" {
+	case "no_tc":
 		driver = pipe.PIPE_CLM
-	} else {
+	default:
 		driver = pipe.PIPE_TC
 		if gInfo.ciliumCNI {
 			driver = pipe.PIPE_CLM

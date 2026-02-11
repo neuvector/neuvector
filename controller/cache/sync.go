@@ -205,7 +205,7 @@ func reqSyncGrpc(target, catgName string) (int, error) {
 	reply, err := rpc.ReqSyncStream(target, localDev.Ctrler.RPCServerPort, catgName, localDev.Ctrler.ClusterIP)
 	if err == nil {
 		log.WithFields(log.Fields{"sync": catgName}).Debug("receive sync reply")
-		var ret int = 0
+		var ret = 0
 		cbSync(catgName, reply.Data, &ret)
 		return ret, nil
 	} else {
@@ -219,7 +219,7 @@ func reqSyncGrpc(target, catgName string) (int, error) {
 	reply, err = rpc.ReqSync(target, localDev.Ctrler.RPCServerPort, catgName, localDev.Ctrler.ClusterIP)
 	if err == nil {
 		log.WithFields(log.Fields{"sync": catgName}).Debug("receive sync reply")
-		var ret int = 0
+		var ret = 0
 		cbSync(catgName, reply.Data, &ret)
 		return ret, nil
 	} else {
@@ -254,8 +254,8 @@ func ctrlSyncFromTarget(target string) int {
 		syncInProcess = false
 	}()
 
-	var pos int = 0
-	var retry int = 0
+	var pos = 0
+	var retry = 0
 	for pos < len(syncCatgArray) {
 		catgName := syncCatgArray[pos].catgName
 		err := reqSync(target, catgName)
@@ -400,7 +400,7 @@ func queueHotSyncRequest(filter []ctrlResyncFilter) {
 		ctrlSyncTimer.Reset(ctrlSyncDelay)
 	}
 	for _, f := range filter {
-		var dup bool = false
+		var dup = false
 		for _, e := range currResyncFilters {
 			if f.ctrlID == e.ctrlID {
 				dup = true
