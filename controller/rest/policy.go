@@ -632,14 +632,14 @@ func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgTyp
 }
 
 func movePolicyRule(w http.ResponseWriter, r *http.Request, move *api.RESTPolicyRuleMove,
-	acc *access.AccessControl, login *loginSession) (error, share.TCfgType) {
+	acc *access.AccessControl, login *loginSession) (share.TCfgType, error) {
 
 	log.Debug("")
 
 	crule, err := cacher.GetPolicyRuleCache(move.ID, acc)
 	if crule == nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
-		return err, 0
+		return 0, err
 	}
 
 	// No need to authorize again as it's done in the GetPolicyRuleCache()
@@ -649,7 +649,7 @@ func movePolicyRule(w http.ResponseWriter, r *http.Request, move *api.RESTPolicy
 		e := "Failed to acquire cluster lock"
 		log.WithFields(log.Fields{"error": err}).Error(e)
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailLockCluster, e)
-		return err, 0
+		return 0, err
 	}
 	defer clusHelper.ReleaseLock(lock)
 
@@ -659,26 +659,26 @@ func movePolicyRule(w http.ResponseWriter, r *http.Request, move *api.RESTPolicy
 		e := "Policy rule doesn't exist"
 		log.WithFields(log.Fields{"move": move.ID}).Error(e)
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
-		return errors.New(e), 0
+		return 0, errors.New(e)
 	}
 
 	if move.After != nil && *move.After != 0 && *move.After == int(move.ID) {
 		// move an item after/before itself means no move
-		return nil, crule.CfgType
+		return crule.CfgType, nil
 	}
 	if err := moveRuleID(crhs, move.ID, crule.CfgType, move.After); err != nil {
 		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
-		return err, 0
+		return 0, err
 	}
 
 	// Put policy rule heads
 	if err := clusHelper.PutPolicyRuleList(crhs); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
-		return err, 0
+		return 0, err
 	}
 
-	return nil, crule.CfgType
+	return crule.CfgType, nil
 }
 
 func isLocalReservedId(id uint32) error {
@@ -1501,7 +1501,7 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 			log.WithFields(log.Fields{"id": rconf.Move.ID, "scope": scope, "fedRole": fedRole}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrOpNotAllowed, e)
 		}
-		err, cfgType := movePolicyRule(w, r, rconf.Move, acc, login)
+		cfgType, err := movePolicyRule(w, r, rconf.Move, acc, login)
 		if err == nil {
 			if cfgType == share.FederalCfg {
 				scope = share.ScopeFed
