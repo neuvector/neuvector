@@ -647,9 +647,10 @@ spec:
 		nvSecurityRules := 0
 		nvClusterSecurityRules := 0
 		for _, r := range secRules {
-			if r.Kind == "NvSecurityRule" {
+			switch r.Kind {
+			case "NvSecurityRule":
 				nvSecurityRules++
-			} else if r.Kind == "NvClusterSecurityRule" {
+			case "NvClusterSecurityRule":
 				nvClusterSecurityRules++
 			}
 		}

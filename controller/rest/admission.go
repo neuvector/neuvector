@@ -46,11 +46,12 @@ func getAdmCtrlRuleTypes(query *restQuery, defScope string) ([]string, string) {
 	} else if scope, ok = query.pairs[api.QueryScope]; !ok { // if not specified, use default value
 		scope = defScope
 	}
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		ruleTypes = append(ruleTypes, api.ValidatingExceptRuleType, api.ValidatingDenyRuleType)
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		ruleTypes = append(ruleTypes, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType)
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		ruleTypes = append(ruleTypes, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType, api.ValidatingExceptRuleType, api.ValidatingDenyRuleType)
 	}
 
@@ -1023,9 +1024,10 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 	var ruleTypeKey string // "exception", "deny", "fed_admctrl_exception" or "fed_admctrl_deny"
 	if cfgType == share.FederalCfg {
-		if ruleCfg.RuleType == api.ValidatingExceptRuleType {
+		switch ruleCfg.RuleType {
+		case api.ValidatingExceptRuleType:
 			ruleTypeKey = share.FedAdmCtrlExceptRulesType
-		} else if ruleCfg.RuleType == api.ValidatingDenyRuleType {
+		case api.ValidatingDenyRuleType:
 			ruleTypeKey = share.FedAdmCtrlDenyRulesType
 		}
 	} else {
@@ -1182,9 +1184,10 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var ruleTypeKey string // "exception", "deny", "fed_admctrl_exception" or "fed_admctrl_deny"
 	if ruleCfg.CfgType == api.CfgTypeFederal {
-		if ruleCfg.RuleType == api.ValidatingExceptRuleType {
+		switch ruleCfg.RuleType {
+		case api.ValidatingExceptRuleType:
 			ruleTypeKey = share.FedAdmCtrlExceptRulesType
-		} else if ruleCfg.RuleType == api.ValidatingDenyRuleType {
+		case api.ValidatingDenyRuleType:
 			ruleTypeKey = share.FedAdmCtrlDenyRulesType
 		}
 	} else {
@@ -1289,9 +1292,10 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 
 	var ruleTypeKey string // internal rule type: "exception", "deny", "fed_admctrl_exception" or "fed_admctrl_deny"
 	if rule.CfgType == api.CfgTypeFederal {
-		if rule.RuleType == api.ValidatingExceptRuleType {
+		switch rule.RuleType {
+		case api.ValidatingExceptRuleType:
 			ruleTypeKey = share.FedAdmCtrlExceptRulesType
-		} else if rule.RuleType == api.ValidatingDenyRuleType {
+		case api.ValidatingDenyRuleType:
 			ruleTypeKey = share.FedAdmCtrlDenyRulesType
 		}
 	} else {
@@ -1305,7 +1309,7 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 	defer clusHelper.ReleaseLock(lock)
 
 	arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
-	var idx int = -1
+	var idx = -1
 	for i, arh := range arhs {
 		if arh.ID == id {
 			idx = i
@@ -1384,9 +1388,10 @@ func handlerGetAdmissionTest(w http.ResponseWriter, r *http.Request, ps httprout
 		if result, err := admission.TestAdmWebhookConnection(resource.NvAdmSvcName); result != admission.TestSucceeded {
 			errorCode := api.RESTErrK8sApiSrvToWebhook
 			if err != nil && strings.Index(err.Error(), " 403 ") > 0 && strings.Index(err.Error(), "forbidden") > 0 {
-				if result == admission.TestFailedAtRead {
+				switch result {
+				case admission.TestFailedAtRead:
 					errorCode = api.RESTErrNvPermission
-				} else if result == admission.TestFailedAtWrite {
+				case admission.TestFailedAtWrite:
 					errorCode = api.RESTErrNoUpdatePermission
 				}
 			}
@@ -1478,7 +1483,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 		actionAllow := api.ValidatingAllowRuleType
 		actionDeny := api.ValidatingDenyRuleType
 		// export selected admission control rules
-		var ids utils.Set = utils.NewSet()
+		var ids = utils.NewSet()
 		admissionRules = make([]*api.NvSecurityAdmCtrlRule, 0, len(rconf.IDs))
 		for _, id := range rconf.IDs {
 			if ids.Contains(id) {
@@ -1659,7 +1664,7 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	denyIdInUse := utils.NewSet()  // id of existing non-fed admission control deny rules
 	ruleTypesUpdated := utils.NewSet()
 	var errMsg string
-	var fedArhs map[string][]*share.CLUSRuleHead = make(map[string][]*share.CLUSRuleHead, 2)
+	var fedArhs = make(map[string][]*share.CLUSRuleHead, 2)
 
 	var lock cluster.LockInterface
 	if lock, err = lockClusKey(w, share.CLUSLockAdmCtrlKey); err != nil {

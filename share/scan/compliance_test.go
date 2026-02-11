@@ -145,24 +145,24 @@ func getComplianceMetaForTest(remediationFolder string, items map[string]api.RES
 }
 
 func isSameExceptTags(meta1, meta2 api.RESTBenchMeta) bool {
-	return meta1.RESTBenchCheck.TestNum == meta2.RESTBenchCheck.TestNum &&
-		meta1.RESTBenchCheck.Type == meta2.RESTBenchCheck.Type &&
-		meta1.RESTBenchCheck.Category == meta2.RESTBenchCheck.Category &&
-		meta1.RESTBenchCheck.Scored == meta2.RESTBenchCheck.Scored &&
-		meta1.RESTBenchCheck.Profile == meta2.RESTBenchCheck.Profile &&
-		meta1.RESTBenchCheck.Automated == meta2.RESTBenchCheck.Automated &&
-		meta1.RESTBenchCheck.Description == meta2.RESTBenchCheck.Description &&
-		meta1.RESTBenchCheck.Remediation == meta2.RESTBenchCheck.Remediation
+	return meta1.TestNum == meta2.TestNum &&
+		meta1.Type == meta2.Type &&
+		meta1.Category == meta2.Category &&
+		meta1.Scored == meta2.Scored &&
+		meta1.Profile == meta2.Profile &&
+		meta1.Automated == meta2.Automated &&
+		meta1.Description == meta2.Description &&
+		meta1.Remediation == meta2.Remediation
 }
 
 func isIdenticalTags(meta, mockMeta api.RESTBenchMeta, isV2 bool) bool {
 	if isV2 {
-		if len(meta.RESTBenchCheck.TagsV2) != len(mockMeta.RESTBenchCheck.TagsV2) {
+		if len(meta.TagsV2) != len(mockMeta.TagsV2) {
 			return false
 		}
 
-		for key, val1 := range meta.RESTBenchCheck.TagsV2 {
-			val2, ok := mockMeta.RESTBenchCheck.TagsV2[key]
+		for key, val1 := range meta.TagsV2 {
+			val2, ok := mockMeta.TagsV2[key]
 			if !ok || !reflect.DeepEqual(val1, val2) {
 				return false
 			}
@@ -170,16 +170,16 @@ func isIdenticalTags(meta, mockMeta api.RESTBenchMeta, isV2 bool) bool {
 		return true
 
 	} else {
-		if len(meta.RESTBenchCheck.Tags) != len(mockMeta.RESTBenchCheck.Tags) {
+		if len(meta.Tags) != len(mockMeta.Tags) {
 			return false
 		}
 		counts := make(map[string]int)
 
-		for _, item := range meta.RESTBenchCheck.Tags {
+		for _, item := range meta.Tags {
 			counts[item]++
 		}
 
-		for _, item := range mockMeta.RESTBenchCheck.Tags {
+		for _, item := range mockMeta.Tags {
 			if counts[item] == 0 {
 				return false
 			}
@@ -212,7 +212,7 @@ func checkMetaConfig(t *testing.T, complianceMetaConfig, mockComplianceMetaConfi
 			t.Errorf("complianceMetaConfig.Metas[%d] and mockComplianceMetaConfig.Metas[%d] should be the identical", i, i)
 		}
 		if !isIdenticalTags((*complianceMetaConfig.Metas)[i], (*mockComplianceMetaConfig.Metas)[i], false) {
-			t.Errorf("Tags for complianceMetaConfig.Metas[%d] and mockComplianceMetaConfig.Metas[%d] should be the same, got %v and %v", i, i, (*complianceMetaConfig.Metas)[i].RESTBenchCheck.Tags, (*mockComplianceMetaConfig.MetasV2)[i].RESTBenchCheck.Tags)
+			t.Errorf("Tags for complianceMetaConfig.Metas[%d] and mockComplianceMetaConfig.Metas[%d] should be the same, got %v and %v", i, i, (*complianceMetaConfig.Metas)[i].Tags, (*mockComplianceMetaConfig.MetasV2)[i].Tags)
 		}
 	}
 
@@ -221,7 +221,7 @@ func checkMetaConfig(t *testing.T, complianceMetaConfig, mockComplianceMetaConfi
 			t.Errorf("complianceMetaConfig.MetasV2[%d] and mockComplianceMetaConfig.MetasV2[%d] should be the identical", i, i)
 		}
 		if !isIdenticalTags((*complianceMetaConfig.MetasV2)[i], (*mockComplianceMetaConfig.MetasV2)[i], true) {
-			t.Errorf("Tags for complianceMetaConfig.MetasV2[%d] and mockComplianceMetaConfig.MetasV2[%d] should be the same, got %v and %v", i, i, (*complianceMetaConfig.Metas)[i].RESTBenchCheck.Tags, (*mockComplianceMetaConfig.MetasV2)[i].RESTBenchCheck.Tags)
+			t.Errorf("Tags for complianceMetaConfig.MetasV2[%d] and mockComplianceMetaConfig.MetasV2[%d] should be the same, got %v and %v", i, i, (*complianceMetaConfig.Metas)[i].Tags, (*mockComplianceMetaConfig.MetasV2)[i].Tags)
 		}
 	}
 
@@ -236,7 +236,7 @@ func checkMetaConfig(t *testing.T, complianceMetaConfig, mockComplianceMetaConfi
 		}
 
 		if !isIdenticalTags(meta, mockMeta, false) {
-			t.Errorf("Tags for complianceMetaConfig.MetaMap[%s] and mockComplianceMetaConfig.MetaMap[%s] should be the same, got %v and %v", key, key, meta.RESTBenchCheck.Tags, mockMeta.RESTBenchCheck.Tags)
+			t.Errorf("Tags for complianceMetaConfig.MetaMap[%s] and mockComplianceMetaConfig.MetaMap[%s] should be the same, got %v and %v", key, key, meta.Tags, mockMeta.Tags)
 		}
 	}
 
@@ -251,7 +251,7 @@ func checkMetaConfig(t *testing.T, complianceMetaConfig, mockComplianceMetaConfi
 		}
 
 		if !isIdenticalTags(meta, mockMeta, false) {
-			t.Errorf("Tags for complianceMetaConfig.MetaMapV2[%s] and mockComplianceMetaConfig.MetaMapV2[%s] should be the same, got %v and %v", key, key, meta.RESTBenchCheck.Tags, mockMeta.RESTBenchCheck.Tags)
+			t.Errorf("Tags for complianceMetaConfig.MetaMapV2[%s] and mockComplianceMetaConfig.MetaMapV2[%s] should be the same, got %v and %v", key, key, meta.Tags, mockMeta.Tags)
 		}
 	}
 }
@@ -298,15 +298,15 @@ func TestGetComplianceMeta(t *testing.T) {
 			t.Errorf("metas[%d] and metasV2[%d] should be the same except for Tags", i, i)
 		}
 
-		if len(metas[i].RESTBenchCheck.Tags) != len(metasV2[i].RESTBenchCheck.TagsV2) {
+		if len(metas[i].Tags) != len(metasV2[i].TagsV2) {
 			t.Errorf("Tags length for metas[%d] and metasV2[%d] should be the same", i, i)
 		}
 
-		if len(metas[i].RESTBenchCheck.TagsV2) != 0 {
+		if len(metas[i].TagsV2) != 0 {
 			t.Errorf("TagsV2 length for metas[%d] should be 0", i)
 		}
 
-		if len(metasV2[i].RESTBenchCheck.Tags) != 0 {
+		if len(metasV2[i].Tags) != 0 {
 			t.Errorf("Tags length for metasV2[%d] should be 0", i)
 		}
 	}
@@ -321,15 +321,15 @@ func TestGetComplianceMeta(t *testing.T) {
 			t.Errorf("metaMap[%s] and metaMapV2[%s] should be the same except for Tags", key, key)
 		}
 
-		if len(meta.RESTBenchCheck.Tags) != len(metaV2.RESTBenchCheck.TagsV2) {
+		if len(meta.Tags) != len(metaV2.TagsV2) {
 			t.Errorf("Tags length for metaMap[%s] and metaMapV2[%s] should be the same", key, key)
 		}
 
-		if len(meta.RESTBenchCheck.TagsV2) != 0 {
+		if len(meta.TagsV2) != 0 {
 			t.Errorf("TagsV2 length for meta should be 0")
 		}
 
-		if len(metaV2.RESTBenchCheck.Tags) != 0 {
+		if len(metaV2.Tags) != 0 {
 			t.Errorf("Tags length for metaV2 should be 0")
 		}
 	}
@@ -338,13 +338,13 @@ func TestGetComplianceMeta(t *testing.T) {
 func TestGetImageBenchMeta(t *testing.T) {
 	metas, metaMap := InitImageBenchMeta()
 	for i := range metas {
-		if len(metas[i].RESTBenchCheck.TagsV2) != 0 {
+		if len(metas[i].TagsV2) != 0 {
 			t.Errorf("TagsV2 length for metas[%d] should be 0", i)
 		}
 	}
 
 	for _, meta := range metaMap {
-		if len(meta.RESTBenchCheck.TagsV2) != 0 {
+		if len(meta.TagsV2) != 0 {
 			t.Errorf("TagsV2 length for meta should be 0")
 		}
 	}

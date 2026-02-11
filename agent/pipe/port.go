@@ -126,9 +126,9 @@ func createNVPorts(jumboframe bool) {
 			PeerIndex: inPortIndexBase + 1,
 		}
 		if jumboframe {
-			veth.LinkAttrs.MTU = share.NV_VBR_PORT_MTU_JUMBO
+			veth.MTU = share.NV_VBR_PORT_MTU_JUMBO
 		} else {
-			veth.LinkAttrs.MTU = share.NV_VBR_PORT_MTU
+			veth.MTU = share.NV_VBR_PORT_MTU
 		}
 		if err := vethAdd(veth); err != nil {
 			log.WithFields(log.Fields{"error": err, "veth": *veth}).Error("Error in creating veth pair")
@@ -433,7 +433,7 @@ func readLinkIPRoute() ([]netlink.Link, map[netlink.Link][]netlink.Addr, []netli
 			// Skip IPv6 address
 			ipv4s := make([]netlink.Addr, 0)
 			for _, addr := range addrs {
-				if utils.IsIPv4(addr.IPNet.IP) {
+				if utils.IsIPv4(addr.IP) {
 					ipv4s = append(ipv4s, addr)
 					hasIPv4 = true
 				}
@@ -528,9 +528,9 @@ func recoverRoutes(routes []netlink.Route, portIdxMap map[int]int) error {
 		log.WithFields(log.Fields{"err": err}).Error("Error to get routes")
 	}
 
-	var retry int = 0
+	var retry = 0
 	for len(routes) > 0 && retry < 3 {
-		var needNap bool = false
+		var needNap = false
 		failed := make([]netlink.Route, 0)
 		for _, route := range routes {
 			if retry == 0 {
@@ -574,8 +574,8 @@ func pullAllContainerPorts(
 
 	intcpPairs := make([]*InterceptPair, 0)
 	// Map the original port's index to injected port's index in order to rebuild route
-	var portIdxMap map[int]int = make(map[int]int)
-	var pulled bool = false
+	var portIdxMap = make(map[int]int)
+	var pulled = false
 
 	// We want to create veth pair with specified ifindex. Get the max existing ifindex in the container,
 	// this will be the ifindex of ports stay in the container. Make sure they are not in the same range of
@@ -712,7 +712,7 @@ func pullAllContainerPorts(
 		pair.Addrs = make([]share.CLUSIPAddr, 0)
 		for _, addr := range addrs {
 			// Not to report IPv6 interface for now
-			if utils.IsIPv4(addr.IPNet.IP) {
+			if utils.IsIPv4(addr.IP) {
 				pair.Addrs = append(pair.Addrs, share.CLUSIPAddr{
 					IPNet: *addr.IPNet,
 					Scope: share.CLUSIPAddrScopeLocalhost,
@@ -929,7 +929,7 @@ func readAllContainerPorts(pid int, existPairs map[string]*InterceptPair) ([]*In
 		pair.Addrs = make([]share.CLUSIPAddr, 0)
 		for _, addr := range addrs {
 			// Not to report IPv6 interface for now
-			if utils.IsIPv4(addr.IPNet.IP) {
+			if utils.IsIPv4(addr.IP) {
 				pair.Addrs = append(pair.Addrs, share.CLUSIPAddr{
 					IPNet: *addr.IPNet,
 					Scope: share.CLUSIPAddrScopeLocalhost,
@@ -1108,7 +1108,7 @@ func pushAllContainerPorts(pid int, pairs []*InterceptPair) error {
 	}
 
 	// Map the inside port's index to moved-in port's index
-	var portIdxMap map[int]int = make(map[int]int)
+	var portIdxMap = make(map[int]int)
 
 	// Read all routes and neighbors
 	routes, err := getRouteList()
@@ -1405,7 +1405,8 @@ func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[sha
 	}
 
 	for p := range appMap {
-		if p.IPProto == syscall.IPPROTO_TCP { //tcp
+		switch p.IPProto {
+		case syscall.IPPROTO_TCP: //tcp
 			//insert to top of rule list in filter table INPUT and OUTPUT chain
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
@@ -1423,7 +1424,7 @@ func insertIptablesNvRules(intf string, isloopback bool, qno int, appMap map[sha
 			if _, dbgError := shellCombined(cmd); dbgError != nil {
 				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 			}
-		} else if p.IPProto == syscall.IPPROTO_UDP { //udp
+		case syscall.IPPROTO_UDP: //udp
 			//insert to top of rule list in filter table INPUT and OUTPUT chain
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -I %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
@@ -1466,7 +1467,8 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 	}
 
 	for p := range appMap {
-		if p.IPProto == syscall.IPPROTO_TCP { //tcp
+		switch p.IPProto {
+		case syscall.IPPROTO_TCP: //tcp
 			//check existence of rule before insert it
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p tcp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)
@@ -1501,7 +1503,7 @@ func checkInsertIptablesNvRules(intf string, isloopback bool, qno int, appMap ma
 					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 				}
 			}
-		} else if p.IPProto == syscall.IPPROTO_UDP { //udp
+		case syscall.IPPROTO_UDP: //udp
 			//check existence of rule before insert it
 			if isloopback {
 				cmd = fmt.Sprintf("iptables -C %v -t filter -i %v -p udp --sport %d -j NFQUEUE --queue-num %d --queue-bypass", nvInputChain, intf, p.Port, qno)

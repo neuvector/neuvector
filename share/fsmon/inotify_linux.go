@@ -223,10 +223,7 @@ func (n *Inotify) AddMonitorDirFile(path string, files map[string]interface{}, c
 func (n *Inotify) MonitorFileEvents() {
 	buffer := make([]byte, syscall.SizeofInotifyEvent*4096) // Buffer for a maximum of 4096 raw events
 	n.bEnabled = true
-	for {
-		if !n.bEnabled {
-			break
-		}
+	for n.bEnabled {
 
 		bytesRead, err := n.inotifyFile.Read(buffer[:])
 		// bytesRead, err := syscall.Read(n.fd, buffer)

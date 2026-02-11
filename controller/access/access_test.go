@@ -1739,7 +1739,7 @@ func (r *tCaseInfo) checkPermissionsResult(gPermitsList, expectedGPermitsList []
 func TestGetUserPermissions(t *testing.T) {
 	preTest()
 
-	var testObj tCaseInfo = tCaseInfo{
+	var testObj = tCaseInfo{
 		t:        t,
 		caseName: "TestGetUserPermissions",
 		caseID:   1,

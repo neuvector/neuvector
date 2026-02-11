@@ -413,11 +413,12 @@ func GetDpkgStatus(fullpath, kernel string) ([]byte, error) {
 		// filter kernels that are not running
 		if strings.HasPrefix(line, "Package: ") && kernel != "" {
 			kpkg := isDpkgKernelPackage(line)
-			if kpkg == "" {
+			switch kpkg {
+			case "":
 				skipPackage = false
-			} else if kpkg == kernel {
+			case kernel:
 				skipPackage = false
-			} else {
+			default:
 				skipPackage = true
 				continue
 			}
@@ -639,7 +640,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	for _, v := range apps.pkgs {
 		for _, vt := range v {
 
-			filename := strings.Replace(vt.FileName, "/package.json", "", -1)
+			filename := strings.ReplaceAll(vt.FileName, "/package.json", "")
 			pckg := &share.ScanAppPackage{
 				AppName:    vt.AppName,
 				ModuleName: vt.ModuleName,

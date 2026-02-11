@@ -40,8 +40,8 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	var defaultAction int = nvsysadmission.AdmCtrlActionAllow
-	var mode string = share.AdmCtrlModeProtect
+	var defaultAction = nvsysadmission.AdmCtrlActionAllow
+	var mode = share.AdmCtrlModeProtect
 	if k8sPlatform {
 		var ctrlState *share.CLUSAdmCtrlState
 		state, _ := clusHelper.GetAdmissionStateRev(resource.NvAdmSvcName)

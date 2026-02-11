@@ -105,7 +105,7 @@ func TestDeleteProcRules(t *testing.T) {
 	//
 	list := make([]*share.CLUSProcessProfileEntry, 0)
 	for i := range pp.Process {
-		if 0 == (i % 2) {
+		if i%2 == 0 {
 			continue
 		}
 		list = append(list, pp.Process[i])
@@ -155,7 +155,7 @@ func TestDeleteProcRules(t *testing.T) {
 
 	list = make([]*share.CLUSProcessProfileEntry, 0)
 	for i := range pp.Process {
-		if 1 == (i % 2) {
+		if i%2 == 1 {
 			continue
 		}
 		list = append(list, pp.Process[i])

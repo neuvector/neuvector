@@ -73,7 +73,8 @@ func (exp *Export) Do() error {
 		commitMessage = exp.Options.Comment
 	}
 
-	if remoteRepository.Provider == share.RemoteRepositoryProvider_GitHub {
+	switch remoteRepository.Provider {
+	case share.RemoteRepositoryProvider_GitHub:
 		githubExport, err := NewGitHubExport(exp.Options.FilePath, exp.Content, commitMessage, *remoteRepository.GitHubConfiguration)
 		if err != nil {
 			return fmt.Errorf("could not initialize github export object: %s", err.Error())
@@ -83,7 +84,7 @@ func (exp *Export) Do() error {
 		if err != nil {
 			return fmt.Errorf("could not do github export: %s", err.Error())
 		}
-	} else if remoteRepository.Provider == share.RemoteRepositoryProvider_AzureDevops {
+	case share.RemoteRepositoryProvider_AzureDevops:
 		export := azureDevopsExport{
 			repoConfig:    *remoteRepository.AzureDevopsConfiguration,
 			exportOptions: *exp.Options,
@@ -94,7 +95,7 @@ func (exp *Export) Do() error {
 		if err != nil {
 			return fmt.Errorf("could not do azure devops export: %w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("unsupported provider for export: %s", remoteRepository.Provider)
 	}
 

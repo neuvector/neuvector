@@ -57,8 +57,8 @@ func getResponsePolicyName(w http.ResponseWriter, id string) (uint32, string, er
 }
 
 func getSecurityEventNameList() []string {
-	var output []string = make([]string, 0)
-	var names []string = make([]string, 0)
+	var output = make([]string, 0)
+	var names = make([]string, 0)
 
 	output = append(output, "name:"+common.NetworkViolation)
 
@@ -96,7 +96,7 @@ func getSecurityEventNameList() []string {
 }
 
 func getEventNameList(isGlobalUser bool) []string {
-	var names []string = make([]string, 0, len(common.LogEventMap))
+	var names = make([]string, 0, len(common.LogEventMap))
 	for id, info := range common.LogEventMap {
 		if !isGlobalUser && (id == share.CLUSEvAdmCtrlK8sConfigured || id == share.CLUSEvAdmCtrlK8sConfigFailed) {
 			continue
@@ -107,7 +107,7 @@ func getEventNameList(isGlobalUser bool) []string {
 }
 
 func getEventLevelList(levels []string) []string {
-	var lvs []string = make([]string, 0, len(levels))
+	var lvs = make([]string, 0, len(levels))
 	for _, lv := range levels {
 		lvs = append(lvs, "level:"+lv)
 	}
@@ -268,7 +268,8 @@ func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	resp.Options = getResponeRuleOptions(acc)
 
 	// Fill webhook names
-	if scope == share.ScopeFed {
+	switch scope {
+	case share.ScopeFed:
 		if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleMaster && (acc.IsFedReader() || acc.IsFedAdmin()) {
 			sc := cacher.GetFedSystemConfig(acc)
 			resp.Webhooks = make([]string, len(sc.Webhooks))
@@ -276,7 +277,7 @@ func handlerResponseRuleOptions(w http.ResponseWriter, r *http.Request, ps httpr
 				resp.Webhooks[i] = wh.Name
 			}
 		}
-	} else if scope == share.ScopeLocal {
+	case share.ScopeLocal:
 		sc := cacher.GetSystemConfig(access.NewReaderAccessControl())
 		resp.Webhooks = make([]string, len(sc.Webhooks))
 		for i, wh := range sc.Webhooks {
@@ -306,7 +307,7 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 	} else if len(r.Conditions) > 0 {
 		cds := utils.NewSet()
 		for i, cd := range r.Conditions {
-			var found bool = false
+			var found = false
 			for _, a := range option.Types {
 				if a == cd.CondType {
 					found = true
@@ -941,7 +942,7 @@ func handlerResponseRuleDelete(w http.ResponseWriter, r *http.Request, ps httpro
 
 	crhs := clusHelper.GetResponseRuleList(policyName)
 
-	var idx int = -1
+	var idx = -1
 	for i, crh := range crhs {
 		if crh.ID == id {
 			idx = i

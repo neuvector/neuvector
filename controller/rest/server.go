@@ -516,9 +516,10 @@ func handlerServerList(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	var fcat, ftype string
 	for _, f := range query.filters {
-		if f.tag == api.FilterServerCategory {
+		switch f.tag {
+		case api.FilterServerCategory:
 			fcat = f.value
-		} else if f.tag == api.FilterServerType {
+		case api.FilterServerType:
 			ftype = f.value
 		}
 	}
@@ -671,9 +672,10 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 	if create {
 		// Set default Group Member Attr if input is empty when creating a new server
 		if ldap.GroupMemberAttr == nil || *ldap.GroupMemberAttr == "" {
-			if cldap.Type == api.ServerLDAPTypeOpenLDAP {
+			switch cldap.Type {
+			case api.ServerLDAPTypeOpenLDAP:
 				cldap.GroupMemberAttr = api.LDAPGroupMemberAttrOpenLDAP
-			} else if cldap.Type == api.ServerLDAPTypeMSAD {
+			case api.ServerLDAPTypeMSAD:
 				cldap.GroupMemberAttr = api.LDAPGroupMemberAttrMSAD
 			}
 		} else {
@@ -681,9 +683,10 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 		}
 		// Set default User Name Attr if input is empty when creating a new server
 		if ldap.UserNameAttr == nil || *ldap.UserNameAttr == "" {
-			if cldap.Type == api.ServerLDAPTypeOpenLDAP {
+			switch cldap.Type {
+			case api.ServerLDAPTypeOpenLDAP:
 				cldap.UserNameAttr = api.LDAPUserNameAttrOpenLDAP
-			} else if cldap.Type == api.ServerLDAPTypeMSAD {
+			case api.ServerLDAPTypeMSAD:
 				cldap.UserNameAttr = api.LDAPUserNameAttrMSAD
 			}
 		} else {
@@ -692,9 +695,10 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 	} else {
 		if ldap.GroupMemberAttr != nil {
 			if *ldap.GroupMemberAttr == "" {
-				if cldap.Type == api.ServerLDAPTypeOpenLDAP {
+				switch cldap.Type {
+				case api.ServerLDAPTypeOpenLDAP:
 					cldap.GroupMemberAttr = api.LDAPGroupMemberAttrOpenLDAP
-				} else if cldap.Type == api.ServerLDAPTypeMSAD {
+				case api.ServerLDAPTypeMSAD:
 					cldap.GroupMemberAttr = api.LDAPGroupMemberAttrMSAD
 				}
 			} else {
@@ -703,9 +707,10 @@ func updateLDAPServer(cs *share.CLUSServer, ldap *api.RESTServerLDAPConfig, crea
 		}
 		if ldap.UserNameAttr != nil {
 			if *ldap.UserNameAttr == "" {
-				if cldap.Type == api.ServerLDAPTypeOpenLDAP {
+				switch cldap.Type {
+				case api.ServerLDAPTypeOpenLDAP:
 					cldap.UserNameAttr = api.LDAPUserNameAttrOpenLDAP
-				} else if cldap.Type == api.ServerLDAPTypeMSAD {
+				case api.ServerLDAPTypeMSAD:
 					cldap.UserNameAttr = api.LDAPUserNameAttrMSAD
 				}
 			} else {

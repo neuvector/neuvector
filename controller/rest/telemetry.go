@@ -68,10 +68,7 @@ func reportTelemetryData(rawData common.TelemetryData) {
 		return
 	}
 
-	logError := false
-	if lastTeleErrorDay != today {
-		logError = true
-	}
+	logError := lastTeleErrorDay != today
 
 	bodyTo, _ := json.Marshal(&reqPayload)
 	if data, _, _, err := sendRestRequest("telemetry", http.MethodPost, _teleNeuvectorURL, "", "", "", "", nil, bodyTo, logError, nil, nil); err == nil {

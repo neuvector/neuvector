@@ -304,7 +304,7 @@ func appNames2IDs(apps []string) []uint32 {
 		return []uint32{}
 	}
 
-	var ids []uint32 = make([]uint32, 0)
+	var ids = make([]uint32, 0)
 	for _, app := range apps {
 		if strings.EqualFold(app, api.PolicyAppAny) {
 			return []uint32{}
@@ -568,9 +568,9 @@ func locatePosition(crhs []*share.CLUSRuleHead, after *int, moveIDx int) (int, i
 // param ruleCfgType: CfgType of the existing item to move
 // param after:       nil: last; 0: first; +id: after rule 'id'; -id: before rule 'id'
 func moveRuleID(crhs []*share.CLUSRuleHead, id uint32, ruleCfgType share.TCfgType, after *int) error {
-	var moveIdx int = -1   // original idx of the moving item
-	var topIdx int = 0     // the top-most idx that the new location could be
-	var bottomIdx int = -1 // the bottom-most idx that the new location could be
+	var moveIdx = -1   // original idx of the moving item
+	var topIdx = 0     // the top-most idx that the new location could be
+	var bottomIdx = -1 // the bottom-most idx that the new location could be
 	for i, crh := range crhs {
 		if crh.ID == id {
 			if crh.CfgType == share.GroundCfg {
@@ -718,12 +718,13 @@ func insertPolicyRule(scope string, w http.ResponseWriter, r *http.Request, inse
 	ids := utils.NewSet()
 	for _, crh := range crhs {
 		ids.Add(crh.ID)
-		if scope == share.ScopeFed {
+		switch scope {
+		case share.ScopeFed:
 			// the new items are federal rules. they could be inserted before any existing non-federal rule
 			if crh.CfgType == share.FederalCfg {
 				bottomIdx++
 			}
-		} else if scope == share.ScopeLocal {
+		case share.ScopeLocal:
 			// the new items are not federal rules. they could be inserted after the last ground rule
 			bottomIdx++
 			if crh.CfgType == share.FederalCfg || crh.CfgType == share.GroundCfg {
@@ -898,9 +899,10 @@ func checkReadOnlyRules(scope string, crhs []*share.CLUSRuleHead, rules []*api.R
 			_, readable, writable := cacher.CheckPolicyRuleAccess(crh.ID, accRead, accWrite)
 			if writable {
 				writableRuleIDs.Add(crh.ID)
-				if crh.CfgType == share.Learned {
+				switch crh.CfgType {
+				case share.Learned:
 					writableLearnedRules++
-				} else if crh.CfgType == share.UserCreated {
+				case share.UserCreated:
 					writableUserCreatedRules++
 				}
 			} else if readable {
@@ -1069,8 +1071,10 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	// namespace users can only see rules whose group's domain/createrDomain is those the user can access. `keep` contains all existing rules
 	//	 so rules in payload can only apply to the permitted rules in `keep`, plus more added rules
 	for _, crh := range crhs {
-		if scope == share.ScopeLocal {
-			if crh.CfgType == share.Learned {
+		switch scope {
+		case share.ScopeLocal:
+			switch crh.CfgType {
+			case share.Learned:
 				if !nsUser {
 					// don't know whether this learned rule will be deleted in this call yet...
 					del.Add(crh.ID) // add to 'del' for now. if it is in rules param, will remove it from 'del' and add it to 'new' later in step 4
@@ -1082,9 +1086,9 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 						del.Add(crh.ID) // add to del for now. if it is in rules param, will remove it from 'del' and add it to 'new' later in step 4
 					} // because user cannot create learned rule, there is no need to record the rule id here
 				}
-			} else if crh.CfgType == share.FederalCfg || crh.CfgType == share.GroundCfg {
+			case share.FederalCfg, share.GroundCfg:
 				keep = append(keep, crh) // ground/fed rules cannot be touched when scope=local
-			} else if crh.CfgType == share.UserCreated {
+			case share.UserCreated:
 				if !nsUser {
 					// don't know whether this user-created rule will be deleted in this call yet...
 					del.Add(crh.ID) // add to 'del' for now. if it is in rules param, will remove it from 'del' and add it to 'new' later in step 4
@@ -1099,7 +1103,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					}
 				}
 			}
-		} else if scope == share.ScopeFed {
+		case share.ScopeFed:
 			if crh.CfgType == share.FederalCfg {
 				// do not append to 'keep' here. Because all federal rules are in rules param, we can append later in step 4
 				del.Add(crh.ID) // add to 'del' for now. if it is in rules param, will remove it from 'del' and add it to 'new' later in step 4
@@ -1116,7 +1120,8 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 	for _, rr := range rules {
 		var newRule, existingRule, modRule bool
 		var modCreatedAt time.Time
-		if rr.CfgType == api.CfgTypeLearned {
+		switch rr.CfgType {
+		case api.CfgTypeLearned:
 			if scope == share.ScopeLocal {
 				if del.Contains(rr.ID) {
 					del.Remove(rr.ID)
@@ -1125,9 +1130,9 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 				// ignore new or unaccessible learned rules in rules param
 				// }
 			} // ignore learned rules when scope=fed
-		} else if rr.CfgType == api.CfgTypeGround {
+		case api.CfgTypeGround:
 			// always ignore ground rules from rest api
-		} else {
+		default:
 			if (rr.CfgType == api.CfgTypeUserCreated && scope == share.ScopeLocal) || (rr.CfgType == api.CfgTypeFederal && scope == share.ScopeFed) {
 				if del.Contains(rr.ID) {
 					del.Remove(rr.ID)
@@ -1196,12 +1201,13 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 					CfgType: utils.ApiCfgTypeToTCfgType[rr.CfgType],
 				})
 			} else { // for namespace user (we did append to 'keep' already in step 3)
-				if rr.CfgType == api.CfgTypeLearned { // if it's accessible learned rule, we re-use the accessible rh spots in 'keep'
+				switch rr.CfgType {
+				case api.CfgTypeLearned: // if it's accessible learned rule, we re-use the accessible rh spots in 'keep'
 					if reusedLearnedSpotIndex < len(accessibleLearnedSpotIndices) {
 						keep[accessibleLearnedSpotIndices[reusedLearnedSpotIndex]].ID = rr.ID
 						reusedLearnedSpotIndex++
 					} // no else because learned rule cannot be created thru rest api
-				} else if rr.CfgType == api.CfgTypeUserCreated { // if it's accessible user-created rule, we re-use the accessible rh spots in 'keep'
+				case api.CfgTypeUserCreated: // if it's accessible user-created rule, we re-use the accessible rh spots in 'keep'
 					if reusedUserSpotIndex < len(accessibleUserSpotIndices) {
 						keep[accessibleUserSpotIndices[reusedUserSpotIndex]].ID = rr.ID
 						reusedUserSpotIndex++
@@ -1272,9 +1278,10 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		// when scope=fed:
 		// 	keep:           contains unchanged local(ground/learned/userCreated) rules head list
 		// 	new:            contains new federal rules head list
-		if scope == share.ScopeLocal { // When replacing local rules, only learned & user-created rules could change
+		switch scope {
+		case share.ScopeLocal: // When replacing local rules, only learned & user-created rules could change
 			newPolicys = append(keep, new...)
-		} else if scope == share.ScopeFed { // When replacing federal rules, only fed rules could change
+		case share.ScopeFed: // When replacing federal rules, only fed rules could change
 			newPolicys = append(new, keep...)
 		}
 	} else {
@@ -1329,7 +1336,7 @@ func replacePolicyRule(scope string, w http.ResponseWriter, r *http.Request, rul
 		newLearnedRuleIDs := policyIDsKV.Difference(policyIDsNew).Difference(delRuleIDs)
 		for id_ := range newLearnedRuleIDs.Iter() {
 			// caller doesn't say to delete this learned rule
-			var id uint32 = id_.(uint32)
+			var id = id_.(uint32)
 			newPolicys = append(newPolicys, &share.CLUSRuleHead{
 				ID:      id,
 				CfgType: share.Learned,
@@ -1702,7 +1709,7 @@ func handlerPolicyRuleConfig(w http.ResponseWriter, r *http.Request, ps httprout
 			ids.Add(crh.ID)
 		}
 
-		var ruleIdx int = -1
+		var ruleIdx = -1
 		for i, crh := range crhs {
 			if crh.ID == rc.ID {
 				ruleIdx = i
@@ -1885,13 +1892,14 @@ func handlerPolicyRuleDeleteAll(w http.ResponseWriter, r *http.Request, ps httpr
 			keeps = append(keeps, crh)
 		} else {
 			// I can modify this rule
-			if delScope == share.ScopeFed {
+			switch delScope {
+			case share.ScopeFed:
 				if crh.CfgType == share.FederalCfg {
 					dels.Add(crh.ID)
 				} else {
 					keeps = append(keeps, crh)
 				}
-			} else if delScope == share.ScopeLocal {
+			case share.ScopeLocal:
 				if crh.CfgType == share.Learned || crh.CfgType == share.GroundCfg {
 					keeps = append(keeps, crh)
 				} else {
@@ -1985,7 +1993,7 @@ func derivedPolicy2Rest(r *share.CLUSDerivedPolicyRule) []*api.RESTDerivedPolicy
 		}
 		result := make([]*api.RESTDerivedPolicyRule, len(rules)+1)
 		result[0] = p
-		var i int = 1
+		var i = 1
 		for _, rule := range rules {
 			result[i] = rule
 			i++
@@ -2157,7 +2165,7 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 	defer clusHelper.ReleaseLock(lock)
 
 	fedIdInUse := utils.NewSet() // id of existing fed policies
-	var topIdx int = 0           // the top-most idx that the new location could be
+	var topIdx = 0               // the top-most idx that the new location could be
 	var errMsg string
 	crhs := clusHelper.GetPolicyRuleList()
 	for _, crh := range crhs {
@@ -2171,7 +2179,7 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 	fedGroupsCountOld := fedGroupNames.Cardinality()
 	emptyMonFilters := make([]share.CLUSFileMonitorFilter, 0)
 	emptyFarFilters := make(map[string]*share.CLUSFileAccessFilterRule)
-	var dlpwafGrpSet utils.Set = utils.NewSet()
+	var dlpwafGrpSet = utils.NewSet()
 
 	txn := cluster.Transact()
 	defer txn.Close()

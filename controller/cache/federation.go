@@ -181,17 +181,18 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			var dec common.DecryptUnmarshaller
 			_ = dec.Unmarshal(value, &m)
 			log.WithFields(log.Fields{"role": m.FedRole}).Info()
-			if m.FedRole == api.FedRoleMaster {
+			switch m.FedRole {
+			case api.FedRoleMaster:
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleMaster)
 				_, _ = kv.GetFedCaCertPath(m.MasterCluster.ID)
 				go func() { _ = cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil) }()
-			} else if m.FedRole == api.FedRoleJoint {
+			case api.FedRoleJoint:
 				var param interface{} = &m.JointCluster
 				if err := cctx.StartStopFedPingPollFunc(share.JointLoadOwnKeys, 0, param); err == nil {
 					//serializeFile(masterCaCertPath, m.MasterCluster.CACert)
 					go func() { _ = cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil) }()
 				}
-			} else if m.FedRole == api.FedRoleNone {
+			case api.FedRoleNone:
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleNone)
 				_ = cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil)
 				go func() { _ = cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil) }()

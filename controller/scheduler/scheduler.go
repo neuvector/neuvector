@@ -122,13 +122,14 @@ func (s *Schd) AddTask(task Task, toHead bool) {
 	priority := task.Priority()
 
 	s.lock()
-	if priority == PriorityLow {
+	switch priority {
+	case PriorityLow:
 		if toHead {
 			s.taskQueueLow = append([]Task{task}, s.taskQueueLow...)
 		} else {
 			s.taskQueueLow = append(s.taskQueueLow, task)
 		}
-	} else if priority == PriorityHigh {
+	case PriorityHigh:
 		if toHead {
 			s.taskQueueHigh = append([]Task{task}, s.taskQueueHigh...)
 		} else {
@@ -145,9 +146,10 @@ func (s *Schd) DeleteTask(key string, priority Priority) bool {
 
 	// If the task is already running, the task will not be deleted
 	s.lock()
-	if priority == PriorityLow {
+	switch priority {
+	case PriorityLow:
 		s.taskQueueLow, t = removeTaskFromQueue(key, s.taskQueueLow)
-	} else if priority == PriorityHigh {
+	case PriorityHigh:
 		s.taskQueueHigh, t = removeTaskFromQueue(key, s.taskQueueHigh)
 	}
 	s.unlock()
@@ -161,9 +163,10 @@ func (s *Schd) DeleteTask(key string, priority Priority) bool {
 
 func (s *Schd) ClearTaskQueue(priority Priority) {
 	s.lock()
-	if priority == PriorityLow {
+	switch priority {
+	case PriorityLow:
 		s.taskQueueLow = nil
-	} else if priority == PriorityHigh {
+	case PriorityHigh:
 		s.taskQueueHigh = nil
 	}
 	s.unlock()

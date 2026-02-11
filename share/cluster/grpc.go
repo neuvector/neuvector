@@ -246,10 +246,11 @@ func (c *GRPCClient) monitorGRPCConnectivity(ctx context.Context) {
 		log.WithFields(log.Fields{"state": s}).Debug("grpc connection state")
 
 		// Even when server shutdown, client grpc channel is in TransientFailure state.
-		if s == connectivity.Shutdown {
+		switch s {
+		case connectivity.Shutdown:
 			c.shutdown()
 			return
-		} else if s == connectivity.TransientFailure {
+		case connectivity.TransientFailure:
 			// In case the connection is in transient state, wait a second and check state again.
 			time.Sleep(time.Second)
 			s = c.conn.GetState()

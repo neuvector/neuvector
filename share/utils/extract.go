@@ -221,7 +221,7 @@ func SelectivelyExtractToFile(r io.Reader, selected func(string) bool, dir strin
 	files := make(map[string]string)
 
 	extract := func(filename string, size int64, reader io.ReadCloser) error {
-		fpath := dir + "/" + strings.Replace(filename, "/", "_", -1)
+		fpath := dir + "/" + strings.ReplaceAll(filename, "/", "_")
 		f, err := os.Create(fpath)
 		if err != nil {
 			return ErrCouldNotWriteToDisk

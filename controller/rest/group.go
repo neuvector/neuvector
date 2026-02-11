@@ -94,7 +94,7 @@ func handlerGroupBrief(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	for _, cached := range allCached {
 		if len(cached) > 1 && len(query.sorts) > 0 {
 			// Convert struct slice to interface slice
-			var data []interface{} = make([]interface{}, len(cached))
+			var data = make([]interface{}, len(cached))
 			for i, d := range cached {
 				data[i] = d
 			}
@@ -199,7 +199,7 @@ func handlerGroupList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	for _, cached := range allCached {
 		if len(cached) > 1 && len(query.sorts) > 0 {
 			// Convert struct slice to interface slice
-			var data []interface{} = make([]interface{}, len(cached))
+			var data = make([]interface{}, len(cached))
 			for i, d := range cached {
 				data[i] = d
 			}
@@ -404,7 +404,8 @@ func validateLearnGroupConfig(rg *api.RESTGroupConfig) (int, string) {
 		if ct.Op != share.CriteriaOpEqual {
 			e = "Learned group can only have operation exact match"
 		} else {
-			if ct.Key == share.CriteriaKeyService {
+			switch ct.Key {
+			case share.CriteriaKeyService:
 				if isNvIpGroup {
 					e = "Learned ip service group does not allow service criteria"
 				} else {
@@ -418,7 +419,7 @@ func validateLearnGroupConfig(rg *api.RESTGroupConfig) (int, string) {
 						}
 					}
 				}
-			} else if ct.Key == share.CriteriaKeyDomain {
+			case share.CriteriaKeyDomain:
 				if domainFind {
 					e = "Learned group only allows one domain criteria"
 				} else {
@@ -427,7 +428,7 @@ func validateLearnGroupConfig(rg *api.RESTGroupConfig) (int, string) {
 						e = fmt.Sprintf("Learned group domain does not match between name and criteria(key: %s, value: %s)", ct.Key, ct.Value)
 					}
 				}
-			} else {
+			default:
 				if isNvIpGroup {
 					// only domain criterion(if exists) will be kept. All other criteria will be dropped for crd nv.ip.xxx groups
 				} else {
@@ -1041,13 +1042,14 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 	// Leave the duplication check in cacher
 
 	if err := cacher.CreateService(rg, acc); err != nil {
-		if err == common.ErrObjectAccessDenied {
+		switch err {
+		case common.ErrObjectAccessDenied:
 			restRespNotFoundLogAccessDenied(w, login, err)
-		} else if err == common.ErrObjectExists {
+		case common.ErrObjectExists:
 			e := "Service already exists"
 			log.WithFields(log.Fields{"name": rg.Name, "domain": rg.Domain}).Error(e)
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
-		} else {
+		default:
 			log.WithFields(log.Fields{"error": err}).Error()
 			restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 		}
@@ -1150,8 +1152,8 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	var qualified bool = false    // Used to respond BadRequest if no group can be configured.
-	var managedByCRD bool = false // Used to respond BadRequest if one group is managed by CRD.
+	var qualified = false    // Used to respond BadRequest if no group can be configured.
+	var managedByCRD = false // Used to respond BadRequest if one group is managed by CRD.
 	for _, svc := range rc.Services {
 		name := api.LearnedGroupPrefix + svc
 		if svc == api.AllHostGroup {
@@ -1171,8 +1173,8 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 
 		qualified = true
 
-		var changed bool = false
-		var profileChanged bool = false
+		var changed = false
+		var profileChanged = false
 		var baselineChanged bool
 		if rc.PolicyMode != nil {
 			if cacher.IsGroupPolicyModeChangeable(name) {
@@ -1227,8 +1229,8 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	if !qualified {
-		var status int = http.StatusNotFound
-		var code int = api.RESTErrObjectNotFound
+		var status = http.StatusNotFound
+		var code = api.RESTErrObjectNotFound
 		if managedByCRD {
 			status = http.StatusBadRequest
 			code = api.RESTErrOpNotAllowed
@@ -1354,7 +1356,7 @@ func handlerServiceList(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	// Sort
 	if len(cached) > 1 && len(query.sorts) > 0 {
 		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
+		var data = make([]interface{}, len(cached))
 		for i, d := range cached {
 			data[i] = d
 		}
@@ -1597,8 +1599,8 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	var qualified bool = false    // Used to respond BadRequest if no group can be configured.
-	var managedByCRD bool = false // Used to respond BadRequest if one group is managed by CRD.
+	var qualified = false    // Used to respond BadRequest if no group can be configured.
+	var managedByCRD = false // Used to respond BadRequest if one group is managed by CRD.
 	for _, svc := range rc.Services {
 		name := api.LearnedGroupPrefix + svc
 		if svc == api.AllHostGroup {
@@ -1618,7 +1620,7 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 
 		qualified = true
 
-		var changed bool = false
+		var changed = false
 		if rc.PolicyMode != nil {
 			if grp.PolicyMode != *rc.PolicyMode && cacher.IsGroupPolicyModeChangeable(name) {
 				grp.PolicyMode = *rc.PolicyMode
@@ -1640,8 +1642,8 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 	}
 
 	if !qualified {
-		var status int = http.StatusNotFound
-		var code int = api.RESTErrObjectNotFound
+		var status = http.StatusNotFound
+		var code = api.RESTErrObjectNotFound
 		if managedByCRD {
 			status = http.StatusBadRequest
 			code = api.RESTErrOpNotAllowed
@@ -1692,8 +1694,8 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	var qualified bool = false    // Used to respond BadRequest if no group can be configured.
-	var managedByCRD bool = false // Used to respond BadRequest if one group is managed by CRD.
+	var qualified = false    // Used to respond BadRequest if no group can be configured.
+	var managedByCRD = false // Used to respond BadRequest if one group is managed by CRD.
 	for _, svc := range rc.Services {
 		name := api.LearnedGroupPrefix + svc
 		if svc == api.AllHostGroup {
@@ -1713,8 +1715,8 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 
 		qualified = true
 
-		var changed bool = false
-		var profileChanged bool = false
+		var changed = false
+		var profileChanged = false
 		var baselineChanged bool
 		if rc.ProfileMode != nil {
 			if grp.ProfileMode != *rc.ProfileMode && cacher.IsGroupPolicyModeChangeable(name) {
@@ -1757,8 +1759,8 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 	}
 
 	if !qualified {
-		var status int = http.StatusNotFound
-		var code int = api.RESTErrObjectNotFound
+		var status = http.StatusNotFound
+		var code = api.RESTErrObjectNotFound
 		if managedByCRD {
 			status = http.StatusBadRequest
 			code = api.RESTErrOpNotAllowed
@@ -1878,32 +1880,34 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 				if nvCrList.Kind == "List" {
 					if len(nvCrList.Items) > 0 {
 						nvCr := nvCrList.Items[0]
-						if nvCr.Kind == resource.NvGroupDefKind {
+						switch nvCr.Kind {
+						case resource.NvGroupDefKind:
 							var nvGrpDefList resource.NvGroupDefinitionList
 							if err = json.Unmarshal(jsonData, &nvGrpDefList); err == nil {
 								nvGrpDefs = append(nvGrpDefs, nvGrpDefList.Items...)
 							}
-						} else if nvCr.Kind == resource.NvClusterSecurityRuleKind || nvCr.Kind == resource.NvSecurityRuleKind {
+						case resource.NvClusterSecurityRuleKind, resource.NvSecurityRuleKind:
 							var nvSecRuleList resource.NvSecurityRuleList
 							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
 								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
 							}
-						} else {
+						default:
 							err = fmt.Errorf("kind: %s", nvCr.Kind)
 						}
 					}
 				} else {
-					if nvCrList.Kind == resource.NvGroupDefKind {
+					switch nvCrList.Kind {
+					case resource.NvGroupDefKind:
 						var nvGrpDef resource.NvGroupDefinition
 						if err = json.Unmarshal(jsonData, &nvGrpDef); err == nil {
 							nvGrpDefs = append(nvGrpDefs, nvGrpDef)
 						}
-					} else if nvCrList.Kind == resource.NvClusterSecurityRuleKind || nvCrList.Kind == resource.NvSecurityRuleKind {
+					case resource.NvClusterSecurityRuleKind, resource.NvSecurityRuleKind:
 						var nvSecRule resource.NvSecurityRule
 						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
 							nvSecRules = append(nvSecRules, nvSecRule)
 						}
-					} else {
+					default:
 						err = fmt.Errorf("kind: %s", nvCrList.Kind)
 					}
 				}

@@ -108,11 +108,12 @@ func readRawBuildInfo(x exe, checkOnly bool) (string, string, error) {
 			bo = binary.LittleEndian
 		}
 		var readPtr func([]byte) uint64
-		if ptrSize == 4 {
+		switch ptrSize {
+		case 4:
 			readPtr = func(b []byte) uint64 { return uint64(bo.Uint32(b)) }
-		} else if ptrSize == 8 {
+		case 8:
 			readPtr = bo.Uint64
-		} else {
+		default:
 			return "", "", errNotGoExe
 		}
 		vers = readString(x, ptrSize, readPtr, readPtr(data[16:]))

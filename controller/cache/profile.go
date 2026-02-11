@@ -246,14 +246,15 @@ func (m *CacheMethod) GetProcessProfile(group string, acc *access.AccessControl)
 func (m *CacheMethod) GetAllProcessProfile(scope string, acc *access.AccessControl) [][]*api.RESTProcessProfile {
 	var getLocal, getFed bool
 	var localGrpsCount, fedGrpsCount int
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getFed = true
 		getLocal = true
-	} else {
+	default:
 		return nil
 	}
 

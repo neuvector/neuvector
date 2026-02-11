@@ -42,7 +42,7 @@ func Connect(ipAddr string, port int) (*OvsdbClient, error) {
 		port = DEFAULT_PORT
 	}
 
-	target := fmt.Sprintf("%s:%d", ipAddr, port)
+	target := net.JoinHostPort(ipAddr, fmt.Sprintf("%d", port))
 	conn, err := net.Dial("tcp", target)
 
 	if err != nil {

@@ -152,7 +152,7 @@ func ctrl2REST(cache *ctrlCache) *api.RESTController {
 }
 
 func translateWorkloadApps(wl *share.CLUSWorkload) []string {
-	var app_set utils.Set = utils.NewSet()
+	var app_set = utils.NewSet()
 
 	for _, app := range wl.Apps {
 		noApp := false
@@ -537,7 +537,7 @@ func addrOrchHostDelete(ipnets []net.IPNet) {
 
 // With cachMutex held
 func addrDeviceAdd(id string, ifaces map[string][]share.CLUSIPAddr) {
-	var addcnt int = 0
+	var addcnt = 0
 	for _, addrs := range ifaces {
 		for _, addr := range addrs {
 			switch addr.Scope {
@@ -2183,7 +2183,7 @@ func refreshInternalIPNet() {
 }
 
 func getPortsForApplication(wl *share.CLUSWorkload, application uint32) string {
-	var ports string = ""
+	var ports = ""
 	for port, app := range wl.Apps {
 		if app.Application == application || app.Proto == application {
 			if ports == "" {

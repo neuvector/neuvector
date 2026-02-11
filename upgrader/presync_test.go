@@ -55,13 +55,13 @@ func ErrorInjector(t *testing.T, clientInit func() *fake.FakeDynamicClient, f fu
 		} else {
 			client = clientInit()
 		}
-		client.Fake.PrependReactor("create", "*", handler)
-		client.Fake.PrependReactor("get", "*", handler)
+		client.PrependReactor("create", "*", handler)
+		client.PrependReactor("get", "*", handler)
 		// Note: we couldn't deal with list for now because it's used in goroutine of watcher, which will automatically retry.
 		//client.Fake.PrependReactor("list", "*", handler)
-		client.Fake.PrependReactor("patch", "*", handler)
-		client.Fake.PrependReactor("update", "*", handler)
-		client.Fake.PrependReactor("delete", "*", handler)
+		client.PrependReactor("patch", "*", handler)
+		client.PrependReactor("update", "*", handler)
+		client.PrependReactor("delete", "*", handler)
 
 		ctx := cli.NewContext(nil, nil, nil)
 

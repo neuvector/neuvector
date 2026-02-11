@@ -717,9 +717,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 		for _, s := range header.Sections {
 			if s == api.ConfSectionAll || s == api.ConfSectionConfig {
 				key := share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey)
-				if importFedRole == api.FedRoleNone {
+				switch importFedRole {
+				case api.FedRoleNone:
 					_ = cluster.Delete(key)
-				} else if importFedRole == api.FedRoleJoint {
+				case api.FedRoleJoint:
 					scanRevs := share.CLUSFedScanRevisions{
 						ScannedRegRevs: make(map[string]uint64),
 					}
@@ -763,9 +764,11 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				}
 			}
 
-			if ep.name == share.CFGEndpointFederation {
+			switch ep.name {
+			case share.CFGEndpointFederation:
 				subKey := share.CLUSKeyNthToken(key, 3)
-				if subKey == share.CLUSFedMembershipSubKey {
+				switch subKey {
+				case share.CLUSFedMembershipSubKey:
 					if ignoreFed {
 						var m share.CLUSFedMembership
 						b, _ := json.Marshal(m)
@@ -789,10 +792,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						// otherwise, Import() doesn't change the existing clusters membership.
 						return nil
 					}
-				} else if subKey == share.CLUSFedClustersSubKey {
+				case share.CLUSFedClustersSubKey:
 					// do not change the joint clusters list no matter what
 					return nil
-				} else if subKey == share.CLUSFedRulesRevisionSubKey {
+				case share.CLUSFedRulesRevisionSubKey:
 					if currFedRole == api.FedRoleMaster || importFedRole == api.FedRoleMaster {
 						// force a full fed rules sync because fed rules could have changed because of import
 						if currFedRulesRev == nil {
@@ -807,7 +810,7 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						return nil
 					}
 				}
-			} else if ep.name == share.CFGEndpointUser {
+			case share.CFGEndpointUser:
 				var u share.CLUSUser
 				for _, field := range []string{"block_login_since", "last_login_at", "pwd_reset_time"} {
 					strOld := fmt.Sprintf("\"%s\":\"\"", field)

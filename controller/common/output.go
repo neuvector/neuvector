@@ -45,11 +45,12 @@ func NewSyslogger(cfg *share.CLUSSyslogConfig) *Syslogger {
 	} else {
 		server = cfg.SyslogServer
 	}
-	if cfg.SyslogIPProto == syscall.IPPROTO_TCP {
+	switch cfg.SyslogIPProto {
+	case syscall.IPPROTO_TCP:
 		proto = "tcp"
-	} else if cfg.SyslogIPProto == api.SyslogProtocolTCPTLS {
+	case api.SyslogProtocolTCPTLS:
 		proto = "tcp+tls"
-	} else {
+	default:
 		proto = "udp"
 	}
 	prio, _ := LevelToPrio(cfg.SyslogLevel)

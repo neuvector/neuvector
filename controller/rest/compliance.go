@@ -573,7 +573,7 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	json_data, _ := os.ReadFile(importTask.TempFilename)
 	var secRuleList resource.NvCompProfileSecurityRuleList
 	var secRule resource.NvCompProfileSecurityRule
-	var secRules []resource.NvCompProfileSecurityRule = []resource.NvCompProfileSecurityRule{}
+	var secRules = []resource.NvCompProfileSecurityRule{}
 	var invalidCrdKind bool
 	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {

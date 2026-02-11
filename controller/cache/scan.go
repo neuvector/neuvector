@@ -163,15 +163,16 @@ func (t *scanTask) rpcScanRunning(scanner string, info *scanInfo) {
 	var result *share.ScanResult
 	var err error
 
-	if info.objType == share.ScanObjectType_CONTAINER {
+	switch info.objType {
+	case share.ScanObjectType_CONTAINER:
 		result, err = rpc.ScanRunning(scanner, info.agentId, t.id, share.ScanObjectType_CONTAINER, scanReqTimeout)
-	} else if info.objType == share.ScanObjectType_HOST {
+	case share.ScanObjectType_HOST:
 		result, err = rpc.ScanRunning(scanner, info.agentId, t.id, share.ScanObjectType_HOST, scanReqTimeout)
 		if result != nil {
 			// TODO: this is a temp. solution to add RancherOS CVEs. Should be added in the database.
 			result, err = appendRancherOSCVE(t.id, result, err)
 		}
-	} else {
+	default:
 		// Do we need get version again? Can k8s be upgraded without restarting controller?
 		cctx.k8sVersion, cctx.ocVersion = global.ORCH.GetVersion(false, false)
 		result, err = rpc.ScanPlatform(scanner, cctx.k8sVersion, cctx.ocVersion, scanReqTimeout)
@@ -699,11 +700,12 @@ func scanMapAdd(taskId string, agentId string, idns []api.RESTIDName, objType sh
 	// When controller starts, scanStateHandler maybe called before the object is added.
 	// We simulate the call if this is a new object
 	var skey string
-	if objType == share.ScanObjectType_CONTAINER {
+	switch objType {
+	case share.ScanObjectType_CONTAINER:
 		skey = share.CLUSScanStateWorkloadKey(taskId)
-	} else if objType == share.ScanObjectType_HOST {
+	case share.ScanObjectType_HOST:
 		skey = share.CLUSScanStateHostKey(taskId)
-	} else {
+	default:
 		skey = share.CLUSScanStatePlatformKey(taskId)
 	}
 
@@ -756,13 +758,14 @@ func scanMapDelete(taskId string) {
 
 		/* delete scan report if any */
 		var key, skey string
-		if info.objType == share.ScanObjectType_CONTAINER {
+		switch info.objType {
+		case share.ScanObjectType_CONTAINER:
 			key = share.CLUSScanDataWorkloadKey(taskId)
 			skey = share.CLUSScanStateWorkloadKey(taskId)
-		} else if info.objType == share.ScanObjectType_HOST {
+		case share.ScanObjectType_HOST:
 			key = share.CLUSScanDataHostKey(taskId)
 			skey = share.CLUSScanStateHostKey(taskId)
-		} else if info.objType == share.ScanObjectType_PLATFORM {
+		case share.ScanObjectType_PLATFORM:
 			key = share.CLUSScanDataPlatformKey(taskId)
 			skey = share.CLUSScanStatePlatformKey(taskId)
 		}
@@ -960,11 +963,12 @@ func putScanReportToCluster(id string, info *scanInfo, result *share.ScanResult)
 	}).Debug("")
 
 	var key string
-	if info.objType == share.ScanObjectType_CONTAINER {
+	switch info.objType {
+	case share.ScanObjectType_CONTAINER:
 		key = share.CLUSScanDataWorkloadKey(id)
-	} else if info.objType == share.ScanObjectType_HOST {
+	case share.ScanObjectType_HOST:
 		key = share.CLUSScanDataHostKey(id)
-	} else {
+	default:
 		key = share.CLUSScanDataPlatformKey(id)
 	}
 
@@ -983,11 +987,12 @@ func putScanReportToCluster(id string, info *scanInfo, result *share.ScanResult)
 func updateScanState(id string, nType share.ScanObjectType, status string) {
 	cctx.ScanLog.WithFields(log.Fields{"id": id, "status": status}).Debug("")
 	var skey string
-	if nType == share.ScanObjectType_CONTAINER {
+	switch nType {
+	case share.ScanObjectType_CONTAINER:
 		skey = share.CLUSScanStateWorkloadKey(id)
-	} else if nType == share.ScanObjectType_HOST {
+	case share.ScanObjectType_HOST:
 		skey = share.CLUSScanStateHostKey(id)
-	} else {
+	default:
 		skey = share.CLUSScanStatePlatformKey(id)
 	}
 
@@ -1029,20 +1034,22 @@ func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte)
 		brief := &api.RESTScanBrief{
 			Status: state.Status,
 		}
-		if info.objType == share.ScanObjectType_CONTAINER {
+		switch info.objType {
+		case share.ScanObjectType_CONTAINER:
 			if c := getWorkloadCache(id); c != nil {
 				c.scanBrief = brief
 			}
-		} else if info.objType == share.ScanObjectType_HOST {
+		case share.ScanObjectType_HOST:
 			if c := getHostCache(id); c != nil {
 				c.scanBrief = brief
 			}
 		}
-		if state.Status == api.ScanStatusScheduled {
+		switch state.Status {
+		case api.ScanStatusScheduled:
 			info.status = statusScanScheduled
-		} else if state.Status == api.ScanStatusIdle {
+		case api.ScanStatusIdle:
 			info.status = statusScanNone
-		} else if state.Status == api.ScanStatusScanning {
+		case api.ScanStatusScanning:
 			info.status = statusScanning
 		}
 		return
@@ -1052,13 +1059,14 @@ func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte)
 	var objType share.ScanObjectType
 	var dkey string
 	t := share.CLUSScanStateKey2Type(key)
-	if t == "workload" {
+	switch t {
+	case "workload":
 		objType = share.ScanObjectType_CONTAINER
 		dkey = share.CLUSScanDataWorkloadKey(id)
-	} else if t == "host" {
+	case "host":
 		objType = share.ScanObjectType_HOST
 		dkey = share.CLUSScanDataHostKey(id)
-	} else {
+	default:
 		objType = share.ScanObjectType_PLATFORM
 		dkey = share.CLUSScanDataPlatformKey(id)
 	}
@@ -1354,7 +1362,7 @@ func scanBecomeScanner() {
 
 func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners uint32, taskCount int) {
 	var setTimeWindow bool
-	var newReplicas uint32 = totalScanners
+	var newReplicas = totalScanners
 
 	if taskCount == 0 {
 		// there is no scanning task waiting in the queue now
@@ -1373,13 +1381,14 @@ func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners 
 		}
 	} else {
 		// there is scanning task waiting in the queue now
-		if autoscaleCfg.Strategy == api.AutoScaleImmediate {
+		switch autoscaleCfg.Strategy {
+		case api.AutoScaleImmediate:
 			// increase scanner count by 1 with immediate stragedy.
 			// it could take about 0 ~ 1 minute to start a new scanner considering scannerTicker is 1 minute
 			newReplicas = newReplicas + 1
 			lastTaskQState = task_Q_NonEmpty
 			setTimeWindow = true // reset calculation time window
-		} else if autoscaleCfg.Strategy == api.AutoScaleDelayed {
+		case api.AutoScaleDelayed:
 			if lastTaskQState == task_Q_Unknown || lastTaskQState == task_Q_Empty {
 				// init/had no scanning task -> has scanning task now
 				lastTaskQState = task_Q_NonEmpty
@@ -1524,15 +1533,15 @@ func fillScanBrief(info *scanInfo, critical, high, med int) *api.RESTScanBrief {
 		brief.Status = api.ScanStatusScanning
 	case statusScanNone:
 		if !info.lastScanTime.IsZero() {
-			if info.lastResult == share.ScanErrorCode_ScanErrNone {
+			switch info.lastResult {
+			case share.ScanErrorCode_ScanErrNone:
 				brief.Status = api.ScanStatusFinished
 				brief.CriticalVuls = critical
 				brief.HighVuls = high
 				brief.MedVuls = med
-			} else if info.lastResult == share.ScanErrorCode_ScanErrNotSupport ||
-				info.lastResult == share.ScanErrorCode_ScanErrContainerExit {
+			case share.ScanErrorCode_ScanErrNotSupport, share.ScanErrorCode_ScanErrContainerExit:
 				brief.Status = api.ScanStatusFinished
-			} else {
+			default:
 				brief.Status = api.ScanStatusFailed
 			}
 			brief.ScannedTimeStamp = info.lastScanTime.Unix()
@@ -1704,7 +1713,7 @@ func ExtractVulAttributes(vulsb []byte, indsStr string) []string {
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	Vuls = vpf.FilterVuls(Vuls, inds)
 
-	var cveSet utils.Set = utils.NewSet()
+	var cveSet = utils.NewSet()
 	for _, vul := range Vuls {
 		if cveSet.Contains(vul.Name) {
 			continue
@@ -1745,7 +1754,7 @@ func FillVulPackages(mu *sync.Mutex, cvePackages map[string]map[string]utils.Set
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	Vuls = vpf.FilterVuls(Vuls, idns)
 
-	var cveSet utils.Set = utils.NewSet()
+	var cveSet = utils.NewSet()
 	mu.Lock()
 	for _, vul := range Vuls {
 		if _, exist := cvePackages[vul.Name]; exist {

@@ -33,7 +33,7 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	var notSupported string = "No support package available for download"
+	var notSupported = "No support package available for download"
 
 	// do not support on standalone cluster on no csp
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleNone {

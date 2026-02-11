@@ -753,19 +753,20 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 	}
 
 	// profile, ==  severityType, possible values are [all/high/medium/low]
-	if q.SeverityType == "high" {
+	switch q.SeverityType {
+	case "high":
 		expectedMeetCount += 1
 
 		if vulasset.Severity == "High" {
 			meetCount += 1
 		}
-	} else if q.SeverityType == "medium" {
+	case "medium":
 		expectedMeetCount += 1
 
 		if vulasset.Severity == "Medium" {
 			meetCount += 1
 		}
-	} else if q.SeverityType == "low" {
+	case "low":
 		expectedMeetCount += 1
 
 		if vulasset.Severity == "Low" {

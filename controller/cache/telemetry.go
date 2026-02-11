@@ -31,7 +31,7 @@ func getTelemetryData(telemetryFreq uint) (bool, common.TelemetryData) {
 		_ = json.Unmarshal(value, &nvUpgradeInfo)
 		lastUploadTime = nvUpgradeInfo.LastUploadTime
 	}
-	var past time.Duration = time.Minute * time.Duration(telemetryFreq)
+	var past = time.Minute * time.Duration(telemetryFreq)
 	if time.Since(lastUploadTime) < past {
 		cacheMutexRUnlock()
 		return false, teleData
@@ -50,9 +50,10 @@ func getTelemetryData(telemetryFreq uint) (bool, common.TelemetryData) {
 	fedRole = fedMembershipCache.FedRole
 	fedCacheMutexRUnlock()
 	// PrimaryCluster/WorkerClusters fields are only sent by master cluster when a cluster is in federate
-	if fedRole == api.FedRoleNone {
+	switch fedRole {
+	case api.FedRoleNone:
 		teleData.Clusters = 1
-	} else if fedRole == api.FedRoleMaster {
+	case api.FedRoleMaster:
 		teleData.Clusters = len(fedJoinedClustersCache) + 1
 		teleData.PrimaryCluster = 1
 	}

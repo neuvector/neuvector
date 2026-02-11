@@ -497,7 +497,7 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 }
 
 func (p *Probe) addContainer(id string, proc *procInternal, scanMode bool) {
-	var pid int = proc.pid
+	var pid = proc.pid
 	c := &procContainer{
 		id: id,
 		//	rootPid:  pid, 	// must rely on external api, like docker
@@ -675,12 +675,13 @@ func truncateStrSlices(strs []string, length int) string {
 // Debug purpose:
 func (p *Probe) printProcReport(id string, proc *procInternal) {
 	var s string
-	if id == "" {
+	switch id {
+	case "":
 		s = "[host]"
-	} else if id == p.selfID {
+	case p.selfID:
 		// s = "[self]"
 		return // hide all information
-	} else {
+	default:
 		s = fmt.Sprintf("[%s]", id[:4])
 	}
 
@@ -848,10 +849,11 @@ func (p *Probe) evalNewRunningApp(pid int) {
 
 func (p *Probe) addContainerCandidateFromProc(proc *procInternal) (*procContainer, bool) {
 	c, res := p.addContainerCandidate(proc, false)
-	if res == 1 {
+	switch res {
+	case 1:
 		//	log.WithFields(log.Fields{"pid": proc.pid}).Info("PROC: Found new container from process")
 		return c, true
-	} else if res == 0 { // new container process
+	case 0: // new container process
 		return c, true
 	}
 	return nil, false
@@ -1182,7 +1184,7 @@ func (p *Probe) handleProcExec(pid int, bInit bool) (bKubeProc bool) {
 	// log.Debug("PROC: exec: ", pid)
 	var proc *procInternal
 	var c, c1 *procContainer
-	var id string = ""
+	var id = ""
 	var ok, bEvalFlag bool
 
 	if proc, ok = p.pidProcMap[pid]; ok {
@@ -1707,7 +1709,8 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 	var bSshdDashD bool
 	//ssh has three layers: daemon --> backend "sshd -D -R" or "sshd: [accepted]")--> sshd session
 	//we only need to report the sshd session, skip those middle processes.
-	if proc.name == "sshd" {
+	switch proc.name {
+	case "sshd":
 		// "-R" is a replicate of sshd
 		for _, cmd := range proc.cmds {
 			if cmd == "-R" {
@@ -1729,7 +1732,7 @@ func (p *Probe) skipSuspicious(id string, proc *procInternal) (bool, bool) {
 			// log.WithFields(log.Fields{"cmds": proc.cmds, "len": len(proc.cmds)}).Debug("PROC: sshd len=1")
 			return proc.cmds[0] == proc.name, true
 		}
-	} else if proc.name == "nc" || proc.name == "ncat" || proc.name == "netcat" { // possible health check application
+	case "nc", "ncat", "netcat": // possible health check application
 		if id == "" { // The health check is not valid for the node(host)
 			return false, false
 		}

@@ -316,9 +316,10 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if verifier.VerifierType == "keyless" {
+	switch verifier.VerifierType {
+	case "keyless":
 		verifier.PublicKey = ""
-	} else if verifier.VerifierType == "keypair" {
+	case "keypair":
 		verifier.CertIssuer = ""
 		verifier.CertSubject = ""
 	}

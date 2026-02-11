@@ -102,9 +102,10 @@ func logLevelComp(level1, level2 string) (int, error) {
 }
 
 func selectResPolicyCache(policyName string) *resPolicyCacheType {
-	if policyName == share.DefaultPolicyName {
+	switch policyName {
+	case share.DefaultPolicyName:
 		return &localResPolicyCache
-	} else if policyName == share.FedPolicyName {
+	case share.FedPolicyName:
 		return &fedResPolicyCache
 	}
 	log.WithFields(log.Fields{"policyName": policyName}).Error("Response policy cache not found")
@@ -150,7 +151,8 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		if cfgType == share.CLUSResCfgRule {
+		switch cfgType {
+		case share.CLUSResCfgRule:
 			var rule share.CLUSResponseRule
 			_ = json.Unmarshal(value, &rule)
 			if exist, ok := resPolicyCache.ruleMap[rule.ID]; ok {
@@ -170,14 +172,15 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 					groupCacheMap[rule.Group] = gc
 				}
 			}
-		} else if cfgType == share.CLUSResCfgRuleList {
+		case share.CLUSResCfgRuleList:
 			var heads []*share.CLUSRuleHead
 			_ = json.Unmarshal(value, &heads)
 			resPolicyCache.ruleHeads = heads
 			resPolicyCache.ruleOrderMap = ruleHeads2OrderMap(heads)
 		}
 	case cluster.ClusterNotifyDelete:
-		if cfgType == share.CLUSResCfgRule {
+		switch cfgType {
+		case share.CLUSResCfgRule:
 			id := share.CLUSPolicyRuleKey2ID(key)
 			if exist, ok := resPolicyCache.ruleMap[id]; ok {
 				if gc, ok := groupCacheMap[exist.Group]; ok {
@@ -185,7 +188,7 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 				}
 				delete(resPolicyCache.ruleMap, id)
 			}
-		} else if cfgType == share.CLUSResCfgRuleList {
+		case share.CLUSResCfgRuleList:
 			resPolicyCache.ruleHeads = make([]*share.CLUSRuleHead, 0)
 			resPolicyCache.ruleOrderMap = ruleHeads2OrderMap(resPolicyCache.ruleHeads)
 		}
@@ -194,7 +197,7 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 
 func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {
 	// AND op within a rule. Return false if one criterion doesn't match
-	var match bool = true
+	var match = true
 	for _, d := range conds {
 		switch d.CondType {
 		case share.EventCondTypeName:

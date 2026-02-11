@@ -284,7 +284,7 @@ func (m *consulMethod) Start(cc *ClusterConfig, eCh chan error, recover bool) {
 		if isBootstrap(cc) {
 			args = append(args, "-bootstrap")
 		} else {
-			var haveSelf bool = false
+			var haveSelf = false
 			for _, ip := range cc.joinAddrList {
 				if ip == cc.AdvertiseAddr {
 					haveSelf = true
@@ -965,7 +965,7 @@ func (m *consulMethod) GetAllMembers() []ClusterMemberInfo {
 		return nil
 	}
 
-	var nodes []ClusterMemberInfo = make([]ClusterMemberInfo, len(curMembers))
+	var nodes = make([]ClusterMemberInfo, len(curMembers))
 	for i, mem := range curMembers {
 		nodes[i].Name = mem.Name
 		if mem.Tags["role"] == "consul" {
@@ -1201,11 +1201,12 @@ func stateUpdateCallback(checks []*api.HealthCheck) {
 		}
 
 		log.WithFields(log.Fields{"Node": check.Node, "Status": check.Status}).Debug("")
-		if check.Status == "passing" {
+		switch check.Status {
+		case "passing":
 			notif = ClusterNotifyStateOnline
-		} else if check.Status == "critical" {
+		case "critical":
 			notif = ClusterNotifyStateOffline
-		} else {
+		default:
 			continue
 		}
 		for _, watcher := range stateWatchers {
@@ -1308,7 +1309,7 @@ func storeUpdateCallback(idx uint64, store string, data interface{}) {
 
 	// Found new or modified key/value pairs
 	for _, kv := range kvs {
-		var notify bool = false
+		var notify = false
 
 		_, ok = cache[kv.Key]
 		if !ok {

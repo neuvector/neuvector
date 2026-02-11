@@ -227,7 +227,7 @@ func TestGroupPolicyMode(t *testing.T) {
 	systemConfigCache.NewServiceProfileMode = share.PolicyModeEvaluate
 
 	policyApplyIngress = true // k8s
-	var extIPs []net.IP = make([]net.IP, 0)
+	var extIPs = make([]net.IP, 0)
 	extIPs = append(extIPs, net.ParseIP("1.1.1.1"))
 	extIPs = append(extIPs, net.ParseIP("2.2.2.2"))
 

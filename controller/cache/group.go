@@ -1680,14 +1680,15 @@ func (m CacheMethod) DoesGroupExist(name string, acc *access.AccessControl) (boo
 
 func (m CacheMethod) GetGroupCount(scope string, acc *access.AccessControl) int {
 	var countLocal, countFed bool
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		countLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		countFed = true
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		countFed = true
 		countLocal = true
-	} else {
+	default:
 		return 0
 	}
 
@@ -1756,15 +1757,16 @@ func (m CacheMethod) GetGroupDetail(name string, view string, withCap bool, acc 
 func (m CacheMethod) GetAllGroups(scope, view string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroup {
 	var getLocal, getFed bool
 	var localGrpsCount, fedGrpsCount int
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
 		fedGrpsCount += 2
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 
@@ -1821,15 +1823,16 @@ func (m CacheMethod) GetAllGroups(scope, view string, withCap bool, acc *access.
 func (m CacheMethod) GetAllGroupsBrief(scope string, withCap bool, acc *access.AccessControl) [][]*api.RESTGroupBrief {
 	var getLocal, getFed bool
 	var localGrpsCount, fedGrpsCount int
-	if scope == share.ScopeLocal {
+	switch scope {
+	case share.ScopeLocal:
 		getLocal = true
-	} else if scope == share.ScopeFed {
+	case share.ScopeFed:
 		getFed = true
 		fedGrpsCount += 2
-	} else if scope == share.ScopeAll {
+	case share.ScopeAll:
 		getLocal = true
 		getFed = true
-	} else {
+	default:
 		return nil
 	}
 

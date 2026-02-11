@@ -384,9 +384,9 @@ func (d *tcPipeDriver) GetPortPairRules(pair *InterceptPair) (string, string, st
 		exEnfRules, _ = shellCombined(cmd)
 	}
 
-	return strings.Replace(string(inRules[:]), "\t", "    ", -1),
-		strings.Replace(string(exRules[:]), "\t", "    ", -1),
-		strings.Replace(string(inEnfRules[:])+string(exEnfRules[:]), "\t", "    ", -1)
+	return strings.ReplaceAll(string(inRules[:]), "\t", "    "),
+		strings.ReplaceAll(string(exRules[:]), "\t", "    "),
+		strings.ReplaceAll(string(inEnfRules[:])+string(exEnfRules[:]), "\t", "    ")
 }
 
 func (d *tcPipeDriver) Connect(jumboframe bool) {

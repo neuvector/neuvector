@@ -46,8 +46,8 @@ func parseFileFilter(filter string) (string, string, bool) {
 		strings.Contains(filter, "/./") {
 		return "", "", false
 	}
-	filter = strings.Replace(filter, ".", "\\.", -1)
-	filter = strings.Replace(filter, "*", ".*", -1)
+	filter = strings.ReplaceAll(filter, ".", "\\.")
+	filter = strings.ReplaceAll(filter, "*", ".*")
 	if a := strings.LastIndex(filter, "/"); a >= 0 {
 		base = filter[:a]
 		regxStr = filter[a+1:]

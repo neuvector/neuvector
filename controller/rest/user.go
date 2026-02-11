@@ -472,7 +472,7 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 }
 
 func applyRoleChange(old *share.CLUSUser, new *api.RESTUserConfig) (*share.CLUSUser, bool) {
-	var roleMod bool = false
+	var roleMod = false
 	// A dummy user for role change authz. If the role in a domain is change, we set the _reader_ role to
 	// the dummy user, then authorize this dummy user.
 	roleModUser := share.CLUSUser{RoleDomains: make(map[string][]string)}
@@ -1015,7 +1015,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 			return
 		}
 
-		var roleMod bool = false
+		var roleMod = false
 		// A dummy user for role change authz. If the role in a domain is change, we set the _reader_ role to
 		// the dummy user, then authorize this dummy user.
 		roleModUser := share.CLUSUser{RoleDomains: make(map[string][]string)}

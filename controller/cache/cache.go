@@ -878,7 +878,7 @@ func getWafThreatNameSensorGroup(id uint32) (string, string, *[]string) { //waf 
 func getWorkloadDlpGrp(id string, grpname *[]string) string {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
-	var gns string = ""
+	var gns = ""
 	if id != "" {
 		if cache, ok := wlCacheMap[id]; ok {
 			if grpname != nil {
@@ -1529,7 +1529,7 @@ func (m CacheMethod) GetWorkloadCountOnHost(hostID string, view string, acc *acc
 			return 0
 		}
 
-		var count int = 0
+		var count = 0
 		for id := range cache.workloads.Iter() {
 			if wlCache, ok := wlCacheMap[id.(string)]; ok {
 				if !acc.Authorize(wlCache.workload, nil) {
@@ -1616,7 +1616,7 @@ func (m CacheMethod) GetInternalSubnets() *api.RESTInternalSubnets {
 	}
 
 	ret.LearnedInternalSubnets = make([]string, len(cachedInternalSubnets))
-	var i int = 0
+	var i = 0
 	for _, snet := range cachedInternalSubnets {
 		ret.LearnedInternalSubnets[i] = snet.Subnet.String()
 		i++
