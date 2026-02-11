@@ -16,7 +16,6 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/mattn/go-sqlite3"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
