@@ -381,7 +381,7 @@ func handlerGetAdmissionState(w http.ResponseWriter, r *http.Request, ps httprou
 	}*/
 	if k8sPlatform {
 		var svcInfo *admission.ValidateWebhookSvcInfo
-		err, svcInfo = admission.GetValidateWebhookSvcInfo(resource.NvAdmSvcName)
+		svcInfo, err = admission.GetValidateWebhookSvcInfo(resource.NvAdmSvcName)
 		if err != nil {
 			restRespError(w, http.StatusNotFound, svcInfo.Status)
 			return
@@ -446,7 +446,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrK8sNvRBAC, msg)
 		return
 	}
-	if err, svcInfo := admission.GetValidateWebhookSvcInfo(resource.NvAdmSvcName); err != nil {
+	if svcInfo, err := admission.GetValidateWebhookSvcInfo(resource.NvAdmSvcName); err != nil {
 		restRespError(w, http.StatusNotFound, svcInfo.Status)
 		return
 	}
