@@ -645,10 +645,11 @@ func makeLearnedGroupName(svc string) string {
 
 func cbGetLearnedGroupName(id string) (string, bool, bool) {
 	svc, _, bNeuvector := getContainerService(id)
-	if svc == "" {
+	switch svc {
+	case "":
 		log.WithFields(log.Fields{"id": id}).Debug("svc not found")
 		return "", false, false
-	} else if svc == "nodes" {
+	case "nodes":
 		return svc, false, false
 	}
 
@@ -659,11 +660,12 @@ func processPolicyLookup(id, riskType, pname, ppath string, pid, pgid, shellCmd 
 	var svcGroup string
 	var bAllowSuspicious bool
 	svc, capBlock, bNeuvector := getContainerService(id)
-	if svc == "" {
+	switch svc {
+	case "":
 		return "", "", "", "", bAllowSuspicious, errors.New("Service not found")
-	} else if svc == "nodes" {
+	case "nodes":
 		svcGroup = svc
-	} else {
+	default:
 		svcGroup = makeLearnedGroupName(utils.NormalizeForURL(svc))
 	}
 
@@ -1351,9 +1353,10 @@ func systemConfigScript(nType cluster.ClusterNotifyType, key string, value []byt
 		}
 		gp.script = &script
 
-		if gp.group.Kind == share.GroupKindNode {
+		switch gp.group.Kind {
+		case share.GroupKindNode:
 			bench.triggerHostCustomCheck(&script)
-		} else if gp.group.Kind == share.GroupKindContainer {
+		case share.GroupKindContainer:
 			bench.triggerContainerCustomCheck()
 		}
 	case cluster.ClusterNotifyDelete:

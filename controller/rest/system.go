@@ -319,18 +319,20 @@ func calcSecurityScore(metrics *api.RESTRiskScoreMetrics, login *loginSession) a
 		runAsRootScore = MAX_RUN_AS_ROOT_CONTAINER_SCORE
 	}
 	if metrics.DenyAdmCtrlRules == 0 {
-		if metrics.AdmCtrlMode == "" {
+		switch metrics.AdmCtrlMode {
+		case "":
 			admissionRuleScore = MAX_ADMISSION_RULE_SCORE
-		} else if metrics.AdmCtrlMode == share.AdmCtrlModeMonitor {
+		case share.AdmCtrlModeMonitor:
 			admissionRuleScore = MAX_ADMISSION_RULE_SCORE * 0.75
-		} else if metrics.AdmCtrlMode == share.AdmCtrlModeProtect {
+		case share.AdmCtrlModeProtect:
 			admissionRuleScore = MAX_ADMISSION_RULE_SCORE * 0.5
 		}
 	}
 	if metrics.EnabledDenyAdmCtrlRules > 0 {
-		if metrics.AdmCtrlMode == share.AdmCtrlModeMonitor {
+		switch metrics.AdmCtrlMode {
+		case share.AdmCtrlModeMonitor:
 			admissionRuleScore = MAX_ADMISSION_RULE_SCORE * 0.25
-		} else if metrics.AdmCtrlMode == share.AdmCtrlModeProtect {
+		case share.AdmCtrlModeProtect:
 			admissionRuleScore = 0
 		}
 	}
@@ -508,9 +510,10 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 	}
 
 	resp := &api.RESTSystemConfigData{}
-	if scope == share.ScopeFed {
+	switch scope {
+	case share.ScopeFed:
 		resp.FedConfig = fedConf
-	} else if scope == share.ScopeLocal || scope == share.ScopeAll {
+	case share.ScopeLocal, share.ScopeAll:
 		_, rconf.CspType = common.GetMappedCspType(nil, &cctx.CspType)
 		if rconf.CspType == "none" || rconf.CspType == "" {
 			if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
@@ -862,9 +865,10 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 	// check if deleted webhook is inuse
 	if dels.Cardinality() > 0 {
 		var policyName string
-		if cfgType == share.UserCreated {
+		switch cfgType {
+		case share.UserCreated:
 			policyName = share.DefaultPolicyName
-		} else if cfgType == share.FederalCfg {
+		case share.FederalCfg:
 			policyName = share.FedPolicyName
 		}
 		chrs := clusHelper.GetResponseRuleList(policyName)

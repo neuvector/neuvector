@@ -876,11 +876,12 @@ func getDefaultGroupPolicy() share.CLUSGroupIPPolicy {
 		}
 		addr := getWorkloadAddress(cache)
 		policy.From = append(policy.From, &addr)
-		if addr.PolicyMode == share.PolicyModeLearn {
+		switch addr.PolicyMode {
+		case share.PolicyModeLearn:
 			wlLearnList = append(wlLearnList, &addr)
-		} else if addr.PolicyMode == share.PolicyModeEvaluate {
+		case share.PolicyModeEvaluate:
 			wlEvalList = append(wlEvalList, &addr)
-		} else if addr.PolicyMode == share.PolicyModeEnforce {
+		case share.PolicyModeEnforce:
 			wlEnforceList = append(wlEnforceList, &addr)
 		}
 		if wlNode == nil {
