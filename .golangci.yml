@@ -7,6 +7,7 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+    - nolintlint # reports ill-formed or insufficient nolint directives
   exclusions:
     generated: lax
     presets:

@@ -1231,7 +1231,6 @@ func startPolicyThread() {
 	vulProfUpdateTimer = time.NewTimer(vulProfUpdateDelayIdle)
 	vulProfUpdateTimer.Stop()
 
-	//nolint:staticcheck // SA1015
 	syncCheckTicker := time.Tick(time.Second * time.Duration(120))
 
 	// In case there are already learned rule in cluster, fetch the rules.
