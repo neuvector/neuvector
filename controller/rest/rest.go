@@ -108,11 +108,11 @@ const defFedSSLKeyFile = "/etc/neuvector/certs/fed-ssl-cert.key"
 
 const restErrMessageDefault string = "Unknown error"
 
-var restErrNeedAgentWorkloadFilter = errors.New("Enforcer or workload filter must be provided")
-var restErrNeedAgentFilter = errors.New("Enforcer filter must be provided")
-var restErrWorkloadNotFound error = errors.New("Container is not found")
-var restErrAgentNotFound error = errors.New("Enforcer is not found")
-var restErrAgentDisconnected error = errors.New("Enforcer is disconnected")
+var errRESTNeedAgentWorkloadFilter = errors.New("Enforcer or workload filter must be provided")
+var errRESTNeedAgentFilter = errors.New("Enforcer filter must be provided")
+var errRESTWorkloadNotFound error = errors.New("Container is not found")
+var errRESTAgentNotFound error = errors.New("Enforcer is not found")
+var errRESTAgentDisconnected error = errors.New("Enforcer is disconnected")
 
 var checkCrdSchemaFunc func(lead, init, crossCheck bool, cspType share.TCspType) []string
 
@@ -416,7 +416,7 @@ func restRespNotFoundLogAccessDenied(w http.ResponseWriter, login *loginSession,
 		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, "Object not found")
 		log.WithFields(log.Fields{"roles": login.domainRoles}).Error(err.Error())
 		authLog(share.CLUSEvAuthAccessDenied, login.fullname, login.remote, login.id, login.domainRoles, "")
-	case restErrNeedAgentWorkloadFilter, restErrNeedAgentFilter:
+	case errRESTNeedAgentWorkloadFilter, errRESTNeedAgentFilter:
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrNotEnoughFilter, err.Error())
 	default:
 		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
@@ -1110,18 +1110,18 @@ func getAgentFromFilter(filters []restFieldFilter, acc *access.AccessControl) (s
 	if agentID != "" {
 		// Agent ID is specified, authz on agent is required
 		if agent := cacher.GetAgent(agentID, acc); agent == nil {
-			err := restErrAgentNotFound
+			err := errRESTAgentNotFound
 			log.WithFields(log.Fields{"agent": agentID}).Error(err)
 			return agentID, err
 		} else if agent.State == api.StateOffline {
-			err := restErrAgentDisconnected
+			err := errRESTAgentDisconnected
 			log.WithFields(log.Fields{"agent": agentID}).Error(err)
 			return agentID, err
 		}
 		return agentID, nil
 	}
 
-	err := restErrNeedAgentFilter
+	err := errRESTNeedAgentFilter
 	log.Error(err)
 	return "", err
 }
@@ -1143,13 +1143,13 @@ func getAgentWorkloadFromFilter(filters []restFieldFilter, acc *access.AccessCon
 		devID, err := cacher.GetAgentbyWorkload(wlID, acc)
 		if devID == "" {
 			if err != common.ErrObjectAccessDenied {
-				err = restErrWorkloadNotFound
+				err = errRESTWorkloadNotFound
 			}
 			log.WithFields(log.Fields{"workload": wlID}).Error(err)
 			return agentID, wlID, err
 		}
 		if agentID != "" && agentID != devID {
-			err = restErrWorkloadNotFound
+			err = errRESTWorkloadNotFound
 			log.WithFields(log.Fields{"agent": agentID, "id": wlID}).Error(err)
 			return agentID, wlID, err
 		}
@@ -1158,27 +1158,27 @@ func getAgentWorkloadFromFilter(filters []restFieldFilter, acc *access.AccessCon
 
 		// Get agent with read-all, as we have to communicate with the agent.
 		if agent := cacher.GetAgent(agentID, access.NewReaderAccessControl()); agent == nil {
-			err = restErrAgentNotFound
+			err = errRESTAgentNotFound
 			log.WithFields(log.Fields{"agent": agentID}).Error(err)
 			return agentID, wlID, err
 		} else if agent.State == api.StateOffline {
-			err = restErrAgentDisconnected
+			err = errRESTAgentDisconnected
 			log.WithFields(log.Fields{"agent": agentID}).Error(err)
 			return agentID, wlID, err
 		}
 	} else if agentID != "" {
 		// If agent ID is specified, authz on agent is required
 		if agent := cacher.GetAgent(agentID, acc); agent == nil {
-			err := restErrAgentNotFound
+			err := errRESTAgentNotFound
 			log.WithFields(log.Fields{"agent": agentID}).Error(err)
 			return agentID, wlID, err
 		} else if agent.State == api.StateOffline {
-			err := restErrAgentDisconnected
+			err := errRESTAgentDisconnected
 			log.WithFields(log.Fields{"agent": agentID}).Error(err)
 			return agentID, wlID, err
 		}
 	} else {
-		err := restErrNeedAgentWorkloadFilter
+		err := errRESTNeedAgentWorkloadFilter
 		log.Error(err)
 		return agentID, wlID, err
 	}

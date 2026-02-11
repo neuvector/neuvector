@@ -2156,7 +2156,7 @@ func handlerSessionSummary(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	agentID, err := getAgentFromFilter(query.filters, acc)
 	if err != nil {
-		if err == restErrNeedAgentFilter {
+		if err == errRESTNeedAgentFilter {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrNotEnoughFilter, err.Error())
 		} else {
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
@@ -2204,7 +2204,7 @@ func handlerSessionDelete(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	agentID, err := getAgentFromFilter(query.filters, acc)
 	if err != nil {
-		if err == restErrNeedAgentFilter {
+		if err == errRESTNeedAgentFilter {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrNotEnoughFilter, err.Error())
 		} else {
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
