@@ -24,9 +24,9 @@ type openshift struct {
 	base
 }
 
-func (r *openshift) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *openshift) Login(cfg *share.CLUSRegistryConfig) error {
 	if r.regCfg != nil && time.Since(r.lastLoginAt) < renewTokenDuration {
-		return nil, ""
+		return nil
 	}
 
 	r.regCfg = cfg
@@ -34,24 +34,24 @@ func (r *openshift) Login(cfg *share.CLUSRegistryConfig) (error, string) {
 		smd.scanLog.WithFields(log.Fields{"registry": r.regCfg.Name}).Debug("Login with token")
 		r.lastLoginAt = time.Now()
 		if err := r.newRegClient(cfg.Registry, unusedAccount, cfg.AuthToken); err != nil {
-			return err, err.Error()
+			return err
 		}
 		if _, err := r.rc.Alive(); err != nil {
-			return err, err.Error()
+			return err
 		}
-		return nil, ""
+		return nil
 	} else {
 		username, token, err := global.ORCH.Login(cfg.Username, cfg.Password)
 		if err != nil {
-			return err, err.Error()
+			return err
 		}
 
 		smd.scanLog.WithFields(log.Fields{"registry": r.regCfg.Name}).Debug("Login succeeded")
 		r.lastLoginAt = time.Now()
 		if err := r.newRegClient(cfg.Registry, username, token); err != nil {
-			return err, err.Error()
+			return err
 		}
-		return nil, ""
+		return nil
 	}
 }
 
@@ -74,7 +74,7 @@ func (r *openshift) renewToken() error {
 		smd.scanLog.WithFields(log.Fields{"registry": r.regCfg.Name}).Debug("Renew")
 
 		r.Logout(true)
-		err, _ := r.Login(r.regCfg)
+		err := r.Login(r.regCfg)
 		return err
 	}
 

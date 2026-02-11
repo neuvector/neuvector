@@ -743,8 +743,8 @@ func newRepoScanRegistry(name string) {
 }
 
 func (rs *Registry) newScanContext() (*scanContext, error) {
-	if err, msg := rs.driver.Login(rs.config); err != nil {
-		rs.errDetail = msg
+	if err := rs.driver.Login(rs.config); err != nil {
+		rs.errDetail = err.Error()
 		return nil, err
 	} else {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1205,7 +1205,7 @@ func (rs *Registry) imageScanAdd(img *share.CLUSImage) {
 
 	filteredTags, _ := filterTags(tags, imageTagFilter.Tag, 0)
 
-	if err, _ := rs.backupDrv.Login(rs.config); err != nil {
+	if err := rs.backupDrv.Login(rs.config); err != nil {
 		smd.scanLog.WithFields(log.Fields{"registry": rs.config.Name, "error": err}).Error()
 		return
 	}

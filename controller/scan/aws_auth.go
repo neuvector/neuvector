@@ -25,21 +25,21 @@ type awsDriver struct {
 	base
 }
 
-func (r *awsDriver) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *awsDriver) Login(cfg *share.CLUSRegistryConfig) error {
 	auth, err := GetAwsEcrAuthToken(cfg.AwsKey, r.proxy)
 	if err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if err := r.newRegClient(cfg.Registry, auth.Username, auth.Password); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if _, err := r.rc.Alive(); err != nil {
-		return err, err.Error()
+		return err
 	}
 
-	return nil, ""
+	return nil
 }
 
 // --

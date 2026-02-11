@@ -87,19 +87,19 @@ func (r *ibmcloud) aquireToken(password, ibmTokenUrl string) error {
 	return nil
 }
 
-func (r *ibmcloud) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *ibmcloud) Login(cfg *share.CLUSRegistryConfig) error {
 	r.account = cfg.IBMCloudAccount
 
 	if err := r.newApiClient(cfg.Password, cfg.IBMCloudTokenURL); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if err := r.newRegClient(cfg.Registry, cfg.Username, cfg.Password); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	r.images = make(map[string][]*ibmImage)
-	return nil, ""
+	return nil
 }
 
 func (r *ibmcloud) getImages() ([]ibmImage, error) {

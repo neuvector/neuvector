@@ -10,14 +10,14 @@ type gcrDriver struct {
 	base
 }
 
-func (r *gcrDriver) Login(cfg *share.CLUSRegistryConfig) (error, string) {
+func (r *gcrDriver) Login(cfg *share.CLUSRegistryConfig) error {
 	if err := r.newRegClient(cfg.Registry, gcrDefaultUsername, cfg.GcrKey.JsonKey); err != nil {
-		return err, err.Error()
+		return err
 	}
 
 	if _, err := r.rc.Alive(); err != nil {
-		return err, err.Error()
+		return err
 	}
 
-	return nil, ""
+	return nil
 }
