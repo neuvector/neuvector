@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/neuvector/neuvector/share/k8sutils"
@@ -230,6 +231,13 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 
 	if os.Getenv("ENABLE_ROTATION") != "" {
 		newjob.Spec.Template.Spec.Containers[0].Command = append(newjob.Spec.Template.Spec.Containers[0].Command, "--enable-rotation")
+	}
+
+	if str := os.Getenv("RSA_KEY_LENGTH"); str != "" {
+		const minKeyLength = 2048
+		if num, err := strconv.Atoi(str); err == nil && num < minKeyLength {
+			return nil, fmt.Errorf("RSA_KEY_LENGTH needs to be >= %d\n", minKeyLength)
+		}
 	}
 
 	unstructedJob, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&newjob)
