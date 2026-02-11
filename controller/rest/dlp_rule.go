@@ -305,18 +305,20 @@ func wildCardToRegexp(pattern string) string {
 	return re.ReplaceAllStringFunc(pattern, func(match string) string {
 		if len(match) == 1 {
 			// Convert pattern starts with single "?" or "*" character.
-			if match[0] == '*' {
+			switch match[0] {
+			case '*':
 				return ".*"
-			} else if match[0] == '?' {
+			case '?':
 				return "."
-			} else {
+			default:
 				return match
 			}
 		} else if len(match) == 2 {
 			// Do not expect user's input with 2 continuous "*" characters in the pattern.
-			if match[1] == '*' {
+			switch match[1] {
+			case '*':
 				return string(match[0]) + ".*"
-			} else if match[1] == '?' {
+			case '?':
 				/* If the pattern starts with 2 continuous "?" characters, convert them to ".*".
 				   Additionally, single "?" character will be converted to ".". */
 				if match[0] == '?' {
@@ -324,7 +326,7 @@ func wildCardToRegexp(pattern string) string {
 				} else {
 					return string(match[0]) + "."
 				}
-			} else {
+			default:
 				return match
 			}
 		} else {

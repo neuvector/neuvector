@@ -1813,13 +1813,14 @@ func auditLog2API(audit *share.CLUSAuditLog) *api.Audit {
 		rlog.WorkloadID = audit.WorkloadID
 
 		for k, v := range audit.Props {
-			if v == share.VulnSeverityCritical {
+			switch v {
+			case share.VulnSeverityCritical:
 				rlog.CriticalCnt++
 				rlog.CriticalVuls = append(rlog.CriticalVuls, k)
-			} else if v == share.VulnSeverityHigh {
+			case share.VulnSeverityHigh:
 				rlog.HighCnt++
 				rlog.HighVuls = append(rlog.HighVuls, k)
-			} else if v == share.VulnSeverityMedium {
+			case share.VulnSeverityMedium:
 				rlog.MediumCnt++
 				rlog.MediumVuls = append(rlog.MediumVuls, k)
 			}
@@ -1951,7 +1952,8 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 		PlatformVersion: report.PlatformVersion,
 	}
 
-	if objType == share.ScanObjectType_CONTAINER {
+	switch objType {
+	case share.ScanObjectType_CONTAINER:
 		clog.Name = api.EventNameContainerScanReport
 		clog.WorkloadID = id
 
@@ -1968,7 +1970,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 			clog.AgentID = c.workload.AgentID
 			clog.AgentName = getAgentName(c.workload.AgentID)
 		}
-	} else if objType == share.ScanObjectType_HOST {
+	case share.ScanObjectType_HOST:
 		clog.Name = api.EventNameHostScanReport
 		clog.HostID = id
 		if c := getHostCache(id); c != nil {
@@ -1979,14 +1981,14 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 				clog.AgentName = getAgentName(agents[0])
 			}
 		}
-	} else if objType == share.ScanObjectType_IMAGE {
+	case share.ScanObjectType_IMAGE:
 		clog.Name = api.EventNameRegistryScanReport
 		clog.ImageID = id
 		clog.Registry = report.Registry
 		clog.RegistryName = regName
 		clog.Repository = report.Repository
 		clog.Tag = report.Tag
-	} else if objType == share.ScanObjectType_PLATFORM {
+	case share.ScanObjectType_PLATFORM:
 		clog.Name = api.EventNamePlatformScanReport
 	}
 

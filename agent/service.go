@@ -879,12 +879,13 @@ func (rs *RPCService) ProbeContainerMap(ctx context.Context, v *share.RPCVoid) (
 }
 
 func (rs *RPCService) SnifferCmd(ctx context.Context, req *share.CLUSSnifferRequest) (*share.CLUSSnifferResponse, error) {
-	if req.Cmd == share.SnifferCmd_StartSniffer {
+	switch req.Cmd {
+	case share.SnifferCmd_StartSniffer:
 		id, err := startSniffer(req)
 		return &share.CLUSSnifferResponse{ID: id}, err
-	} else if req.Cmd == share.SnifferCmd_StopSniffer {
+	case share.SnifferCmd_StopSniffer:
 		return &share.CLUSSnifferResponse{}, stopSniffer(req.ID)
-	} else if req.Cmd == share.SnifferCmd_RemoveSniffer {
+	case share.SnifferCmd_RemoveSniffer:
 		return &share.CLUSSnifferResponse{}, removeSniffer(req.ID)
 	}
 	return &share.CLUSSnifferResponse{}, status.Errorf(codes.InvalidArgument, "Invalid sniffer command")

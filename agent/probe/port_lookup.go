@@ -123,7 +123,8 @@ func lookupAppMap(cmdName string, cmdline []string) (uint32, bool) {
 		return 0, false
 	}
 
-	if cmdName == "java" {
+	switch cmdName {
+	case "java":
 		if javaClasses := getJavaClass(cmdline); len(javaClasses) > 0 {
 			for _, class := range javaClasses {
 				// log.WithFields(log.Fields{"javaClass": class}).Debug()
@@ -135,7 +136,7 @@ func lookupAppMap(cmdName string, cmdline []string) (uint32, bool) {
 			}
 		}
 		return 0, false
-	} else if cmdName == "beam.smp" || cmdName == "beam" {
+	case "beam.smp", "beam":
 		//erlang daemon
 		for _, c := range cmdline {
 			for name, app := range erlangAppMap {
@@ -145,7 +146,7 @@ func lookupAppMap(cmdName string, cmdline []string) (uint32, bool) {
 			}
 		}
 		return 0, false
-	} else if cmdName == "epmd" {
+	case "epmd":
 		return C.DPI_APP_ERLANG_EPMD, false
 	}
 

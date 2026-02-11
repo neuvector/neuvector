@@ -828,7 +828,8 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 
 	wlList := make([]*share.CLUSWorkloadAddr, 0)
 	for _, addr := range addrs {
-		if addr.WlID == share.CLUSWLModeGroup {
+		switch addr.WlID {
+		case share.CLUSWLModeGroup:
 			if (polAppDir&C.DP_POLICY_APPLY_EGRESS > 0 && isto) ||
 				(polAppDir&C.DP_POLICY_APPLY_INGRESS > 0 && !isto) {
 				for id, wl := range wlMap {
@@ -843,7 +844,7 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 					}
 				}
 			}
-		} else if addr.WlID == share.CLUSWLAllContainer {
+		case share.CLUSWLAllContainer:
 			for id, wl := range wlMap {
 				wlAddr := share.CLUSWorkloadAddr{
 					WlID:       id,
@@ -854,7 +855,7 @@ func getWorkload(addrs []*share.CLUSWorkloadAddr,
 				}
 				wlList = append(wlList, &wlAddr)
 			}
-		} else {
+		default:
 			wlList = append(wlList, addr)
 		}
 	}
@@ -1189,9 +1190,8 @@ func policy_chk_unknown_ip(pInfo *WorkloadIPPolicyInfo, srcip, dstip net.IP, ipt
 		dip: dstip.String(),
 	}
 
-	if iptype == "" ||
-		iptype == share.SpecInternalHostIP ||
-		iptype == share.SpecInternalTunnelIP {
+	switch iptype {
+	case "", share.SpecInternalHostIP, share.SpecInternalTunnelIP:
 		pver := pInfo.PolVer
 		unknown_ip_map_mutex.RLock()
 		uip_cache, exist := unknown_ip_map[uip_desc]
@@ -1214,7 +1214,7 @@ func policy_chk_unknown_ip(pInfo *WorkloadIPPolicyInfo, srcip, dstip net.IP, ipt
 			*action = C.DP_POLICY_ACTION_OPEN
 			add_unkn_ip_cache(&uip_desc, pInfo.PolVer, iptype, ext, aTimerWheel)
 		}
-	} else if iptype == share.SpecInternalDevIP {
+	case share.SpecInternalDevIP:
 		//connection from nv device is open
 		*action = C.DP_POLICY_ACTION_OPEN
 	}
