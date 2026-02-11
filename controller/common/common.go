@@ -706,11 +706,11 @@ var DefaultFileMonitorConfig share.CLUSFileMonitorProfile = share.CLUSFileMonito
 }
 
 func FsmonFilterToRest(path, regex string) string {
-	regex = strings.Replace(regex, ".*", "*", -1)
-	regex = strings.Replace(regex, "\\.", ".", -1)
+	regex = strings.ReplaceAll(regex, ".*", "*")
+	regex = strings.ReplaceAll(regex, "\\.", ".")
 	regex = strings.TrimRight(regex, "$")
-	path = strings.Replace(path, "\\.", ".", -1)
-	path = strings.Replace(path, ".*", "*", -1)
+	path = strings.ReplaceAll(path, "\\.", ".")
+	path = strings.ReplaceAll(path, ".*", "*")
 	var flt string
 	if regex != "" {
 		flt = fmt.Sprintf("%s/%s", path, regex)
