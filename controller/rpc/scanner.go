@@ -116,7 +116,7 @@ func (mgr *ScannerAcquisitionManager) requestProcessLoop() {
 		}
 		scanner, err := mgr.clusterHelper.PickLeastLoadedScanner()
 
-		if err != nil {
+		if err != nil || scanner == nil {
 			// Retry - add backoff and keep it in queue for next iteration
 			req.attempts++
 			time.Sleep(req.backoff.NextBackOff())
@@ -234,6 +234,14 @@ func (mgr *ScannerAcquisitionManager) CountScanners() (busy, idle uint32) {
 		}
 	}
 	return busy, idle
+}
+
+func (mgr *ScannerAcquisitionManager) TaskCount() int {
+	taskCount := 0
+	for _, scanner := range mgr.clusterHelper.GetAvailableScanners() {
+		taskCount += (mgr.maxConcurrentScansPerScanner - scanner.ScanCredit)
+	}
+	return taskCount
 }
 
 // This function performs a task on all scanners.

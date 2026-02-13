@@ -1776,10 +1776,7 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) er
 
 func (m clusterHelper) InitCreditOwners() error {
 	key := share.CLUSScannerCreditOwnerKey(m.id)
-
-	return RetryOnCASError(m.maxScanCreditRetries, func() error {
-		return cluster.PutRev(key, []byte("{}"), 0)
-	})
+	return cluster.Put(key, []byte("{}"))
 }
 
 // TrackCreditAcquisition records or removes a controller's ownership of scanner credits.

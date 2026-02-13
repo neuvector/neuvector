@@ -2534,24 +2534,60 @@ type RESTScanReportData struct {
 	Report *RESTScanReport `json:"report"`
 }
 
-type RESTHostScanData struct {
-	HostName string `json:"host_name"`
-	RESTScanReport
+type RESTAssetsScanReportFilter struct {
+	Name  string   `json:"name"`
+	Op    string   `json:"op"`
+	Value []string `json:"value"`
 }
 
-type RESTHostScanReportData struct {
-	HostsScanData []*RESTHostScanData `json:"hosts_scan_data"`
+type RESTVulScoreFilter struct {
+	ScoreVersion string  `json:"score_version"`
+	ScoreBottom  float32 `json:"score_bottom"`
+	ScoreTop     float32 `json:"score_top"`
+}
+
+type RESTScanReportAsset struct {
+	Name     string `json:"name"`
+	HostName string `json:"host_name"`
+	Domain   string `json:"domain"`
+}
+
+type RESTAssetsScanReportQuery struct {
+	ShowAccepted    bool                         `json:"show_accepted"`
+	MaxCveRecords   int                          `json:"max_cve_records"`    // one cve per-record
+	Page            int                          `json:"page"`               // 1st-layer pagination for assets. it starts from page 0
+	AssetsPerPage   int                          `json:"assets_per_page"`    // number of assets in the page. 0 means no limit
+	LastStopAtAsset RESTScanReportAsset          `json:"last_stop_at_asset"` // last query stopped at this asset
+	LastStopAtCVE   string                       `json:"last_stop_at_cve"`   // last query stopped at this cve for asset {LastStoppedAtAsset}
+	ViewPod         *string                      `json:"view_pod,omitempty"` // for workloads only
+	VulScoreFilter  *RESTVulScoreFilter          `json:"vul_score_filter,omitempty"`
+	Filters         []RESTAssetsScanReportFilter `json:"filters,omitempty"`
+}
+
+type RESTHostScanData struct {
+	HostName string `json:"host_name"`
+	RESTVulnerability
+}
+
+type RESTHostsScanReportData struct {
+	AssetsLeft    int                 `json:"assets_left"` // number of hosts not done yet for this page
+	StopAtAsset   RESTScanReportAsset `json:"stop_at_asset"`
+	StopAtCVE     string              `json:"stop_at_cve"`     // last collected {cve} in the {StoppedAtAsset}
+	HostsScanData []*RESTHostScanData `json:"hosts_scan_data"` // each cve for each host has an entry
 }
 
 type RESTWorkloadScanData struct {
 	WorkloadName     string `json:"workload_name"`
 	WorkloadDomain   string `json:"workload_domain"`
 	WorkloadHostName string `json:"workload_host_name"`
-	RESTScanReport
+	RESTVulnerability
 }
 
 type RESTWorkloadsScanReportData struct {
-	WorkloadsScanData []*RESTWorkloadScanData `json:"workloads_scan_data"`
+	AssetsLeft        int                     `json:"assets_left"` // number of workloads not done yet for this page
+	StopAtAsset       RESTScanReportAsset     `json:"stop_at_asset"`
+	StopAtCVE         string                  `json:"stop_at_cve"`         // last collected {cve} in the {StoppedAtAsset}
+	WorkloadsScanData []*RESTWorkloadScanData `json:"workloads_scan_data"` // each cve for each workload has an entry
 }
 
 type RESTScanReport struct {

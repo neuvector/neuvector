@@ -2,9 +2,11 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -268,77 +270,77 @@ func handlerScanWorkloadReport(w http.ResponseWriter, r *http.Request, ps httpro
 	restRespSuccess(w, r, resp, acc, login, nil, "Get container scan report")
 }
 
-func getWorkloads(query *restQuery, idlist utils.Set, acc *access.AccessControl) []*api.RESTWorkload {
-	var view string
-	var wls []*api.RESTWorkload
-
-	if value, ok := query.pairs[api.QueryKeyView]; ok && value == api.QueryValueViewPod {
-		view = api.QueryValueViewPod
+func skipWorkload(lastStopAtAsset api.RESTScanReportAsset, wlDomain, wlHostName, wlName string) bool {
+	none := api.RESTScanReportAsset{}
+	if lastStopAtAsset == none {
+		return false
 	}
-
-	cached := cacher.GetAllWorkloads(view, acc, idlist)
-
-	// Sort
-	if len(cached) > 1 && len(query.sorts) > 0 {
-		// Convert struct slice to interface slice
-		var data []interface{} = make([]interface{}, len(cached))
-		for i, d := range cached {
-			data[i] = d
-		}
-
-		// Sort
-		restNewSorter(data, query.sorts).Sort()
-
-		// Copy the result
-		wls = make([]*api.RESTWorkload, 0, len(data))
-		for _, d := range data {
-			wl, ok := d.(*api.RESTWorkload)
-			if ok {
-				wls = append(wls, wl)
+	if wlDomain == lastStopAtAsset.Domain {
+		if wlHostName == lastStopAtAsset.HostName {
+			if wlHostName == lastStopAtAsset.HostName {
+				return false
+			} else {
+				return wlName < lastStopAtAsset.Name
 			}
-		}
-	} else {
-		wls = cached
-		sort.Slice(wls, func(i, j int) bool { return wls[i].Name < wls[j].Name })
-	}
-
-	retWorkloads := make([]*api.RESTWorkload, 0)
-
-	// Filter
-	if len(wls) <= query.start {
-		return retWorkloads
-	}
-
-	if len(query.filters) > 0 {
-		var dummy api.RESTWorkload
-		rf := restNewFilter(&dummy, query.filters)
-
-		for _, wl := range wls[query.start:] {
-			if !rf.Filter(wl) {
-				continue
-			}
-
-			retWorkloads = append(retWorkloads, wl)
-
-			if query.limit > 0 && len(retWorkloads) >= query.limit {
-				break
-			}
-		}
-	} else if query.limit == 0 {
-		retWorkloads = wls[query.start:]
-	} else {
-		var end int
-		if query.start+query.limit > len(wls) {
-			end = len(wls)
 		} else {
-			end = query.start + query.limit
+			return wlHostName < lastStopAtAsset.HostName
 		}
-		retWorkloads = wls[query.start:end]
+	} else {
+		return wlDomain < lastStopAtAsset.Domain
+	}
+}
+
+func skipCVE(vulScoreFilter api.RESTVulScoreFilter, lastStopAtCVE string, cve *api.RESTVulnerability) bool {
+	if lastStopAtCVE == "" || cve.Name >= lastStopAtCVE {
+		switch vulScoreFilter.ScoreVersion {
+		case "v2":
+			return cve.Score < vulScoreFilter.ScoreBottom || cve.Score > vulScoreFilter.ScoreTop
+		case "v3":
+			return cve.ScoreV3 < vulScoreFilter.ScoreBottom || cve.ScoreV3 > vulScoreFilter.ScoreTop
+		}
+	}
+	return true
+}
+
+func validateVulScoreFilter(vulScoreFilter api.RESTVulScoreFilter) error {
+	if vulScoreFilter.ScoreVersion == "" {
+		return nil
+	}
+	if vulScoreFilter.ScoreVersion != "v2" && vulScoreFilter.ScoreVersion != "v3" {
+		return fmt.Errorf("unsupported score version %s", vulScoreFilter.ScoreVersion)
+	}
+	if vulScoreFilter.ScoreTop > 10 || vulScoreFilter.ScoreBottom < 0 || vulScoreFilter.ScoreTop < vulScoreFilter.ScoreBottom {
+		return fmt.Errorf("invalid top/bottom score values: %f/%f", vulScoreFilter.ScoreTop, vulScoreFilter.ScoreBottom)
+	}
+	return nil
+}
+
+func parseFilters(filterNames utils.Set, rconfFilters []api.RESTAssetsScanReportFilter) []restFieldFilter {
+	filters := make([]restFieldFilter, 0)
+	for _, filter := range rconfFilters {
+		if !filterNames.Contains(filter.Name) || len(filter.Value[0]) == 0 {
+			continue
+		}
+
+		switch filter.Op {
+		case api.OPeq, api.OPneq:
+			filters = append(filters,
+				restFieldFilter{
+					tag:   filter.Name,
+					op:    filter.Op,
+					value: filter.Value[0],
+				})
+		case api.OPin, api.OPnotin:
+			filters = append(filters,
+				restFieldFilter{
+					tag:   filter.Name,
+					op:    filter.Op,
+					value: strings.Join(filter.Value, "|"),
+				})
+		}
 	}
 
-	log.WithFields(log.Fields{"entries": len(retWorkloads)}).Debug("Response")
-
-	return retWorkloads
+	return filters
 }
 
 func handlerWorkloadsScanReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -350,29 +352,122 @@ func handlerWorkloadsScanReport(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	var resp api.RESTWorkloadsScanReportData
+	body, _ := io.ReadAll(r.Body)
 
-	query := restParseQuery(r)
-	var showTag string
-	if value, ok := query.pairs[api.QueryKeyShow]; ok && value == api.QueryValueShowAccepted {
+	var rconf api.RESTAssetsScanReportQuery
+	err := json.Unmarshal(body, &rconf)
+	if err == nil && rconf.VulScoreFilter != nil {
+		err = validateVulScoreFilter(*rconf.VulScoreFilter)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	var resp api.RESTWorkloadsScanReportData
+	resp.WorkloadsScanData = make([]*api.RESTWorkloadScanData, 0)
+	showTag := ""
+	if rconf.ShowAccepted {
 		showTag = api.QueryValueShowAccepted
 	}
 
-	wls := getWorkloads(query, utils.NewSet(), acc)
+	queryStart := rconf.Page * rconf.AssetsPerPage
+	if wl, _, _ := cacher.GetWorkloadCount(acc); wl <= queryStart {
+		restRespSuccess(w, r, resp, acc, login, nil, "Get containers scan report")
+		return
+	}
+
+	var view string
+	if rconf.ViewPod != nil && *rconf.ViewPod == api.QueryValueViewPod {
+		view = api.QueryValueViewPod
+	}
+	cached := cacher.GetAllWorkloads(view, acc, utils.NewSet())
+	if len(cached) <= queryStart {
+		restRespSuccess(w, r, resp, acc, login, nil, "Get containers scan report")
+		return
+	}
+
+	// Sort by namespce -> host_name -> workload name
+	sort.Slice(cached, func(i, j int) bool {
+		if cached[i].Domain == cached[j].Domain {
+			if cached[i].HostName == cached[j].HostName {
+				return cached[i].Name < cached[j].Name
+			}
+			return cached[i].HostName < cached[j].HostName
+		}
+		return cached[i].Domain < cached[j].Domain
+	})
+
+	wls := make([]*api.RESTWorkload, 0)
+
+	// Filter
+	var rf *restFilter
+	filterNames := utils.NewSetFromStringSlice([]string{"domain", "host_name"})
+	filters := parseFilters(filterNames, rconf.Filters)
+	if len(filters) > 0 {
+		var dummy api.RESTWorkload
+		rf = restNewFilter(&dummy, filters)
+	}
+
+	if len(rf.filters) > 0 {
+		for _, wl := range cached[queryStart:] {
+			if !rf.Filter(wl) {
+				continue
+			}
+
+			wls = append(wls, wl)
+
+			if rconf.AssetsPerPage > 0 && len(wls) >= rconf.AssetsPerPage {
+				break
+			}
+		}
+	} else if rconf.AssetsPerPage == 0 {
+		wls = cached[queryStart:]
+	} else {
+		var end int
+		if queryStart+rconf.AssetsPerPage > len(cached) {
+			end = len(cached)
+		} else {
+			end = queryStart + rconf.AssetsPerPage
+		}
+		wls = cached[queryStart:end]
+	}
+
+	log.WithFields(log.Fields{"entries": len(wls)}).Debug("Response")
 
 	resp.WorkloadsScanData = make([]*api.RESTWorkloadScanData, 0, len(wls))
-	for _, wl := range wls {
-		vuls, modules, _ := cacher.GetVulnerabilityReport(wl.ID, showTag)
+	for i, wl := range wls {
+		if skipWorkload(rconf.LastStopAtAsset, wl.Domain, wl.HostName, wl.Name) {
+			continue
+		}
+		vuls, _, _ := cacher.GetVulnerabilityReport(wl.ID, showTag)
 		if len(vuls) == 0 {
 			continue
 		}
-		scanData := &api.RESTWorkloadScanData{
-			WorkloadName:     wl.Name,
-			WorkloadDomain:   wl.Domain,
-			WorkloadHostName: wl.HostName,
-			RESTScanReport:   api.RESTScanReport{Vuls: vuls, Modules: modules},
+		sort.Slice(vuls, func(i, j int) bool {
+			return vuls[i].Name < vuls[j].Name
+		})
+		for _, cve := range vuls {
+			if rconf.VulScoreFilter != nil {
+				if skipCVE(*rconf.VulScoreFilter, rconf.LastStopAtCVE, cve) {
+					continue
+				}
+			}
+			scanData := &api.RESTWorkloadScanData{
+				WorkloadName:      wl.Name,
+				WorkloadDomain:    wl.Domain,
+				WorkloadHostName:  wl.HostName,
+				RESTVulnerability: *cve,
+			}
+			resp.WorkloadsScanData = append(resp.WorkloadsScanData, scanData)
+			if rconf.MaxCveRecords != 0 && len(resp.WorkloadsScanData) >= rconf.MaxCveRecords {
+				resp.AssetsLeft = len(wls) - i
+				resp.StopAtAsset = api.RESTScanReportAsset{Domain: wl.Domain, HostName: wl.HostName, Name: wl.Name}
+				resp.StopAtCVE = cve.Name
+				break
+			}
 		}
-		resp.WorkloadsScanData = append(resp.WorkloadsScanData, scanData)
 	}
 
 	restRespSuccess(w, r, resp, acc, login, nil, "Get containers scan report")
@@ -599,28 +694,112 @@ func handlerHostsScanReport(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	query := restParseQuery(r)
+	body, _ := io.ReadAll(r.Body)
 
-	var showTag string
-	if value, ok := query.pairs[api.QueryKeyShow]; ok && value == api.QueryValueShowAccepted {
+	var rconf api.RESTAssetsScanReportQuery
+	err := json.Unmarshal(body, &rconf)
+	if err == nil && rconf.VulScoreFilter != nil {
+		err = validateVulScoreFilter(*rconf.VulScoreFilter)
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Request error")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+
+	var resp api.RESTHostsScanReportData
+	resp.HostsScanData = make([]*api.RESTHostScanData, 0)
+	showTag := ""
+	if rconf.ShowAccepted {
 		showTag = api.QueryValueShowAccepted
 	}
 
-	hosts := getHosts(query, acc)
+	queryStart := rconf.Page * rconf.AssetsPerPage
+	if cacher.GetHostCount(acc) <= queryStart {
+		restRespSuccess(w, r, resp, acc, login, nil, "Get hosts scan report")
+		return
+	}
 
-	var resp api.RESTHostScanReportData
+	cached := cacher.GetAllHosts(acc)
+	if len(cached) <= queryStart {
+		restRespSuccess(w, r, resp, acc, login, nil, "Get hosts scan report")
+		return
+	}
+
+	// Sort by host name
+	sort.Slice(cached, func(i, j int) bool {
+		return cached[i].Name < cached[j].Name
+	})
+
+	// Filter
+	var rf *restFilter
+	hosts := make([]*api.RESTHost, 0)
+	filterNames := utils.NewSetFromStringSlice([]string{"name"})
+	filters := parseFilters(filterNames, rconf.Filters)
+	if len(filters) > 0 {
+		var dummy api.RESTHost
+		rf = restNewFilter(&dummy, filters)
+	}
+
+	if len(rf.filters) > 0 {
+		for _, host := range cached[queryStart:] {
+			if !rf.Filter(host) {
+				continue
+			}
+
+			hosts = append(hosts, host)
+
+			if rconf.AssetsPerPage > 0 && len(hosts) >= rconf.AssetsPerPage {
+				break
+			}
+		}
+	} else if rconf.AssetsPerPage == 0 {
+		hosts = cached[queryStart:]
+	} else {
+		var end int
+		if queryStart+rconf.AssetsPerPage > len(cached) {
+			end = len(cached)
+		} else {
+			end = queryStart + rconf.AssetsPerPage
+		}
+		hosts = cached[queryStart:end]
+	}
+	for _, host := range hosts {
+		host.DockerBenchStatus, host.KubeBenchStatus = getHostBenchStatus(host.ID)
+	}
+
+	log.WithFields(log.Fields{"entries": len(hosts)}).Debug("Response")
 
 	resp.HostsScanData = make([]*api.RESTHostScanData, 0, len(hosts))
-	for _, host := range hosts {
+	for i, host := range hosts {
+		if rconf.LastStopAtAsset.HostName != "" && host.Name < rconf.LastStopAtAsset.HostName {
+			continue
+		}
 		vuls, _, _ := cacher.GetVulnerabilityReport(host.ID, showTag)
 		if len(vuls) == 0 {
 			continue
 		}
-		scanData := &api.RESTHostScanData{
-			HostName:       host.Name,
-			RESTScanReport: api.RESTScanReport{Vuls: vuls},
+		sort.Slice(vuls, func(i, j int) bool {
+			return vuls[i].Name < vuls[j].Name
+		})
+		for _, cve := range vuls {
+			if rconf.VulScoreFilter != nil {
+				if skipCVE(*rconf.VulScoreFilter, rconf.LastStopAtCVE, cve) {
+					continue
+				}
+			}
+			scanData := &api.RESTHostScanData{
+				HostName:          host.Name,
+				RESTVulnerability: *cve,
+			}
+			resp.HostsScanData = append(resp.HostsScanData, scanData)
+			if rconf.MaxCveRecords != 0 && len(resp.HostsScanData) >= rconf.MaxCveRecords {
+				resp.AssetsLeft = len(hosts) - i
+				resp.StopAtAsset = api.RESTScanReportAsset{HostName: host.Name}
+				resp.StopAtCVE = cve.Name
+				break
+			}
 		}
-		resp.HostsScanData = append(resp.HostsScanData, scanData)
 	}
 
 	restRespSuccess(w, r, resp, acc, login, nil, "Get hosts scan report")

@@ -1846,12 +1846,12 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.GET("/v1/scan/cache_data/:id", handlerScanCacheData)
 	r.POST("/v1/scan/workload/:id", handlerScanWorkloadReq)
 	r.GET("/v1/scan/workload/:id", handlerScanWorkloadReport)
-	r.GET("/v1/scan/workloads/scan_report", handlerWorkloadsScanReport) // Returns scan report of all queried workloads' scan result
-	r.GET("/v1/scan/image", handlerScanImageSummary)                    // Returns all workload's scan result summary by images
-	r.GET("/v1/scan/image/:id", handlerScanImageReport)                 // Returns workload scan result by workload's image ID
+	r.POST("/v1/scan/workloads/scan_report", handlerWorkloadsScanReport) // Returns scan report of all queried workloads' scan result
+	r.GET("/v1/scan/image", handlerScanImageSummary)                     // Returns all workload's scan result summary by images
+	r.GET("/v1/scan/image/:id", handlerScanImageReport)                  // Returns workload scan result by workload's image ID
 	r.POST("/v1/scan/host/:id", handlerScanHostReq)
 	r.GET("/v1/scan/host/:id", handlerScanHostReport)
-	r.GET("/v1/scan/hosts/scan_report", handlerHostsScanReport) // Returns scan report of all queried hosts' scan result
+	r.POST("/v1/scan/hosts/scan_report", handlerHostsScanReport) // Returns scan report of all queried hosts' scan result
 	r.POST("/v1/scan/platform/platform", handlerScanPlatformReq)
 	r.GET("/v1/scan/platform", handlerScanPlatformSummary)
 	r.GET("/v1/scan/platform/platform", handlerScanPlatformReport)

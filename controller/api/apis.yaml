@@ -5,7 +5,7 @@ swagger: '2.0'
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: '5.4.9'
+  version: '5.5.0'
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -2553,20 +2553,27 @@ paths:
         '200':
           description: Success
   /v1/scan/hosts/scan_report:
-    get:
+    post:
       tags:
         - Scan
       summary: Get hosts scan report
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
-      produces:
+      consumes:
         - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Filter data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAssetsScanReportQuery'
       responses:
         '200':
           description: Success
           schema:
-            $ref: '#/definitions/RESTHostScanReportData'
+            $ref: '#/definitions/RESTHostsScanReportData'
   /v1/scan/host/{id}:
     get:
       tags:
@@ -3058,15 +3065,22 @@ paths:
         '200':
           description: Success
   /v1/scan/workloads/scan_report:
-    get:
+    post:
       tags:
         - Scan
       summary: Get containers scan report
       security:
         - ApiKeyAuth: []
         - TokenAuth: []
-      produces:
+      consumes:
         - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Filter data
+          required: true
+          schema:
+            $ref: '#/definitions/RESTAssetsScanReportQuery'
       responses:
         '200':
           description: Success
@@ -9758,12 +9772,92 @@ definitions:
         items:
           type: string
           example: ""
+  RESTScanReportAsset:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+      host_namep:
+        type: string
+      domain:
+        type: string
+  RESTVulScoreFilter:
+    type: object
+    required:
+      - score_version
+      - score_bottom
+      - score_top
+    properties:
+      score_version:
+        type: string
+      score_bottom:
+        type: number
+      score_top:
+        type: number
+  RESTAssetsScanReportFilter:
+    type: object
+    required:
+      - name
+      - op
+      - value
+    properties:
+      name:
+        type: string
+      op:
+        type: string
+      value:
+        type: array
+        items:
+          type: string
+  RESTAssetsScanReportQuery:
+    type: object
+    required:
+      - page
+    properties:
+      show_accepted:
+        type: boolean
+      max_cve_records:
+        type: integer
+      page:
+        type: integer
+      assets_per_page:
+        type: integer
+      last_stop_at_asset:
+        $ref: '#/definitions/RESTScanReportAsset'
+      last_stop_at_cve:
+        type: string
+      view_pod:
+        type: string
+      vul_score_filter:
+        $ref: '#/definitions/RESTVulScoreFilter'
+      filters:
+        type: array
+        items:
+          $ref: '#/definitions/RESTAssetsScanReportFilter'
   RESTWorkloadScanData:
     type: object
     required:
       - workload_name
       - workload_domain
       - workload_host_name
+      - name
+      - score
+      - severity
+      - vectors
+      - description
+      - file_name
+      - package_name
+      - package_version
+      - fixed_version
+      - link
+      - score_v3
+      - vectors_v3
+      - published_timestamp
+      - last_modified_timestamp
+      - feed_rating
+      - in_base_image
     properties:
       workload_name:
         type: string
@@ -9771,17 +9865,82 @@ definitions:
         type: string
       workload_host_name:
         type: string
-      vulnerabilities:
+      name:
+        type: string
+        example: CVE-2015-8356
+      score:
+        type: number
+        format: float32
+        example: 7.2
+      severity:
+        type: string
+        example: High
+      vectors:
+        type: string
+        example: ""
+      description:
+        type: string
+        example: "The setup_env function in group.c in sshd in OpenSSH allows local users to gain privileges."
+      file_name:
+        type: string
+        example: "usr/lib/python3.9"
+      package_name:
+        type: string
+        example: openssh
+      package_version:
+        type: string
+        example: 7.2_p2-r0
+      fixed_version:
+        type: string
+        example: 1:7.2p2-3
+      link:
+        type: string
+        example: https://security-tracker.debian.org/tracker/CVE-2015-8356
+      score_v3:
+        type: number
+        format: float32
+        example: 7.3
+      vectors_v3:
+        type: string
+        example: ""
+      published_timestamp:
+        type: integer
+        format: int64
+        example: 1516561260
+      last_modified_timestamp:
+        type: integer
+        format: int64
+        example: 1516561253
+      cpes:
         type: array
         items:
-          $ref: '#/definitions/RESTVulnerability'
-      modules:
+          type: string
+          example: ""
+      cves:
         type: array
         items:
-          $ref: '#/definitions/RESTScanModule'
+          type: string
+          example: ""
+      feed_rating:
+        type: string
+        example: ""
+      in_base_image:
+        type: boolean
+        example: true
+      tags:
+        type: array
+        items:
+          type: string
+          example: ""
   RESTWorkloadsScanReportData:
     type: object
     properties:
+      assets_left:
+        type: integer
+      stop_at_asset:
+        $ref: '#/definitions/RESTScanReportAsset'
+      stop_at_cve:
+        type: string
       workloads_scan_data:
         type: array
         items:
@@ -9790,20 +9949,101 @@ definitions:
     type: object
     required:
       - host_name
+      - name
+      - score
+      - severity
+      - vectors
+      - description
+      - file_name
+      - package_name
+      - package_version
+      - fixed_version
+      - link
+      - score_v3
+      - vectors_v3
+      - published_timestamp
+      - last_modified_timestamp
+      - feed_rating
+      - in_base_image
     properties:
       host_name:
         type: string
-      vulnerabilities:
+      name:
+        type: string
+        example: CVE-2015-8356
+      score:
+        type: number
+        format: float32
+        example: 7.2
+      severity:
+        type: string
+        example: High
+      vectors:
+        type: string
+        example: ""
+      description:
+        type: string
+        example: "The setup_env function in group.c in sshd in OpenSSH allows local users to gain privileges."
+      file_name:
+        type: string
+        example: "usr/lib/python3.9"
+      package_name:
+        type: string
+        example: openssh
+      package_version:
+        type: string
+        example: 7.2_p2-r0
+      fixed_version:
+        type: string
+        example: 1:7.2p2-3
+      link:
+        type: string
+        example: https://security-tracker.debian.org/tracker/CVE-2015-8356
+      score_v3:
+        type: number
+        format: float32
+        example: 7.3
+      vectors_v3:
+        type: string
+        example: ""
+      published_timestamp:
+        type: integer
+        format: int64
+        example: 1516561260
+      last_modified_timestamp:
+        type: integer
+        format: int64
+        example: 1516561253
+      cpes:
         type: array
         items:
-          $ref: '#/definitions/RESTVulnerability'
-      modules:
+          type: string
+          example: ""
+      cves:
         type: array
         items:
-          $ref: '#/definitions/RESTScanModule'
-  RESTHostScanReportData:
+          type: string
+          example: ""
+      feed_rating:
+        type: string
+        example: ""
+      in_base_image:
+        type: boolean
+        example: true
+      tags:
+        type: array
+        items:
+          type: string
+          example: ""
+  RESTHostsScanReportData:
     type: object
     properties:
+      assets_left:
+        type: integer
+      stop_at_asset:
+        $ref: '#/definitions/RESTScanReportAsset'
+      stop_at_cve:
+        type: string
       hosts_scan_data:
         type: array
         items:
@@ -12277,7 +12517,7 @@ definitions:
         example: "The setup_env function in group.c in sshd in OpenSSH allows local users to gain privileges."
       file_name:
         type: string
-        example: "usr/lib/python3.9" 
+        example: "usr/lib/python3.9"
       package_name:
         type: string
         example: openssh

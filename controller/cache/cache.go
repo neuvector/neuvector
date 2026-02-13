@@ -1791,7 +1791,7 @@ func startWorkerThread(ctx *Context) {
 					cacheMutexRUnlock()
 
 					taskCount := scan.RegTaskCount()
-					taskCount = taskCount + scanScher.TaskCount()
+					taskCount = taskCount + scanScher.TaskCount() + rpc.ScannerAcquisitionMgr.TaskCount()
 					replicas := atomic.LoadUint32(&scannerReplicas)
 					if (autoscaleCfg.Strategy != api.AutoScaleImmediate && autoscaleCfg.Strategy != api.AutoScaleDelayed) || (replicas == 0) ||
 						(replicas <= autoscaleCfg.MinPods && taskCount == 0) || (replicas >= autoscaleCfg.MaxPods && taskCount > 0) {

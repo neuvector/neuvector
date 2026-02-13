@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
@@ -18,12 +17,24 @@ func getHostBenchStatus(id string) (string, string) {
 	return dockerStatus, kubeStatus
 }
 
-func getHosts(query *restQuery, acc *access.AccessControl) []*api.RESTHost {
-	var hosts []*api.RESTHost
+func handlerHostList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
 
-	retHosts := make([]*api.RESTHost, 0)
+	acc, login := getAccessControl(w, r, "")
+	if acc == nil {
+		return
+	}
+
+	query := restParseQuery(r)
+
+	var hosts []*api.RESTHost
+	var resp api.RESTHostsData
+	resp.Hosts = make([]*api.RESTHost, 0)
+
 	if cacher.GetHostCount(acc) <= query.start {
-		return retHosts
+		restRespSuccess(w, r, &resp, acc, login, nil, "Get node list")
+		return
 	}
 
 	cached := cacher.GetAllHosts(acc)
@@ -51,7 +62,8 @@ func getHosts(query *restQuery, acc *access.AccessControl) []*api.RESTHost {
 
 	// Filter
 	if len(hosts) <= query.start {
-		return retHosts
+		restRespSuccess(w, r, &resp, acc, login, nil, "Get node list")
+		return
 	}
 
 	if len(query.filters) > 0 {
@@ -63,14 +75,14 @@ func getHosts(query *restQuery, acc *access.AccessControl) []*api.RESTHost {
 				continue
 			}
 
-			retHosts = append(retHosts, host)
+			resp.Hosts = append(resp.Hosts, host)
 
-			if query.limit > 0 && len(retHosts) >= query.limit {
+			if query.limit > 0 && len(resp.Hosts) >= query.limit {
 				break
 			}
 		}
 	} else if query.limit == 0 {
-		retHosts = hosts[query.start:]
+		resp.Hosts = hosts[query.start:]
 	} else {
 		var end int
 		if query.start+query.limit > len(hosts) {
@@ -78,31 +90,13 @@ func getHosts(query *restQuery, acc *access.AccessControl) []*api.RESTHost {
 		} else {
 			end = query.start + query.limit
 		}
-		retHosts = hosts[query.start:end]
+		resp.Hosts = hosts[query.start:end]
 	}
-	for _, host := range retHosts {
+	for _, host := range resp.Hosts {
 		host.DockerBenchStatus, host.KubeBenchStatus = getHostBenchStatus(host.ID)
 	}
 
-	log.WithFields(log.Fields{"entries": len(retHosts)}).Debug("Response")
-
-	return retHosts
-}
-
-func handlerHostList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
-	defer r.Body.Close()
-
-	acc, login := getAccessControl(w, r, "")
-	if acc == nil {
-		return
-	}
-
-	query := restParseQuery(r)
-
-	var resp api.RESTHostsData
-
-	resp.Hosts = getHosts(query, acc)
+	log.WithFields(log.Fields{"entries": len(resp.Hosts)}).Debug("Response")
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get node list")
 }
