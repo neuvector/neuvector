@@ -420,8 +420,7 @@ func handlerAssetsScanReportInternal(
 	var err error
 	cachedAssets, err = filterAssets(rconf.Filters, &rconf.Cursor, cachedAssets)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Warn("Failed to filter assets")
-		// fallthrough
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to filter assets.  Continue with unfiltered assets")
 	}
 
 	slices.SortFunc(cachedAssets, func(a, b api.AssetScanReportInterface) int {
@@ -431,18 +430,16 @@ func handlerAssetsScanReportInternal(
 	ret.ScanData = make([]*api.RESTAssetScanData, 0, len(cachedAssets))
 
 	// 2. Apply cursor and filters to CVEs, and build the response.
-	var i int
 	var asset api.AssetScanReportInterface
 	var itemKey api.RESTScanReportCursor
 	maxReached := false
 outer:
-	for i, asset = range cachedAssets {
+	for _, asset = range cachedAssets {
 		vuls, _, _ := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
 
 		vuls, err = filterAndSortCVE(rconf.VulScoreFilter, vuls)
 		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Warn("Failed to filter vulnerabilities")
-			// fallthrough
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to filter vulnerabilities.  Continue with unfiltered vulnerabilities")
 		}
 
 		for _, cve := range vuls {
@@ -464,7 +461,6 @@ outer:
 		}
 	}
 
-	ret.AssetsLeft = len(cachedAssets) - i - 1
 	if maxReached {
 		// Only set cursor when max is reached
 		ret.Cursor = itemKey

@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -154,59 +153,6 @@ func TestHandlerWorkloadsScanReportInternal(t *testing.T) {
 			},
 			expectedLen:   0, // No vulnerabilities in mock
 			expectedError: false,
-		},
-		{
-			name: "multiple workloads sorted by domain",
-			setupWorkloads: func() {
-				mockCache.AddWorkload("wl1", &api.RESTWorkload{
-					RESTWorkloadBrief: api.RESTWorkloadBrief{
-						ID:       "wl1",
-						Name:     "workload1",
-						Domain:   "prod",
-						HostName: "host1",
-					},
-				})
-				mockCache.AddWorkload("wl2", &api.RESTWorkload{
-					RESTWorkloadBrief: api.RESTWorkloadBrief{
-						ID:       "wl2",
-						Name:     "workload2",
-						Domain:   "default",
-						HostName: "host1",
-					},
-				})
-			},
-			query: &api.RESTAssetsScanReportQuery{
-				MaxCveRecords: 100,
-			},
-			expectedLen:   0,
-			expectedError: false,
-			validate: func(t *testing.T, data api.RESTAssetScanReportData) {
-				// Workloads should be sorted by domain
-				assert.GreaterOrEqual(t, data.AssetsLeft, 0)
-			},
-		},
-		{
-			name: "max assets limit",
-			setupWorkloads: func() {
-				for i := 0; i < 5; i++ {
-					mockCache.AddWorkload(fmt.Sprintf("wl%d", i), &api.RESTWorkload{
-						RESTWorkloadBrief: api.RESTWorkloadBrief{
-							ID:       fmt.Sprintf("wl%d", i),
-							Name:     fmt.Sprintf("workload%d", i),
-							Domain:   "default",
-							HostName: "host1",
-						},
-					})
-				}
-			},
-			query: &api.RESTAssetsScanReportQuery{
-				MaxCveRecords: 100,
-			},
-			expectedLen:   0,
-			expectedError: false,
-			validate: func(t *testing.T, data api.RESTAssetScanReportData) {
-				assert.GreaterOrEqual(t, data.AssetsLeft, 0)
-			},
 		},
 		{
 			name: "with domain filter",

@@ -10032,8 +10032,6 @@ definitions:
   RESTAssetScanReportData:
     type: object
     properties:
-      assets_left:
-        type: integer
       cursor:
         $ref: "#/definitions/RESTScanReportCursor"
       scan_data:
