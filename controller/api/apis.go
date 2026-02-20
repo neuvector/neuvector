@@ -2576,9 +2576,8 @@ type RESTAssetScanData struct {
 }
 
 type RESTAssetScanReportData struct {
-	AssetsLeft int                  `json:"assets_left"` // number of workloads not done yet for this page
-	Cursor     RESTScanReportCursor `json:"cursor"`
-	ScanData   []*RESTAssetScanData `json:"scan_data"` // each cve for each asset has an entry
+	Cursor   RESTScanReportCursor `json:"cursor"`
+	ScanData []*RESTAssetScanData `json:"scan_data"` // each cve for each asset has an entry
 }
 
 type RESTScanReport struct {
