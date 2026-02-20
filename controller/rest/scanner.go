@@ -301,10 +301,10 @@ func validateVulScoreFilter(vulScoreFilter api.RESTVulScoreFilter) error {
 	return nil
 }
 
-func parseFilters(filterNames utils.Set, rconfFilters []api.RESTAssetsScanReportFilter) []restFieldFilter {
+func parseFilters(filterNames utils.Set, rconfFilters []api.RESTAssetsScanReportFilter) ([]restFieldFilter, error) {
 	filters := make([]restFieldFilter, 0)
 	for _, filter := range rconfFilters {
-		if !filterNames.Contains(filter.Name) || len(filter.Value[0]) == 0 {
+		if !filterNames.Contains(filter.Name) || len(filter.Value) == 0 {
 			continue
 		}
 
@@ -323,21 +323,26 @@ func parseFilters(filterNames utils.Set, rconfFilters []api.RESTAssetsScanReport
 					op:    filter.Op,
 					value: strings.Join(filter.Value, "|"),
 				})
+		default:
+			return nil, fmt.Errorf("unsupported filter operator: %s", filter.Op)
 		}
 	}
 
-	return filters
+	return filters, nil
 }
 
-// filterWorkloads applies the filters to the workloads and returns the filtered list.
-func filterWorkloads(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScanReportCursor, workloads []api.AssetScanReportInterface) ([]api.AssetScanReportInterface, error) {
+// filterAssets applies the filters to the assets and returns the filtered list.
+func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScanReportCursor, workloads []api.AssetScanReportInterface) ([]api.AssetScanReportInterface, error) {
 	ret := []api.AssetScanReportInterface{}
 	if len(filters) == 0 {
 		// nothing to do
 		return workloads, nil
 	}
 	filterNames := utils.NewSetFromStringSlice([]string{"domain", "host_name"})
-	restFilters := parseFilters(filterNames, filters)
+	restFilters, err := parseFilters(filterNames, filters)
+	if err != nil {
+		return nil, err
+	}
 
 	rf := restNewFilter(&api.RESTWorkload{}, restFilters)
 	if len(rf.filters) == 0 {
@@ -353,7 +358,7 @@ func filterWorkloads(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTS
 				workload.GetCursor(),
 				*cursor,
 			) <= 0 {
-				// here we keep the workload with the same name as the cursor, so we will still look into CVEs later.
+				// here we keep the asset with the same name as the cursor, so we will still look into CVEs later.
 				continue
 			}
 		}
@@ -363,7 +368,7 @@ func filterWorkloads(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTS
 	return ret, nil
 }
 
-// filterCVEs applies the filters to the CVEs and returns the filtered list.
+// filterAndSortCVE applies the filters to the CVEs and returns the filtered list.
 func filterAndSortCVE(filter *api.RESTVulScoreFilter, vuls []*api.RESTVulnerability) ([]*api.RESTVulnerability, error) {
 	ret := []*api.RESTVulnerability{}
 	for _, vul := range vuls {
@@ -413,7 +418,7 @@ func handlerAssetsScanReportInternal(
 	cachedAssets := getAssetFunc()
 
 	var err error
-	cachedAssets, err = filterWorkloads(rconf.Filters, &rconf.Cursor, cachedAssets)
+	cachedAssets, err = filterAssets(rconf.Filters, &rconf.Cursor, cachedAssets)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Warn("Failed to filter assets")
 		// fallthrough
@@ -459,7 +464,7 @@ outer:
 		}
 	}
 
-	ret.AssetsLeft = len(cachedAssets) - i
+	ret.AssetsLeft = len(cachedAssets) - i - 1
 	if maxReached {
 		// Only set cursor when max is reached
 		ret.Cursor = itemKey
