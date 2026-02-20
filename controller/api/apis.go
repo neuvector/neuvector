@@ -2555,7 +2555,7 @@ type RESTScanReportCursor struct {
 }
 
 func (a *RESTScanReportCursor) String() string {
-	return a.HostName + "/" + a.Domain + "/" + a.Name + "/" + a.CVEName + "/" + a.CVEPackage
+	return a.HostName + "###" + a.Domain + "###" + a.Name + "###" + a.CVEName + "###" + a.CVEPackage
 }
 
 type RESTAssetsScanReportQuery struct {
