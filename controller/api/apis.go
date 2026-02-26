@@ -2572,6 +2572,8 @@ type RESTAssetScanData struct {
 	WorkloadName     string `json:"workload_name"`
 	WorkloadDomain   string `json:"workload_domain"`
 	WorkloadHostName string `json:"workload_host_name"`
+	WorkloadImage    string `json:"workload_image"`
+	WorkloadImageID  string `json:"workload_image_id"`
 	RESTVulnerability
 }
 
@@ -4392,8 +4394,11 @@ func (a *RESTWorkload) GetScanData() RESTAssetScanData {
 		WorkloadName:     a.Name,
 		WorkloadDomain:   a.Domain,
 		WorkloadHostName: a.HostName,
+		WorkloadImage:    a.Image,
+		WorkloadImageID:  a.ImageID,
 	}
 }
+
 func (h *RESTHost) GetID() string {
 	return h.ID
 }
