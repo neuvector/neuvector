@@ -9843,12 +9843,15 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/RESTAssetsScanReportFilter"
-  RESTWorkloadScanData:
+  RESTAssetScanData:
     type: object
     required:
       - workload_name
       - workload_domain
       - workload_host_name
+      - workload_image
+      - workload_image_id
+      - host_name
       - name
       - score
       - severity
@@ -9872,94 +9875,10 @@ definitions:
         type: string
       workload_host_name:
         type: string
-      name:
+      workload_image:
         type: string
-        example: CVE-2015-8356
-      score:
-        type: number
-        format: float32
-        example: 7.2
-      severity:
+      workload_image_id:
         type: string
-        example: High
-      vectors:
-        type: string
-        example: ""
-      description:
-        type: string
-        example: "The setup_env function in group.c in sshd in OpenSSH allows local users to gain privileges."
-      file_name:
-        type: string
-        example: "usr/lib/python3.9"
-      package_name:
-        type: string
-        example: openssh
-      package_version:
-        type: string
-        example: 7.2_p2-r0
-      fixed_version:
-        type: string
-        example: 1:7.2p2-3
-      link:
-        type: string
-        example: https://security-tracker.debian.org/tracker/CVE-2015-8356
-      score_v3:
-        type: number
-        format: float32
-        example: 7.3
-      vectors_v3:
-        type: string
-        example: ""
-      published_timestamp:
-        type: integer
-        format: int64
-        example: 1516561260
-      last_modified_timestamp:
-        type: integer
-        format: int64
-        example: 1516561253
-      cpes:
-        type: array
-        items:
-          type: string
-          example: ""
-      cves:
-        type: array
-        items:
-          type: string
-          example: ""
-      feed_rating:
-        type: string
-        example: ""
-      in_base_image:
-        type: boolean
-        example: true
-      tags:
-        type: array
-        items:
-          type: string
-          example: ""
-  RESTAssetScanData:
-    type: object
-    required:
-      - host_name
-      - name
-      - score
-      - severity
-      - vectors
-      - description
-      - file_name
-      - package_name
-      - package_version
-      - fixed_version
-      - link
-      - score_v3
-      - vectors_v3
-      - published_timestamp
-      - last_modified_timestamp
-      - feed_rating
-      - in_base_image
-    properties:
       host_name:
         type: string
       name:
