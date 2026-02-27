@@ -683,7 +683,6 @@ func filter(d interface{}, filter *restFieldFilter) bool {
 	case reflect.Bool:
 		return filterBool(f.Bool(), filter)
 	}
-
 	return false
 }
 
