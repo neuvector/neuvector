@@ -2568,12 +2568,11 @@ type RESTAssetsScanReportQuery struct {
 }
 
 type RESTAssetScanData struct {
-	HostName         string `json:"host_name"`
-	WorkloadName     string `json:"workload_name"`
-	WorkloadDomain   string `json:"workload_domain"`
-	WorkloadHostName string `json:"workload_host_name"`
-	WorkloadImage    string `json:"workload_image"`
-	WorkloadImageID  string `json:"workload_image_id"`
+	HostName        string `json:"host_name"`
+	WorkloadName    string `json:"workload_name"`
+	WorkloadDomain  string `json:"workload_domain"`
+	WorkloadImage   string `json:"workload_image"`
+	WorkloadImageID string `json:"workload_image_id"`
 	RESTVulnerability
 }
 
@@ -4390,12 +4389,11 @@ func (a *RESTWorkload) GetCursor() RESTScanReportCursor {
 
 func (a *RESTWorkload) GetScanData() RESTAssetScanData {
 	return RESTAssetScanData{
-		HostName:         "",
-		WorkloadName:     a.Name,
-		WorkloadDomain:   a.Domain,
-		WorkloadHostName: a.HostName,
-		WorkloadImage:    a.Image,
-		WorkloadImageID:  a.ImageID,
+		HostName:        a.HostName,
+		WorkloadName:    a.Name,
+		WorkloadDomain:  a.Domain,
+		WorkloadImage:   a.Image,
+		WorkloadImageID: a.ImageID,
 	}
 }
 

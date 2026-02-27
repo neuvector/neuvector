@@ -332,30 +332,45 @@ func parseFilters(filterNames utils.Set, rconfFilters []api.RESTAssetsScanReport
 }
 
 // filterAssets applies the filters to the assets and returns the filtered list.
-func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScanReportCursor, workloads []api.AssetScanReportInterface) ([]api.AssetScanReportInterface, error) {
+func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScanReportCursor, assets []api.AssetScanReportInterface) ([]api.AssetScanReportInterface, error) {
 	ret := []api.AssetScanReportInterface{}
-	if len(filters) == 0 {
+	if len(filters) == 0 || len(assets) == 0 {
 		// nothing to do
-		return workloads, nil
-	}
-	filterNames := utils.NewSetFromStringSlice([]string{"domain", "host_name"})
-	restFilters, err := parseFilters(filterNames, filters)
-	if err != nil {
-		return nil, err
+		return assets, nil
 	}
 
-	rf := restNewFilter(&api.RESTWorkload{}, restFilters)
-	if len(rf.filters) == 0 {
-		return workloads, errors.New("invalid filters")
+	var rf *restFilter
+
+	switch v := assets[0].(type) {
+	case *api.RESTWorkload:
+		filterNames := utils.NewSetFromStringSlice([]string{"domain", "host_name"})
+		restFilters, err := parseFilters(filterNames, filters)
+		if err != nil {
+			return nil, err
+		}
+		rf = restNewFilter(&api.RESTWorkload{}, restFilters)
+	case *api.RESTHost:
+		filterNames := utils.NewSetFromStringSlice([]string{"name"})
+		restFilters, err := parseFilters(filterNames, filters)
+		if err != nil {
+			return nil, err
+		}
+		rf = restNewFilter(&api.RESTHost{}, restFilters)
+	default:
+		return nil, fmt.Errorf("unsupported type: %T", v)
 	}
-	for _, workload := range workloads {
-		if !rf.Filter(workload) {
+
+	if len(rf.filters) == 0 {
+		return assets, errors.New("invalid filters")
+	}
+	for _, asset := range assets {
+		if !rf.Filter(asset) {
 			continue
 		}
 
 		if cursor != nil {
 			if compareCursor(
-				workload.GetCursor(),
+				asset.GetCursor(),
 				*cursor,
 			) <= 0 {
 				// here we keep the asset with the same name as the cursor, so we will still look into CVEs later.
@@ -363,7 +378,7 @@ func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScan
 			}
 		}
 
-		ret = append(ret, workload)
+		ret = append(ret, asset)
 	}
 	return ret, nil
 }
