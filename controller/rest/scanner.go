@@ -343,7 +343,7 @@ func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScan
 
 	switch v := assets[0].(type) {
 	case *api.RESTWorkload:
-		filterNames := utils.NewSetFromStringSlice([]string{"domain", "host_name"})
+		filterNames := utils.NewSetFromStringSlice([]string{"domain", "host_name", "name", "image"})
 		restFilters, err := parseFilters(filterNames, filters)
 		if err != nil {
 			return nil, err
