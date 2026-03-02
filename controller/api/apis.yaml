@@ -9848,7 +9848,6 @@ definitions:
     required:
       - workload_name
       - workload_domain
-      - workload_host_name
       - workload_image
       - workload_image_id
       - host_name
