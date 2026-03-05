@@ -131,6 +131,7 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 			UserInfoURL:      cs.OIDC.UserInfoURL,
 			Scopes:           cs.OIDC.Scopes,
 			GroupClaim:       cs.OIDC.GroupClaim,
+			UsernameClaim:    cs.OIDC.UsernameClaim,
 			Enable:           cs.Enable,
 			DefaultRole:      cs.OIDC.DefaultRole,
 			GroupMappedRoles: cs.OIDC.GroupMappedRoles,
@@ -1001,6 +1002,9 @@ func updateOIDCServer(cs *share.CLUSServer, oidc *api.RESTServerOIDCConfig, acc 
 	}
 	if oidc.GroupClaim != nil {
 		coidc.GroupClaim = *oidc.GroupClaim
+	}
+	if oidc.UsernameClaim != nil {
+		coidc.UsernameClaim = *oidc.UsernameClaim
 	}
 
 	if oidc.UseProxy != nil {
