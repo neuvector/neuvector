@@ -1,5 +1,8 @@
 name: Adds all issues to project board
 
+permissions:
+  contents: read
+
 on:
   issues:
     types:
