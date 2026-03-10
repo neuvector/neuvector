@@ -986,7 +986,7 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 func xlateDeployment(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
 		if o.GetNamespace() != NvAdmSvcNamespace {
-			return "", nil
+			return string(o.GetUID()), o
 		}
 		r := &Deployment{
 			UID:    string(o.GetUID()),
@@ -2159,13 +2159,33 @@ func SetK8sVersion(k8sVer string) {
 	}
 }
 
+// get rancher service name from rancher deployment
+func getRancherSvcName(nsName string) string {
+	if objs, err := global.ORCH.ListResource(RscTypeDeployment, nsName); err == nil {
+		for _, obj := range objs {
+			if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
+				for _, c := range o.Spec.Template.Spec.Containers {
+					if c.Name == "rancher" {
+						for _, env := range c.Env {
+							if env.Name == "CATTLE_PEER_SERVICE" {
+								return env.Value
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func IsRancherFlavor() bool {
 	nsName := "cattle-system"
 	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
 		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
 	} else {
 		if len(nvRscMapSSO) == 0 {
-			svcnames := []string{"cattle-cluster-agent", "rancher", "rancher-prime"}
+			svcnames := utils.NewSetFromStringSlice([]string{"cattle-cluster-agent", "rancher", "rancher-prime"})
 			nvPermitsRscSSO := utils.NewSetFromStringSlice([]string{
 				share.PERM_REG_SCAN_ID,
 				share.PERM_CICD_SCAN_ID,
@@ -2198,7 +2218,10 @@ func IsRancherFlavor() bool {
 				share.PERMS_SECURITY_EVENTS_ID:  "securityevents",
 				share.PERM_FED_ID:               "federation",
 			}
-			for _, svcname := range svcnames {
+			if svcName := getRancherSvcName(nsName); svcName != "" {
+				svcnames.Add(svcName)
+			}
+			for _, svcname := range svcnames.ToStringSlice() {
 				if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
 					log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
 					// For Rancher SSO only: nv permission crd kind -> nv permission uint32 value
