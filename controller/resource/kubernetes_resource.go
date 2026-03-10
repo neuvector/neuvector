@@ -2160,23 +2160,28 @@ func SetK8sVersion(k8sVer string) {
 }
 
 // get rancher service name from rancher deployment
-func getRancherSvcName(nsName string) string {
-	if objs, err := global.ORCH.ListResource(RscTypeDeployment, nsName); err == nil {
-		for _, obj := range objs {
-			if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
-				for _, c := range o.Spec.Template.Spec.Containers {
-					if c.Name == "rancher" {
-						for _, env := range c.Env {
-							if env.Name == "CATTLE_PEER_SERVICE" {
-								return env.Value
-							}
-						}
-					}
+func getRancherSvcName(nsName string) (string, bool) {
+	objs, err := global.ORCH.ListResource(RscTypeDeployment, nsName)
+	if err != nil {
+		return "", false
+	}
+	for _, obj := range objs {
+		deploy, ok := obj.(*appsv1.Deployment)
+		if !ok {
+			continue
+		}
+		for _, c := range deploy.Spec.Template.Spec.Containers {
+			if c.Name != "rancher" {
+				continue
+			}
+			for _, env := range c.Env {
+				if env.Name == "CATTLE_PEER_SERVICE" {
+					return env.Value, true
 				}
 			}
 		}
 	}
-	return ""
+	return "", false
 }
 
 func IsRancherFlavor() bool {
@@ -2218,7 +2223,7 @@ func IsRancherFlavor() bool {
 				share.PERMS_SECURITY_EVENTS_ID:  "securityevents",
 				share.PERM_FED_ID:               "federation",
 			}
-			if svcName := getRancherSvcName(nsName); svcName != "" {
+			if svcName, ok := getRancherSvcName(nsName); ok {
 				svcnames.Add(svcName)
 			}
 			for _, svcname := range svcnames.ToStringSlice() {

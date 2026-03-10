@@ -3,6 +3,8 @@ package resource
 import (
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -11,13 +13,43 @@ import (
 	"github.com/neuvector/neuvector/share/global"
 )
 
+const PLATFORM_PSEUDO_K8S = "pseudo_k8s"
+const PSEUDO_K8S_VERSION = "1.24"
+
+func setupDefaultRancherEnv() *k8s_unittest {
+	defRancherName := "rancher"
+	svcRancher := "rancher"
+
+	d := global.ORCH.ResourceDriver.(*k8s_unittest)
+
+	nvRscMapSSO = nil
+	objNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: RANCHER_NAMESPACE}}
+	d.updateResourceCacheEx(RscTypeNamespace, "", RANCHER_NAMESPACE, objNS)
+
+	objDeploy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: defRancherName, Namespace: RANCHER_NAMESPACE}}
+	objDeploy.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Name: RAHCHER_CONTAINER_NAME,
+			Env:  []corev1.EnvVar{{Name: ENV_CATTLE_PEER_SERVICE, Value: svcRancher}},
+		},
+	}
+	d.updateResourceCacheEx(RscTypeDeployment, RANCHER_NAMESPACE, defRancherName, objDeploy)
+
+	svcObj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: svcRancher, Namespace: RANCHER_NAMESPACE}}
+	d.updateResourceCacheEx(RscTypeService, RANCHER_NAMESPACE, svcRancher, svcObj)
+
+	nvRscMapSSO = nil
+	IsRancherFlavor()
+
+	return d
+}
+
 func TestRBACRancherSSOv2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -635,9 +667,8 @@ func TestRBACRancherSSOFedAdminReaderV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -905,9 +936,8 @@ func TestRBACRancherSSOMixedClusterRoleV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -1214,9 +1244,8 @@ func TestRBACRancherSSOAdminV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -1350,9 +1379,8 @@ func TestRBACRancherSSOProjectRolesV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -1471,9 +1499,8 @@ func TestRBACRancherSSOK8sroleV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -1731,10 +1758,9 @@ func removeRedundant(domainRole map[string]string, domainPermits map[string]shar
 func TestConsolidateNvRolePermitsV2(t *testing.T) {
 	preTest()
 
-	//_k8sFlavor = share.FlavorRancher
-	//global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	//IsRancherFlavor()
+	_k8sFlavor = share.FlavorRancher
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -1949,9 +1975,8 @@ func TestRancherMultiplePrinciplesV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
@@ -2228,9 +2253,8 @@ func TestRBACRancherSSOFedPermitV2(t *testing.T) {
 	preTest()
 
 	_k8sFlavor = share.FlavorRancher
-	global.SetPseudoOrchHub_UnitTest("pseudo_k8s", _k8sFlavor, "1.24", "", register_k8s_unittest)
-	d := new_k8s_unittest()
-	IsRancherFlavor()
+	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+	d := setupDefaultRancherEnv()
 
 	var rbacRancherSSO = tRbacRancherSSO{
 		t:        t,
