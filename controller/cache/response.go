@@ -313,7 +313,7 @@ func lookup(desc *eventDesc) []actionDesc {
 				if desc.event != share.EventIncident && desc.event != share.EventThreat && desc.event != share.EventViolation {
 					continue
 				}
-			} else if rule.Event != desc.event {
+			} else if rule.Event != desc.event && !(desc.event == share.EventActivity && rule.Event == share.EventEvent) {
 				continue
 			}
 
