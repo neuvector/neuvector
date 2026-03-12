@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,9 +30,11 @@ import (
 // }
 
 const (
-	RAHCHER_CONTAINER_NAME  = "rancher"
-	ENV_CATTLE_PEER_SERVICE = "CATTLE_PEER_SERVICE"
-	RANCHER_NAMESPACE       = "cattle-system"
+	RAHCHER_CONTAINER_NAME   = "rancher"
+	ENV_CATTLE_PEER_SERVICE  = "CATTLE_PEER_SERVICE"
+	ENV_RANCHER_CLUSTER_NAME = "RANCHER_CLUSTER_NAME"
+	RANCHER_NAMESPACE        = "cattle-system"
+	customRancherName        = "my-rancher"
 )
 
 func preTest() {
@@ -43,55 +47,62 @@ func postTest() {
 	log.SetLevel(log.DebugLevel)
 }
 
+func setRancherClusterEnv(t *testing.T) {
+	err := os.Setenv(ENV_RANCHER_CLUSTER_NAME, customRancherName)
+	assert.Equal(t, nil, err, "failed to set env variable for unit test")
+}
+
+func resetRancherClusterEnv(t *testing.T) {
+	err := os.Setenv(ENV_RANCHER_CLUSTER_NAME, "")
+	assert.Equal(t, nil, err, "failed to reset env variable for unit test")
+	nvRscMapSSO = nil
+	global.ORCH = nil
+}
+
 func TestIsRancher(t *testing.T) {
 	preTest()
+	defer postTest()
 
-	_k8sFlavor = ""
-	global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
-	d := global.ORCH.ResourceDriver.(*k8s_unittest)
+	t.Run("env var RANCHER_CLUSTER_NAME is non-empty value without pseudo_k8s", func(t *testing.T) {
+		setRancherClusterEnv(t)
+		isRancher := IsRancherFlavor()
+		assert.Equal(t, true, isRancher, "failed to determine it's Rancher flavor")
+		resetRancherClusterEnv(t)
+	})
 
-	customRancherName := "my-rancher"
+	t.Run("env var RANCHER_CLUSTER_NAME is empty value with pseudo_k8s", func(t *testing.T) {
+		_k8sFlavor = ""
+		global.SetPseudoOrchHub_UnitTest(PLATFORM_PSEUDO_K8S, _k8sFlavor, PSEUDO_K8S_VERSION, "", register_k8s_unittest)
+		d := global.ORCH.ResourceDriver.(*k8s_unittest)
 
-	nvRscMapSSO = nil
-	objNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: RANCHER_NAMESPACE}}
-	d.updateResourceCacheEx(RscTypeNamespace, "", RANCHER_NAMESPACE, objNS)
+		isRancher := IsRancherFlavor()
+		assert.Equal(t, false, isRancher, "failed to determine it's not Rancher flavor [1]")
 
-	objDeploy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: customRancherName, Namespace: RANCHER_NAMESPACE}}
-	objDeploy.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Name: RAHCHER_CONTAINER_NAME,
-			Env:  []corev1.EnvVar{{Name: ENV_CATTLE_PEER_SERVICE, Value: customRancherName}},
-		},
-	}
-	d.updateResourceCacheEx(RscTypeDeployment, RANCHER_NAMESPACE, customRancherName, objDeploy)
-	isRancher := IsRancherFlavor()
-	if isRancher {
-		t.Errorf("Unexpected isRancher result [1]")
-		t.Logf("  Expect: false\n")
-		t.Logf("  Actual: %+v\n", isRancher)
-	}
+		objNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: RANCHER_NAMESPACE}}
+		d.updateResourceCacheEx(RscTypeNamespace, "", RANCHER_NAMESPACE, objNS)
 
-	svcObj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "nv_controller", Namespace: RANCHER_NAMESPACE}}
-	d.updateResourceCacheEx(RscTypeService, RANCHER_NAMESPACE, svcObj.Name, svcObj)
-	nvRscMapSSO = nil
-	isRancher = IsRancherFlavor()
-	if isRancher {
-		t.Errorf("Unexpected isRancher result [2]")
-		t.Logf("  Expect: false\n")
-		t.Logf("  Actual: %+v\n", isRancher)
-	}
+		objDeploy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: customRancherName, Namespace: RANCHER_NAMESPACE}}
+		objDeploy.Spec.Template.Spec.Containers = []corev1.Container{
+			{
+				Name: RAHCHER_CONTAINER_NAME,
+				Env:  []corev1.EnvVar{{Name: ENV_CATTLE_PEER_SERVICE, Value: customRancherName}},
+			},
+		}
+		d.updateResourceCacheEx(RscTypeDeployment, RANCHER_NAMESPACE, customRancherName, objDeploy)
+		isRancher = IsRancherFlavor()
+		assert.Equal(t, false, isRancher, "failed to determine it's not Rancher flavor [2]")
 
-	svcObj = &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: customRancherName, Namespace: RANCHER_NAMESPACE}}
-	d.updateResourceCacheEx(RscTypeService, RANCHER_NAMESPACE, customRancherName, svcObj)
-	nvRscMapSSO = nil
-	isRancher = IsRancherFlavor()
-	if !isRancher {
-		t.Errorf("Unexpected isRancher result [3]")
-		t.Logf("  Expect: true\n")
-		t.Logf("  Actual: %+v\n", isRancher)
-	}
+		svcObj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "nv_controller", Namespace: RANCHER_NAMESPACE}}
+		d.updateResourceCacheEx(RscTypeService, RANCHER_NAMESPACE, svcObj.Name, svcObj)
+		isRancher = IsRancherFlavor()
+		assert.Equal(t, false, isRancher, "failed to determine it's not Rancher flavor [3]")
 
-	postTest()
+		svcObj = &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: customRancherName, Namespace: RANCHER_NAMESPACE}}
+		d.updateResourceCacheEx(RscTypeService, RANCHER_NAMESPACE, customRancherName, svcObj)
+		isRancher = IsRancherFlavor()
+		assert.Equal(t, true, isRancher, "failed to determine it's Rancher flavor")
+		resetRancherClusterEnv(t)
+	})
 }
 
 func TestRBAC(t *testing.T) {
