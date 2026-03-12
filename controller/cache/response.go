@@ -314,11 +314,11 @@ func lookup(desc *eventDesc) []actionDesc {
 					continue
 				}
 			} else if rule.Event != desc.event {
-				// The type of activity logs(Container.Start/Container.Stop/Container.Remove/Container.Secured/Container.Unsecured) is
-				// "activity" while the type of event logs is "event".
-				// However, response rules for Event apply to both event logs & activity logs
-				// So for activity logs(desc.event being "activity"), response rules for Event(rule.Event being "event") could still match.
-				if desc.event != share.EventActivity || rule.Event != share.EventEvent {
+				// "event" response rules are designed to match "event" log & "activity" logs
+				// (e.g. Container.Start/Container.Stop/Container.Remove/Container.Secured/Container.Unsecured),
+				// So for activity logs, do not skip them simply because their "event" value is "activity" but not "event"
+				evalActivityLogWithEventRule := (desc.event == share.EventActivity && rule.Event == share.EventEvent)
+				if !evalActivityLogWithEventRule {
 					continue
 				}
 			}
