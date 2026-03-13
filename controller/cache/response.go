@@ -314,7 +314,13 @@ func lookup(desc *eventDesc) []actionDesc {
 					continue
 				}
 			} else if rule.Event != desc.event {
-				continue
+				// "event" response rules are designed to match "event" log & "activity" logs
+				// (e.g. Container.Start/Container.Stop/Container.Remove/Container.Secured/Container.Unsecured),
+				// So for activity logs, do not skip them simply because their "event" value is "activity" but not "event"
+				evalActivityLogWithEventRule := (desc.event == share.EventActivity && rule.Event == share.EventEvent)
+				if !evalActivityLogWithEventRule {
+					continue
+				}
 			}
 
 			// If no group config, it means applying to all
