@@ -1,8 +1,6 @@
 module github.com/neuvector/neuvector
 
-go 1.24.0
-
-toolchain go1.24.6
+go 1.25.0
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
@@ -99,7 +97,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
