@@ -986,7 +986,7 @@ func xlatePod(obj metav1.Object) (string, interface{}) {
 func xlateDeployment(obj metav1.Object) (string, interface{}) {
 	if o, ok := obj.(*appsv1.Deployment); ok && o != nil {
 		if o.GetNamespace() != NvAdmSvcNamespace {
-			return "", nil
+			return string(o.GetUID()), o
 		}
 		r := &Deployment{
 			UID:    string(o.GetUID()),
@@ -2159,93 +2159,133 @@ func SetK8sVersion(k8sVer string) {
 	}
 }
 
+// get rancher service name from rancher deployment
+func getRancherSvcName(nsName string) (string, bool) {
+	objs, err := global.ORCH.ListResource(RscTypeDeployment, nsName)
+	if err != nil {
+		return "", false
+	}
+	for _, obj := range objs {
+		deploy, ok := obj.(*appsv1.Deployment)
+		if !ok {
+			continue
+		}
+		for _, c := range deploy.Spec.Template.Spec.Containers {
+			if c.Name != "rancher" {
+				continue
+			}
+			for _, env := range c.Env {
+				if env.Name == "CATTLE_PEER_SERVICE" {
+					return env.Value, true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+// For Rancher SSO only: initialize {nv permission crd kind} -> {nv permission uint32 value}
+func initNvRscMapForSSO() {
+	if len(nvRscMapSSO) > 0 {
+		return
+	}
+
+	nvPermitsRscSSO := utils.NewSetFromStringSlice([]string{
+		share.PERM_REG_SCAN_ID,
+		share.PERM_CICD_SCAN_ID,
+		share.PERM_ADM_CONTROL_ID,
+		share.PERM_AUDIT_EVENTS_ID,
+		share.PERM_EVENTS_ID,
+		share.PERM_AUTHENTICATION_ID,
+		share.PERM_AUTHORIZATION_ID,
+		share.PERM_SYSTEM_CONFIG_ID,
+		share.PERM_VULNERABILITY_ID,
+		share.PERMS_RUNTIME_SCAN_ID,
+		share.PERMS_RUNTIME_POLICIES_ID,
+		share.PERMS_COMPLIANCE_ID,
+		share.PERMS_SECURITY_EVENTS_ID,
+		share.PERM_FED_ID,
+	})
+	permIDtoCRD := map[string]string{
+		share.PERM_REG_SCAN_ID:          "registryscan",
+		share.PERM_CICD_SCAN_ID:         "ciscan",
+		share.PERM_ADM_CONTROL_ID:       "admissioncontrol",
+		share.PERM_AUDIT_EVENTS_ID:      "auditevents",
+		share.PERM_EVENTS_ID:            "events",
+		share.PERM_AUTHENTICATION_ID:    "authentication",
+		share.PERM_AUTHORIZATION_ID:     "authorization",
+		share.PERM_SYSTEM_CONFIG_ID:     "systemconfig",
+		share.PERM_VULNERABILITY_ID:     "vulnerability",
+		share.PERMS_RUNTIME_SCAN_ID:     "runtimescan",
+		share.PERMS_RUNTIME_POLICIES_ID: "runtimepolicy",
+		share.PERMS_COMPLIANCE_ID:       "compliance",
+		share.PERMS_SECURITY_EVENTS_ID:  "securityevents",
+		share.PERM_FED_ID:               "federation",
+	}
+	nvPermitsValueSSO = make(map[string]share.NvPermissions, nvPermitsRscSSO.Cardinality()+len(permIDtoCRD))
+	for _, option := range access.PermissionOptions {
+		if crdKind, ok := permIDtoCRD[option.ID]; ok || nvPermitsRscSSO.Contains(option.ID) {
+			var readPermits uint32
+			var writePermits uint32
+			if len(option.ComplexPermits) > 0 {
+				for _, option2 := range option.ComplexPermits {
+					if option.ReadSupported && option2.ReadSupported {
+						readPermits |= option2.Value
+					}
+					if option.WriteSupported && option2.WriteSupported {
+						writePermits |= option2.Value
+					}
+				}
+			} else {
+				if option.ReadSupported {
+					readPermits |= option.Value
+				}
+				if option.WriteSupported {
+					writePermits |= option.Value
+				}
+			}
+			if ok {
+				nvPermitsValueSSO[crdKind] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+				nvPermitsRscSSO.Add(crdKind)
+			}
+			if nvPermitsRscSSO.Contains(option.ID) {
+				optionID := strings.ReplaceAll(option.ID, "_", "-")
+				nvPermitsValueSSO[optionID] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
+			}
+		}
+	}
+
+	nvRscMapSSO = map[string]utils.Set{ // apiGroup -> neuvector permission resources
+		"read-only.neuvector.api.io": nvPermitsRscSSO,
+		"api.neuvector.com":          nvPermitsRscSSO,
+		"permission.neuvector.com":   nvPermitsRscSSO,
+		"*":                          nvPermitsRscSSO,
+	}
+}
+
 func IsRancherFlavor() bool {
+	if len(nvRscMapSSO) > 0 {
+		return true
+	}
+
+	if name := os.Getenv("RANCHER_CLUSTER_NAME"); name != "" {
+		initNvRscMapForSSO()
+		return true
+	}
+
 	nsName := "cattle-system"
 	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
 		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
-	} else {
-		if len(nvRscMapSSO) == 0 {
-			svcnames := []string{"cattle-cluster-agent", "rancher", "rancher-prime"}
-			nvPermitsRscSSO := utils.NewSetFromStringSlice([]string{
-				share.PERM_REG_SCAN_ID,
-				share.PERM_CICD_SCAN_ID,
-				share.PERM_ADM_CONTROL_ID,
-				share.PERM_AUDIT_EVENTS_ID,
-				share.PERM_EVENTS_ID,
-				share.PERM_AUTHENTICATION_ID,
-				share.PERM_AUTHORIZATION_ID,
-				share.PERM_SYSTEM_CONFIG_ID,
-				share.PERM_VULNERABILITY_ID,
-				share.PERMS_RUNTIME_SCAN_ID,
-				share.PERMS_RUNTIME_POLICIES_ID,
-				share.PERMS_COMPLIANCE_ID,
-				share.PERMS_SECURITY_EVENTS_ID,
-				share.PERM_FED_ID,
-			})
-			permIDtoCRD := map[string]string{
-				share.PERM_REG_SCAN_ID:          "registryscan",
-				share.PERM_CICD_SCAN_ID:         "ciscan",
-				share.PERM_ADM_CONTROL_ID:       "admissioncontrol",
-				share.PERM_AUDIT_EVENTS_ID:      "auditevents",
-				share.PERM_EVENTS_ID:            "events",
-				share.PERM_AUTHENTICATION_ID:    "authentication",
-				share.PERM_AUTHORIZATION_ID:     "authorization",
-				share.PERM_SYSTEM_CONFIG_ID:     "systemconfig",
-				share.PERM_VULNERABILITY_ID:     "vulnerability",
-				share.PERMS_RUNTIME_SCAN_ID:     "runtimescan",
-				share.PERMS_RUNTIME_POLICIES_ID: "runtimepolicy",
-				share.PERMS_COMPLIANCE_ID:       "compliance",
-				share.PERMS_SECURITY_EVENTS_ID:  "securityevents",
-				share.PERM_FED_ID:               "federation",
-			}
-			for _, svcname := range svcnames {
-				if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
-					log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("resource found")
-					// For Rancher SSO only: nv permission crd kind -> nv permission uint32 value
-					nvPermitsValueSSO = make(map[string]share.NvPermissions, nvPermitsRscSSO.Cardinality()+len(permIDtoCRD))
-					for _, option := range access.PermissionOptions {
-						if crdKind, ok := permIDtoCRD[option.ID]; ok || nvPermitsRscSSO.Contains(option.ID) {
-							var readPermits uint32
-							var writePermits uint32
-							if len(option.ComplexPermits) > 0 {
-								for _, option2 := range option.ComplexPermits {
-									if option.ReadSupported && option2.ReadSupported {
-										readPermits |= option2.Value
-									}
-									if option.WriteSupported && option2.WriteSupported {
-										writePermits |= option2.Value
-									}
-								}
-							} else {
-								if option.ReadSupported {
-									readPermits |= option.Value
-								}
-								if option.WriteSupported {
-									writePermits |= option.Value
-								}
-							}
-							if ok {
-								nvPermitsValueSSO[crdKind] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
-								nvPermitsRscSSO.Add(crdKind)
-							}
-							if nvPermitsRscSSO.Contains(option.ID) {
-								optionID := strings.ReplaceAll(option.ID, "_", "-")
-								nvPermitsValueSSO[optionID] = share.NvPermissions{ReadValue: readPermits, WriteValue: writePermits}
-							}
-						}
-					}
-
-					nvRscMapSSO = map[string]utils.Set{ // apiGroup -> neuvector permission resources
-						"read-only.neuvector.api.io": nvPermitsRscSSO,
-						"api.neuvector.com":          nvPermitsRscSSO,
-						"permission.neuvector.com":   nvPermitsRscSSO,
-						"*":                          nvPermitsRscSSO,
-					}
-
-					return true
-				}
-			}
-		} else {
+		return false
+	}
+	svcnames := utils.NewSetFromStringSlice([]string{"cattle-cluster-agent", "rancher", "rancher-prime"})
+	if svcName, ok := getRancherSvcName(nsName); ok {
+		svcnames.Add(svcName)
+	}
+	for _, svcname := range svcnames.ToStringSlice() {
+		if _, err := global.ORCH.GetResource(RscTypeService, nsName, svcname); err == nil {
+			log.WithFields(log.Fields{"namespace": nsName, "service": svcname}).Info("rancher resource found")
+			initNvRscMapForSSO()
 			return true
 		}
 	}
