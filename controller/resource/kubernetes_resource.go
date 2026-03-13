@@ -2264,6 +2264,10 @@ func initNvRscMapForSSO() {
 }
 
 func IsRancherFlavor() bool {
+	if len(nvRscMapSSO) > 0 {
+		return true
+	}
+
 	if name := os.Getenv("RANCHER_CLUSTER_NAME"); name != "" {
 		initNvRscMapForSSO()
 		return true
@@ -2273,9 +2277,6 @@ func IsRancherFlavor() bool {
 	if _, err := global.ORCH.GetResource(RscTypeNamespace, "", nsName); err != nil {
 		log.WithFields(log.Fields{"namespace": nsName, "err": err}).Info("resource no found")
 		return false
-	}
-	if len(nvRscMapSSO) > 0 {
-		return true
 	}
 	svcnames := utils.NewSetFromStringSlice([]string{"cattle-cluster-agent", "rancher", "rancher-prime"})
 	if svcName, ok := getRancherSvcName(nsName); ok {
