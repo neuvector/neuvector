@@ -10,7 +10,7 @@ replace (
 require (
 	github.com/Microsoft/hcsshim v0.13.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.7
-	github.com/beevik/etree v1.5.1
+	github.com/beevik/etree v1.6.0
 	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 	github.com/containerd/containerd/api v1.9.0
@@ -39,7 +39,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/russellhaering/gosaml2 v0.10.0
-	github.com/russellhaering/goxmldsig v1.5.0
+	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/streadway/simpleuuid v0.0.0-20130420165545-6617b501e485
