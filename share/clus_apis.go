@@ -1920,6 +1920,7 @@ type CLUSRegistryImageSummary struct {
 	ScannedAt         time.Time     `json:"scanned_at"`
 	CreatedAt         time.Time     `json:"created_at"`
 	BaseOS            string        `json:"base_os"`
+	OSScanStatus      OSScanStatus  `json:"os_scan_status"`
 	Version           string        `json:"version"`
 	Result            ScanErrorCode `json:"result"`
 	Status            string        `json:"status"`

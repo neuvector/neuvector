@@ -967,6 +967,7 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 		if result.ScanTypesRequested.Vulnerability {
 			sum.Provider = result.Provider
 			sum.BaseOS = result.Namespace
+			sum.OSScanStatus = result.OSScanStatus
 			sum.Version = result.Version
 			sum.Author = result.Author
 			sum.Size = result.Size
@@ -1351,6 +1352,7 @@ func (rs *Registry) stopScan() {
 			sum.Status = api.ScanStatusIdle
 			sum.ScannedAt = time.Time{}
 			sum.BaseOS = ""
+			sum.OSScanStatus = share.OSScanStatus_OSScanStatusUnknown
 			sum.Version = ""
 			sum.Result = share.ScanErrorCode_ScanErrNone
 
@@ -1534,8 +1536,9 @@ func (rs *Registry) scheduleScanImagesOnDemand(sctx *scanContext, imageMap map[s
 				RegName:  rs.config.Name,
 				Digest:   meta.digest,
 				// Signed:    meta.signed, [2019.Apr] comment out until we can accurately tell it
-				RunAsRoot: meta.runAsRoot,
-				Status:    api.ScanStatusScheduled,
+				RunAsRoot:    meta.runAsRoot,
+				Status:       api.ScanStatusScheduled,
+				OSScanStatus: share.OSScanStatus_OSScanStatusUnknown,
 			}
 			sum.Images = make([]share.CLUSImage, 0, meta.images.Cardinality())
 			for image := range meta.images.Iter() {
@@ -1705,6 +1708,7 @@ func (rs *Registry) scheduleScanImages(
 					SignatureDigest:   info.SignatureDigest,
 					SigstoreTimestamp: sigstoreTimestamp,
 					Images:            []share.CLUSImage{image},
+					OSScanStatus:      share.OSScanStatus_OSScanStatusUnknown,
 				}
 				rs.summary[info.ID] = sum
 				scanTypesRequired.Vulnerability = true

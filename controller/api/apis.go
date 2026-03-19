@@ -2360,6 +2360,7 @@ type RESTScanBrief struct {
 	BaseOS           string `json:"base_os"`
 	CVEDBVersion     string `json:"scanner_version"`
 	CVEDBCreateTime  string `json:"cvedb_create_time"`
+	OSScanStatus     string `json:"os_scan_status,omitempty"`
 }
 
 func (sb *RESTScanBrief) CVECount() int {
@@ -2582,6 +2583,7 @@ type RESTAssetScanReportData struct {
 }
 
 type RESTScanReport struct {
+	OSScanStatus  string                 `json:"os_scan_status,omitempty"`
 	Vuls          []*RESTVulnerability   `json:"vulnerabilities"`
 	Modules       []*RESTScanModule      `json:"modules,omitempty"`
 	Checks        []*RESTBenchItem       `json:"checks,omitempty"`
