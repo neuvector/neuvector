@@ -278,7 +278,7 @@ func image2RESTSummary(rs *Registry, id string, sum *share.CLUSRegistryImageSumm
 		RESTScanBrief: api.RESTScanBrief{
 			Status:       sum.Status,
 			BaseOS:       sum.BaseOS,
-			OSScanStatus: scanUtils.OSScanStatusToString(sum.OSScanStatus),
+			OSScanStatus: sum.OSScanStatus.String(),
 			CVEDBVersion: sum.Version,
 		},
 	}
@@ -580,7 +580,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 	}
 
 	var rrpt api.RESTScanReport
-	rrpt.OSScanStatus = scanUtils.OSScanStatusToString(sum.OSScanStatus)
+	rrpt.OSScanStatus = sum.OSScanStatus.String()
 
 	if vpf != nil {
 		if c, ok := rs.cache[id]; ok {
@@ -626,7 +626,7 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 			}
 
 			rrpt.SignatureInfo.Verifiers = make([]string, len(c.signatureVerifiers))
-			rrpt.OSScanStatus = scanUtils.OSScanStatusToString(sum.OSScanStatus)
+			rrpt.OSScanStatus = sum.OSScanStatus.String()
 			copy(rrpt.SignatureInfo.Verifiers, c.signatureVerifiers)
 		}
 	}

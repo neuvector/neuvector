@@ -2,8 +2,6 @@ package scan
 
 import (
 	"testing"
-
-	"github.com/neuvector/neuvector/share"
 )
 
 func TestParseSocket(t *testing.T) {
@@ -107,37 +105,5 @@ func TestNormalizeImageCmds(t *testing.T) {
 		if out != exp {
 			t.Errorf("Incorrect: %s ==> %s\n", in, out)
 		}
-	}
-}
-
-func TestOSScanStatusToString(t *testing.T) {
-	tests := []struct {
-		name   string
-		status share.OSScanStatus
-		want   string
-	}{
-		{
-			name:   "supported",
-			status: share.OSScanStatus_OSScanStatusSupported,
-			want:   "supported",
-		},
-		{
-			name:   "unsupported",
-			status: share.OSScanStatus_OSScanStatusUnsupported,
-			want:   "unsupported",
-		},
-		{
-			name:   "unknown default",
-			status: share.OSScanStatus_OSScanStatusUnknown,
-			want:   "unknown",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := OSScanStatusToString(tt.status); got != tt.want {
-				t.Fatalf("OSScanStatusToString(%v) = %q, want %q", tt.status, got, tt.want)
-			}
-		})
 	}
 }

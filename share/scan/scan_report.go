@@ -346,7 +346,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{
-			OSScanStatus: OSScanStatusToString(result.OSScanStatus),
+			OSScanStatus: result.OSScanStatus.String(),
 			Envs:         result.Envs,
 			Labels:       result.Labels,
 			Vuls:         rvuls,

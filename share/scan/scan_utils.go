@@ -80,17 +80,6 @@ var scanErrString = []string{
 	share.ScanErrorCode_ScanErrSignatureScanError:    "signature scan error",
 }
 
-func OSScanStatusToString(status share.OSScanStatus) string {
-	switch status {
-	case share.OSScanStatus_OSScanStatusSupported:
-		return "supported"
-	case share.OSScanStatus_OSScanStatusUnsupported:
-		return "unsupported"
-	default:
-		return "unknown"
-	}
-}
-
 type CacheRecord struct {
 	Layer   string    `json:"layerID,omitempty"`
 	Size    uint64    `json:"size,omitempty"`
