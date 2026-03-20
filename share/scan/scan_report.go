@@ -346,14 +346,15 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{
-			Envs:    result.Envs,
-			Labels:  result.Labels,
-			Vuls:    rvuls,
-			Modules: rmods,
-			Secrets: rsecrets,
-			SetIDs:  ridperms,
-			Checks:  checks,
-			Cmds:    result.Cmds,
+			OSScanStatus: result.OSScanStatus.String(),
+			Envs:         result.Envs,
+			Labels:       result.Labels,
+			Vuls:         rvuls,
+			Modules:      rmods,
+			Secrets:      rsecrets,
+			SetIDs:       ridperms,
+			Checks:       checks,
+			Cmds:         result.Cmds,
 		},
 	}
 	if result.SignatureInfo != nil {

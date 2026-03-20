@@ -40,6 +40,12 @@ enum ScanProvider {
     JFrogXray = 1;
 }
 
+enum OSScanStatus {
+    OSScanStatusUnknown = 0;
+    OSScanStatusSupported = 1;
+    OSScanStatusUnsupported = 2;
+}
+
 enum ScanVulStatus {
     Unpatched = 0;
     FixExists = 1;
@@ -144,6 +150,7 @@ message ScanResult {
     ScanSignatureInfo SignatureInfo = 25;
     string Created = 26;
     ScanTypeMap ScanTypesRequested = 27;
+    OSScanStatus OSScanStatus = 28;
 }
 
 message ScanSignatureInfo {
