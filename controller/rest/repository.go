@@ -99,7 +99,8 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 	var err error
 
 	// Determine if a proxy is needed based on the registry
-	if req.Registry != "" {
+	ignoreProxySetting := req.IgnoreProxy != nil && *req.IgnoreProxy
+	if req.Registry != "" && !ignoreProxySetting {
 		proxy = scan.GetProxy(req.Registry)
 	}
 

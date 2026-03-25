@@ -10089,6 +10089,9 @@ definitions:
       base_image:
         type: string
         example: alpine
+      ignore_proxy:
+        type: boolean
+        example: true
   RESTScanRepoReqData:
     type: object
     required:
