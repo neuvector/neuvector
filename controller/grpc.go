@@ -149,7 +149,13 @@ func (ss *ScanService) ScannerRegisterStream(stream share.ControllerScanService_
 		}
 	}
 
-	return ss.scannerRegister(data)
+	if data == nil {
+		return status.Error(codes.Aborted, "empty scanner registration stream")
+	}
+	if err := ss.scannerRegister(data); err != nil {
+		return err
+	}
+	return stream.SendAndClose(&share.RPCVoid{})
 }
 
 func (ss *ScanService) ScannerRegister(ctx context.Context, data *share.ScannerRegisterData) (*share.RPCVoid, error) {
