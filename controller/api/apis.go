@@ -2651,14 +2651,15 @@ type RESTScanMeta struct {
 }
 
 type RESTScanRepoReq struct {
-	Metadata   RESTScanMeta `json:"metadata"`
-	Registry   string       `json:"registry"`
-	Username   string       `json:"username,omitempty"`
-	Password   string       `json:"password,omitempty"`
-	Repository string       `json:"repository"`
-	Tag        string       `json:"tag"`
-	ScanLayers bool         `json:"scan_layers"`
-	BaseImage  string       `json:"base_image"`
+	Metadata    RESTScanMeta `json:"metadata"`
+	Registry    string       `json:"registry"`
+	Username    string       `json:"username,omitempty"`
+	Password    string       `json:"password,omitempty"`
+	Repository  string       `json:"repository"`
+	Tag         string       `json:"tag"`
+	ScanLayers  bool         `json:"scan_layers"`
+	BaseImage   string       `json:"base_image"`
+	IgnoreProxy *bool        `json:"ignore_proxy,omitempty"`
 }
 
 type RESTScanRepoReqData struct {
