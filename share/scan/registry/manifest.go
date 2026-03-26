@@ -55,7 +55,6 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 	var err error
 	retry := 0
 	withOCIManifest := false
-	withOCIIndex := false
 
 	if reqType == ManifestRequest_CosignSignature {
 		withOCIManifest = true
@@ -70,11 +69,9 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 		case 1:
 			req.Header.Add("Accept", manifestV1.MediaTypeManifest)
 			req.Header.Add("Accept", manifestV1.MediaTypeSignedManifest)
+			req.Header.Add("Accept", MediaTypeOCIIndex)
 			if withOCIManifest {
 				req.Header.Add("Accept", MediaTypeOCIManifest)
-			}
-			if withOCIIndex {
-				req.Header.Add("Accept", MediaTypeOCIIndex)
 			}
 		case 2:
 			// Add Accept headers for manifest types:
@@ -83,9 +80,7 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 			// This allows the registry to return the appropriate manifest format based on what's available
 			fuseMediaType := fmt.Sprintf("%s,%s", manifestV2.MediaTypeManifest, MediaTypeOCIManifest)
 			req.Header.Add("Accept", fuseMediaType)
-			if withOCIIndex {
-				req.Header.Add("Accept", MediaTypeOCIIndex)
-			}
+			req.Header.Add("Accept", MediaTypeOCIIndex)
 		default:
 			return "", nil, errors.New("Unsupported manifest schema version")
 		}
@@ -102,8 +97,6 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 
 		if !withOCIManifest && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(MediaTypeOCIMissingManifest)) {
 			withOCIManifest = true
-		} else if !withOCIIndex && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(MediaTypeOCIMissingIndex)) {
-			withOCIIndex = true
 		} else {
 			retry++
 		}
