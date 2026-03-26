@@ -4306,19 +4306,20 @@ type RESTImageAssetView struct {
 }
 
 type RESTImageAssetViewV2 struct {
-	ID        string `json:"image_id"`
-	Name      string `json:"repository"`
-	Critical  int    `json:"critical,omitempty"`
-	High      int    `json:"high"`
-	Medium    int    `json:"medium"`
-	CreatedAt string `json:"created_at"`
-	ScannedAt string `json:"scanned_at"`
-	Digest    string `json:"digest"`
-	BaseOS    string `json:"base_os"`
-	RegName   string `json:"reg_name"`
-	Registry  string `json:"repo_url"`
-	Size      int    `json:"size"`
-	Tag       string `json:"tag"`
+	ID           string `json:"image_id"`
+	Name         string `json:"repository"`
+	Critical     int    `json:"critical,omitempty"`
+	High         int    `json:"high"`
+	Medium       int    `json:"medium"`
+	CreatedAt    string `json:"created_at"`
+	ScannedAt    string `json:"scanned_at"`
+	Digest       string `json:"digest"`
+	BaseOS       string `json:"base_os"`
+	OSScanStatus string `json:"os_scan_status,omitempty"`
+	RegName      string `json:"reg_name"`
+	Registry     string `json:"repo_url"`
+	Size         int    `json:"size"`
+	Tag          string `json:"tag"`
 }
 
 type RESTVulQueryStats struct {
