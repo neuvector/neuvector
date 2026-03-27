@@ -54,11 +54,7 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 	var req *http.Request
 	var err error
 	retry := 0
-	withOCIManifest := false
-
-	if reqType == ManifestRequest_CosignSignature {
-		withOCIManifest = true
-	}
+	withOCIManifest := reqType == ManifestRequest_CosignSignature
 
 	for retry < retryTimes {
 		req, err = http.NewRequest(http.MethodGet, url, nil)
