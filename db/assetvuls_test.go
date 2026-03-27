@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPopulateAssetVul(t *testing.T) {
@@ -82,6 +84,65 @@ func TestUpdateHostContainerCount(t *testing.T) {
 	t.Log("TestUpdateHostContainerCount completed successfully.")
 }
 
+func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
+	err := CreateVulAssetDb(true)
+	assert.NoError(t, err)
+
+	SetGetCVECountFunc(func(string, string) (int, int, int, error) {
+		return 0, 5, 3, nil
+	})
+
+	imageID := "img-156a5c9e349b9fe0596db0a3846cce6de655936781386764040c6532841f3"
+	err = PopulateAssetVul(generateImageDbAssetVul(imageID))
+	assert.NoError(t, err)
+
+	queryToken := "abc123def456"
+	queryFilter := &AssetQueryFilter{
+		QueryToken: queryToken,
+		QueryStart: 0,
+		QueryCount: -1,
+		Filters: &api.AssetQueryFilterViewModel{
+			Type:          AssetImage,
+			OrderByColumn: "repository",
+			OrderByType:   "asc",
+		},
+	}
+
+	allowed := map[string]utils.Set{
+		AssetImage: utils.NewSet(imageID),
+	}
+	_, _, err = CreateImageAssetSession(allowed, queryFilter)
+	assert.NoError(t, err)
+
+	filterBytes, err := json.Marshal(queryFilter)
+	assert.NoError(t, err)
+
+	_, err = PopulateQueryStat(&QueryStat{
+		Token:        queryToken,
+		CreationTime: 1,
+		LoginType:    0,
+		LoginName:    "test",
+		Data1:        string(filterBytes),
+		FileDBReady:  0,
+		Type:         QueryStateType_Asset,
+	})
+	assert.NoError(t, err)
+	defer func() {
+		if err := DeleteQuerySessionByToken(queryToken); err != nil {
+			t.Logf("DeleteQuerySessionByToken returns %v", err)
+		}
+	}()
+
+	assets, quickFilterMatched, err := GetImageAssetSession(queryFilter)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, quickFilterMatched)
+
+	assert.Equal(t, 1, len(assets))
+
+	assert.Equal(t, "OSScanStatusSupported", assets[0].OSScanStatus)
+}
+
 func generateHostDbAssetVul(assetid string, containerCount int) *DbAssetVul {
 	d := &DbAssetVul{
 		Type:         AssetNode,
@@ -124,4 +185,27 @@ func generateWorkloadDbAssetVul(assetid string) *DbAssetVul {
 
 	d.Scanned_at = "2023-12-29T08:46:32Z"
 	return d
+}
+
+func generateImageDbAssetVul(assetid string) *DbAssetVul {
+	images, err := json.Marshal([]share.CLUSImage{{Repo: "library/nginx", Tag: "1.25"}})
+	if err != nil {
+		images = []byte("[]")
+	}
+
+	return &DbAssetVul{
+		Type:              AssetImage,
+		AssetID:           assetid,
+		Name:              "library/nginx:1.25",
+		CVE_high:          5,
+		CVE_medium:        3,
+		I_repository_name: "registry-1",
+		I_repository_url:  "https://registry.example.com/",
+		I_base_os:         "debian",
+		I_os_scan_status:  "OSScanStatusSupported",
+		I_created_at:      "2024-01-02T03:04:05Z",
+		I_scanned_at:      "2024-01-03T03:04:05Z",
+		I_digest:          "sha256:abc",
+		I_images:          string(images),
+	}
 }

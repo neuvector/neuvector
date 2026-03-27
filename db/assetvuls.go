@@ -834,6 +834,7 @@ func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
 		"I_scanned_at":      assetVul.I_scanned_at,
 		"I_digest":          assetVul.I_digest,
 		"I_base_os":         assetVul.I_base_os,
+		"I_os_scan_status":  assetVul.I_os_scan_status,
 		"I_repository_name": assetVul.I_repository_name,
 		"I_repository_url":  assetVul.I_repository_url,
 		"I_size":            assetVul.I_size,
@@ -923,7 +924,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 
 	columns := []interface{}{"type", "assetid", "name",
 		"cve_critical", "cve_high", "cve_medium", "cve_low",
-		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_repository_name", "I_repository_url", "I_size", "I_images"}
+		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status", "I_repository_name", "I_repository_url", "I_size", "I_images"}
 
 	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"type": "image"}).Prepared(true).ToSQL()
 	log.WithFields(log.Fields{"statement": statement, "args": args}).Debug("CreateImageAssetSession, fetch assets")
@@ -946,7 +947,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 
 		err = rows.Scan(&asset.Type, &asset.AssetID, &asset.Name,
 			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low,
-			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os,
+			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os, &asset.I_os_scan_status,
 			&asset.I_repository_name, &asset.I_repository_url, &asset.I_size, &asset.I_images)
 		if err != nil {
 			return 0, nil, err
@@ -1064,7 +1065,7 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 
 	columns := []interface{}{"type", "assetid", "name",
 		"cve_critical", "cve_high", "cve_medium", "cve_low",
-		"I_created_at", "I_scanned_at", "I_digest", "I_base_os",
+		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
 	tableName := formatSessionTempTableName(sessionToken)
@@ -1080,7 +1081,7 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 
 		err = rows.Scan(&asset.Type, &asset.AssetID, &asset.Name,
 			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low,
-			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os,
+			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os, &asset.I_os_scan_status,
 			&asset.I_repository_name, &asset.I_repository_url, &asset.I_size, &asset.I_tag)
 		if err != nil {
 			return err
@@ -1144,6 +1145,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 			repo_exp := goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 			id_exp := goqu.C("assetid").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 			os_exp := goqu.C("I_base_os").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
+			os_status_exp := goqu.C("I_os_scan_status").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 			createat_exp := goqu.C("I_created_at").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 			scanned_exp := goqu.C("I_scanned_at").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 
@@ -1151,7 +1153,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 			repo_url_exp := goqu.C("I_repository_url").Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 			fname_exp := goqu.L("? || ':' || ?", goqu.C("name"), goqu.C("I_tag")).Like(fmt.Sprintf("%%%s%%", queryFilter.Filters.QuickFilter))
 
-			return goqu.Or(repo_exp, id_exp, os_exp, createat_exp, scanned_exp, repo_name_exp, repo_url_exp, fname_exp)
+			return goqu.Or(repo_exp, id_exp, os_exp, os_status_exp, createat_exp, scanned_exp, repo_name_exp, repo_url_exp, fname_exp)
 		}
 
 		return goqu.And(goqu.Ex{})
@@ -1159,7 +1161,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 
 	columns := []interface{}{"assetid", "name",
 		"cve_critical", "cve_high", "cve_medium",
-		"I_created_at", "I_scanned_at", "I_digest", "I_base_os",
+		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
 	sessionToken := queryFilter.QueryToken
@@ -1209,7 +1211,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 
 		err = rows.Scan(&asset.ID, &asset.Name,
 			&asset.Critical, &asset.High, &asset.Medium,
-			&asset.CreatedAt, &asset.ScannedAt, &asset.Digest, &asset.BaseOS,
+			&asset.CreatedAt, &asset.ScannedAt, &asset.Digest, &asset.BaseOS, &asset.OSScanStatus,
 			&asset.RegName, &asset.Registry, &asset.Size, &asset.Tag)
 		if err != nil {
 			return nil, 0, err
