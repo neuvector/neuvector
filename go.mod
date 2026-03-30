@@ -114,10 +114,11 @@ require (
 	github.com/alitto/pond v1.9.2
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/dmachard/go-clientsyslog v1.0.1
+	github.com/glebarez/go-sqlite v1.20.3
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/go-ldap/ldap/v3 v3.4.11
+	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/mitchellh/pointerstructure v1.2.1
-	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
 	github.com/quay/clair/v2 v2.1.8
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 )
@@ -148,7 +149,6 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/glebarez/go-sqlite v1.20.3 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect

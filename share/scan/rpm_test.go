@@ -3,7 +3,9 @@ package scan
 import (
 	"testing"
 
-	rpmdb "github.com/neuvector/go-rpmdb/pkg"
+	_ "github.com/glebarez/go-sqlite"
+	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSLESPackageList(t *testing.T) {
@@ -62,4 +64,33 @@ func TestUbiPackageList(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestFedoraPackageList(t *testing.T) {
+	db, err := rpmdb.Open("testdata/rpmdb.sqlite.fedora")
+	if err != nil {
+		t.Errorf("%s", err.Error())
+	} else {
+		defer db.Close()
+	}
+
+	pkgs, err := db.ListPackages()
+	assert.NoError(t, err)
+	assert.Len(t, pkgs, 142, "incorrect package count")
+	assert.NotNil(t, pkgs, "package list should not be nil")
+
+	var fedoraPkg *rpmdb.PackageInfo
+loop:
+	for _, pkg := range pkgs {
+		switch pkg.Name {
+		case "fedora-release-common":
+			fedoraPkg = pkg
+			break loop
+		}
+	}
+	assert.NotNil(t, fedoraPkg)
+
+	assert.Equal(t, "fedora-release-common", fedoraPkg.Name)
+	assert.Equal(t, "43", fedoraPkg.Version)
+	assert.Equal(t, "26", fedoraPkg.Release)
 }
