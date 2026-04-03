@@ -12,13 +12,9 @@ import (
 	"strings"
 	"time"
 
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerEvent "github.com/docker/docker/api/types/events"
-	dockerImage "github.com/docker/docker/api/types/image"
-	dockerNetwork "github.com/docker/docker/api/types/network"
-	dockerSystem "github.com/docker/docker/api/types/system"
-	dockerClient "github.com/docker/docker/client"
+	dockerEvent "github.com/moby/moby/api/types/events"
+	dockerClient "github.com/moby/moby/client"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"
@@ -32,43 +28,42 @@ const defaultDockerShimSocket string = "/var/run/dockershim.sock"
 type MsgEventCallback func(e dockerEvent.Message)
 
 type dockerDriver struct {
-	sys          *system.SystemTools
-	endpoint     string
-	endpointHost string
-	selfID       string
-	evCallback   EventCallback
-	client       *dockerClient.Client
-	version      *dockerTypes.Version
-	info         *dockerSystem.Info
-	rtProcMap    utils.Set
-	pidHost      bool
-	eventCancel  context.CancelFunc
+	sys             *system.SystemTools
+	endpoint        string
+	endpointHost    string
+	selfID          string
+	evCallback      EventCallback
+	client          *dockerClient.Client
+	sysVerionResult *dockerClient.ServerVersionResult
+	sysInfoResult   *dockerClient.SystemInfoResult
+	rtProcMap       utils.Set
+	pidHost         bool
+	eventCancel     context.CancelFunc
 }
 
-func _connect(endpoint string) (*dockerClient.Client, *dockerTypes.Version, *dockerSystem.Info, error) {
-	var ver dockerTypes.Version
-	var info dockerSystem.Info
+func _connect(endpoint string) (*dockerClient.Client, *dockerClient.ServerVersionResult, *dockerClient.SystemInfoResult, error) {
+	var ver dockerClient.ServerVersionResult
+	var info dockerClient.SystemInfoResult
 
 	if !strings.HasPrefix(endpoint, "unix://") {
 		endpoint = "unix://" + endpoint
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint}).Info("Connecting to docker")
-	client, err := dockerClient.NewClientWithOpts(
-		dockerClient.WithHost(endpoint),
-		dockerClient.WithAPIVersionNegotiation())
+	client, err := dockerClient.New(
+		dockerClient.WithHost(endpoint))
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create client")
 		return nil, nil, nil, err
 	}
 
-	if ver, err = client.ServerVersion(context.Background()); err != nil {
+	if ver, err = client.ServerVersion(context.Background(), dockerClient.ServerVersionOptions{}); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to get version")
 		return client, nil, nil, err
 	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("docker connected")
-	if info, err = client.Info(context.Background()); err != nil {
+	if info, err = client.Info(context.Background(), dockerClient.InfoOptions{}); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to get info")
 		return client, &ver, nil, err
 	}
@@ -83,10 +78,10 @@ func getContainerSocketPath(client *dockerClient.Client, id, endpoint string) (s
 		return strings.TrimPrefix(endpoint, "/proc/1/root"), nil
 	}
 
-	info, err := client.ContainerInspect(context.Background(), id)
+	info, err := client.ContainerInspect(context.Background(), id, dockerClient.ContainerInspectOptions{})
 	if err == nil {
 		endpoint = strings.TrimPrefix(endpoint, "unix://")
-		for _, m := range info.Mounts {
+		for _, m := range info.Container.Mounts {
 			if m.Destination == endpoint {
 				return m.Source, nil
 			}
@@ -113,7 +108,7 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	}
 
 	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client,
-		version: ver, info: info, selfID: id}
+		sysVerionResult: ver, sysInfoResult: info, selfID: id}
 	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current",
 		"docker-containerd-shim-current", "containerd-shim-runc-v1", "containerd-shim-runc-v2", "containerd", "containerd-shim")
 	driver.pidHost = IsPidHost()
@@ -144,8 +139,8 @@ func (d *dockerDriver) reConnect() error {
 
 	// update records
 	d.client = client
-	d.version = ver
-	d.info = info
+	d.sysVerionResult = ver
+	d.sysInfoResult = info
 	return nil
 }
 
@@ -157,19 +152,20 @@ func (d *dockerDriver) GetHost() (*share.CLUSHost, error) {
 	var host share.CLUSHost
 
 	host.Runtime = d.String()
-	if d.version != nil {
-		host.RuntimeVer = d.version.Version
-		host.RuntimeAPIVer = d.version.APIVersion
+	if d.sysVerionResult != nil {
+		host.RuntimeVer = d.sysVerionResult.Version
+		host.RuntimeAPIVer = d.sysVerionResult.APIVersion
 	}
 
-	if d.info != nil {
-		host.Name = d.info.Name
-		host.ID = fmt.Sprintf("%s:%s", d.info.Name, d.info.ID)
-		host.OS = d.info.OperatingSystem
-		host.Kernel = d.info.KernelVersion
-		host.CPUs = int64(d.info.NCPU)
-		host.Memory = d.info.MemTotal
-		host.StorageDriver = d.info.Driver
+	// Add Info due to the breaking changes of docker API.
+	if d.sysInfoResult != nil {
+		host.Name = d.sysInfoResult.Info.Name
+		host.ID = fmt.Sprintf("%s:%s", d.sysInfoResult.Info.Name, d.sysInfoResult.Info.ID)
+		host.OS = d.sysInfoResult.Info.OperatingSystem
+		host.Kernel = d.sysInfoResult.Info.KernelVersion
+		host.CPUs = int64(d.sysInfoResult.Info.NCPU)
+		host.Memory = d.sysInfoResult.Info.MemTotal
+		host.StorageDriver = d.sysInfoResult.Info.Driver
 	}
 
 	return &host, nil
@@ -186,27 +182,27 @@ func (d *dockerDriver) GetDevice(id string) (*share.CLUSDevice, *ContainerMetaEx
 func (d *dockerDriver) ListContainerIDs() (utils.Set, utils.Set) {
 	set := utils.NewSet()
 
-	containers, err := d.client.ContainerList(context.Background(), dockerContainer.ListOptions{All: true})
+	containers, err := d.client.ContainerList(context.Background(), dockerClient.ContainerListOptions{All: true})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in listing containers")
 		return set, nil
 	}
 
-	for _, c := range containers {
+	for _, c := range containers.Items {
 		set.Add(c.ID)
 	}
 	return set, nil
 }
 
 func (d *dockerDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error) {
-	containers, err := d.client.ContainerList(context.Background(), dockerContainer.ListOptions{All: !runningOnly})
+	containers, err := d.client.ContainerList(context.Background(), dockerClient.ContainerListOptions{All: !runningOnly})
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "runningOnly": runningOnly}).Error("Fail to list containers")
 		return nil, err
 	}
 
-	metas := make([]*ContainerMeta, len(containers))
-	for i, c := range containers {
+	metas := make([]*ContainerMeta, len(containers.Items))
+	for i, c := range containers.Items {
 		metas[i] = &ContainerMeta{
 			ID:     c.ID,
 			Image:  d.getImageRepoTag("", c.Image), // c.Image,
@@ -219,47 +215,60 @@ func (d *dockerDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error
 	return metas, nil
 }
 
+// getContainerPrimaryNetwork returns the IP and prefix length from the first
+// network interface, assuming a single-network legacy Docker environment.
+func (d *dockerDriver) getContainerPrimaryNetwork(info dockerClient.ContainerInspectResult) (string, int) {
+	for _, endpoint := range info.Container.NetworkSettings.Networks {
+		if endpoint.IPAddress.IsValid() {
+			return endpoint.IPAddress.String(), endpoint.IPPrefixLen
+		}
+	}
+	return "", 0
+}
+
 func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
-	info, err := d.client.ContainerInspect(context.Background(), id)
+	info, err := d.client.ContainerInspect(context.Background(), id, dockerClient.ContainerInspectOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	ipAddress, ipPrefixLen := d.getContainerPrimaryNetwork(info)
+
 	meta := &ContainerMetaExtra{
 		ContainerMeta: ContainerMeta{
-			ID:       info.ID,
-			Name:     trimContainerName(info.Name),
-			Image:    d.getImageRepoTag(info.Image, info.Config.Image),
-			Labels:   info.Config.Labels,
-			Hostname: info.Config.Hostname,
-			Pid:      info.State.Pid,
-			Envs:     info.Config.Env,
-			PidMode:  string(info.HostConfig.PidMode),
-			NetMode:  string(info.HostConfig.NetworkMode),
+			ID:       info.Container.ID,
+			Name:     trimContainerName(info.Container.Name),
+			Image:    d.getImageRepoTag(info.Container.Image, info.Container.Config.Image),
+			Labels:   info.Container.Config.Labels,
+			Hostname: info.Container.Config.Hostname,
+			Pid:      info.Container.State.Pid,
+			Envs:     info.Container.Config.Env,
+			PidMode:  string(info.Container.HostConfig.PidMode),
+			NetMode:  string(info.Container.HostConfig.NetworkMode),
 		},
-		ImageID:     TrimImageID(info.Image),
-		Privileged:  info.HostConfig.Privileged,
-		Running:     info.State.Running,
-		ExitCode:    info.State.ExitCode,
-		IPAddress:   info.NetworkSettings.IPAddress,
-		IPPrefixLen: info.NetworkSettings.IPPrefixLen,
+		ImageID:     TrimImageID(info.Container.Image),
+		Privileged:  info.Container.HostConfig.Privileged,
+		Running:     info.Container.State.Running,
+		ExitCode:    info.Container.State.ExitCode,
+		IPAddress:   ipAddress,
+		IPPrefixLen: ipPrefixLen,
 		MappedPorts: make(map[share.CLUSProtoPort]*share.CLUSMappedPort),
 		Networks:    utils.NewSet(),
-		LogPath:     info.LogPath,
+		LogPath:     info.Container.LogPath,
 	}
 
-	if tm, err := time.Parse(time.RFC3339, info.State.StartedAt); err == nil {
+	if tm, err := time.Parse(time.RFC3339, info.Container.State.StartedAt); err == nil {
 		meta.StartedAt = tm
 	}
 
-	if tm, err := time.Parse(time.RFC3339, info.State.FinishedAt); err == nil {
+	if tm, err := time.Parse(time.RFC3339, info.Container.State.FinishedAt); err == nil {
 		meta.FinishedAt = tm
 	}
 
-	if info.Config != nil && info.Config.Healthcheck != nil {
-		// log.WithFields(log.Fields{"health": info.Config.Healthcheck}).Debug()
-		meta.Healthcheck = make([]string, len(info.Config.Healthcheck.Test))
-		copy(meta.Healthcheck, info.Config.Healthcheck.Test)
+	if info.Container.Config != nil && info.Container.Config.Healthcheck != nil {
+		// log.WithFields(log.Fields{"health": info.Container.Config.Healthcheck}).Debug()
+		meta.Healthcheck = make([]string, len(info.Container.Config.Healthcheck.Test))
+		copy(meta.Healthcheck, info.Container.Config.Healthcheck.Test)
 	}
 
 	if info, err := d.client.ImageInspect(context.Background(), meta.ImageID); err == nil {
@@ -271,13 +280,13 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 
 	meta.isChild, _ = d.GetParent(meta, nil)
 
-	if tm, err := time.Parse(time.RFC3339, info.Created); err == nil {
+	if tm, err := time.Parse(time.RFC3339, info.Container.Created); err == nil {
 		meta.CreatedAt = tm
 	}
 
-	for pstr, bind := range info.NetworkSettings.Ports {
+	for pstr, bind := range info.Container.NetworkSettings.Ports {
 		if len(bind) > 0 {
-			ipproto, port := parsePortString(string(pstr))
+			ipproto, port := parsePortString(pstr.String())
 			hport, _ := strconv.Atoi(bind[0].HostPort)
 			cp := share.CLUSProtoPort{
 				Port:    uint16(port),
@@ -285,13 +294,13 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 			}
 			meta.MappedPorts[cp] = &share.CLUSMappedPort{
 				CLUSProtoPort: cp,
-				HostIP:        net.ParseIP(bind[0].HostIP),
+				HostIP:        net.IP(bind[0].HostIP.AsSlice()),
 				HostPort:      uint16(hport),
 			}
 		}
 	}
 
-	for _, n := range info.NetworkSettings.Networks {
+	for _, n := range info.Container.NetworkSettings.Networks {
 		meta.Networks.Add(n.NetworkID)
 	}
 
@@ -301,8 +310,8 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 func (d *dockerDriver) GetImageHistory(name string) ([]*ImageHistory, error) {
 	layers, err := d.client.ImageHistory(context.Background(), name)
 	if err == nil {
-		list := make([]*ImageHistory, len(layers))
-		for i, l := range layers {
+		list := make([]*ImageHistory, len(layers.Items))
+		for i, l := range layers.Items {
 			list[i] = &ImageHistory{ID: l.ID, Cmd: l.CreatedBy, Size: l.Size}
 		}
 		return list, nil
@@ -395,18 +404,15 @@ func (d *dockerDriver) GetImageFile(id string) (io.ReadCloser, error) {
 
 // List network doesn't give container list in some network, such as ingress, but inspect gives the detail.
 func (d *dockerDriver) GetNetworkEndpoint(netID, container, epName string) (*NetworkEndpoint, error) {
-	network, err := d.client.NetworkInspect(context.Background(), netID, dockerNetwork.InspectOptions{})
+	networkInspectResult, err := d.client.NetworkInspect(context.Background(), netID, dockerClient.NetworkInspectOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	for c, ep := range network.Containers {
+	for c, ep := range networkInspectResult.Network.Containers {
 		if (container == "" || c == container) && ep.Name == epName {
-			cnep := &NetworkEndpoint{ID: ep.EndpointID, Name: ep.Name}
-			if mac, err := net.ParseMAC(ep.MacAddress); err == nil {
-				cnep.MAC = mac
-			}
-			if ip, subnet, err := net.ParseCIDR(ep.IPv4Address); err == nil {
+			cnep := &NetworkEndpoint{ID: ep.EndpointID, Name: ep.Name, MAC: net.HardwareAddr(ep.MacAddress)}
+			if ip, subnet, err := net.ParseCIDR(ep.IPv4Address.String()); err == nil {
 				cnep.IPNet = &net.IPNet{IP: ip, Mask: subnet.Mask}
 			}
 			return cnep, nil
@@ -417,68 +423,68 @@ func (d *dockerDriver) GetNetworkEndpoint(netID, container, epName string) (*Net
 }
 
 func (d *dockerDriver) ListNetworks() (map[string]*Network, error) {
-	networks, err := d.client.NetworkList(context.Background(), dockerNetwork.ListOptions{})
+	networks, err := d.client.NetworkList(context.Background(), dockerClient.NetworkListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	netmap := make(map[string]*Network, len(networks))
-	for _, n := range networks {
-		network, err := d.client.NetworkInspect(context.Background(), n.ID, dockerNetwork.InspectOptions{})
+	netmap := make(map[string]*Network, len(networks.Items))
+	for _, n := range networks.Items {
+		networkInspectResult, err := d.client.NetworkInspect(context.Background(), n.ID, dockerClient.NetworkInspectOptions{})
 		if err != nil {
 			continue
 		}
 
 		nwdata := &Network{
-			Name:     network.Name,
-			ID:       network.ID,
-			Scope:    network.Scope,
-			Driver:   network.Driver,
+			Name:     networkInspectResult.Network.Name,
+			ID:       networkInspectResult.Network.ID,
+			Scope:    networkInspectResult.Network.Scope,
+			Driver:   networkInspectResult.Network.Driver,
 			Subnets:  make([]*net.IPNet, 0),
 			Gateways: make([]net.IP, 0),
 		}
-		for _, ipam := range network.IPAM.Config {
-			if _, subnet, err := net.ParseCIDR(ipam.Subnet); err == nil {
+		for _, ipam := range networkInspectResult.Network.IPAM.Config {
+			if _, subnet, err := net.ParseCIDR(ipam.Subnet.String()); err == nil {
 				nwdata.Subnets = append(nwdata.Subnets, subnet)
 			}
-			if ip := net.ParseIP(ipam.Gateway); ip != nil {
-				nwdata.Gateways = append(nwdata.Gateways, ip)
+			if ipam.Gateway.IsValid() {
+				nwdata.Gateways = append(nwdata.Gateways, net.IP(ipam.Gateway.AsSlice()))
 			}
 		}
-		netmap[network.ID] = nwdata
+		netmap[networkInspectResult.Network.ID] = nwdata
 	}
 
 	return netmap, nil
 }
 
 func (d *dockerDriver) GetService(id string) (*Service, error) {
-	svc, _, err := d.client.ServiceInspectWithRaw(context.Background(), id, dockerTypes.ServiceInspectOptions{})
+	serviceInspectResult, err := d.client.ServiceInspect(context.Background(), id, dockerClient.ServiceInspectOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	r := &Service{
-		ID:     svc.ID,
-		Name:   svc.Spec.Name,
-		Labels: svc.Spec.Labels,
-		VIPs:   make([]net.IP, 0, len(svc.Endpoint.VirtualIPs)),
+		ID:     serviceInspectResult.Service.ID,
+		Name:   serviceInspectResult.Service.Spec.Name,
+		Labels: serviceInspectResult.Service.Spec.Labels,
+		VIPs:   make([]net.IP, 0, len(serviceInspectResult.Service.Endpoint.VirtualIPs)),
 	}
-	for _, vip := range svc.Endpoint.VirtualIPs {
-		if ip, _, err := net.ParseCIDR(vip.Addr); err == nil {
-			r.VIPs = append(r.VIPs, ip)
+	for _, vip := range serviceInspectResult.Service.Endpoint.VirtualIPs {
+		if vip.Addr.IsValid() {
+			r.VIPs = append(r.VIPs, net.IP(vip.Addr.Addr().AsSlice()))
 		}
 	}
 	return r, nil
 }
 
 func (d *dockerDriver) ListServices() ([]*Service, error) {
-	svcs, err := d.client.ServiceList(context.Background(), dockerTypes.ServiceListOptions{})
+	svcs, err := d.client.ServiceList(context.Background(), dockerClient.ServiceListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	rs := make([]*Service, len(svcs))
-	for i, svc := range svcs {
+	rs := make([]*Service, len(svcs.Items))
+	for i, svc := range svcs.Items {
 		r := &Service{
 			ID:     svc.ID,
 			Name:   svc.Spec.Name,
@@ -486,8 +492,8 @@ func (d *dockerDriver) ListServices() ([]*Service, error) {
 			VIPs:   make([]net.IP, 0, len(svc.Endpoint.VirtualIPs)),
 		}
 		for _, vip := range svc.Endpoint.VirtualIPs {
-			if ip, _, err := net.ParseCIDR(vip.Addr); err == nil {
-				r.VIPs = append(r.VIPs, ip)
+			if vip.Addr.IsValid() {
+				r.VIPs = append(r.VIPs, net.IP(vip.Addr.Addr().AsSlice()))
 			}
 		}
 		rs[i] = r
@@ -532,14 +538,14 @@ func (d *dockerDriver) MonitorEvent(cb EventCallback, cpath bool) error {
 
 	var bRunning, bTimeoutError bool
 	for {
-		msgs, errCh := d.client.Events(ctx, dockerEvent.ListOptions{})
+		events := d.client.Events(ctx, dockerClient.EventsListOptions{})
 		bRunning = true
 		bTimeoutError = false
 		for bRunning {
 			select {
-			case event := <-msgs:
+			case event := <-events.Messages:
 				handler(event)
-			case err := <-errCh:
+			case err := <-events.Err:
 				bRunning = false // escape
 				bTimeoutError = strings.Contains(err.Error(), "Client.Timeout") || strings.Contains(err.Error(), "deadline exceed")
 				if !bTimeoutError {
@@ -602,7 +608,7 @@ func (d *dockerDriver) eventHandler(e dockerEvent.Message) {
 	case dockerEvent.ContainerEventType:
 		switch e.Action {
 		case dockerEvent.ActionStart:
-			d.evCallback(EventContainerStart, e.ID, 0)
+			d.evCallback(EventContainerStart, e.Actor.ID, 0)
 		case dockerEvent.ActionKill:
 			// To be conservative, ingore only SIGHUP. It is often used to reload config for applications.
 			// For example, nginx -s reload
@@ -610,15 +616,15 @@ func (d *dockerDriver) eventHandler(e dockerEvent.Message) {
 				log.WithFields(log.Fields{"signal": sig}).Debug("Ignore event")
 				return
 			}
-			d.evCallback(EventContainerStop, e.ID, 0)
+			d.evCallback(EventContainerStop, e.Actor.ID, 0)
 		case dockerEvent.ActionDie:
-			d.evCallback(EventContainerStop, e.ID, 0)
+			d.evCallback(EventContainerStop, e.Actor.ID, 0)
 		case dockerEvent.ActionDestroy:
-			d.evCallback(EventContainerDelete, e.ID, 0)
+			d.evCallback(EventContainerDelete, e.Actor.ID, 0)
 		case dockerEvent.ActionExtractToDir:
-			d.evCallback(EventContainerCopyIn, e.ID, 0)
+			d.evCallback(EventContainerCopyIn, e.Actor.ID, 0)
 		case dockerEvent.ActionArchivePath:
-			d.evCallback(EventContainerCopyOut, e.ID, 0)
+			d.evCallback(EventContainerCopyOut, e.Actor.ID, 0)
 		}
 	case dockerEvent.NetworkEventType:
 		switch e.Action {
@@ -631,35 +637,35 @@ func (d *dockerDriver) eventHandler(e dockerEvent.Message) {
 }
 
 func (d *dockerDriver) GetProxy() (string, string, string) {
-	if d.info == nil {
-		log.Error("info is nil")
+	if d.sysInfoResult == nil {
+		log.Error("sysInfoResult is nil")
 		return "", "", ""
 	}
-	return d.info.HTTPProxy, d.info.HTTPSProxy, d.info.NoProxy
+	return d.sysInfoResult.Info.HTTPProxy, d.sysInfoResult.Info.HTTPSProxy, d.sysInfoResult.Info.NoProxy
 }
 
 func (d *dockerDriver) GetDefaultRegistries() []string {
 	var regNames []string
 
-	if d.info == nil && d.info.RegistryConfig == nil {
-		log.Error("info is nil")
+	if d.sysInfoResult == nil && d.sysInfoResult.Info.RegistryConfig == nil {
+		log.Error("sysInfoResult is nil")
 		return nil
 	}
 
-	for _, inf := range d.info.RegistryConfig.IndexConfigs {
+	for _, inf := range d.sysInfoResult.Info.RegistryConfig.IndexConfigs {
 		regNames = append(regNames, inf.Name)
 	}
-	log.WithFields(log.Fields{"os": d.info.OperatingSystem, "Registries": regNames}).Debug("docker info")
+	log.WithFields(log.Fields{"os": d.sysInfoResult.Info.OperatingSystem, "Registries": regNames}).Debug("docker info")
 
 	return regNames
 }
 
 func (d *dockerDriver) GetStorageDriver() string {
-	if d.info == nil {
-		log.Error("info is nil")
+	if d.sysInfoResult == nil {
+		log.Error("sysInfoResult is nil")
 		return ""
 	}
-	return d.info.Driver
+	return d.sysInfoResult.Info.Driver
 }
 
 func isSha256String(input string) bool {
@@ -700,8 +706,8 @@ func (d *dockerDriver) getImageRepoTag(imageID, imageName string) string {
 			return repoTag
 		}
 	} else if strings.Contains(imageName, "@sha256:") {
-		if images, err := d.client.ImageList(context.Background(), dockerImage.ListOptions{All: true}); err == nil {
-			for _, image := range images {
+		if imageListResult, err := d.client.ImageList(context.Background(), dockerClient.ImageListOptions{All: true}); err == nil {
+			for _, image := range imageListResult.Items {
 				// log.WithFields(log.Fields{"image": image, "imageName": imageName}).Debug("")
 				if len(image.RepoDigests) > 0 && len(image.RepoTags) > 0 {
 					for _, repoDigest := range image.RepoDigests {
