@@ -605,7 +605,8 @@ func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprout
 		w := wl.ScanSummary
 
 		old, ok := imageMap[wl.ImageID]
-		if !ok || old.HighVuls < w.HighVuls || (old.HighVuls == w.HighVuls && old.MedVuls < w.MedVuls) {
+		if !ok || old.CriticalVuls < w.CriticalVuls || (old.CriticalVuls == w.CriticalVuls && old.HighVuls < w.HighVuls) ||
+			(old.CriticalVuls == w.CriticalVuls && old.HighVuls == w.HighVuls && old.MedVuls < w.MedVuls) {
 			img := api.RESTScanImageSummary{
 				Image:         wl.Image,
 				ImageID:       wl.ImageID,

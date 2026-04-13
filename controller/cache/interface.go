@@ -166,7 +166,6 @@ type CacheInterface interface {
 	// Admission control - non-UI
 	SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDetected bool) (bool, error)
 	WaitUntilApiPathReady() bool
-	IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int)
 	MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 		evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
 		containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool)

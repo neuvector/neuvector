@@ -1098,7 +1098,8 @@ func GetFedKvVer() string { // NV clusters with the same "fed kv version" means 
 	//return "E907B7AE" // for 4.3.2 ~ 5.0.x
 	//return "28ea479c" // for 5.1 ~ 5.4.2
 	//return "G7B5S135" // for 5.4.3 ~ 5.4.4
-	return "94444768" // for 5.4.5 ~
+	//return "94444768" // for 5.4.5 ~ 5.5.x
+	return "BB38FD65" // for 5.6.0 ~
 }
 
 func GetRestVer() string { // NV clusters with the same "rest version" means master cluster can switch UI view to them
@@ -1107,7 +1108,8 @@ func GetRestVer() string { // NV clusters with the same "rest version" means mas
 	// return "449EC339" // for 5.3 ~ 5.3.x
 	// return "D6AD17D4" // for 5.4 ~ 5.4.2
 	// return "G7B5S135" // for 5.4.3 ~ 5.4.5
-	return "94444768" // for 5.4.6 ~
+	// return "94444768" // for 5.4.6 ~ 5.5.x
+	return "BB38FD65" // for 5.6.0 ~
 }
 
 func genFileAccessRule() {

@@ -340,52 +340,48 @@ func getAdmK8sDenyRuleOptions() map[string]*api.RESTAdmissionRuleOption {
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalCount: {
-			// 	Name:       share.CriteriaKeyCVECriticalCount,
-			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc:   api.MatchSrcImage,
-			// 	SubOptions: subOptions,
-			// },
-			share.CriteriaKeyCVEHighCount: {
+			share.CriteriaKeyCVECriticalCount: {
+				Name:       share.CriteriaKeyCVECriticalCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighCountNoCritical: { // count of high CVEs only
+				Name:       share.CriteriaKeyCVEHighCountNoCritical,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighCount: { // count of high and critical CVEs (for backward compatibility)
 				Name:       share.CriteriaKeyCVEHighCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighCountNoCritical: {
-			// 	Name:       share.CriteriaKeyCVEHighCountNoCritical,
-			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc:   api.MatchSrcImage,
-			// 	SubOptions: subOptions,
-			// },
 			share.CriteriaKeyCVEMediumCount: {
 				Name:       share.CriteriaKeyCVEMediumCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalWithFixCount: {
-			// 	Name:       share.CriteriaKeyCVECriticalWithFixCount,
-			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc:   api.MatchSrcImage,
-			// 	SubOptions: subOptions,
-			// },
-			share.CriteriaKeyCVEHighWithFixCount: {
+			share.CriteriaKeyCVECriticalWithFixCount: {
+				Name:       share.CriteriaKeyCVECriticalWithFixCount,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
+			share.CriteriaKeyCVEHighWithFixCount: { // count of "high with fix" and "critical with fix" CVEs (for backward compatibility))
 				Name:       share.CriteriaKeyCVEHighWithFixCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
 				MatchSrc:   api.MatchSrcImage,
 				SubOptions: subOptions,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighWithFixCountNoCritical: {
-			// 	Name:       share.CriteriaKeyCVEHighWithFixCountNoCritical,
-			// 	Ops:        []string{share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc:   api.MatchSrcImage,
-			// 	SubOptions: subOptions,
-			// },
+			share.CriteriaKeyCVEHighWithFixCountNoCritical: { // count of "high with fix" CVEs only
+				Name:       share.CriteriaKeyCVEHighWithFixCountNoCritical,
+				Ops:        []string{share.CriteriaOpBiggerEqualThan},
+				MatchSrc:   api.MatchSrcImage,
+				SubOptions: subOptions,
+			},
 			share.CriteriaKeyCVEScoreCount: {
 				Name:       share.CriteriaKeyCVEScoreCount,
 				Ops:        []string{share.CriteriaOpBiggerEqualThan},
@@ -589,45 +585,41 @@ func getAdmK8sExceptRuleOptions() map[string]*api.RESTAdmissionRuleOption { // f
 				Ops:      allSetOps,
 				MatchSrc: api.MatchSrcImage,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalCount: {
-			// 	Name:     share.CriteriaKeyCVECriticalCount,
-			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc: api.MatchSrcImage,
-			// },
-			share.CriteriaKeyCVEHighCount: {
+			share.CriteriaKeyCVECriticalCount: {
+				Name:     share.CriteriaKeyCVECriticalCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyCVEHighCount: { // count of high and critical CVEs (for backward compatibility)
 				Name:     share.CriteriaKeyCVEHighCount,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighCountNoCritical: {
-			// 	Name:     share.CriteriaKeyCVEHighCountNoCritical,
-			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc: api.MatchSrcImage,
-			// },
+			share.CriteriaKeyCVEHighCountNoCritical: { // count of high CVEs only
+				Name:     share.CriteriaKeyCVEHighCountNoCritical,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
 			share.CriteriaKeyCVEMediumCount: {
 				Name:     share.CriteriaKeyCVEMediumCount,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVECriticalWithFixCount: {
-			// 	Name:     share.CriteriaKeyCVECriticalWithFixCount,
-			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc: api.MatchSrcImage,
-			// },
-			share.CriteriaKeyCVEHighWithFixCount: {
+			share.CriteriaKeyCVECriticalWithFixCount: {
+				Name:     share.CriteriaKeyCVECriticalWithFixCount,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
+			share.CriteriaKeyCVEHighWithFixCount: { // count of "high with fix" and "critical with fix" CVEs (for backward compatibility)
 				Name:     share.CriteriaKeyCVEHighWithFixCount,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
 				MatchSrc: api.MatchSrcImage,
 			},
-			// NVSHAS-8242: temporary reversion
-			// share.CriteriaKeyCVEHighWithFixCountNoCritical: {
-			// 	Name:     share.CriteriaKeyCVEHighWithFixCountNoCritical,
-			// 	Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
-			// 	MatchSrc: api.MatchSrcImage,
-			// },
+			share.CriteriaKeyCVEHighWithFixCountNoCritical: { // count of "high with fix" CVEs only
+				Name:     share.CriteriaKeyCVEHighWithFixCountNoCritical,
+				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},
+				MatchSrc: api.MatchSrcImage,
+			},
 			/*share.CriteriaKeyCVEScore: {
 				Name:     share.CriteriaKeyCVEScore,
 				Ops:      []string{share.CriteriaOpLessEqualThan, share.CriteriaOpBiggerEqualThan},

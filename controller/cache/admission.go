@@ -2021,33 +2021,6 @@ func (m CacheMethod) WaitUntilApiPathReady() bool {
 	return false
 }
 
-func (m CacheMethod) IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int) {
-	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-	scannedImages := scan.GetScannedImageSummary(c.ImageRegistry, c.ImageRepo, c.ImageTag, vpf)
-	if len(scannedImages) == 1 {
-		if !scannedImages[0].Scanned {
-			log.WithFields(log.Fields{"ImageRegistry": c.ImageRegistry.Any(), "ImageRepo": c.ImageRepo, "ImageTag": c.ImageTag}).Info("requested image not scanned")
-			return false, 0, 0
-		} else {
-			return true, scannedImages[0].HighVuls, scannedImages[0].MedVuls
-		}
-	} else {
-		scanned, highVuls, medVuls := false, 0, 0
-		for _, scannedImage := range scannedImages {
-			if scannedImage.Scanned {
-				scanned = true
-				if scannedImage.HighVuls > highVuls {
-					highVuls = scannedImage.HighVuls
-				}
-				if scannedImage.MedVuls > medVuls {
-					medVuls = scannedImage.MedVuls
-				}
-			}
-		}
-		return scanned, highVuls, medVuls
-	}
-}
-
 // it's for a container/image's evaluation only
 func (m CacheMethod) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
