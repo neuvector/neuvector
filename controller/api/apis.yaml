@@ -5,7 +5,7 @@ swagger: "2.0"
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: "5.5.0"
+  version: "5.6.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -9878,6 +9878,10 @@ definitions:
         type: string
       workload_image_id:
         type: string
+      workload_image_digest:
+        type: array
+        items:
+          type: string
       host_name:
         type: string
       name:
@@ -13396,6 +13400,11 @@ definitions:
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
+      image_digest:
+        type: array
+        items:
+          type: string
+          example: c2ced31c5dda37cb805f481e3fa34b742cc8980f439b20af3111b08e66cff8e1
       image_created_at:
         type: string
         format: date-time
@@ -13501,6 +13510,11 @@ definitions:
       image_id:
         type: string
         example: d572b7ee3511b21a2b78b8915bc03c5786ad01949704c1418624224c4cae2c5f
+      image_digest:
+        type: array
+        items:
+          type: string
+          example: c2ced31c5dda37cb805f481e3fa34b742cc8980f439b20af3111b08e66cff8e1
       image_created_at:
         type: string
         format: date-time
