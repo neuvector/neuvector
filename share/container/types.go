@@ -143,7 +143,7 @@ type ContainerMetaExtra struct {
 	ContainerMeta
 	ImageID          string
 	ImageDigest      string
-	ImageDigestExtra []string // on docer runtime env, there is no guarantee we we only get one digest for an image. so store the 2nd~ digests here
+	ImageDigestExtra []string // on docker runtime env, there is no guarantee we we only get one digest for an image. so store the 2nd~ digests here
 	ImgCreateAt      time.Time
 	Author           string
 	Privileged       bool
