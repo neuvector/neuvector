@@ -1163,6 +1163,7 @@ type CLUSWorkload struct {
 	HostID       string                    `json:"host_id"`
 	Image        string                    `json:"image"`
 	ImageID      string                    `json:"image_id"`
+	ImageDigest  []string                  `json:"image_digest"`
 	ImgCreateAt  time.Time                 `json:"image_created_at"`
 	Privileged   bool                      `json:"privileged"`
 	RunAsRoot    bool                      `json:"run_as_root"`

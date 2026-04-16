@@ -203,9 +203,10 @@ func (d *dockerDriver) ListContainers(runningOnly bool) ([]*ContainerMeta, error
 
 	metas := make([]*ContainerMeta, len(containers.Items))
 	for i, c := range containers.Items {
+		repoTag, _ := d.getImageRepoTag("", c.Image)
 		metas[i] = &ContainerMeta{
 			ID:     c.ID,
-			Image:  d.getImageRepoTag("", c.Image), // c.Image,
+			Image:  repoTag, // c.Image,
 			Labels: c.Labels,
 		}
 		if len(c.Names) > 0 {
@@ -232,13 +233,30 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		return nil, err
 	}
 
+	imageDigest := ""
+	var imageDigestExtra []string
+	repoTag, repoDigests := d.getImageRepoTag(info.Container.Image, info.Container.Config.Image)
+	if len(repoDigests) >= 1 {
+		if len(repoDigests) == 1 && strings.Contains(repoDigests[0], "@sha256:") {
+			var repoTagTemp string
+			repoTagTemp, repoDigests[0], _ = strings.Cut(repoDigests[0], "@sha256:")
+			if strings.HasPrefix(repoTag, "sha256:") {
+				repoTag = repoTagTemp
+			}
+		}
+		imageDigest = repoDigests[0]
+		if len(repoDigests) > 1 {
+			imageDigestExtra = repoDigests[1:]
+		}
+	}
+
 	ipAddress, ipPrefixLen := d.getContainerPrimaryNetwork(info)
 
 	meta := &ContainerMetaExtra{
 		ContainerMeta: ContainerMeta{
 			ID:       info.Container.ID,
 			Name:     trimContainerName(info.Container.Name),
-			Image:    d.getImageRepoTag(info.Container.Image, info.Container.Config.Image),
+			Image:    repoTag,
 			Labels:   info.Container.Config.Labels,
 			Hostname: info.Container.Config.Hostname,
 			Pid:      info.Container.State.Pid,
@@ -246,15 +264,17 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 			PidMode:  string(info.Container.HostConfig.PidMode),
 			NetMode:  string(info.Container.HostConfig.NetworkMode),
 		},
-		ImageID:     TrimImageID(info.Container.Image),
-		Privileged:  info.Container.HostConfig.Privileged,
-		Running:     info.Container.State.Running,
-		ExitCode:    info.Container.State.ExitCode,
-		IPAddress:   ipAddress,
-		IPPrefixLen: ipPrefixLen,
-		MappedPorts: make(map[share.CLUSProtoPort]*share.CLUSMappedPort),
-		Networks:    utils.NewSet(),
-		LogPath:     info.Container.LogPath,
+		ImageID:          TrimImageID(info.Container.Image),
+		ImageDigest:      imageDigest,
+		ImageDigestExtra: imageDigestExtra,
+		Privileged:       info.Container.HostConfig.Privileged,
+		Running:          info.Container.State.Running,
+		ExitCode:         info.Container.State.ExitCode,
+		IPAddress:        ipAddress,
+		IPPrefixLen:      ipPrefixLen,
+		MappedPorts:      make(map[share.CLUSProtoPort]*share.CLUSMappedPort),
+		Networks:         utils.NewSet(),
+		LogPath:          info.Container.LogPath,
 	}
 
 	if tm, err := time.Parse(time.RFC3339, info.Container.State.StartedAt); err == nil {
@@ -677,20 +697,28 @@ func isSha256String(input string) bool {
 	return shaPatterns.MatchString(input)
 }
 
-func (d *dockerDriver) getImageRepoTag(imageID, imageName string) string {
+func (d *dockerDriver) getImageRepoTag(imageID, imageName string) (string, []string) {
 	repoTag := imageName
 	if imageID != "" { // a valid image ID, look it up in local database
 		if !strings.HasPrefix(imageName, "sha256:") && !strings.Contains(imageName, "@sha256:") {
-			return imageName // simplest matched form since it could be re-tagged  in native docker env
+			image, err := d.client.ImageInspect(context.Background(), imageID)
+			if err == nil {
+				return imageName, image.RepoDigests // simplest matched form since it could be re-tagged  in native docker env
+			} else {
+				return imageName, nil // simplest matched form since it could be re-tagged  in native docker env
+			}
 		}
 
 		image, err := d.client.ImageInspect(context.Background(), imageID)
-		if err == nil && len(image.RepoTags) > 0 {
-			for _, repo := range image.RepoTags {
-				repoTag = repo // report the last one
+		if err == nil {
+			if len(image.RepoTags) > 0 {
+				for _, repo := range image.RepoTags {
+					repoTag = repo // report the last one
+				}
+				//	log.WithFields(log.Fields{"imageID": imageID, "RepoTag": repoTag}).Debug("")
+				return repoTag, image.RepoDigests
 			}
-			//	log.WithFields(log.Fields{"imageID": imageID, "RepoTag": repoTag}).Debug("")
-			return repoTag
+			return imageName, image.RepoDigests
 		}
 	}
 
@@ -698,12 +726,15 @@ func (d *dockerDriver) getImageRepoTag(imageID, imageName string) string {
 	if strings.HasPrefix(imageName, "sha256:") || isSha256String(imageName) {
 		// retrive repoTag
 		image, err := d.client.ImageInspect(context.Background(), imageName)
-		if err == nil && len(image.RepoTags) > 0 {
-			for _, repo := range image.RepoTags {
-				repoTag = repo // report the last one
+		if err == nil {
+			if len(image.RepoTags) > 0 {
+				for _, repo := range image.RepoTags {
+					repoTag = repo // report the last one
+				}
+				//	log.WithFields(log.Fields{"imageName": imageName, "RepoTag": repoTag}).Debug("")
+				return repoTag, image.RepoDigests
 			}
-			//	log.WithFields(log.Fields{"imageName": imageName, "RepoTag": repoTag}).Debug("")
-			return repoTag
+			return imageName, image.RepoDigests
 		}
 	} else if strings.Contains(imageName, "@sha256:") {
 		if imageListResult, err := d.client.ImageList(context.Background(), dockerClient.ImageListOptions{All: true}); err == nil {
@@ -716,12 +747,12 @@ func (d *dockerDriver) getImageRepoTag(imageID, imageName string) string {
 								repoTag = repo // report the last one
 							}
 							//				log.WithFields(log.Fields{"imageName": imageName, "RepoTag": repoTag}).Debug("")
-							return repoTag
+							return repoTag, image.RepoDigests
 						}
 					}
 				}
 			}
 		}
 	}
-	return repoTag
+	return repoTag, nil
 }
