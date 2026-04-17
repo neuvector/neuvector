@@ -16,7 +16,9 @@ var sr1 = share.ScanResult{
 	Error:     share.ScanErrorCode_ScanErrNone,
 	Namespace: "alpine:2.10",
 	Vuls: []*share.ScanVulnerability{
-		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
+		{Name: "CVE-2021-0001", Severity: "Critical", PublishedDate: "1618536298"},
+		{Name: "CVE-2021-0002", Severity: "Critical", PublishedDate: "1618536298"},
+		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1587000298"},
 		{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
 		{Name: "CVE-2018-0001", Severity: "High", PublishedDate: "1514764800"},
 	},
@@ -38,7 +40,7 @@ var sr2 = share.ScanResult{
 	Error:     share.ScanErrorCode_ScanErrNone,
 	Namespace: "alpine:2.10",
 	Vuls: []*share.ScanVulnerability{
-		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
+		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1587000298"},
 		{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
 		{Name: "CVE-2020-0002", Severity: "Medium", PublishedDate: "1546300900"},
 	},
@@ -60,7 +62,7 @@ var sr3 = share.ScanResult{
 	Error:     share.ScanErrorCode_ScanErrNone,
 	Namespace: "alpine:2.10",
 	Vuls: []*share.ScanVulnerability{
-		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1546300800"},
+		{Name: "CVE-2020-0001", Severity: "High", PublishedDate: "1587000298"},
 		{Name: "CVE-2019-0001", Severity: "Medium", PublishedDate: "1577836800"},
 	},
 	Registry:   "https://docker.io/",
@@ -107,8 +109,10 @@ func TestLocalRepoScan(t *testing.T) {
 	c, ok := repoScanRegistry.cache[sr1.ImageID]
 	if !ok {
 		t.Errorf("Unable to local image cache: id=%+v", sr1.ImageID)
-	} else if c.highVuls != 2 || c.medVuls != 1 {
+	} else if c.criticalVuls != 2 || c.highVuls != 2 || c.medVuls != 1 {
 		t.Errorf("Incorrect CVE count: high=%+v, medium=%+v", c.highVuls, c.medVuls)
+	} else if h := c.vulInfo["Critical"]; len(h) != 2 {
+		t.Errorf("Incorrect CVE info critical count: high=%+v", len(h))
 	} else if h := c.vulInfo["High"]; len(h) != 2 {
 		t.Errorf("Incorrect CVE info high count: high=%+v", len(h))
 	} else if m := c.vulInfo["Medium"]; len(m) != 1 {

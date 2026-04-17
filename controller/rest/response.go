@@ -323,7 +323,7 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 				case share.EventCondTypeCVECritical, share.EventCondTypeCVEHighOnly, share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium:
 					id, err := strconv.Atoi(cd.CondValue)
 					if err != nil || id <= 0 {
-						return fmt.Errorf("Invalid cve-high value:n %s", cd.CondValue)
+						return fmt.Errorf("Invalid %s value:n %s", cd.CondType, cd.CondValue)
 					}
 				case share.EventCondTypeCVECriticalWithFix, share.EventCondTypeCVEHighOnlyWithFix, share.EventCondTypeCVEHighWithFix:
 					invalid := false
@@ -335,7 +335,7 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 						}
 					}
 					if len(ss) > 2 || invalid {
-						return fmt.Errorf("Invalid cve-high-with-fix value:n %s", cd.CondValue)
+						return fmt.Errorf("Invalid %s value:n %s", cd.CondType, cd.CondValue)
 					}
 				case share.EventCondTypeCVEName:
 					r.Conditions[i].CondValue = strings.ToUpper(cd.CondValue)

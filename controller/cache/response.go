@@ -195,30 +195,29 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 	}
 }
 
-func matchCVEWithFixConditions(condValue string, cve_fixed_info []scanUtils.FixedVulInfo) bool {
-	match := true
+func matchCVEWithFixConditions(condValue string, cveFixedInfo []scanUtils.FixedVulInfo) bool {
 	ss := strings.Split(condValue, "/")
-	cveCountInRule, err := strconv.Atoi(ss[0]) // high vul with fix count configured in response rule
+	cveCountInRule, err := strconv.Atoi(ss[0]) // vul with fix count configured in response rule's condition
 	// get settings from response rule
 	if err != nil {
 		return false
 	}
-	if len(ss) >= 1 && len(cve_fixed_info) < cveCountInRule {
-		// it's configured like: ( high_vul_with_fix:X ) meaning "# of high vul(with fix) >= X"
+	if len(ss) >= 1 && len(cveFixedInfo) < cveCountInRule {
+		// example: ( cve-critical-with-fix:X ) means "rule condition is matched when # of critical vul(with fix) >= X"
 		return false
 	}
 	if len(ss) == 2 {
-		// it's configured like: ( high_vul_with_fix:X/Y ) meaning "# of (high vul that are reported Y days ago AND have fix) >= X"
+		// example: ( cve-critical-with-fix:X/Y ) means "rule condition is matched when # of (critical vul that are reported Y days ago AND have fix) >= X"
 		daysReported, err := strconv.Atoi(ss[1])
 		if err != nil {
 			return false
 		}
 		hoursReported := float64(24 * daysReported) // "reported before N hours" that is configured in response rule
 		reportedBeforeNDays := 0
-		// calculate how many high cve(with fix) that are reported before <daysReported> days
-		for _, info := range cve_fixed_info {
+		// calculate how many cve(with fix) that are reported before <daysReported> days
+		for _, info := range cveFixedInfo {
 			dur := time.Since(time.Unix(info.PubTS, 0))
-			if dur.Hours() >= hoursReported { // found high cve that is reported before <daysReported> days ago
+			if dur.Hours() >= hoursReported { // found cve that is reported before <daysReported> days ago
 				reportedBeforeNDays += 1
 			}
 		}
@@ -226,7 +225,7 @@ func matchCVEWithFixConditions(condValue string, cve_fixed_info []scanUtils.Fixe
 			return false
 		}
 	}
-	return match
+	return true
 }
 
 func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {

@@ -107,7 +107,6 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	// get [count_distribution] summary,
 	// it's dynamic data, the result is derived from filtered dataset.
 	CVEDist, nMatchedRecordCount := getCVEDistribution(vulAssets)
-	CVEDist.Critical = -1 // temporarily revert critical cve logic
 
 	// save to session temp table
 	start = time.Now()
@@ -465,6 +464,8 @@ func getCVEDistribution(vulAssets []*db.DbVulAsset) (*api.VulAssetCountDist, int
 		nMatchedRecordCount++
 
 		switch r.Severity {
+		case "Critical":
+			dist.Critical++
 		case "High":
 			dist.High++
 		case "Medium":

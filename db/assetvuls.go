@@ -247,9 +247,10 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		av.Applications = parseJsonStrToSlice(apps)
 
 		cveStats := map[string]*int{
-			"High":   &av.High,
-			"Medium": &av.Medium,
-			"Low":    &av.Low,
+			"Critical": &av.Critical,
+			"High":     &av.High,
+			"Medium":   &av.Medium,
+			"Low":      &av.Low,
 		}
 
 		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
@@ -299,9 +300,10 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 		}
 
 		cveStats := map[string]*int{
-			"High":   &av.High,
-			"Medium": &av.Medium,
-			"Low":    &av.Low,
+			"Critical": &av.Critical,
+			"High":     &av.High,
+			"Medium":   &av.Medium,
+			"Low":      &av.Low,
 		}
 		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
 
@@ -348,9 +350,10 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 		}
 
 		cveStats := map[string]*int{
-			"High":   &av.High,
-			"Medium": &av.Medium,
-			"Low":    &av.Low,
+			"Critical": &av.Critical,
+			"High":     &av.High,
+			"Medium":   &av.Medium,
+			"Low":      &av.Low,
 		}
 		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
 
@@ -396,9 +399,10 @@ func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		}
 
 		cveStats := map[string]*int{
-			"High":   &av.High,
-			"Medium": &av.Medium,
-			"Low":    &av.Low,
+			"Critical": &av.Critical,
+			"High":     &av.High,
+			"Medium":   &av.Medium,
+			"Low":      &av.Low,
 		}
 		batchProcessAssetView(pool, &mux, cvePackages, vulsBytes, idnsStr, &av.Vulnerabilities, vulMap, cveStats)
 		av.ID = assetId
@@ -412,6 +416,8 @@ func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 func formatCVEName(name, severity string) string {
 	prefix := "L"
 	switch severity {
+	case "Critical":
+		prefix = "C"
 	case "High":
 		prefix = "H"
 	case "Medium":
@@ -865,7 +871,8 @@ func hasNamespaceFilter(queryFilter *api.VulQueryFilterViewModel) bool {
 	return false
 }
 
-func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsBytes []byte, idnsStr string, vulnerabilities *[]string, vulMap map[string]*DbVulAsset, cveStat map[string]*int) {
+func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages map[string]map[string]utils.Set, vulsBytes []byte,
+	idnsStr string, vulnerabilities *[]string, vulMap map[string]*DbVulAsset, cveStat map[string]*int) {
 	pool.Submit(func() {
 		cveList := make([]string, 0)
 		if err := funcFillVulPackages(mu, cvePackages, vulsBytes, idnsStr, &cveList, cveStat); err != nil {

@@ -154,17 +154,16 @@ type AdmCtrlMatchedImageInfo struct {
 // AdmCtrlMatchedResult is for each matched occurrence.
 // One rule could be matched multiple times when there are multiple containers in a request
 type AdmCtrlMatchedResult struct {
-	ContainerImage  string
-	RuleID          uint32                  // matched rule's id
-	IsFedRule       bool                    // whether the matched rule is a fed rule
-	IsDenyRuleType  bool                    // whether the matched rule is a deny rule
-	IsMatchMonitor  bool                    // whether the matched deny rule gets "monitor" action (neither "allow" nor "deny")
-	IsCriticalMatch bool                    // whether this result is from a matched rule that decides "allow"/"deny" action
-	Disabled        bool                    // whether the matched rule is a disabled rule. for assessment, disabled rules are evaluated as well.
-	RuleDetails     string                  // matched rule's criteria description in plain-text
-	RuleMode        string                  // matched deny rule's per-rule mode. could be ""/"monitor"/"protect"
-	ImageInfo       AdmCtrlMatchedImageInfo // info of the image that matches a rule
-	RuleCfgType     share.TCfgType
+	ContainerImage      string
+	RuleID              uint32                  // matched rule's id
+	IsFedRule           bool                    // whether the matched rule is a fed rule
+	IsDenyRuleType      bool                    // whether the matched rule is a deny rule
+	IsNonMonitorMatched bool                    // whether this result is from a matched rule that decides "allow"/"deny" action
+	Disabled            bool                    // whether the matched rule is a disabled rule. for assessment, disabled rules are evaluated as well.
+	RuleDetails         string                  // matched rule's criteria description in plain-text
+	RuleMode            string                  // matched deny rule's per-rule mode. could be ""/"monitor"/"protect"
+	ImageInfo           AdmCtrlMatchedImageInfo // info of the image that matches a rule
+	RuleCfgType         share.TCfgType
 }
 
 func (r AdmCtrlMatchedResult) IsMatchedMode(globalMode, matchedMode string) bool {

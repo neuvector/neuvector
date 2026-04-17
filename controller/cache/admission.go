@@ -1788,7 +1788,7 @@ func collectMatchedResult(rule *share.CLUSAdmissionRule, evalContext *nvsysadmis
 	// 2. for non-assessment, disabled rules are not evaluated at all.
 
 	isDenyRuleType := false
-	isCriticalMatch := false // meaning the matched rule gets allow/deny action(not including deny/monitor)
+	isNonMonitorMatched := false // meaning the matched rule gets allow/deny action(not including deny/monitor)
 	matchedAction := ""
 
 	if ruleType == share.FedAdmCtrlDenyRulesType || ruleType == api.ValidatingDenyRuleType {
@@ -1810,18 +1810,18 @@ func collectMatchedResult(rule *share.CLUSAdmissionRule, evalContext *nvsysadmis
 	}
 
 	if result.AssessAction == "" && !rule.Disable && matchedAction != "" {
-		isCriticalMatch = true
+		isNonMonitorMatched = true
 	}
 	matchedResult := &nvsysadmission.AdmCtrlMatchedResult{
-		ContainerImage:  image,
-		RuleID:          rule.ID,
-		IsFedRule:       ruleType == share.FedAdmCtrlDenyRulesType || ruleType == share.FedAdmCtrlExceptRulesType,
-		IsDenyRuleType:  isDenyRuleType,
-		Disabled:        rule.Disable,
-		IsCriticalMatch: isCriticalMatch,
-		RuleDetails:     ruleDetails,
-		RuleMode:        rule.RuleMode, // matched rule's per-rule mode. for deny rules only
-		RuleCfgType:     rule.CfgType,
+		ContainerImage:      image,
+		RuleID:              rule.ID,
+		IsFedRule:           ruleType == share.FedAdmCtrlDenyRulesType || ruleType == share.FedAdmCtrlExceptRulesType,
+		IsDenyRuleType:      isDenyRuleType,
+		Disabled:            rule.Disable,
+		IsNonMonitorMatched: isNonMonitorMatched,
+		RuleDetails:         ruleDetails,
+		RuleMode:            rule.RuleMode, // matched rule's per-rule mode. for deny rules only
+		RuleCfgType:         rule.CfgType,
 	}
 	if imageSummary != nil {
 		matchedResult.ImageInfo = nvsysadmission.AdmCtrlMatchedImageInfo{
@@ -1835,12 +1835,12 @@ func collectMatchedResult(rule *share.CLUSAdmissionRule, evalContext *nvsysadmis
 		}
 	}
 	result.MatchedResults = append(result.MatchedResults, matchedResult)
-	if isCriticalMatch {
+	if isNonMonitorMatched {
 		result.AssessAction = matchedAction
 		result.CriticalMatch = matchedResult
 	}
 
-	return isCriticalMatch
+	return isNonMonitorMatched
 }
 
 // matchCfgType being 0 means to compare with default(critical) rules only
