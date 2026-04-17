@@ -1,6 +1,6 @@
 module github.com/neuvector/neuvector
 
-go 1.25.0
+go 1.26.2
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
