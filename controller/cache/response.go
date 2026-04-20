@@ -221,7 +221,7 @@ func matchCVEWithFixConditions(condValue string, cveFixedInfo []scanUtils.FixedV
 				reportedBeforeNDays += 1
 			}
 		}
-		if reportedBeforeNDays == 0 {
+		if reportedBeforeNDays < cveCountInRule {
 			return false
 		}
 	}

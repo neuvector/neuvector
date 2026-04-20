@@ -175,7 +175,7 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 	preTest()
 	defer postTest()
 
-	t.Run("CVE-report log matches 1 response rule for cve-with-fix count", func(t *testing.T) {
+	t.Run("CVE-report log matches 1 response rule for cve-high-with-fix count", func(t *testing.T) {
 		// rule: # of high & critical vul(with fix) >= 3
 		now := time.Now()
 		actions := []string{share.EventActionSuppressLog}
@@ -194,7 +194,26 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 		require.True(t, matched, "it should match cve-high-with-fix:3 rule")
 	})
 
-	t.Run("CVE-report log matches 1 response rule for cve-with-fix count with reported date", func(t *testing.T) {
+	t.Run("CVE-report log matches 0 response rule for cve-high-with-fix count with reported date", func(t *testing.T) {
+		// rule: # of (high & critical vul that are reported 15 days ago AND have fix) >= 2
+		now := time.Now()
+		actions := []string{share.EventActionSuppressLog}
+		cveFixedInfo := []scanUtils.FixedVulInfo{
+			{PubTS: now.AddDate(0, 0, -7).Unix()},
+			{PubTS: now.AddDate(0, 0, -14).Unix()},
+			{PubTS: now.AddDate(0, 0, -21).Unix()},
+		}
+
+		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "2/15"}}, actions)
+		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
+			rule,
+		})
+
+		matched := matchCVEWithFixConditions(rule.Conditions[0].CondValue, cveFixedInfo)
+		require.False(t, matched, "it should not match cve-high-with-fix:2/15 rule")
+	})
+
+	t.Run("CVE-report log matches 1 response rule for cve-high-with-fix count with reported date", func(t *testing.T) {
 		// rule: # of (high & critical vul that are reported 10 days ago AND have fix) >= 2
 		now := time.Now()
 		actions := []string{share.EventActionSuppressLog}
@@ -213,7 +232,7 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 		require.True(t, matched, "it should match cve-high-with-fix:2/10 rule")
 	})
 
-	t.Run("CVE-report log does not match response rule for cve-with-fix count with reported date", func(t *testing.T) {
+	t.Run("CVE-report log does not match response rule for cve-high-with-fix count with reported date", func(t *testing.T) {
 		// rule: # of (high & critical vul that are reported 30 days ago AND have fix) >= 1
 		now := time.Now()
 		actions := []string{share.EventActionSuppressLog}
