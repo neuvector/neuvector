@@ -86,6 +86,14 @@ func setupWorkloads(mockCache *ScannerMockCache) {
 		},
 	})
 	mockCache.AddVulnerability("wl1", &api.RESTVulnerability{
+		Name:     "vulnerability11",
+		Severity: "critical",
+	})
+	mockCache.AddVulnerability("wl1", &api.RESTVulnerability{
+		Name:     "vulnerability12",
+		Severity: "critical",
+	})
+	mockCache.AddVulnerability("wl1", &api.RESTVulnerability{
 		Name:     "vulnerability1",
 		Severity: "high",
 	})
@@ -335,7 +343,7 @@ func TestHandlerWorkloadsScanReportInternal(t *testing.T) {
 				ViewPod:       stringPtr(api.QueryValueViewPod),
 				Cursor:        api.RESTScanReportCursor{},
 			},
-			expectedLen:   5,
+			expectedLen:   7,
 			expectedError: false,
 		},
 		{

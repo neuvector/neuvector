@@ -575,6 +575,16 @@ func handlerScanImageReport(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 }
 
+func isMoreSevere(incoming *api.RESTScanBrief, existing *api.RESTScanImageSummary) bool {
+	if incoming.CriticalVuls != existing.CriticalVuls {
+		return incoming.CriticalVuls > existing.CriticalVuls
+	}
+	if incoming.HighVuls != existing.HighVuls {
+		return incoming.HighVuls > existing.HighVuls
+	}
+	return incoming.MedVuls > existing.MedVuls
+}
+
 func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -605,7 +615,7 @@ func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprout
 		w := wl.ScanSummary
 
 		old, ok := imageMap[wl.ImageID]
-		if !ok || old.HighVuls < w.HighVuls || (old.HighVuls == w.HighVuls && old.MedVuls < w.MedVuls) {
+		if !ok || isMoreSevere(w, old) {
 			img := api.RESTScanImageSummary{
 				Image:         wl.Image,
 				ImageID:       wl.ImageID,
@@ -630,14 +640,15 @@ func handlerScanImageSummary(w http.ResponseWriter, r *http.Request, ps httprout
 		var asc = false
 		for i, s := range query.sorts {
 			if s.tag == "severity" {
-				query.sorts[i].tag = "high"
+				query.sorts[i].tag = "critical"
 				hasSeverity = true
 				asc = s.asc
 				break
 			}
 		}
-		// add medium and name as additional sorting criteria
+		// add high, medium and name as additional sorting criteria
 		if hasSeverity {
+			query.sorts = append(query.sorts, restFieldSort{tag: "high", asc: asc})
 			query.sorts = append(query.sorts, restFieldSort{tag: "medium", asc: asc})
 			query.sorts = append(query.sorts, restFieldSort{tag: "image", asc: true})
 			log.WithFields(log.Fields{"sorts": query.sorts}).Debug("")
@@ -1049,12 +1060,24 @@ func handlerAssetVulnerability(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	sort.Slice(list, func(s, t int) bool {
-		if list[s].Severity == "high" && list[t].Severity == "medium" {
-			return true
-		} else if list[s].Severity == "medium" && list[t].Severity == "high" {
-			return false
-		} else {
+		if list[s].Severity == list[t].Severity {
 			return list[s].Name > list[t].Name
+		}
+		switch list[s].Severity {
+		case "critical":
+			return true
+		case "high":
+			if list[t].Severity == "critical" {
+				return false
+			}
+			return true
+		case "medium":
+			if list[t].Severity == "low" {
+				return true
+			}
+			return false
+		default:
+			return false
 		}
 	})
 

@@ -4265,6 +4265,7 @@ type RESTWorkloadAssetView struct {
 	Applications    []string `json:"applications"`
 	PolicyMode      string   `json:"policy_mode"`
 	ServiceGroup    string   `json:"service_group"`
+	Critical        int      `json:"critical"`
 	High            int      `json:"high"`
 	Medium          int      `json:"medium"`
 	Low             int      `json:"low"`
@@ -4281,6 +4282,7 @@ type RESTHostAssetView struct {
 	CPUs            int      `json:"cpus"`
 	Memory          int64    `json:"memory"`
 	Containers      int      `json:"containers"`
+	Critical        int      `json:"critical"`
 	High            int      `json:"high"`
 	Medium          int      `json:"medium"`
 	Low             int      `json:"low"`
@@ -4293,6 +4295,7 @@ type RESTPlatformAssetView struct {
 	Name            string   `json:"name"`
 	Version         string   `json:"version"`
 	BaseOS          string   `json:"base_os"`
+	Critical        int      `json:"critical"`
 	High            int      `json:"high"`
 	Medium          int      `json:"medium"`
 	Low             int      `json:"low"`
@@ -4302,6 +4305,7 @@ type RESTPlatformAssetView struct {
 type RESTImageAssetView struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
+	Critical        int      `json:"critical"`
 	High            int      `json:"high"`
 	Medium          int      `json:"medium"`
 	Low             int      `json:"low"`

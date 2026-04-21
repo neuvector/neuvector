@@ -57,7 +57,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 
 	q.Filters.ScoreType = validateOrDefault(q.Filters.ScoreType, []string{"v2", "v3"}, "v3")
 	q.Filters.ViewType = validateOrDefault(q.Filters.ViewType, []string{"all", "containers", "infrastructure", "registry"}, "all")
-	q.Filters.SeverityType = validateOrDefault(q.Filters.SeverityType, []string{"all", "high", "medium", "low"}, "all")
+	q.Filters.SeverityType = validateOrDefault(q.Filters.SeverityType, []string{"all", "critical", "high", "medium", "low"}, "all")
 	q.Filters.PackageType = validateOrDefault(q.Filters.PackageType, []string{"all", "withFix", "withoutFix", "withFixAll"}, "all")
 	q.Filters.PublishedType = validateOrDefault(q.Filters.PublishedType, []string{"all", "before", "after"}, "all")
 
@@ -751,8 +751,14 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 		}
 	}
 
-	// profile, ==  severityType, possible values are [all/high/medium/low]
+	// profile, ==  severityType, possible values are [all/critical/high/medium/low]
 	switch q.SeverityType {
+	case "critical":
+		expectedMeetCount += 1
+
+		if vulasset.Severity == "Critical" {
+			meetCount += 1
+		}
 	case "high":
 		expectedMeetCount += 1
 
@@ -945,7 +951,7 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
+	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
 
 	db := dbHandle
 	rows, err := db.Query(statement, args...)
@@ -958,7 +964,7 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 		record := &api.AssetCVECount{
 			Critical: -1,
 		}
-		err = rows.Scan(&record.ID, &record.DisplayName, &record.High, &record.Medium, &record.Low)
+		err = rows.Scan(&record.ID, &record.DisplayName, &record.Critical, &record.High, &record.Medium, &record.Low)
 
 		if err != nil {
 			return nil, err

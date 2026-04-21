@@ -195,6 +195,39 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 	}
 }
 
+func matchCVEWithFixConditions(condValue string, cveFixedInfo []scanUtils.FixedVulInfo) bool {
+	ss := strings.Split(condValue, "/")
+	cveCountInRule, err := strconv.Atoi(ss[0]) // vul with fix count configured in response rule's condition
+	// get settings from response rule
+	if err != nil {
+		return false
+	}
+	if len(ss) >= 1 && len(cveFixedInfo) < cveCountInRule {
+		// example: ( cve-critical-with-fix:X ) means "rule condition is matched when # of critical vul(with fix) >= X"
+		return false
+	}
+	if len(ss) == 2 {
+		// example: ( cve-critical-with-fix:X/Y ) means "rule condition is matched when # of (critical vul that are reported Y days ago AND have fix) >= X"
+		daysReported, err := strconv.Atoi(ss[1])
+		if err != nil {
+			return false
+		}
+		hoursReported := float64(24 * daysReported) // "reported before N hours" that is configured in response rule
+		reportedBeforeNDays := 0
+		// calculate how many cve(with fix) that are reported before <daysReported> days
+		for _, info := range cveFixedInfo {
+			dur := time.Since(time.Unix(info.PubTS, 0))
+			if dur.Hours() >= hoursReported { // found cve that is reported before <daysReported> days ago
+				reportedBeforeNDays += 1
+			}
+		}
+		if reportedBeforeNDays < cveCountInRule {
+			return false
+		}
+	}
+	return true
+}
+
 func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {
 	// AND op within a rule. Return false if one criterion doesn't match
 	var match = true
@@ -221,41 +254,27 @@ func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {
 			if desc.vuls == nil || !desc.vuls.Contains(d.CondValue) {
 				return false
 			}
-		case share.EventCondTypeCVEHigh:
+		case share.EventCondTypeCVECritical:
+			count, err := strconv.Atoi(d.CondValue)
+			if err != nil || desc.cve_critical < count {
+				return false
+			}
+		case share.EventCondTypeCVEHighOnly:
 			count, err := strconv.Atoi(d.CondValue)
 			if err != nil || desc.cve_high < count {
 				return false
 			}
+		case share.EventCondTypeCVEHigh:
+			count, err := strconv.Atoi(d.CondValue)
+			if err != nil || (desc.cve_high+desc.cve_critical) < count {
+				return false
+			}
+		case share.EventCondTypeCVECriticalWithFix:
+			return matchCVEWithFixConditions(d.CondValue, desc.cve_critical_fixed_info)
+		case share.EventCondTypeCVEHighOnlyWithFix:
+			return matchCVEWithFixConditions(d.CondValue, desc.cve_high_fixed_info)
 		case share.EventCondTypeCVEHighWithFix:
-			ss := strings.Split(d.CondValue, "/")
-			cveCountInRule, err := strconv.Atoi(ss[0]) // high vul with fix count configured in response rule
-			// get settings from response rule
-			if err != nil {
-				return false
-			}
-			if len(ss) >= 1 && len(desc.cve_high_fixed_info) < cveCountInRule {
-				// it's configured like: ( high_vul_with_fix:X ) meaning "# of high vul(with fix) >= X"
-				return false
-			}
-			if len(ss) == 2 {
-				// it's configured like: ( high_vul_with_fix:X/Y ) meaning "# of (high vul that are reported Y days ago AND have fix) >= X"
-				daysReported, err := strconv.Atoi(ss[1])
-				if err != nil {
-					return false
-				}
-				hoursReported := float64(24 * daysReported) // "reported before N hours" that is configured in response rule
-				reportedBeforeNDays := 0
-				// calculate how many high cve(with fix) that are reported before <daysReported> days
-				for _, info := range desc.cve_high_fixed_info {
-					dur := time.Since(time.Unix(info.PubTS, 0))
-					if dur.Hours() >= hoursReported { // found high cve that is reported before <daysReported> days ago
-						reportedBeforeNDays += 1
-					}
-				}
-				if reportedBeforeNDays == 0 {
-					return false
-				}
-			}
+			return matchCVEWithFixConditions(d.CondValue, append(desc.cve_critical_fixed_info, desc.cve_high_fixed_info...))
 		case share.EventCondTypeCVEMedium:
 			count, err := strconv.Atoi(d.CondValue)
 			if err != nil || desc.cve_med < count {
