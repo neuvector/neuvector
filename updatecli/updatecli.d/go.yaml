@@ -1,0 +1,73 @@
+name: Update Golang version
+
+pipelineid: golang/version
+
+sources:
+  go:
+    name: Get latest Golang version
+    kind: golang
+
+conditions:
+  docker:
+    name: Check Docker image tag
+    kind: dockerimage
+    sourceid: go
+    spec:
+      image: registry.suse.com/bci/golang
+
+targets:
+  gomod:
+    name: 'deps(go): update Go version to {{ source "go" }}'
+    sourceid: go
+    kind: golang/gomod
+    scmid: default
+    spec:
+      file: go.mod
+
+  dockerfile:
+    name: "deps(go): update Docker image tag"
+    kind: dockerfile
+    sourceid: go
+    scmid: default
+    spec:
+      files:
+        - package/Dockerfile.controller
+        - package/Dockerfile.enforcer
+      instruction:
+        keyword: FROM
+        matcher: registry.suse.com/bci/golang
+
+actions:
+  default:
+    title: 'deps(go): update Go to {{ source "go" }} version'
+    kind: github/pullrequest
+    scmid: default
+    spec:
+      automerge: false
+      mergemethod: squash
+      description: |
+        Automatic Golang version {{ source "go" }} update.
+        This PR has been created by the automation used to automatically update the Golang version in the neuvector project
+        REMEMBER IF YOU WANT TO MERGE IN A SINGLE COMMIT CHANGES AND VERSION BUMP, YOU MUST SQUASH THE COMMIT BEFORE MERGING THIS PR!
+      draft: false
+      labels:
+        - "chore"
+        - "dependencies"
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: "{{ .github.author }}"
+      email: "{{ .github.email }}"
+      owner: "{{ requiredEnv .github.owner }}"
+      repository: "neuvector"
+      token: "{{ requiredEnv .github.token }}"
+      username: "{{ requiredEnv .github.user }}"
+      branch: "{{ .github.branch }}"
+      commitmessage:
+        type: "chore"
+        scope: deps
+        title: "update Golang version"
+        hidecredit: true
+        footers: "Signed-off-by: NeuVector bot <neuvector-bot@users.noreply.github.com>"
