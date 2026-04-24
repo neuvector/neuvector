@@ -337,11 +337,6 @@ github.com/go-asn1-ber/asn1-ber
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
 github.com/go-errors/errors
-# github.com/go-jose/go-jose/v3 v3.0.5
-## explicit; go 1.12
-github.com/go-jose/go-jose/v3
-github.com/go-jose/go-jose/v3/cipher
-github.com/go-jose/go-jose/v3/json
 # github.com/go-jose/go-jose/v4 v4.1.4
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
@@ -727,7 +722,6 @@ go.starlark.net/syntax
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/md4
-golang.org/x/crypto/pbkdf2
 # golang.org/x/net v0.51.0
 ## explicit; go 1.25.0
 golang.org/x/net/bpf
