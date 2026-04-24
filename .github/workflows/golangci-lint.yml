@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: stable
+          go-version-file: "go.mod"
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt install -y libpcre3-dev
