@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -62,6 +64,9 @@ const (
 	rDefaultPath2   = "usr/local/lib/R/library/"
 	rRepositoryPath = "usr/local/lib/R/site-library/"
 	rDescFileName   = "DESCRIPTION"
+
+	// govulncheck
+	govulncheckTimeout = 30 * time.Second
 )
 
 // var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]+)>`)
@@ -84,10 +89,13 @@ type ComposerPackage struct {
 }
 
 type AppPackage struct {
-	AppName    string `json:"app_name"`
-	ModuleName string `json:"module_name"`
-	Version    string `json:"version"`
-	FileName   string `json:"file_name"`
+	AppName     string          `json:"app_name"`
+	ModuleName  string          `json:"module_name"`
+	Version     string          `json:"version"`
+	FileName    string          `json:"file_name"`
+	ImportPaths []string        `json:"IP,omitempty"`
+	Symbols     []string        `json:"SYM,omitempty"`
+	GovulnVulns []GovulnFinding `json:"GVS,omitempty"`
 }
 
 /*
@@ -272,6 +280,14 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), govulncheckTimeout)
+	defer cancel()
+
+	govulnByModule, govulnErr := runGovulncheckBinary(ctx, fullpath)
+	if govulnErr != nil {
+		log.WithFields(log.Fields{"file": filename, "error": govulnErr.Error()}).Warn("govulncheck failed, falling back to app DB")
+	}
+
 	pkgs := make([]AppPackage, len(bi.Deps))
 	for i, m := range bi.Deps {
 		if m.Replace != nil {
@@ -284,6 +300,9 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 			Version:    strings.TrimPrefix(m.Version, "v"),
 			FileName:   filename,
 		}
+		if govulnErr == nil {
+			pkg.GovulnVulns = lookupGovulnFindings(govulnByModule, pkg.ModuleName, pkg.Version)
+		}
 		pkgs[i] = pkg
 	}
 
@@ -294,6 +313,9 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 			ModuleName: "go:stdlib",
 			Version:    goVersion,
 			FileName:   filename,
+		}
+		if govulnErr == nil {
+			stdLibPkg.GovulnVulns = lookupGovulnFindings(govulnByModule, stdLibPkg.ModuleName, stdLibPkg.Version)
 		}
 		pkgs = append(pkgs, stdLibPkg)
 	}
