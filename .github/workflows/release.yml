@@ -43,7 +43,7 @@ jobs:
           neuvector
           neuvector-private
     - name: Load Secrets from Vault
-      uses: rancher-eio/read-vault-secrets@7282bf97898cd1c16c89f837e0bb442e6d384c89 # v3
+      uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
       with:
         secrets: |
           secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | RANCHER_DOCKER_USERNAME ;
@@ -83,7 +83,7 @@ jobs:
         cat sha256sum-controller-arm64 | sha256sum --check
 
     - name: Publish neuvector manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@575bb831c67edd950bfedb59d41dd127bd0005d6 # v0.65.2
+      uses: rancher/ecm-distro-tools/actions/publish-image@8821b2e4aa18f762dc334f811f54e8f215771a68 # v0.66.2
       with:
         push-to-public: true
         push-to-prime: false
@@ -97,7 +97,7 @@ jobs:
         public-username: ${{ env.DOCKER_USERNAME }}
         public-password: ${{ env.DOCKER_PASSWORD }}
     - name: Publish rancher manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@575bb831c67edd950bfedb59d41dd127bd0005d6 # v0.65.2
+      uses: rancher/ecm-distro-tools/actions/publish-image@8821b2e4aa18f762dc334f811f54e8f215771a68 # v0.66.2
       env:
         IMAGE_PREFIX: neuvector-
       with:
