@@ -494,6 +494,29 @@ func getCVEDistribution(vulAssets []*db.DbVulAsset) (*api.VulAssetCountDist, int
 	return dist, nMatchedRecordCount
 }
 
+func getNoVulAssets(allowed map[string]utils.Set, queryFilter *db.VulQueryFilter, assetView *api.RESTAssetView) {
+	allowedImages := allowed[db.AssetImage]
+	if allowedImages == nil || allowedImages.Cardinality() <= len(assetView.Images) {
+		return
+	}
+
+	vulImageIDs := make([]string, len(assetView.Images))
+	for i, image := range assetView.Images {
+		vulImageIDs[i] = image.ID
+	}
+	noVulImageIDs := allowedImages.Difference(utils.NewSetFromStringSlice(vulImageIDs))
+	assetsMap := map[string][]string{
+		db.AssetImage: noVulImageIDs.ToStringSlice(),
+	}
+
+	noVulAssetView, err := db.GetMatchedNoVulAssets(assetsMap, queryFilter) // queryFilter *VulQueryFilter
+	if err != nil {
+		return
+	}
+
+	assetView.Images = append(assetView.Images, noVulAssetView.Images...)
+}
+
 func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -512,7 +535,7 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// combine incoming request with existing advanced filters.
-	queryFilter, err := combineQueryFilter(r)
+	queryFilter, includeNoVulAssets, err := combineQueryFilter(r)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
 		return
@@ -539,6 +562,11 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	}
 	fillPolicyMode(resp.Vuls, acc)
 
+	if includeNoVulAssets {
+		// collect qualified images that have no cve found
+		getNoVulAssets(allowed, queryFilter, resp) // queryFilter *VulQueryFilter
+	}
+
 	elapsed = time.Since(start)
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("2/2, get assets from db, poolSize=%v, took=%v", queryFilter.ThreadCount, elapsed))
 
@@ -549,18 +577,18 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	restRespSuccess(w, r, resp, acc, login, nil, "getAssetViewSession")
 }
 
-func combineQueryFilter(r *http.Request) (*db.VulQueryFilter, error) {
+func combineQueryFilter(r *http.Request) (*db.VulQueryFilter, bool, error) {
 	// combine
 	// 1. QueryToken and LastModifiedTime from incoming request
 	// 2. advanced filter belong to the QueryToken
 	qf, err := db.GetVulnerabilityQuery(r)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	queryStat, err := db.GetQueryStat(qf.QueryToken)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	queryFilter := &db.VulQueryFilter{
@@ -571,12 +599,12 @@ func combineQueryFilter(r *http.Request) (*db.VulQueryFilter, error) {
 	vulQF := &db.VulQueryFilter{}
 	err = json.Unmarshal([]byte(queryStat.Data1), &vulQF)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	queryFilter.Filters = vulQF.Filters
 	queryFilter.Filters.LastModifiedTime = qf.Filters.LastModifiedTime
 
-	return queryFilter, nil
+	return queryFilter, qf.Filters.IncludeNoVulAssets, nil
 }
 
 func createAssetSession(w http.ResponseWriter, r *http.Request) {
