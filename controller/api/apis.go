@@ -384,8 +384,9 @@ type RESTServerOIDC struct {
 	UserInfoURL  string   `json:"user_info_endpoint"`
 	ClientID     string   `json:"client_id"`
 	ClientSecret string   `json:"client_secret,cloak"`
-	GroupClaim   string   `json:"group_claim"`
-	Scopes       []string `json:"scopes"`
+	GroupClaim     string   `json:"group_claim"`
+	UsernameClaim  string   `json:"username_claim"`
+	Scopes         []string `json:"scopes"`
 
 	Enable           bool                      `json:"enable"`
 	DefaultRole      string                    `json:"default_role"`
@@ -468,8 +469,9 @@ type RESTServerOIDCConfig struct {
 	Issuer       *string   `json:"issuer"`
 	ClientID     *string   `json:"client_id"`
 	ClientSecret *string   `json:"client_secret,cloak"`
-	GroupClaim   *string   `json:"group_claim"`
-	Scopes       *[]string `json:"scopes,omitempty"`
+	GroupClaim     *string   `json:"group_claim"`
+	UsernameClaim  *string   `json:"username_claim"`
+	Scopes         *[]string `json:"scopes,omitempty"`
 
 	Enable           *bool                      `json:"enable"`
 	DefaultRole      *string                    `json:"default_role"`
