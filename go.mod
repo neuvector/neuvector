@@ -120,6 +120,7 @@ require (
 	github.com/moby/moby/client v0.3.0
 	github.com/quay/clair/v2 v2.1.8
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
+	golang.org/x/vuln v1.3.0
 )
 
 require (
@@ -185,6 +186,7 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
+	golang.org/x/tools v0.44.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	k8s.io/cli-runtime v0.29.3 // indirect
 	k8s.io/component-base v0.31.2 // indirect
