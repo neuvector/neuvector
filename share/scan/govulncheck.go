@@ -3,12 +3,12 @@ package scan
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/openvex/go-vex/pkg/vex"
 	vulnscan "golang.org/x/vuln/scan"
 )
 
@@ -22,31 +22,6 @@ type GovulnFinding struct {
 	Link         string    `json:"L,omitempty"`
 	Published    time.Time `json:"P,omitempty"`
 	Modified     time.Time `json:"M,omitempty"`
-}
-
-type govulncheckOpenVEXDocument struct {
-	Statements []govulncheckOpenVEXStatement `json:"statements"`
-}
-
-type govulncheckOpenVEXStatement struct {
-	Vulnerability govulncheckOpenVEXVulnerability `json:"vulnerability"`
-	Products      []govulncheckOpenVEXProduct     `json:"products"`
-	Status        string                          `json:"status"`
-}
-
-type govulncheckOpenVEXVulnerability struct {
-	ID          string   `json:"@id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Aliases     []string `json:"aliases"`
-}
-
-type govulncheckOpenVEXProduct struct {
-	Subcomponents []govulncheckOpenVEXSubcomponent `json:"subcomponents"`
-}
-
-type govulncheckOpenVEXSubcomponent struct {
-	ID string `json:"@id"`
 }
 
 func runGovulncheckBinary(ctx context.Context, fullpath string) (map[string][]GovulnFinding, error) {
@@ -71,21 +46,26 @@ func runGovulncheckBinary(ctx context.Context, fullpath string) (map[string][]Go
 }
 
 func parseGovulncheckConfirmedFindings(data []byte) (map[string][]GovulnFinding, error) {
-	var doc govulncheckOpenVEXDocument
-	if err := json.Unmarshal(data, &doc); err != nil {
+	doc, err := vex.Parse(data)
+	if err != nil {
 		return nil, err
 	}
 
 	findingsByModule := make(map[string][]GovulnFinding)
 	dedupedfindings := make(map[string]struct{})
 	for _, statement := range doc.Statements {
-		if statement.Status != "affected" || statement.Vulnerability.Name == "" {
+		if statement.Status != vex.StatusAffected || statement.Vulnerability.Name == "" {
 			continue
 		}
 
+		aliases := make([]string, len(statement.Vulnerability.Aliases))
+		for i, a := range statement.Vulnerability.Aliases {
+			aliases[i] = string(a)
+		}
+
 		govulnFinding := GovulnFinding{
-			OSV:     statement.Vulnerability.Name,
-			Aliases: statement.Vulnerability.Aliases,
+			OSV:     string(statement.Vulnerability.Name),
+			Aliases: aliases,
 			Link:    statement.Vulnerability.ID,
 		}
 		for _, product := range statement.Products {
