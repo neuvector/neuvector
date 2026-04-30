@@ -6,6 +6,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNormalizeGovulnVersion(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"v1.2.3", "1.2.3"},
+		{"go1.19", "1.19"},
+		{"1.0.0", "1.0.0"},
+		{"v28.5.2+incompatible", "28.5.2+incompatible"},
+		{"go1.21.5", "1.21.5"},
+		{"  v1.0.0  ", "1.0.0"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := normalizeGovulnVersion(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestParseGovulncheckConfirmedFindings(t *testing.T) {
 	data := []byte(`{
   "@context": "https://openvex.dev/ns/v0.2.0",

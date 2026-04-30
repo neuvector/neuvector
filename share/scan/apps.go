@@ -89,13 +89,11 @@ type ComposerPackage struct {
 }
 
 type AppPackage struct {
-	AppName     string          `json:"app_name"`
-	ModuleName  string          `json:"module_name"`
-	Version     string          `json:"version"`
-	FileName    string          `json:"file_name"`
-	ImportPaths []string        `json:"IP,omitempty"`
-	Symbols     []string        `json:"SYM,omitempty"`
-	GovulnVulns []GovulnFinding `json:"GVS,omitempty"`
+	AppName             string          `json:"app_name"`
+	ModuleName          string          `json:"module_name"`
+	Version             string          `json:"version"`
+	FileName            string          `json:"file_name"`
+	GovulncheckFindings []GovulnFinding `json:"govulncheck_findings,omitempty"`
 }
 
 /*
@@ -285,7 +283,8 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 
 	govulnByModule, govulnErr := runGovulncheckBinary(ctx, fullpath)
 	if govulnErr != nil {
-		log.WithFields(log.Fields{"file": filename, "error": govulnErr.Error()}).Warn("govulncheck failed, falling back to app DB")
+		log.WithFields(log.Fields{"file": filename, "error": govulnErr.Error()}).Error("govulncheck failed")
+		return
 	}
 
 	pkgs := make([]AppPackage, len(bi.Deps))
@@ -294,14 +293,14 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 			m = m.Replace
 		}
 
+		moduleName := fmt.Sprintf("go:%s", m.Path)
+		version := strings.TrimPrefix(m.Version, "v")
 		pkg := AppPackage{
-			AppName:    golang,
-			ModuleName: fmt.Sprintf("go:%s", m.Path),
-			Version:    strings.TrimPrefix(m.Version, "v"),
-			FileName:   filename,
-		}
-		if govulnErr == nil {
-			pkg.GovulnVulns = lookupGovulnFindings(govulnByModule, pkg.ModuleName, pkg.Version)
+			AppName:             golang,
+			ModuleName:          moduleName,
+			Version:             version,
+			FileName:            filename,
+			GovulncheckFindings: lookupGovulnFindings(govulnByModule, moduleName, version),
 		}
 		pkgs[i] = pkg
 	}
@@ -309,13 +308,11 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 	if goVersion != "" {
 		goVersion := strings.TrimPrefix(goVersion, "go")
 		stdLibPkg := AppPackage{
-			AppName:    golang,
-			ModuleName: "go:stdlib",
-			Version:    goVersion,
-			FileName:   filename,
-		}
-		if govulnErr == nil {
-			stdLibPkg.GovulnVulns = lookupGovulnFindings(govulnByModule, stdLibPkg.ModuleName, stdLibPkg.Version)
+			AppName:             golang,
+			ModuleName:          "go:stdlib",
+			Version:             goVersion,
+			FileName:            filename,
+			GovulncheckFindings: lookupGovulnFindings(govulnByModule, "go:stdlib", goVersion),
 		}
 		pkgs = append(pkgs, stdLibPkg)
 	}
