@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParsePythonPackage(t *testing.T) {
@@ -206,8 +207,15 @@ func TestParseRubyPackage(t *testing.T) {
 }
 
 func TestParseJarPackage(t *testing.T) {
-	// NVSHAS-8757
-	m := `
+	tests := []struct {
+		name       string
+		manifest   string
+		moduleName string
+		version    string
+	}{
+		{
+			name: "NVSHAS-8757 postgresql",
+			manifest: `
 Manifest-Version: 1.0
 Automatic-Module-Name: org.postgresql.jdbc
 Bundle-Activator: org.postgresql.osgi.PGBundleActivator
@@ -221,14 +229,13 @@ Bundle-Name: PostgreSQL JDBC Driver
 Bundle-SymbolicName: org.postgresql.jdbc
 Bundle-Vendor: PostgreSQL Global Development Group
 Bundle-Version: 42.2.23
-`
-	r := strings.NewReader(m)
-	pkg, _ := parseJarManifestFile("", r)
-	if pkg.ModuleName != "org.postgresql:postgresql" {
-		t.Errorf("Wrong jar package: %+v\n", pkg)
-	}
-
-	m = `
+`,
+			moduleName: "org.postgresql:postgresql",
+			version:    "42.2.23",
+		},
+		{
+			name: "tomcat-embed-core",
+			manifest: `
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: tomcat-embed-core
@@ -242,14 +249,13 @@ Specification-Vendor: Apache Software Foundation
 Specification-Version: 10.1
 X-Compile-Source-JDK: 11
 X-Compile-Target-JDK: 11
-`
-	r = strings.NewReader(m)
-	pkg, _ = parseJarManifestFile("", r)
-	if pkg.ModuleName != "org.apache.tomcat.embed:tomcat-embed-core" && pkg.Version != "10.1.11" {
-		t.Errorf("Wrong jar package: %+v\n", pkg)
-	}
-
-	m = `
+`,
+			moduleName: "org.apache.tomcat.embed:tomcat-embed-core",
+			version:    "10.1.11",
+		},
+		{
+			name: "JNA",
+			manifest: `
 Manifest-Version: 1.0
 Ant-Version: Apache Ant 1.10.6
 Created-By: 1.8.0_201-b09 (Oracle Corporation)
@@ -270,27 +276,26 @@ Bundle-Version: 5.5.0
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Bundle-Vendor: JNA Development Team
 Bundle-ActivationPolicy: lazy
-`
-	r = strings.NewReader(m)
-	pkg, _ = parseJarManifestFile("", r)
-	if pkg.ModuleName != "JNA Development Team:com.sun.jna" && pkg.Version != "5.5.0" {
-		t.Errorf("Wrong jar package: %+v\n", pkg)
-	}
-
-	m = `
+`,
+			moduleName: "JNA Development Team:com.sun.jna",
+			version:    "5.5.0",
+		},
+		{
+			name: "spring boot",
+			manifest: `
 Manifest-Version: 1.0
 Automatic-Module-Name: spring.boot
 Build-Jdk-Spec: 17
 Built-By: Spring
 Implementation-Title: Spring Boot
 Implementation-Version: 3.3.10
-`
-	r = strings.NewReader(m)
-	pkg, _ = parseJarManifestFile("", r)
-	if pkg.ModuleName != "jar:spring-boot" && pkg.Version != "3.3.10" {
-		t.Errorf("Wrong jar package: %+v\n", pkg)
-	}
-	m = `
+`,
+			moduleName: "org.springframework.boot:spring-boot",
+			version:    "3.3.10",
+		},
+		{
+			name: "elasticsearch",
+			manifest: `
 Manifest-Version: 1.0
 Multi-Release: true
 Implementation-Title: org.elasticsearch#server;6.6.1
@@ -311,11 +316,47 @@ X-Compile-Source-JDK: 1.8
 X-Compile-Elasticsearch-Version: 6.6.1
 X-Compile-Lucene-Version: 7.6.0
 X-Compile-Elasticsearch-Snapshot: false
-`
-	r = strings.NewReader(m)
-	pkg, _ = parseJarManifestFile("", r)
-	if pkg.ModuleName != "jar:elasticsearch" && pkg.Version != "6.6.1" {
-		t.Errorf("Wrong jar package: %+v\n", pkg)
+`,
+			moduleName: "jar:elasticsearch",
+			version:    "6.6.1",
+		},
+		{
+			name: "opentelemetry with leading spaces",
+			manifest: `
+Manifest-Version: 1.0
+Automatic-Module-Name: io.opentelemetry.exporter.internal.otlp
+Built-By: runner
+Built-JDK: 21.0.10
+Implementation-Title: common
+Implementation-Version: 1.59.0
+		`,
+			moduleName: "io.opentelemetry.exporter.internal.otlp:common",
+			version:    "1.59.0",
+		},
+		{
+			name: "opentelemetry with leading spaces",
+			manifest: `
+Manifest-Version: 1.0
+Automatic-Module-Name: io.opentelemetry.exporter.internal
+Built-By: runner
+Built-JDK: 21.0.10
+Implementation-Title: common
+Implementation-Version: 1.59.0
+Multi-Release: true
+		`,
+			moduleName: "io.opentelemetry.exporter.internal:common",
+			version:    "1.59.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := strings.NewReader(tt.manifest)
+			pkg, err := parseJarManifestFile("", r)
+			require.NoError(t, err)
+			require.Equal(t, tt.moduleName, pkg.ModuleName)
+			require.Equal(t, tt.version, pkg.Version)
+		})
 	}
 }
 
