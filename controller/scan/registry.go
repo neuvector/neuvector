@@ -564,6 +564,8 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			dbAssetVul := getImageDbAssetVul(c, sum, lows)
 			dbAssetVul.Vuls = report.Vuls
 			dbAssetVul.Modules = report.Modules
+			dbAssetVul.CVEDB_version = report.Version
+			dbAssetVul.CVEDB_createtime = report.CVEDBCreateTime
 
 			b, err := json.Marshal(images2IDNames(rs, sum))
 			if err == nil {

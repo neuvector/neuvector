@@ -555,6 +555,10 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 	if ok && dbAssetVul != nil {
 		dbAssetVul.Vuls = report.Vuls
 		dbAssetVul.Modules = report.Modules
+		if info.brief != nil {
+			dbAssetVul.CVEDB_version = info.brief.CVEDBVersion
+			dbAssetVul.CVEDB_createtime = info.brief.CVEDBCreateTime
+		}
 
 		if len(info.idns) > 0 {
 			b, err := json.Marshal(info.idns)

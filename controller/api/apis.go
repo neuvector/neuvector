@@ -2531,6 +2531,7 @@ type RESTImageAsset struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	PolicyMode  string `json:"policy_mode"`
+	Digest      string `json:"digest"`
 }
 
 type RESTScanReportData struct {
@@ -4215,8 +4216,9 @@ type VulQueryFilterViewModel struct {
 	ViewType      string `json:"viewType"`
 
 	//specific for /v1/assetvul
-	LastModifiedTime int64  `json:"last_modified_timestamp"`
-	DebugCVEName     string `json:"debugcve"`
+	LastModifiedTime   int64  `json:"last_modified_timestamp"`
+	DebugCVEName       string `json:"debugcve"`
+	IncludeNoVulAssets bool   `json:"include_no_vul_assets"`
 }
 
 type AssetQueryFilterViewModel struct {
@@ -4249,12 +4251,13 @@ type QuerySessionRequest struct {
 }
 
 type RESTAssetView struct {
-	Workloads []*RESTWorkloadAssetView    `json:"workloads"`
-	Nodes     []*RESTHostAssetView        `json:"nodes"`
-	Platforms []*RESTPlatformAssetView    `json:"platforms"`
-	Images    []*RESTImageAssetView       `json:"images"`
-	Vuls      []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
-	QueryStat *RESTVulQueryStats          `json:"summary"`
+	Workloads   []*RESTWorkloadAssetView    `json:"workloads"`
+	Nodes       []*RESTHostAssetView        `json:"nodes"`
+	Platforms   []*RESTPlatformAssetView    `json:"platforms"`
+	Images      []*RESTImageAssetView       `json:"images"`
+	NoVulImages []*RESTNoVulImageAsset      `json:"no_vul_images"`
+	Vuls        []*RESTVulnerabilityAssetV2 `json:"vulnerabilities"`
+	QueryStat   *RESTVulQueryStats          `json:"summary"`
 }
 
 type RESTWorkloadAssetView struct {
@@ -4305,28 +4308,41 @@ type RESTPlatformAssetView struct {
 type RESTImageAssetView struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
+	Digest          string   `json:"digest"`
 	Critical        int      `json:"critical"`
 	High            int      `json:"high"`
 	Medium          int      `json:"medium"`
 	Low             int      `json:"low"`
 	Vulnerabilities []string `json:"vulnerabilities"`
+	CVEDBVersion    string   `json:"cvedb_version"`
+	CVEDBCreateTime string   `json:"cvedb_create_time"`
+}
+
+type RESTNoVulImageAsset struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Digest          string `json:"digest"`
+	CVEDBVersion    string `json:"cvedb_version"`
+	CVEDBCreateTime string `json:"cvedb_create_time"`
 }
 
 type RESTImageAssetViewV2 struct {
-	ID           string `json:"image_id"`
-	Name         string `json:"repository"`
-	Critical     int    `json:"critical,omitempty"`
-	High         int    `json:"high"`
-	Medium       int    `json:"medium"`
-	CreatedAt    string `json:"created_at"`
-	ScannedAt    string `json:"scanned_at"`
-	Digest       string `json:"digest"`
-	BaseOS       string `json:"base_os"`
-	OSScanStatus string `json:"os_scan_status,omitempty"`
-	RegName      string `json:"reg_name"`
-	Registry     string `json:"repo_url"`
-	Size         int    `json:"size"`
-	Tag          string `json:"tag"`
+	ID              string `json:"image_id"`
+	Name            string `json:"repository"`
+	Critical        int    `json:"critical,omitempty"`
+	High            int    `json:"high"`
+	Medium          int    `json:"medium"`
+	CreatedAt       string `json:"created_at"`
+	ScannedAt       string `json:"scanned_at"`
+	Digest          string `json:"digest"`
+	BaseOS          string `json:"base_os"`
+	OSScanStatus    string `json:"os_scan_status,omitempty"`
+	RegName         string `json:"reg_name"`
+	Registry        string `json:"repo_url"`
+	Size            int    `json:"size"`
+	Tag             string `json:"tag"`
+	CVEDBVersion    string `json:"cvedb_version"`
+	CVEDBCreateTime string `json:"cvedb_create_time"`
 }
 
 type RESTVulQueryStats struct {
