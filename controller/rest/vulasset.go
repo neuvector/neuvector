@@ -530,9 +530,14 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	elapsed := time.Since(start)
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("1/2, get vul from db, took=%v", elapsed))
 
+	var noVulImageIDs []string
+	if queryFilter.Filters.IncludeNoVulAssets {
+		noVulImageIDs = allowed[db.AssetImage].Difference(utils.NewSetFromStringSlice(assetsMap[db.AssetImage])).ToStringSlice()
+	}
+
 	// apply asset filtering to get data from [assetvuls] table, only return matched assets
 	start = time.Now()
-	resp, err := db.GetMatchedAssets(vulMap, assetsMap, queryFilter) // queryFilter *VulQueryFilter
+	resp, err := db.GetMatchedAssets(vulMap, assetsMap, noVulImageIDs, queryFilter) // queryFilter *VulQueryFilter
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
 		return
@@ -575,6 +580,7 @@ func combineQueryFilter(r *http.Request) (*db.VulQueryFilter, error) {
 	}
 	queryFilter.Filters = vulQF.Filters
 	queryFilter.Filters.LastModifiedTime = qf.Filters.LastModifiedTime
+	queryFilter.Filters.IncludeNoVulAssets = qf.Filters.IncludeNoVulAssets
 
 	return queryFilter, nil
 }

@@ -141,6 +141,10 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	assert.Equal(t, 1, len(assets))
 
 	assert.Equal(t, "OSScanStatusSupported", assets[0].OSScanStatus)
+
+	assert.Equal(t, "1.21", assets[0].CVEDBVersion)
+
+	assert.Equal(t, "1769111241", assets[0].CVEDBCreateTime)
 }
 
 func generateHostDbAssetVul(assetid string, containerCount int) *DbAssetVul {
@@ -202,6 +206,8 @@ func generateImageDbAssetVul(assetid string) *DbAssetVul {
 		CVE_critical:      2,
 		CVE_high:          5,
 		CVE_medium:        3,
+		CVEDB_version:     "1.21",
+		CVEDB_createtime:  "1769111241",
 		I_repository_name: "registry-1",
 		I_repository_url:  "https://registry.example.com/",
 		I_base_os:         "debian",

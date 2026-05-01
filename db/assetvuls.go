@@ -29,7 +29,10 @@ type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.
 
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	var lastErr error
 	for retry := 0; retry < 50; retry++ {
@@ -96,7 +99,10 @@ func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 	// Insert case
 	if assetVul.Db_ID == 0 {
 		ds := dialect.Insert(targetTable).Rows(getCompiledAssetVulRecord(assetVul))
-		sql, args, _ := ds.Prepared(true).ToSQL()
+		sql, args, err := ds.Prepared(true).ToSQL()
+		if err != nil {
+			return 0, err
+		}
 
 		result, err := db.Exec(sql, args...)
 		if err != nil {
@@ -112,8 +118,11 @@ func UpdateAssetVul(assetVul *DbAssetVul) (int, error) {
 	}
 
 	// Update case
-	sql, args, _ := dialect.Update(targetTable).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(getCompiledAssetVulRecord(assetVul)).Prepared(true).ToSQL()
-	_, err := db.Exec(sql, args...)
+	sql, args, err := dialect.Update(targetTable).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(getCompiledAssetVulRecord(assetVul)).Prepared(true).ToSQL()
+	if err != nil {
+		return 0, err
+	}
+	_, err = db.Exec(sql, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -132,7 +141,10 @@ func UpdateHostContainers(id string, containers int) error {
 
 	dialect := goqu.Dialect("sqlite3")
 	record := &goqu.Record{"n_containers": assetVul.N_containers}
-	sql, args, _ := dialect.Update(Table_assetvuls).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(record).Prepared(true).ToSQL()
+	sql, args, err := dialect.Update(Table_assetvuls).Where(goqu.C("id").Eq(assetVul.Db_ID)).Set(record).Prepared(true).ToSQL()
+	if err != nil {
+		return err
+	}
 	_, err = db.Exec(sql, args...)
 	if err != nil {
 		return err
@@ -141,7 +153,7 @@ func UpdateHostContainers(id string, containers int) error {
 }
 
 // for REST[asset]AssetView, used in /v1/assetvul
-func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]string, queryFilter *VulQueryFilter) (*api.RESTAssetView, error) {
+func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]string, noVulImageIDs []string, queryFilter *VulQueryFilter) (*api.RESTAssetView, error) {
 	var err error
 	assetView := &api.RESTAssetView{}
 
@@ -164,6 +176,13 @@ func GetMatchedAssets(vulMap map[string]*DbVulAsset, assetsMap map[string][]stri
 	assetView.Images, err = getImageAssetView(vulMap, assetsMap[AssetImage], queryFilter, cvePackages)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(noVulImageIDs) > 0 {
+		assetView.NoVulImages, err = getNoVulImageAssetView(noVulImageIDs, queryFilter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	assetView.Platforms, err = getPlatformAssetView(vulMap, assetsMap[AssetPlatform], queryFilter, cvePackages)
@@ -219,7 +238,10 @@ func getWorkloadAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 		"scanned_at", "idns", "vulsb", "w_image"}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForWorkload(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForWorkload(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := dbHandle.Query(statement, args...)
 	if err != nil {
@@ -274,7 +296,10 @@ func getHostAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilte
 		"scanned_at", "n_os", "n_kernel", "n_cpus", "n_memory", "n_containers", "idns", "vulsb"}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForNode(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForNode(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := dbHandle.Query(statement, args...)
 	if err != nil {
@@ -322,9 +347,12 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 		return records, nil
 	}
 
-	columns := []interface{}{"assetid", "name", "idns", "vulsb"}
+	columns := []interface{}{"assetid", "name", "I_digest", "cvedb_version", "cvedb_createtime", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForImage(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForImage(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := dbHandle.Query(statement, args...)
 	if err != nil {
@@ -342,7 +370,7 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 
 		var assetId, idnsStr string
 		var vulsBytes []byte
-		err = rows.Scan(&assetId, &av.Name, &idnsStr, &vulsBytes)
+		err = rows.Scan(&assetId, &av.Name, &av.Digest, &av.CVEDBVersion, &av.CVEDBCreateTime, &idnsStr, &vulsBytes)
 
 		if err != nil {
 			pool.StopAndWait()
@@ -365,6 +393,39 @@ func getImageAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilt
 	return records, nil
 }
 
+func getNoVulImageAssetView(assets []string, queryFilter *VulQueryFilter) ([]*api.RESTNoVulImageAsset, error) {
+	records := make([]*api.RESTNoVulImageAsset, 0)
+
+	if len(assets) == 0 {
+		return records, nil
+	}
+
+	columns := []interface{}{"assetid", "name", "I_digest", "cvedb_version", "cvedb_createtime"}
+	dialect := goqu.Dialect("sqlite3")
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForImage(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := dbHandle.Query(statement, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		av := &api.RESTNoVulImageAsset{}
+		err = rows.Scan(&av.ID, &av.Name, &av.Digest, &av.CVEDBVersion, &av.CVEDBCreateTime)
+
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, av)
+	}
+
+	return records, nil
+}
+
 func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryFilter *VulQueryFilter, cvePackages map[string]map[string]utils.Set) ([]*api.RESTPlatformAssetView, error) {
 	records := make([]*api.RESTPlatformAssetView, 0)
 
@@ -374,7 +435,10 @@ func getPlatformAssetView(vulMap map[string]*DbVulAsset, assets []string, queryF
 
 	columns := []interface{}{"assetid", "name", "p_version", "p_base_os", "idns", "vulsb"}
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForPlatform(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildWhereClauseForPlatform(assets, queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := dbHandle.Query(statement, args...)
 	if err != nil {
@@ -489,7 +553,10 @@ func _getWorkloadsMeta(allAssets utils.Set) (map[string]*api.RESTWorkloadAsset, 
 
 	expAssetType := goqu.Ex{"type": "workload"}
 	expAssets := goqu.Ex{"assetid": assets}
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	var lastErr error
 	records := make(map[string]*api.RESTWorkloadAsset, 0)
@@ -532,7 +599,10 @@ func _getNodesMeta(allAssets utils.Set) (map[string]*api.RESTHostAsset, error) {
 
 	expAssetType := goqu.Ex{"type": "host"}
 	expAssets := goqu.Ex{"assetid": assets}
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	var lastErr error
 	records := make(map[string]*api.RESTHostAsset, 0)
@@ -574,7 +644,10 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 
 	expAssetType := goqu.Ex{"type": "platform"}
 	expAssets := goqu.Ex{"assetid": assets}
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	var lastErr error
 	records := make(map[string]*api.RESTPlatformAsset, 0)
@@ -609,14 +682,17 @@ func _getPlatformsMeta(allAssets utils.Set) (map[string]*api.RESTPlatformAsset, 
 }
 
 func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error) {
-	columns := []interface{}{"assetid", "name"}
+	columns := []interface{}{"assetid", "name", "I_digest"}
 
 	dialect := goqu.Dialect("sqlite3")
 	assets := allAssets.ToStringSlice()
 
 	expAssetType := goqu.Ex{"type": "image"}
 	expAssets := goqu.Ex{"assetid": assets}
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssetType, expAssets)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	var lastErr error
 	records := make(map[string]*api.RESTImageAsset, 0)
@@ -634,7 +710,7 @@ func _getImagesMeta(allAssets utils.Set) (map[string]*api.RESTImageAsset, error)
 
 		for rows.Next() {
 			as := &api.RESTImageAsset{}
-			err = rows.Scan(&as.ID, &as.DisplayName)
+			err = rows.Scan(&as.ID, &as.DisplayName, &as.Digest)
 			if err != nil {
 				return nil, err
 			}
@@ -817,12 +893,14 @@ func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
 		"w_service_group": assetVul.W_service_group,
 		"w_image":         assetVul.W_workload_image,
 
-		"cve_critical": assetVul.CVE_critical,
-		"cve_high":     assetVul.CVE_high,
-		"cve_medium":   assetVul.CVE_medium,
-		"cve_low":      assetVul.CVE_low,
-		"cve_count":    assetVul.CVE_high + assetVul.CVE_medium + assetVul.CVE_low + assetVul.CVE_critical,
-		"scanned_at":   assetVul.Scanned_at,
+		"cve_critical":     assetVul.CVE_critical,
+		"cve_high":         assetVul.CVE_high,
+		"cve_medium":       assetVul.CVE_medium,
+		"cve_low":          assetVul.CVE_low,
+		"cve_count":        assetVul.CVE_high + assetVul.CVE_medium + assetVul.CVE_low + assetVul.CVE_critical,
+		"cvedb_version":    assetVul.CVEDB_version,
+		"cvedb_createtime": assetVul.CVEDB_createtime,
+		"scanned_at":       assetVul.Scanned_at,
 
 		"n_os":     assetVul.N_os,
 		"n_kernel": assetVul.N_kernel,
@@ -930,10 +1008,13 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	db := dbHandle
 
 	columns := []interface{}{"type", "assetid", "name",
-		"cve_critical", "cve_high", "cve_medium", "cve_low",
+		"cve_critical", "cve_high", "cve_medium", "cve_low", "cvedb_version", "cvedb_createtime",
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status", "I_repository_name", "I_repository_url", "I_size", "I_images"}
 
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"type": "image"}).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"type": "image"}).Prepared(true).ToSQL()
+	if err != nil {
+		return 0, nil, err
+	}
 	log.WithFields(log.Fields{"statement": statement, "args": args}).Debug("CreateImageAssetSession, fetch assets")
 	rows, err := db.Query(statement, args...)
 	if err != nil {
@@ -953,7 +1034,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 		asset := &DbAssetVul{}
 
 		err = rows.Scan(&asset.Type, &asset.AssetID, &asset.Name,
-			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low,
+			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low, &asset.CVEDB_version, &asset.CVEDB_createtime,
 			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os, &asset.I_os_scan_status,
 			&asset.I_repository_name, &asset.I_repository_url, &asset.I_size, &asset.I_images)
 		if err != nil {
@@ -995,7 +1076,10 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 
 	// do summary - top5 and others
 	sessionTable := formatSessionTempTableName(queryToken)
-	statement, args, _ = dialect.From(sessionTable).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(goqu.Ex{"type": "image"}).Order(goqu.C("cve_count").Desc()).Prepared(true).ToSQL()
+	statement, args, err = dialect.From(sessionTable).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(goqu.Ex{"type": "image"}).Order(goqu.C("cve_count").Desc()).Prepared(true).ToSQL()
+	if err != nil {
+		return 0, nil, err
+	}
 
 	rows, err = memoryDbHandle.Query(statement, args...)
 	if err != nil {
@@ -1042,7 +1126,10 @@ func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAsset
 
 	dialect := goqu.Dialect("sqlite3")
 	ds := dialect.Insert(tableName).Rows(record)
-	sql, args, _ := ds.Prepared(true).ToSQL()
+	sql, args, err := ds.Prepared(true).ToSQL()
+	if err != nil {
+		return 0, err
+	}
 
 	result, err := db.Exec(sql, args...)
 	if err != nil {
@@ -1071,12 +1158,15 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 	}
 
 	columns := []interface{}{"type", "assetid", "name",
-		"cve_critical", "cve_high", "cve_medium", "cve_low",
+		"cve_critical", "cve_high", "cve_medium", "cve_low", "cvedb_version", "cvedb_createtime",
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
 	tableName := formatSessionTempTableName(sessionToken)
-	statement, args, _ := dialect.From(tableName).Select(columns...).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(tableName).Select(columns...).Prepared(true).ToSQL()
+	if err != nil {
+		return err
+	}
 	rows, err := memoryDbHandle.Query(statement, args...)
 	if err != nil {
 		return err
@@ -1087,7 +1177,7 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 		asset := &DbAssetVul{}
 
 		err = rows.Scan(&asset.Type, &asset.AssetID, &asset.Name,
-			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low,
+			&asset.CVE_critical, &asset.CVE_high, &asset.CVE_medium, &asset.CVE_low, &asset.CVEDB_version, &asset.CVEDB_createtime,
 			&asset.I_created_at, &asset.I_scanned_at, &asset.I_digest, &asset.I_base_os, &asset.I_os_scan_status,
 			&asset.I_repository_name, &asset.I_repository_url, &asset.I_size, &asset.I_tag)
 		if err != nil {
@@ -1167,7 +1257,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 	}
 
 	columns := []interface{}{"assetid", "name",
-		"cve_critical", "cve_high", "cve_medium",
+		"cve_critical", "cve_high", "cve_medium", "cvedb_version", "cvedb_createtime",
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
@@ -1180,10 +1270,14 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
 	var args []interface{}
+	var err error
 	if row == -1 {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Prepared(true).ToSQL() // select all
+		statement, args, err = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Prepared(true).ToSQL() // select all
 	} else {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+		statement, args, err = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+	}
+	if err != nil {
+		return nil, 0, err
 	}
 
 	queryStat, err := GetQueryStat(sessionToken)
@@ -1217,7 +1311,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 		asset := &api.RESTImageAssetViewV2{}
 
 		err = rows.Scan(&asset.ID, &asset.Name,
-			&asset.Critical, &asset.High, &asset.Medium,
+			&asset.Critical, &asset.High, &asset.Medium, &asset.CVEDBVersion, &asset.CVEDBCreateTime,
 			&asset.CreatedAt, &asset.ScannedAt, &asset.Digest, &asset.BaseOS, &asset.OSScanStatus,
 			&asset.RegName, &asset.Registry, &asset.Size, &asset.Tag)
 		if err != nil {
@@ -1233,7 +1327,10 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 	// 1. when no quick filter, return all assets count
 	// 2. has quick filter, return the matched assets count
 	quickFilterMatched := 0
-	sql, _, _ := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(buildWhereClause(queryFilter)).ToSQL()
+	sql, _, err := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(buildWhereClause(queryFilter)).ToSQL()
+	if err != nil {
+		return nil, 0, err
+	}
 
 	rows, err = db.Query(sql)
 	if err != nil {
