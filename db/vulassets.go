@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,7 +32,6 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q.PerfTest = getQueryParamInteger(r, "perftest", defaultDebugMode)
 	q.Filters.DebugCVEName = r.URL.Query().Get("debugcve")
 	q.ThreadCount = getQueryParamInteger(r, "threadcount", 10)
-	q.Filters.IncludeNoVulAssets, _ = strconv.ParseBool(r.URL.Query().Get("include_no_vul_assets"))
 
 	// for performance test
 	q.CreateDummyAsset_Enable = getQueryParamInteger(r, "createdummyasset", 0)

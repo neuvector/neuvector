@@ -580,6 +580,7 @@ func combineQueryFilter(r *http.Request) (*db.VulQueryFilter, error) {
 	}
 	queryFilter.Filters = vulQF.Filters
 	queryFilter.Filters.LastModifiedTime = qf.Filters.LastModifiedTime
+	queryFilter.Filters.IncludeNoVulAssets = qf.Filters.IncludeNoVulAssets
 
 	return queryFilter, nil
 }
