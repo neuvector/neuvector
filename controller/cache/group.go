@@ -1321,13 +1321,19 @@ func hostWorkloadDelete(id string, param interface{}) {
 
 func addImageRelatedContainer2group(cache *groupCache, wlc *workloadCache) {
 	for _, ct := range cache.group.Criteria {
-		if ct.Key != share.CriteriaKeyImage {
+		switch ct.Key {
+		case share.CriteriaKeyImage, share.CriteriaKeyNamespace, share.CriteriaKeyDomain:
+			continue
+		default:
 			return
 		}
 	}
 	if cache.group.CfgType != share.Learned {
 		if wlc.workload.ShareNetNS != "" {
 			if pwlc, ok := wlCacheMap[wlc.workload.ShareNetNS]; ok {
+				if !share.IsWorkloadSelected(wlc.workload, cache.group.Criteria, getDomainData(wlc.workload.Domain)) {
+					return
+				}
 				cache.members.Add(pwlc.workload.ID)
 				pwlc.groups.Add(cache.group.Name)
 				for child := range pwlc.children.Iter() {
@@ -1340,6 +1346,9 @@ func addImageRelatedContainer2group(cache *groupCache, wlc *workloadCache) {
 		} else {
 			for child := range wlc.children.Iter() {
 				if childCache, ok := wlCacheMap[child.(string)]; ok {
+					if !share.IsWorkloadSelected(childCache.workload, cache.group.Criteria, getDomainData(childCache.workload.Domain)) {
+						continue
+					}
 					cache.members.Add(childCache.workload.ID)
 					childCache.groups.Add(cache.group.Name)
 				}
