@@ -89,10 +89,12 @@ type ComposerPackage struct {
 }
 
 type AppPackage struct {
-	AppName             string          `json:"app_name"`
-	ModuleName          string          `json:"module_name"`
-	Version             string          `json:"version"`
-	FileName            string          `json:"file_name"`
+	AppName    string `json:"app_name"`
+	ModuleName string `json:"module_name"`
+	Version    string `json:"version"`
+	FileName   string `json:"file_name"`
+	// GovulncheckFindings stores govulncheck findings for Go binaries, used as a filter
+	// to confirm vulnerabilities. Severity information comes from the existing matching mechanism.
 	GovulncheckFindings []GovulnFinding `json:"govulncheck_findings,omitempty"`
 }
 

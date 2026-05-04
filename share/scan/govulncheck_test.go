@@ -28,6 +28,103 @@ func TestNormalizeGovulnVersion(t *testing.T) {
 	}
 }
 
+func TestParseGovulncheckOpenVEXSubcomponent(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             string
+		wantModuleName string
+		wantVersion    string
+		wantOk         bool
+	}{
+		{
+			name:           "normal package with version",
+			id:             "pkg:golang/github.com/stretchr/testify@v1.8.0",
+			wantModuleName: "go:github.com/stretchr/testify",
+			wantVersion:    "1.8.0",
+			wantOk:         true,
+		},
+		{
+			name:           "package with URL-encoded path",
+			id:             "pkg:golang/github.com%2Fdocker%2Fdocker@v28.5.2+incompatible",
+			wantModuleName: "go:github.com/docker/docker",
+			wantVersion:    "28.5.2+incompatible",
+			wantOk:         true,
+		},
+		{
+			name:           "stdlib package",
+			id:             "pkg:golang/stdlib@go1.21.5",
+			wantModuleName: "go:stdlib",
+			wantVersion:    "1.21.5",
+			wantOk:         true,
+		},
+		{
+			name:           "package with go prefix in version",
+			id:             "pkg:golang/example.com/module@go1.19",
+			wantModuleName: "go:example.com/module",
+			wantVersion:    "1.19",
+			wantOk:         true,
+		},
+		{
+			name:           "no prefix - should fail",
+			id:             "github.com/stretchr/testify@v1.8.0",
+			wantModuleName: "",
+			wantVersion:    "",
+			wantOk:         false,
+		},
+		{
+			name:           "no version - should fail",
+			id:             "pkg:golang/github.com/stretchr/testify",
+			wantModuleName: "",
+			wantVersion:    "",
+			wantOk:         false,
+		},
+		{
+			name:           "empty string - should fail",
+			id:             "",
+			wantModuleName: "",
+			wantVersion:    "",
+			wantOk:         false,
+		},
+		{
+			name:           "@ at beginning - should fail",
+			id:             "pkg:golang/@v1.0.0",
+			wantModuleName: "",
+			wantVersion:    "",
+			wantOk:         false,
+		},
+		{
+			name:           "with spaces",
+			id:             "  pkg:golang/example.com/module@v1.0.0  ",
+			wantModuleName: "go:example.com/module",
+			wantVersion:    "1.0.0",
+			wantOk:         true,
+		},
+		{
+			name:           "different package format - npm (should fail)",
+			id:             "pkg:npm/lodash@4.17.21",
+			wantModuleName: "",
+			wantVersion:    "",
+			wantOk:         false,
+		},
+		{
+			name:           "complex module path",
+			id:             "pkg:golang/go.opentelemetry.io/otel/exporters/otlp@v1.0.0",
+			wantModuleName: "go:go.opentelemetry.io/otel/exporters/otlp",
+			wantVersion:    "1.0.0",
+			wantOk:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotModuleName, gotVersion, gotOk := parseGovulncheckOpenVEXSubcomponent(tt.id)
+			require.Equal(t, tt.wantModuleName, gotModuleName, "module name mismatch")
+			require.Equal(t, tt.wantVersion, gotVersion, "version mismatch")
+			require.Equal(t, tt.wantOk, gotOk, "ok flag mismatch")
+		})
+	}
+}
+
 func TestParseGovulncheckConfirmedFindings(t *testing.T) {
 	data := []byte(`{
   "@context": "https://openvex.dev/ns/v0.2.0",
