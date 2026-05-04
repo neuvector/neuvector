@@ -20,8 +20,8 @@
       "description": "Enable security only bumps for release branches",
       "enabled": false,
       "matchBaseBranches": [
-        "release/5.4.x",
-        "release/5.3.x"
+        "release/v5.5",
+        "release/v5.4"
       ]
     }
   ],
