@@ -521,10 +521,6 @@ func (m *MockCache) WaitUntilApiPathReady() bool {
 	return false
 }
 
-func (m *MockCache) IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, int, int) {
-	return false, 0, 0
-}
-
 func (m *MockCache) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
 	containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool) {

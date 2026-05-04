@@ -346,14 +346,15 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 		BaseOS:          result.Namespace,
 		Layers:          layers,
 		RESTScanReport: api.RESTScanReport{
-			Envs:    result.Envs,
-			Labels:  result.Labels,
-			Vuls:    rvuls,
-			Modules: rmods,
-			Secrets: rsecrets,
-			SetIDs:  ridperms,
-			Checks:  checks,
-			Cmds:    result.Cmds,
+			OSScanStatus: result.OSScanStatus.String(),
+			Envs:         result.Envs,
+			Labels:       result.Labels,
+			Vuls:         rvuls,
+			Modules:      rmods,
+			Secrets:      rsecrets,
+			SetIDs:       ridperms,
+			Checks:       checks,
+			Cmds:         result.Cmds,
 		},
 	}
 	if result.SignatureInfo != nil {
@@ -383,12 +384,9 @@ func fillVulFields(vr *share.ScanVulnerability, v *api.RESTVulnerability) {
 	}
 
 	if v.Severity == "" {
-		// NVSHAS-8242: temporary reversion
-		// if v.Score >= 9 || v.ScoreV3 >= 9 {
-		// 	v.Severity = share.VulnSeverityCritical
-		// } else
-
-		if v.Score >= 7 || v.ScoreV3 >= 7 {
+		if v.Score >= 9 || v.ScoreV3 >= 9 {
+			v.Severity = share.VulnSeverityCritical
+		} else if v.Score >= 7 || v.ScoreV3 >= 7 {
 			v.Severity = share.VulnSeverityHigh
 		} else if v.Score >= 4 || v.ScoreV3 >= 4 {
 			v.Severity = share.VulnSeverityMedium
@@ -522,10 +520,9 @@ func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
 			pkgName:  v.PackageName, pkgVer: v.PackageVersion, fixVer: v.FixedVersion,
 		}
 
-		// NVSHAS-8242: temporary reversion
-		// if v.Score >= 9 || v.ScoreV3 >= 9 {
-		// 	traits[i].severity = vulnSeverityCritical
-		// }
+		if v.Score >= 9 || v.ScoreV3 >= 9 {
+			traits[i].severity = vulnSeverityCritical
+		}
 	}
 	return traits
 }

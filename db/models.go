@@ -107,13 +107,15 @@ type DbAssetVul struct {
 	W_service_group  string
 	W_workload_image string
 
-	CVE_critical int
-	CVE_high     int
-	CVE_medium   int
-	CVE_low      int
-	Vuls         []*share.ScanVulnerability
-	Modules      []*share.ScanModule
-	Scanned_at   string
+	CVE_critical     int
+	CVE_high         int
+	CVE_medium       int
+	CVE_low          int
+	Vuls             []*share.ScanVulnerability
+	Modules          []*share.ScanModule
+	Scanned_at       string
+	CVEDB_version    string
+	CVEDB_createtime string
 
 	N_os         string
 	N_kernel     string
@@ -127,6 +129,7 @@ type DbAssetVul struct {
 	I_repository_name string
 	I_repository_url  string
 	I_base_os         string
+	I_os_scan_status  string
 	I_size            int64
 	I_created_at      string
 	I_scanned_at      string
@@ -341,10 +344,11 @@ func getAssetvulSchema(uniqueAssetId bool) []string {
 
 	schema := []string{"id INTEGER NOT NULL PRIMARY KEY", "type TEXT", assetIdColumn, "name TEXT",
 		"w_domain TEXT", "w_applications TEXT", "policy_mode TEXT", "w_service_group TEXT", "w_image TEXT",
-		"cve_critical INTEGER", "cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER", "scanned_at TEXT",
+		"cve_critical INTEGER", "cve_high INTEGER", "cve_medium INTEGER", "cve_low INTEGER", "cve_count INTEGER",
+		"cvedb_version TEXT DEFAULT ''", "cvedb_createtime TEXT DEFAULT ''", "scanned_at TEXT",
 		"n_os TEXT", "n_kernel TEXT", "n_cpus INTEGER", "n_memory INTEGER",
 		"n_containers INTEGER", "p_version TEXT", "p_base_os TEXT", "idns TEXT", "vulsb BLOB", "modulesb BLOB",
-		"I_created_at TEXT", "I_scanned_at TEXT", "I_digest TEXT", "I_base_os TEXT",
+		"I_created_at TEXT", "I_scanned_at TEXT", "I_digest TEXT", "I_base_os TEXT", "I_os_scan_status TEXT DEFAULT ''",
 		"I_repository_name TEXT", "I_repository_url TEXT", "I_size INTEGER", "I_tag TEXT", "I_images TEXT"}
 
 	return schema

@@ -6,6 +6,7 @@ import (
 	"net"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -259,6 +260,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		HostID:             wl.HostID,
 		Image:              wl.Image,
 		ImageID:            wl.ImageID,
+		ImageDigest:        slices.Clone(wl.ImageDigest),
 		ImgCreateAt:        api.RESTTimeString(wl.ImgCreateAt),
 		ImgRegScand:        scan.IsRegistryImageScanned(wl.ImageID),
 		PlatformRole:       cache.platformRole,

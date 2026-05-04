@@ -178,16 +178,18 @@ const (
 )
 
 const (
-	EventCondTypeName    string = "name"
-	EventCondTypeCVEName string = "cve-name"
-	// EventCondTypeCVECritical        string = "cve-critical" // NVSHAS-8242: temporary reversion
-	EventCondTypeCVEHigh   string = "cve-high"
-	EventCondTypeCVEMedium string = "cve-medium"
-	// EventCondTypeCVECriticalWithFix string = "cve-critical-with-fix" // NVSHAS-8242: temporary reversion
-	EventCondTypeCVEHighWithFix string = "cve-high-with-fix"
-	EventCondTypeLevel          string = "level"
-	EventCondTypeProc           string = "process"
-	EventCondTypeBenchNumber    string = "number"
+	EventCondTypeName               string = "name"
+	EventCondTypeCVEName            string = "cve-name"
+	EventCondTypeCVECritical        string = "cve-critical"
+	EventCondTypeCVEHighOnly        string = "cve-high-only" // for high CVEs only
+	EventCondTypeCVEHigh            string = "cve-high"      // for high & critical CVEs (for backward compatibility)
+	EventCondTypeCVEMedium          string = "cve-medium"
+	EventCondTypeCVECriticalWithFix string = "cve-critical-with-fix"
+	EventCondTypeCVEHighOnlyWithFix string = "cve-high-only-with-fix" // for "high with fix" CVEs only
+	EventCondTypeCVEHighWithFix     string = "cve-high-with-fix"      // for "high with fix" & "critical with fix" CVEs (for backward compatibility)
+	EventCondTypeLevel              string = "level"
+	EventCondTypeProc               string = "process"
+	EventCondTypeBenchNumber        string = "number"
 )
 
 const (

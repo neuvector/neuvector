@@ -463,6 +463,10 @@ func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *sh
 		Ports:        make(map[string]share.CLUSMappedPort),
 		Apps:         make(map[string]share.CLUSApp),
 	}
+	if info.ImageDigest != "" {
+		wl.ImageDigest = []string{info.ImageDigest}
+		wl.ImageDigest = append(wl.ImageDigest, info.ImageDigestExtra...)
+	}
 
 	if wl.Running {
 		if info.IPAddress != "" {
@@ -570,6 +574,10 @@ func updateContainer(ev *ClusterEvent, wl *share.CLUSWorkload) {
 	}
 	if ev.info != nil {
 		wl.ProxyMesh = ev.info.ProxyMesh
+		if ev.info.ImageDigest != "" {
+			wl.ImageDigest = []string{ev.info.ImageDigest}
+			wl.ImageDigest = append(wl.ImageDigest, ev.info.ImageDigestExtra...)
+		}
 	}
 }
 

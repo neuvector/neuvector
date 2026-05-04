@@ -28,12 +28,12 @@ const (
 	CriteriaKeyBaseImage                     string = "baseImage"
 	CriteriaKeyCVENames                      string = "cveNames"
 	CriteriaKeyCVECriticalCount              string = "cveCriticalCount"
-	CriteriaKeyCVEHighCount                  string = "cveHighCount"
-	CriteriaKeyCVEHighCountNoCritical        string = "cveHighCountNoCritical"
+	CriteriaKeyCVEHighCount                  string = "cveHighCount"           // count of high & critical CVEs (for backward compatibility)
+	CriteriaKeyCVEHighCountNoCritical        string = "cveHighCountNoCritical" // count of high CVEs only
 	CriteriaKeyCVEMediumCount                string = "cveMediumCount"
 	CriteriaKeyCVECriticalWithFixCount       string = "cveCriticalWithFixCount"
-	CriteriaKeyCVEHighWithFixCount           string = "cveHighWithFixCount"
-	CriteriaKeyCVEHighWithFixCountNoCritical string = "cveHighWithFixCountNoCritical"
+	CriteriaKeyCVEHighWithFixCount           string = "cveHighWithFixCount"           // count of "high with fix" & "critical with fix" CVEs (for backward compatibility)
+	CriteriaKeyCVEHighWithFixCountNoCritical string = "cveHighWithFixCountNoCritical" // count of "high with fix" CVEs only
 	CriteriaKeyCVEScore                      string = "cveScore"
 	CriteriaKeyCVEScoreCount                 string = "cveScoreCount"
 	CriteriaKeyImageScanned                  string = "imageScanned"

@@ -345,10 +345,13 @@ func (sp *SAMLServiceProvider) SigningContext() *dsig.SigningContext {
 	if signing != nil {
 		sp.signingContext, err = dsig.NewSigningContext(signing.Signer, [][]byte{signing.Cert})
 		if err != nil {
-			// Ideally this function should return the error, but updating the function signature would be backward incompatible.
-			// In practice, this error should never happen because NewSigningContext only errors when passed a nil signer, and
-			// sp.spSigningKeyStoreOverride only gets set after checking to ensure the signer is not nil.
-			panic(err)
+			// Ideally this function should return the error, but updating the function
+			// signature would be backward incompatible. Returning nil avoids the previous
+			// panic while preserving the existing API contract. In practice, this error
+			// should never happen because NewSigningContext only errors when passed a nil
+			// signer, and sp.spSigningKeyStoreOverride only gets set after checking to
+			// ensure the signer is not nil.
+			return nil
 		}
 	} else {
 		sp.signingContext = dsig.NewDefaultSigningContext(sp.GetSigningKey())

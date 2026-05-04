@@ -1,0 +1,45 @@
+name: Updatecli
+on:
+  # Allow to manually trigger Updatecli
+  workflow_dispatch:
+  # Trigger Updatecli on main branch changes
+  # To rebase existing PR
+  push:
+    branches: [main]
+  # Trigger Updatecli pullrequest to test potential changes
+  pull_request:
+    branches: [main]
+  # Periodically checks update
+  schedule:
+    # Run every hour
+    - cron: "0 * * * *"
+
+jobs:
+  updatecli:
+    name: Run Updatecli
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # for updatecli to update the repository
+      pull-requests: write # for updatecli to create a PR
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Updatecli in the runner
+        uses: updatecli/updatecli-action@7aab164eed4ee3bb279611182ba1e62a3a867640 # v3.1.1
+
+      - name: Run Updatecli (dryrun)
+        if: github.ref != 'refs/heads/main'
+        env:
+          UPDATECLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATECLI_GITHUB_OWNER: ${{ github.repository_owner }}
+        run: "updatecli compose diff --file updatecli/updatecli-compose.yaml"
+
+      - name: Run Updatecli
+        if: github.ref == 'refs/heads/main'
+        env:
+          UPDATECLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATECLI_GITHUB_OWNER: ${{ github.repository_owner }}
+        run: "updatecli compose apply --file updatecli/updatecli-compose.yaml"

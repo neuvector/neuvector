@@ -16,7 +16,8 @@ import (
 	"strings"
 	"time"
 
-	rpmdb "github.com/neuvector/go-rpmdb/pkg"
+	_ "github.com/glebarez/go-sqlite"
+	rpmdb "github.com/knqyf263/go-rpmdb/pkg"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/neuvector/neuvector/share"

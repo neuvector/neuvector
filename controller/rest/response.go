@@ -172,8 +172,9 @@ func getResponeRuleOptions(acc *access.AccessControl) map[string]*api.RESTRespon
 			},
 			share.EventCVEReport: {
 				Types: []string{share.EventCondTypeName, share.EventCondTypeLevel,
-					share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium,
-					share.EventCondTypeCVEName, share.EventCondTypeCVEHighWithFix},
+					share.EventCondTypeCVECritical, share.EventCondTypeCVEHighOnly, share.EventCondTypeCVEHigh,
+					share.EventCondTypeCVEMedium, share.EventCondTypeCVEName,
+					share.EventCondTypeCVECriticalWithFix, share.EventCondTypeCVEHighOnlyWithFix, share.EventCondTypeCVEHighWithFix},
 				Name:  getCVEReportNameList(),
 				Level: getEventLevelList([]string{api.LogLevelCRIT, api.LogLevelERR, api.LogLevelWARNING}),
 			},
@@ -318,12 +319,13 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 				return fmt.Errorf("Unsupported condition type for event %s", r.Event)
 			} else if r.Event == share.EventCVEReport {
 				// value validation
-				if cd.CondType == share.EventCondTypeCVEHigh || cd.CondType == share.EventCondTypeCVEMedium {
+				switch cd.CondType {
+				case share.EventCondTypeCVECritical, share.EventCondTypeCVEHighOnly, share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium:
 					id, err := strconv.Atoi(cd.CondValue)
 					if err != nil || id <= 0 {
-						return fmt.Errorf("Invalid cve-high value:n %s", cd.CondValue)
+						return fmt.Errorf("Invalid %s value:n %s", cd.CondType, cd.CondValue)
 					}
-				} else if cd.CondType == share.EventCondTypeCVEHighWithFix {
+				case share.EventCondTypeCVECriticalWithFix, share.EventCondTypeCVEHighOnlyWithFix, share.EventCondTypeCVEHighWithFix:
 					invalid := false
 					ss := strings.Split(cd.CondValue, "/")
 					for _, n := range ss {
@@ -333,9 +335,9 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 						}
 					}
 					if len(ss) > 2 || invalid {
-						return fmt.Errorf("Invalid cve-high-with-fix value:n %s", cd.CondValue)
+						return fmt.Errorf("Invalid %s value:n %s", cd.CondType, cd.CondValue)
 					}
-				} else if cd.CondType == share.EventCondTypeCVEName {
+				case share.EventCondTypeCVEName:
 					r.Conditions[i].CondValue = strings.ToUpper(cd.CondValue)
 				}
 			} //else if r.Event == share.EventCompliance {

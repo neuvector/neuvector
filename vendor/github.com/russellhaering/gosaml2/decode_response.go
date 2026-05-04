@@ -185,8 +185,7 @@ func (sp *SAMLServiceProvider) decryptAssertions(el *etree.Element) error {
 
 		// Replace the original encrypted assertion with the decrypted one.
 		if el.RemoveChild(encryptedElement) == nil {
-			// Out of an abundance of caution, make sure removed worked
-			panic("unable to remove encrypted assertion")
+			return fmt.Errorf("unable to remove encrypted assertion element")
 		}
 
 		el.AddChild(doc.Root())
@@ -233,9 +232,7 @@ func (sp *SAMLServiceProvider) validateAssertionSignatures(el *etree.Element) er
 		// Replace the original unverified Assertion with the verified one. Note that
 		// if the Response is not signed, only signed Assertions (and not the parent Response) can be trusted.
 		if el.RemoveChild(unverifiedAssertion) == nil {
-			// Out of an abundance of caution, check to make sure an Assertion was actually
-			// removed. If it wasn't a programming error has occurred.
-			panic("unable to remove assertion")
+			return fmt.Errorf("unable to remove unverified assertion element")
 		}
 
 		el.AddChild(assertion)
@@ -253,6 +250,42 @@ func (sp *SAMLServiceProvider) validateAssertionSignatures(el *etree.Element) er
 	} else {
 		return nil
 	}
+}
+
+// verifyAssertionSignaturesIfPresent iterates through assertions within a
+// signed Response and verifies any that carry their own signatures. Assertions
+// without signatures are left untouched (the Response envelope signature
+// covers them). This prevents XML wrapping attacks where assertion content is
+// tampered with inside a signed envelope.
+func (sp *SAMLServiceProvider) verifyAssertionSignaturesIfPresent(responseEl *etree.Element) error {
+	verifyAssertion := func(ctx etreeutils.NSContext, assertionEl *etree.Element) error {
+		if assertionEl.Parent() != responseEl {
+			return nil
+		}
+
+		detached, err := etreeutils.NSDetatch(ctx, assertionEl)
+		if err != nil {
+			return fmt.Errorf("unable to detach assertion for signature verification: %v", err)
+		}
+
+		verified, err := sp.validationContext().Validate(detached)
+		if err == dsig.ErrMissingSignature {
+			// No signature on this assertion — that's fine, the Response
+			// envelope signature covers it.
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("assertion signature verification failed: %v", err)
+		}
+
+		// Replace the unverified assertion with the signature-verified version.
+		if responseEl.RemoveChild(assertionEl) == nil {
+			return fmt.Errorf("unable to remove unverified assertion element")
+		}
+		responseEl.AddChild(verified)
+		return nil
+	}
+
+	return etreeutils.NSFindIterate(responseEl, SAMLAssertionNamespace, AssertionTag, verifyAssertion)
 }
 
 // ValidateEncodedResponse both decodes and validates, based on SP
@@ -306,6 +339,15 @@ func (sp *SAMLServiceProvider) ValidateEncodedResponse(encodedResponse string) (
 		// 1. Response is signed
 		// optionally decrypt each assertion
 		err = sp.decryptAssertions(signedResponseEl)
+		if err != nil {
+			return nil, err
+		}
+
+		// Even though the Response envelope is signed, verify assertion
+		// signatures when present. This prevents XML wrapping attacks
+		// where an attacker tampers with assertion content within a
+		// signed envelope.
+		err = sp.verifyAssertionSignaturesIfPresent(signedResponseEl)
 		if err != nil {
 			return nil, err
 		}

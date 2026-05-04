@@ -1,0 +1,7 @@
+github:
+  owner: "UPDATECLI_GITHUB_OWNER"
+  token: "UPDATECLI_GITHUB_TOKEN"
+  branch: "main"
+  author: "NeuVector bot"
+  user: "UPDATECLI_GITHUB_OWNER"
+  email: "neuvector-bot@users.noreply.github.com"

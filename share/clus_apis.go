@@ -1164,6 +1164,7 @@ type CLUSWorkload struct {
 	HostID       string                    `json:"host_id"`
 	Image        string                    `json:"image"`
 	ImageID      string                    `json:"image_id"`
+	ImageDigest  []string                  `json:"image_digest"`
 	ImgCreateAt  time.Time                 `json:"image_created_at"`
 	Privileged   bool                      `json:"privileged"`
 	RunAsRoot    bool                      `json:"run_as_root"`
@@ -1921,6 +1922,7 @@ type CLUSRegistryImageSummary struct {
 	ScannedAt         time.Time     `json:"scanned_at"`
 	CreatedAt         time.Time     `json:"created_at"`
 	BaseOS            string        `json:"base_os"`
+	OSScanStatus      OSScanStatus  `json:"os_scan_status"`
 	Version           string        `json:"version"`
 	Result            ScanErrorCode `json:"result"`
 	Status            string        `json:"status"`

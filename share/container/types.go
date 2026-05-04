@@ -141,21 +141,22 @@ type ContainerMeta struct {
 
 type ContainerMetaExtra struct {
 	ContainerMeta
-	ImageID     string
-	ImageDigest string
-	ImgCreateAt time.Time
-	Author      string
-	Privileged  bool
-	ExitCode    int
-	Running     bool
-	CreatedAt   time.Time
-	StartedAt   time.Time
-	FinishedAt  time.Time
-	MemoryLimit int64
-	CPUs        string
-	ProxyMesh   bool
-	Sidecar     bool
-	RunAsRoot   bool
+	ImageID          string
+	ImageDigest      string
+	ImageDigestExtra []string // on docker runtime env, there is no guarantee we we only get one digest for an image. so store the 2nd~ digests here
+	ImgCreateAt      time.Time
+	Author           string
+	Privileged       bool
+	ExitCode         int
+	Running          bool
+	CreatedAt        time.Time
+	StartedAt        time.Time
+	FinishedAt       time.Time
+	MemoryLimit      int64
+	CPUs             string
+	ProxyMesh        bool
+	Sidecar          bool
+	RunAsRoot        bool
 	// network
 	IPAddress   string
 	IPPrefixLen int

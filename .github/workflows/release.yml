@@ -17,7 +17,7 @@ jobs:
       # - OIDC for cosign's use in ecm-distro-tools/publish-image.
       # - Read vault secrets in rancher-eio/read-vault-secrets.
       id-token: write
-    
+
     strategy:
       matrix:
         include:
@@ -29,11 +29,11 @@ jobs:
             rancher_target: neuvector-enforcer
             make-target: push-enforcer-image
             platforms: linux/amd64,linux/arm64
-    
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-    - uses: actions/create-github-app-token@v2
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+    - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
       id: app-token
       with:
         app-id: ${{ secrets.NEUVECTOR_RELEASE_APP_ID }}
@@ -43,7 +43,7 @@ jobs:
           neuvector
           neuvector-private
     - name: Load Secrets from Vault
-      uses: rancher-eio/read-vault-secrets@main
+      uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
       with:
         secrets: |
           secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | RANCHER_DOCKER_USERNAME ;
@@ -83,7 +83,7 @@ jobs:
         cat sha256sum-controller-arm64 | sha256sum --check
 
     - name: Publish neuvector manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@master
+      uses: rancher/ecm-distro-tools/actions/publish-image@8821b2e4aa18f762dc334f811f54e8f215771a68 # v0.66.2
       with:
         push-to-public: true
         push-to-prime: false
@@ -97,7 +97,7 @@ jobs:
         public-username: ${{ env.DOCKER_USERNAME }}
         public-password: ${{ env.DOCKER_PASSWORD }}
     - name: Publish rancher manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@master
+      uses: rancher/ecm-distro-tools/actions/publish-image@8821b2e4aa18f762dc334f811f54e8f215771a68 # v0.66.2
       env:
         IMAGE_PREFIX: neuvector-
       with:
@@ -131,13 +131,13 @@ jobs:
         GIT_PATH_EXTERNAL_PROD: "external-production/"
       if: ${{ needs.publish.outputs.parsed_tag != '' }}
       steps:
-        - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
         - name: Set up Python
-          uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+          uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
           with:
             python-version: '3.11'
-        
+
         - name: Creating upgrade-responder file
           run: |
             python -c '
@@ -148,7 +148,7 @@ jobs:
             data = {"Versions": [{"Name": f"v{tag_value}", "ReleaseDate": current_date, "Tags": ["latest", tag_value]}]}
             with open(".github/upgrade-responder.json", "w") as f: json.dump(data, f, indent=2); f.write("\n")
             '
-        
+
         - name: Set git config
           run: |
             git config --global user.name "github-actions[bot]"

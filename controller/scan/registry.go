@@ -564,6 +564,8 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 			dbAssetVul := getImageDbAssetVul(c, sum, lows)
 			dbAssetVul.Vuls = report.Vuls
 			dbAssetVul.Modules = report.Modules
+			dbAssetVul.CVEDB_version = report.Version
+			dbAssetVul.CVEDB_createtime = report.CVEDBCreateTime
 
 			b, err := json.Marshal(images2IDNames(rs, sum))
 			if err == nil {
@@ -967,6 +969,7 @@ func (rs *Registry) checkAndPutImageResult(sctx *scanContext, id string, result 
 		if result.ScanTypesRequested.Vulnerability {
 			sum.Provider = result.Provider
 			sum.BaseOS = result.Namespace
+			sum.OSScanStatus = result.OSScanStatus
 			sum.Version = result.Version
 			sum.Author = result.Author
 			sum.Size = result.Size
@@ -1351,6 +1354,7 @@ func (rs *Registry) stopScan() {
 			sum.Status = api.ScanStatusIdle
 			sum.ScannedAt = time.Time{}
 			sum.BaseOS = ""
+			sum.OSScanStatus = share.OSScanStatus_OSScanStatusUnknown
 			sum.Version = ""
 			sum.Result = share.ScanErrorCode_ScanErrNone
 
@@ -1534,8 +1538,9 @@ func (rs *Registry) scheduleScanImagesOnDemand(sctx *scanContext, imageMap map[s
 				RegName:  rs.config.Name,
 				Digest:   meta.digest,
 				// Signed:    meta.signed, [2019.Apr] comment out until we can accurately tell it
-				RunAsRoot: meta.runAsRoot,
-				Status:    api.ScanStatusScheduled,
+				RunAsRoot:    meta.runAsRoot,
+				Status:       api.ScanStatusScheduled,
+				OSScanStatus: share.OSScanStatus_OSScanStatusUnknown,
 			}
 			sum.Images = make([]share.CLUSImage, 0, meta.images.Cardinality())
 			for image := range meta.images.Iter() {
@@ -1705,6 +1710,7 @@ func (rs *Registry) scheduleScanImages(
 					SignatureDigest:   info.SignatureDigest,
 					SigstoreTimestamp: sigstoreTimestamp,
 					Images:            []share.CLUSImage{image},
+					OSScanStatus:      share.OSScanStatus_OSScanStatusUnknown,
 				}
 				rs.summary[info.ID] = sum
 				scanTypesRequired.Vulnerability = true
@@ -1988,6 +1994,7 @@ func getImageDbAssetVul(c *imageInfoCache, sum *share.CLUSRegistryImageSummary, 
 		I_scanned_at:      sum.ScannedAt.Format("2006-01-02T15:04:05Z"),
 		I_digest:          sum.Digest,
 		I_base_os:         sum.BaseOS,
+		I_os_scan_status:  sum.OSScanStatus.String(),
 		I_repository_name: sum.RegName,
 		I_repository_url:  sum.Registry,
 		I_size:            sum.Size,
