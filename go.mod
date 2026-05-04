@@ -120,7 +120,7 @@ require (
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/moby/moby/api v1.54.0
 	github.com/moby/moby/client v0.3.0
-	github.com/quay/clair/v2 v2.1.8
+	github.com/quay/clair/v4 v4.9.0
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 )
 
