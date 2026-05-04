@@ -426,6 +426,123 @@ func TestParseDotNetPackage(t *testing.T) {
 	}
 }
 
+func TestCutLast(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		sep       string
+		wantFirst string
+		wantLast  string
+		wantOk    bool
+	}{
+		{
+			name:      "normal case with multiple dots",
+			input:     "org.apache.tomcat",
+			sep:       ".",
+			wantFirst: "org.apache",
+			wantLast:  "tomcat",
+			wantOk:    true,
+		},
+		{
+			name:      "single dot in middle",
+			input:     "a.b",
+			sep:       ".",
+			wantFirst: "a",
+			wantLast:  "b",
+			wantOk:    true,
+		},
+		{
+			name:      "no dot",
+			input:     "nodot",
+			sep:       ".",
+			wantFirst: "",
+			wantLast:  "",
+			wantOk:    false,
+		},
+		{
+			name:      "dot at beginning",
+			input:     ".startdot",
+			sep:       ".",
+			wantFirst: "",
+			wantLast:  "",
+			wantOk:    false,
+		},
+		{
+			name:      "dot at end",
+			input:     "enddot.",
+			sep:       ".",
+			wantFirst: "enddot",
+			wantLast:  "",
+			wantOk:    true,
+		},
+		{
+			name:      "multiple consecutive dots",
+			input:     "a..b",
+			sep:       ".",
+			wantFirst: "a.",
+			wantLast:  "b",
+			wantOk:    true,
+		},
+		{
+			name:      "empty string",
+			input:     "",
+			sep:       ".",
+			wantFirst: "",
+			wantLast:  "",
+			wantOk:    false,
+		},
+		{
+			name:      "single dot only",
+			input:     ".",
+			sep:       ".",
+			wantFirst: "",
+			wantLast:  "",
+			wantOk:    false,
+		},
+		{
+			name:      "real package name",
+			input:     "org.springframework.boot",
+			sep:       ".",
+			wantFirst: "org.springframework",
+			wantLast:  "boot",
+			wantOk:    true,
+		},
+		{
+			name:      "single character before and after",
+			input:     "x.y",
+			sep:       ".",
+			wantFirst: "x",
+			wantLast:  "y",
+			wantOk:    true,
+		},
+		{
+			name:      "multi-char separator",
+			input:     "a::b::c",
+			sep:       "::",
+			wantFirst: "a::b",
+			wantLast:  "c",
+			wantOk:    true,
+		},
+		{
+			name:      "different separator - slash",
+			input:     "path/to/file",
+			sep:       "/",
+			wantFirst: "path/to",
+			wantLast:  "file",
+			wantOk:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFirst, gotLast, gotOk := cutLast(tt.input, tt.sep)
+			assert.Equal(t, tt.wantFirst, gotFirst, "first part mismatch")
+			assert.Equal(t, tt.wantLast, gotLast, "last part mismatch")
+			assert.Equal(t, tt.wantOk, gotOk, "ok flag mismatch")
+		})
+	}
+}
+
 func TestParseDotNetPackageWithoutScanRuntime(t *testing.T) {
 	filename := "test.deps.json"
 	fullpath := "/home/test.deps.json"
