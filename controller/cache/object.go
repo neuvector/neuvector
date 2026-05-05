@@ -260,7 +260,7 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		HostID:             wl.HostID,
 		Image:              wl.Image,
 		ImageID:            wl.ImageID,
-		ImageDigest:        slices.Clone(wl.ImageDigest),
+		ImageDigest:        wl.ImageDigest,
 		ImgCreateAt:        api.RESTTimeString(wl.ImgCreateAt),
 		ImgRegScand:        scan.IsRegistryImageScanned(wl.ImageID),
 		PlatformRole:       cache.platformRole,
@@ -280,6 +280,9 @@ func workload2BriefREST(cache *workloadCache) *api.RESTWorkloadBrief {
 		ServiceMeshSidecar: wl.Sidecar,
 		Privileged:         wl.Privileged,
 		RunAsRoot:          wl.RunAsRoot,
+	}
+	if len(wl.ImageRepoDigests) > 0 {
+		r.ImageRepoDigests = slices.Clone(wl.ImageRepoDigests)
 	}
 
 	r.PolicyMode, r.ProfileMode = getWorkloadPerGroupPolicyMode(cache)

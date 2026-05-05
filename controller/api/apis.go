@@ -948,7 +948,8 @@ type RESTWorkloadBrief struct { // obsolete, use v2 instead
 	HostID             string               `json:"host_id"`
 	Image              string               `json:"image"`
 	ImageID            string               `json:"image_id"`
-	ImageDigest        []string             `json:"image_digest"`
+	ImageDigest        string               `json:"image_digest"`
+	ImageRepoDigests   []string             `json:"image_repo_digests"` // for docker runtime only
 	ImgCreateAt        string               `json:"image_created_at"`
 	ImgRegScand        bool                 `json:"image_reg_scanned"`
 	PlatformRole       string               `json:"platform_role"`
@@ -1007,21 +1008,22 @@ type RESTWorkloadsData struct {
 }
 
 type RESTWorkloadBriefV2 struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	DisplayName  string   `json:"display_name"`
-	HostName     string   `json:"host_name"`
-	HostID       string   `json:"host_id"`
-	Image        string   `json:"image"`
-	ImageID      string   `json:"image_id"`
-	ImageDigest  []string `json:"image_digest"`
-	ImgCreateAt  string   `json:"image_created_at"`
-	ImgRegScand  bool     `json:"image_reg_scanned"`
-	Domain       string   `json:"domain"`
-	State        string   `json:"state"`
-	Service      string   `json:"service"`
-	Author       string   `json:"author"`
-	ServiceGroup string   `json:"service_group"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	DisplayName      string   `json:"display_name"`
+	HostName         string   `json:"host_name"`
+	HostID           string   `json:"host_id"`
+	Image            string   `json:"image"`
+	ImageID          string   `json:"image_id"`
+	ImageDigest      string   `json:"image_digest"`
+	ImageRepoDigests []string `json:"image_repo_digests"` // for docker runtime only
+	ImgCreateAt      string   `json:"image_created_at"`
+	ImgRegScand      bool     `json:"image_reg_scanned"`
+	Domain           string   `json:"domain"`
+	State            string   `json:"state"`
+	Service          string   `json:"service"`
+	Author           string   `json:"author"`
+	ServiceGroup     string   `json:"service_group"`
 }
 
 type RESTWorkloadSecurityV2 struct {
@@ -2572,12 +2574,13 @@ type RESTAssetsScanReportQuery struct {
 }
 
 type RESTAssetScanData struct {
-	HostName            string   `json:"host_name"`
-	WorkloadName        string   `json:"workload_name"`
-	WorkloadDomain      string   `json:"workload_domain"`
-	WorkloadImage       string   `json:"workload_image"`
-	WorkloadImageID     string   `json:"workload_image_id"`
-	WorkloadImageDigest []string `json:"workload_image_digest"`
+	HostName                 string   `json:"host_name"`
+	WorkloadName             string   `json:"workload_name"`
+	WorkloadDomain           string   `json:"workload_domain"`
+	WorkloadImage            string   `json:"workload_image"`
+	WorkloadImageID          string   `json:"workload_image_id"`
+	WorkloadImageDigest      string   `json:"workload_image_digest"`
+	WorkloadImageRepoDigests []string `json:"workload_image_repo_digests"` // for docker runtime env only
 	RESTVulnerability
 }
 
@@ -4416,12 +4419,13 @@ func (a *RESTWorkload) GetCursor() RESTScanReportCursor {
 
 func (a *RESTWorkload) GetScanData() RESTAssetScanData {
 	return RESTAssetScanData{
-		HostName:            a.HostName,
-		WorkloadName:        a.Name,
-		WorkloadDomain:      a.Domain,
-		WorkloadImage:       a.Image,
-		WorkloadImageID:     a.ImageID,
-		WorkloadImageDigest: a.ImageDigest,
+		HostName:                 a.HostName,
+		WorkloadName:             a.Name,
+		WorkloadDomain:           a.Domain,
+		WorkloadImage:            a.Image,
+		WorkloadImageID:          a.ImageID,
+		WorkloadImageDigest:      a.ImageDigest,
+		WorkloadImageRepoDigests: a.ImageRepoDigests,
 	}
 }
 
