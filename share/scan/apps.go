@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -63,6 +65,9 @@ const (
 	rDefaultPath2   = "usr/local/lib/R/library/"
 	rRepositoryPath = "usr/local/lib/R/site-library/"
 	rDescFileName   = "DESCRIPTION"
+
+	// govulncheck
+	govulncheckTimeout = 30 * time.Second
 )
 
 // var verRegexp = regexp.MustCompile(`<([a-zA-Z0-9\.]+)>([0-9\.]+)</([a-zA-Z0-9\.]+)>`)
@@ -89,6 +94,9 @@ type AppPackage struct {
 	ModuleName string `json:"module_name"`
 	Version    string `json:"version"`
 	FileName   string `json:"file_name"`
+	// GovulncheckFindings stores govulncheck findings for Go binaries, used as a filter
+	// to confirm vulnerabilities. Severity information comes from the existing matching mechanism.
+	GovulncheckFindings []GovulnFinding `json:"govulncheck_findings,omitempty"`
 }
 
 /*
@@ -283,17 +291,29 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), govulncheckTimeout)
+	defer cancel()
+
+	govulnByModule, govulnErr := runGovulncheckBinary(ctx, fullpath)
+	if govulnErr != nil {
+		log.WithFields(log.Fields{"file": filename, "error": govulnErr.Error()}).Error("govulncheck failed")
+		return
+	}
+
 	pkgs := make([]AppPackage, len(bi.Deps))
 	for i, m := range bi.Deps {
 		if m.Replace != nil {
 			m = m.Replace
 		}
 
+		moduleName := fmt.Sprintf("go:%s", m.Path)
+		version := strings.TrimPrefix(m.Version, "v")
 		pkg := AppPackage{
-			AppName:    golang,
-			ModuleName: fmt.Sprintf("go:%s", m.Path),
-			Version:    strings.TrimPrefix(m.Version, "v"),
-			FileName:   filename,
+			AppName:             golang,
+			ModuleName:          moduleName,
+			Version:             version,
+			FileName:            filename,
+			GovulncheckFindings: lookupGovulnFindings(govulnByModule, moduleName, version),
 		}
 		pkgs[i] = pkg
 	}
@@ -301,10 +321,11 @@ func (s *ScanApps) parseGolangPackage(filename, fullpath string) {
 	if goVersion != "" {
 		goVersion := strings.TrimPrefix(goVersion, "go")
 		stdLibPkg := AppPackage{
-			AppName:    golang,
-			ModuleName: "go:stdlib",
-			Version:    goVersion,
-			FileName:   filename,
+			AppName:             golang,
+			ModuleName:          "go:stdlib",
+			Version:             goVersion,
+			FileName:            filename,
+			GovulncheckFindings: lookupGovulnFindings(govulnByModule, "go:stdlib", goVersion),
 		}
 		pkgs = append(pkgs, stdLibPkg)
 	}
