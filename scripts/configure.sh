@@ -2,7 +2,7 @@
 
 readonly RC_TC=0
 readonly RC_NOTC=1
-readonly RC_OVS=2
+#readonly RC_OVS=2
 readonly RC_ERROR=3
 
 #if [ ! -e /var/run/docker.sock ] && [ ! -e /run/containerd/containerd.sock ] && [ ! -e /var/run/crio/crio.sock ]; then

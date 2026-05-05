@@ -107,13 +107,6 @@ github.com/beevik/etree
 # github.com/cenkalti/backoff/v5 v5.0.3
 ## explicit; go 1.23
 github.com/cenkalti/backoff/v5
-# github.com/cenkalti/hub v1.0.2
-## explicit; go 1.20
-github.com/cenkalti/hub
-# github.com/cenkalti/rpc2 v1.0.4
-## explicit; go 1.20
-github.com/cenkalti/rpc2
-github.com/cenkalti/rpc2/jsonrpc
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2

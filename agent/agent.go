@@ -608,8 +608,6 @@ func main() {
 
 	//var driver string
 	switch *pipeType {
-	case "ovs":
-		driver = pipe.PIPE_OVS
 	case "no_tc":
 		driver = pipe.PIPE_CLM
 	default:
