@@ -234,20 +234,15 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	}
 
 	imageDigest := ""
-	var imageDigestExtra []string
+	imageDigests := utils.NewSet()
 	repoTag, repoDigests := d.getImageRepoTag(info.Container.Image, info.Container.Config.Image)
-	if len(repoDigests) >= 1 {
-		if len(repoDigests) == 1 && strings.Contains(repoDigests[0], "@sha256:") {
-			var repoTagTemp string
-			repoTagTemp, repoDigests[0], _ = strings.Cut(repoDigests[0], "@sha256:")
-			if strings.HasPrefix(repoTag, "sha256:") {
-				repoTag = repoTagTemp
-			}
+	for _, repoDigest := range repoDigests {
+		if _, digest, found := strings.Cut(repoDigest, "@sha256:"); found {
+			imageDigests.Add(digest)
 		}
-		imageDigest = repoDigests[0]
-		if len(repoDigests) > 1 {
-			imageDigestExtra = repoDigests[1:]
-		}
+	}
+	if imageDigests.Cardinality() == 1 {
+		imageDigest = imageDigests.ToStringSlice()[0]
 	}
 
 	ipAddress, ipPrefixLen := d.getContainerPrimaryNetwork(info)
@@ -266,7 +261,7 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 		},
 		ImageID:          TrimImageID(info.Container.Image),
 		ImageDigest:      imageDigest,
-		ImageDigestExtra: imageDigestExtra,
+		ImageRepoDigests: repoDigests,
 		Privileged:       info.Container.HostConfig.Privileged,
 		Running:          info.Container.State.Running,
 		ExitCode:         info.Container.State.ExitCode,

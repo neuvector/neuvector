@@ -434,38 +434,36 @@ func putContainerForStop(info *container.ContainerMetaExtra, wl *share.CLUSWorkl
 
 func createWorkload(info *container.ContainerMetaExtra, svc, domain *string) *share.CLUSWorkload {
 	wl := share.CLUSWorkload{
-		ID:           info.ID,
-		Name:         info.Name,
-		SelfHostname: info.Hostname,
-		AgentID:      Agent.ID,
-		HostName:     Host.Name,
-		HostID:       Host.ID,
-		Image:        info.Image,
-		ImageID:      info.ImageID,
-		ImgCreateAt:  info.ImgCreateAt,
-		Author:       info.Author,
-		NetworkMode:  info.NetMode,
-		Privileged:   info.Privileged,
-		RunAsRoot:    info.RunAsRoot,
-		CreatedAt:    info.CreatedAt,
-		StartedAt:    info.StartedAt,
-		FinishedAt:   info.FinishedAt,
-		Running:      info.Running,
-		ExitCode:     info.ExitCode,
-		Pid:          info.Pid,
-		Inline:       false,
-		Labels:       info.Labels,
-		MemoryLimit:  info.MemoryLimit,
-		CPUs:         info.CPUs,
-		ProxyMesh:    info.ProxyMesh,
-		Sidecar:      info.Sidecar,
-		Ifaces:       make(map[string][]share.CLUSIPAddr),
-		Ports:        make(map[string]share.CLUSMappedPort),
-		Apps:         make(map[string]share.CLUSApp),
-	}
-	if info.ImageDigest != "" {
-		wl.ImageDigest = []string{info.ImageDigest}
-		wl.ImageDigest = append(wl.ImageDigest, info.ImageDigestExtra...)
+		ID:               info.ID,
+		Name:             info.Name,
+		SelfHostname:     info.Hostname,
+		AgentID:          Agent.ID,
+		HostName:         Host.Name,
+		HostID:           Host.ID,
+		Image:            info.Image,
+		ImageID:          info.ImageID,
+		ImageDigest:      info.ImageDigest,
+		ImageRepoDigests: info.ImageRepoDigests,
+		ImgCreateAt:      info.ImgCreateAt,
+		Author:           info.Author,
+		NetworkMode:      info.NetMode,
+		Privileged:       info.Privileged,
+		RunAsRoot:        info.RunAsRoot,
+		CreatedAt:        info.CreatedAt,
+		StartedAt:        info.StartedAt,
+		FinishedAt:       info.FinishedAt,
+		Running:          info.Running,
+		ExitCode:         info.ExitCode,
+		Pid:              info.Pid,
+		Inline:           false,
+		Labels:           info.Labels,
+		MemoryLimit:      info.MemoryLimit,
+		CPUs:             info.CPUs,
+		ProxyMesh:        info.ProxyMesh,
+		Sidecar:          info.Sidecar,
+		Ifaces:           make(map[string][]share.CLUSIPAddr),
+		Ports:            make(map[string]share.CLUSMappedPort),
+		Apps:             make(map[string]share.CLUSApp),
 	}
 
 	if wl.Running {
@@ -574,10 +572,8 @@ func updateContainer(ev *ClusterEvent, wl *share.CLUSWorkload) {
 	}
 	if ev.info != nil {
 		wl.ProxyMesh = ev.info.ProxyMesh
-		if ev.info.ImageDigest != "" {
-			wl.ImageDigest = []string{ev.info.ImageDigest}
-			wl.ImageDigest = append(wl.ImageDigest, ev.info.ImageDigestExtra...)
-		}
+		wl.ImageDigest = ev.info.ImageDigest
+		wl.ImageRepoDigests = ev.info.ImageRepoDigests
 	}
 }
 

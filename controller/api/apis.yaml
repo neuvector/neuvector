@@ -9879,6 +9879,8 @@ definitions:
       workload_image_id:
         type: string
       workload_image_digest:
+        type: string
+      workload_image_repo_digests:
         type: array
         items:
           type: string
