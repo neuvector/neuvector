@@ -11,7 +11,6 @@ require (
 	github.com/Microsoft/hcsshim v0.13.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/beevik/etree v1.6.0
-	github.com/cenkalti/rpc2 v1.0.4
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 	github.com/containerd/containerd/api v1.9.0
 	github.com/containerd/containerd/v2 v2.1.5
@@ -63,7 +62,6 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/cenkalti/hub v1.0.2 // indirect
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect

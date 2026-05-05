@@ -44,7 +44,6 @@ const (
 
 const (
 	PIPE_TC   = "tc"
-	PIPE_OVS  = "ovs"
 	PIPE_NOTC = "no_tc"
 	PIPE_CLM  = "clm"
 )
@@ -1770,8 +1769,6 @@ func GetPortPairDebug(pair *InterceptPair) *share.CLUSWorkloadInterceptPort {
 
 func Open(driver string, cnet_type *string, pid int, jumboframe bool) (string, string, error) {
 	switch driver {
-	case PIPE_OVS:
-		piper = &ovsPipe
 	case PIPE_TC:
 		piper = &tcPipe
 	case PIPE_NOTC:
