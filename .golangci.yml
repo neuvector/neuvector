@@ -19,11 +19,11 @@ linters:
       - linters:
           - staticcheck
         path: share/
-        text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+        text: 'SA5008: invalid appearance of unknown `cloak` tag option'
       - linters:
           - staticcheck
         path: controller/
-        text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+        text: 'SA5008: invalid appearance of unknown `cloak` tag option'
       - path: (.+)\.go$
         text: 'SA1019: grpc.RPCCompressor is deprecated: use encoding.RegisterCompressor'
       - path: (.+)\.go$

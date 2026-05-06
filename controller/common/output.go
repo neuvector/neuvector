@@ -318,7 +318,7 @@ func getDetailInfoFromLog(elog interface{}) string {
 	for _, fieldName := range fieldOrder {
 		value, err := getFieldStringValue(elog, fieldName)
 		if err == nil {
-			builder.WriteString(fmt.Sprintf("%s: %s, ", fieldNames[fieldName], value))
+			fmt.Fprintf(&builder, "%s: %s, ", fieldNames[fieldName], value)
 		} else {
 			log.WithFields(log.Fields{"err": err, "elog": elog}).Debug("Error when get detail info from elog")
 		}
