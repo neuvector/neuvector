@@ -476,7 +476,7 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.Uint() == 0
 	case reflect.Float32, reflect.Float64:
 		return v.Float() == 0
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		return v.IsNil()
 	}
 	return false
@@ -494,11 +494,11 @@ func unmarshal(cloak string, data interface{}, reEncryptRequired *bool, unmarsha
 	v := reflect.ValueOf(data)
 	t := v.Type()
 
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		// follow pointer
 		t = t.Elem()
 	}
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		// follow pointer
 		v = v.Elem()
 	}
@@ -526,7 +526,7 @@ func unmarshal(cloak string, data interface{}, reEncryptRequired *bool, unmarsha
 			continue
 		}
 
-		if val.Kind() == reflect.Ptr {
+		if val.Kind() == reflect.Pointer {
 			val = val.Elem()
 		}
 
@@ -590,7 +590,7 @@ func unmarshalValue(cloak string, v reflect.Value, reEncryptRequired *bool, unma
 	}
 
 	k := v.Kind()
-	if k == reflect.Ptr {
+	if k == reflect.Pointer {
 		v = v.Elem()
 		k = v.Kind()
 	}
@@ -636,11 +636,11 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 	v := reflect.ValueOf(data)
 	t := v.Type()
 
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		// follow pointer
 		t = t.Elem()
 	}
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		// follow pointer
 		v = v.Elem()
 	}
@@ -673,7 +673,7 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 			continue
 		}
 
-		if val.Kind() == reflect.Ptr {
+		if val.Kind() == reflect.Pointer {
 			val = val.Elem()
 		}
 
@@ -748,7 +748,7 @@ func marshalValue(cloak string, v reflect.Value, marshalResult tMarshallResult) 
 	}
 
 	k := v.Kind()
-	if k == reflect.Ptr {
+	if k == reflect.Pointer {
 		v = v.Elem()
 		val = v.Interface()
 		k = v.Kind()

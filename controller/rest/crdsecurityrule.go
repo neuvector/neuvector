@@ -2473,7 +2473,7 @@ func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail re
 			return ruleCfg, buffer.String(), 1
 		}
 		if ruleSet.Contains(*ruleCfg.Comment) {
-			buffer.WriteString(fmt.Sprintf("Duplicated rule name: %s%s", *ruleCfg.Comment, ownerStr))
+			fmt.Fprintf(&buffer, "Duplicated rule name: %s%s", *ruleCfg.Comment, ownerStr)
 			return ruleCfg, buffer.String(), 1
 
 		}
@@ -2534,7 +2534,7 @@ func (h *nvCrdHandler) validateCrdProcessRules(rules []*api.RESTProcessProfileEn
 		if r.Path == "*" || r.Path == "" {
 			// possibly wildcard
 		} else if strings.HasSuffix(r.Path, "/") || !strings.HasPrefix(r.Path, "/") || strings.ContainsAny(r.Path, "<>") || strings.Count(r.Path, "*") > 1 {
-			buffer.WriteString(fmt.Sprintf(" validate error: process[%s], invalid path format: %s \n", r.Name, r.Path))
+			fmt.Fprintf(&buffer, " validate error: process[%s], invalid path format: %s \n", r.Name, r.Path)
 			errCnt++
 		}
 
@@ -2542,14 +2542,14 @@ func (h *nvCrdHandler) validateCrdProcessRules(rules []*api.RESTProcessProfileEn
 			path := r.Path
 			r.Path = filepath.Clean(r.Path)
 			if r.Path == "." || r.Path == "/" {
-				buffer.WriteString(fmt.Sprintf(" validate error: process[%s], unknown path format: %s[%s] \n", r.Name, path, r.Path))
+				fmt.Fprintf(&buffer, " validate error: process[%s], unknown path format: %s[%s] \n", r.Name, path, r.Path)
 				errCnt++
 			}
 		}
 
 		if r.Name == "" {
 			if r.Path == "*" || r.Path == "" || r.Path == "." || r.Path == "/" {
-				buffer.WriteString(fmt.Sprintf(" validate error: process needs a name: Name: %s \n", msg))
+				fmt.Fprintf(&buffer, " validate error: process needs a name: Name: %s \n", msg)
 				errCnt++
 			} else {
 				index := strings.LastIndexByte(r.Path, '/')
@@ -2559,7 +2559,7 @@ func (h *nvCrdHandler) validateCrdProcessRules(rules []*api.RESTProcessProfileEn
 		}
 
 		if r.Name == "*" && r.Path == "" {
-			buffer.WriteString(fmt.Sprintf(" validate error: process needs a non-empty path: Name: %s \n", msg))
+			fmt.Fprintf(&buffer, " validate error: process needs a non-empty path: Name: %s \n", msg)
 			errCnt++
 		}
 
@@ -2570,7 +2570,7 @@ func (h *nvCrdHandler) validateCrdProcessRules(rules []*api.RESTProcessProfileEn
 
 		// avoid deny all entry
 		if r.Name == "*" && (r.Path == "*" || r.Path == "/*") && r.Action == share.PolicyActionDeny {
-			buffer.WriteString(fmt.Sprintf(" invalid process entry: deny all: %s \n", msg))
+			fmt.Fprintf(&buffer, " invalid process entry: deny all: %s \n", msg)
 			errCnt++
 		}
 
@@ -2594,12 +2594,12 @@ func (h *nvCrdHandler) validateCrdFileRules(rules []*api.RESTFileMonitorFilter) 
 		r.Behavior = strings.TrimSpace(r.Behavior)
 		r.Filter = filepath.Clean(r.Filter)
 		if r.Filter == "." || r.Filter == "/" {
-			buffer.WriteString(fmt.Sprintf(" validate error: filter: %s[%s] \n", flt, r.Filter))
+			fmt.Fprintf(&buffer, " validate error: filter: %s[%s] \n", flt, r.Filter)
 			errCnt++
 		} else {
 			_, _, ok := parseFileFilter(r.Filter)
 			if !ok {
-				buffer.WriteString(fmt.Sprintf(" validate error: unsupported filter: %s[%s] \n", flt, r.Filter))
+				fmt.Fprintf(&buffer, " validate error: unsupported filter: %s[%s] \n", flt, r.Filter)
 				errCnt++
 			}
 		}
@@ -2611,7 +2611,7 @@ func (h *nvCrdHandler) validateCrdFileRules(rules []*api.RESTFileMonitorFilter) 
 
 		key := fmt.Sprintf("%s:%s:%v", r.Filter, r.Behavior, r.Recursive)
 		if ruleSet.Contains(key) {
-			buffer.WriteString(fmt.Sprintf(" Duplicated file rule entry: : %s \n", key))
+			fmt.Fprintf(&buffer, " Duplicated file rule entry: : %s \n", key)
 			errCnt++
 		} else {
 			ruleSet.Add(key)
@@ -2633,11 +2633,11 @@ func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec)
 	if spec.DlpGroup != nil {
 		for _, s := range spec.DlpGroup.Settings {
 			if s.Name == share.CLUSDlpDefaultSensor {
-				buffer.WriteString(fmt.Sprintf(" validate error: cannot use reserved sensor name%s \n", s.Name))
+				fmt.Fprintf(&buffer, " validate error: cannot use reserved sensor name%s \n", s.Name)
 				errCnt++
 			}
 			if s.Action != share.PolicyActionAllow && s.Action != share.PolicyActionDeny {
-				buffer.WriteString(fmt.Sprintf(" validate error: action %s \n", s.Action))
+				fmt.Fprintf(&buffer, " validate error: action %s \n", s.Action)
 				errCnt++
 			}
 		}
@@ -2646,11 +2646,11 @@ func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec)
 	if spec.WafGroup != nil {
 		for _, s := range spec.WafGroup.Settings {
 			if s.Name == share.CLUSWafDefaultSensor {
-				buffer.WriteString(fmt.Sprintf(" validate error: cannot use reserved sensor name%s \n", s.Name))
+				fmt.Fprintf(&buffer, " validate error: cannot use reserved sensor name%s \n", s.Name)
 				errCnt++
 			}
 			if s.Action != share.PolicyActionAllow && s.Action != share.PolicyActionDeny {
-				buffer.WriteString(fmt.Sprintf(" validate error: action %s \n", s.Action))
+				fmt.Fprintf(&buffer, " validate error: action %s \n", s.Action)
 				errCnt++
 			}
 		}
