@@ -630,9 +630,10 @@ type RESTUserConfig struct {
 }
 
 type RESTUsersData struct {
-	Users       []*RESTUser `json:"users"`
-	GlobalRoles []string    `json:"global_roles"`
-	DomainRoles []string    `json:"domain_roles"`
+	Users             []*RESTUser `json:"users"`
+	GlobalRoles       []string    `json:"global_roles"`
+	DomainRoles       []string    `json:"domain_roles"`
+	RolesNotForDomain []string    `json:"roles_not_for_domain"` // roles that do not work on domain level
 }
 
 type RESTUsersDataCfgMap struct {
