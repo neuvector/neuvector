@@ -312,8 +312,8 @@ github.com/fatih/camelcase
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
-# github.com/fsnotify/fsnotify v1.9.0 => github.com/fsnotify/fsnotify v1.9.0
-## explicit; go 1.17
+# github.com/fsnotify/fsnotify v1.10.1 => github.com/fsnotify/fsnotify v1.10.1
+## explicit; go 1.23
 github.com/fsnotify/fsnotify
 github.com/fsnotify/fsnotify/internal
 # github.com/fxamacker/cbor/v2 v2.7.0
@@ -1594,5 +1594,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
+# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
 # k8s.io/cri-api => k8s.io/cri-api v0.25.16
