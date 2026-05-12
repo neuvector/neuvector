@@ -3,7 +3,7 @@ module github.com/neuvector/neuvector
 go 1.26.2
 
 replace (
-	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
 	k8s.io/cri-api => k8s.io/cri-api v0.25.16
 )
 
@@ -18,7 +18,7 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/doug-martin/goqu/v9 v9.19.0
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/protobuf v1.5.4
