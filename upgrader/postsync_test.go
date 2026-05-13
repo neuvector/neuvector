@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -245,7 +244,7 @@ func TestUpgradeInternalCerts_ForcedError(t *testing.T) {
 				)
 				return client
 			},
-			func(ctx *cli.Context, client dynamic.Interface, injected *bool) bool {
+			func(client dynamic.Interface, injected *bool) bool {
 				err := UpgradeInternalCerts(context.Background(), client, "neuvector", "neuvector-internal-certs", time.Hour)
 
 				if *injected {

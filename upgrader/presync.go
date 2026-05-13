@@ -11,7 +11,7 @@ import (
 
 	"github.com/neuvector/neuvector/share/k8sutils"
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -302,11 +302,11 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 	return &ret, nil
 }
 
-func PreSyncHook(ctx *cli.Context) error {
-	namespace := ctx.String("pod-namespace")
-	kubeconfig := ctx.String("kube-config")
-	secretName := ctx.String("internal-secret-name")
-	timeout := ctx.Duration("timeout")
+func PreSyncHook(ctx context.Context, cmd *cli.Command) error {
+	namespace := cmd.String("pod-namespace")
+	kubeconfig := cmd.String("kube-config")
+	secretName := cmd.String("internal-secret-name")
+	timeout := cmd.Duration("timeout")
 
 	log.Info("Getting running namespace")
 
@@ -360,7 +360,7 @@ func PreSyncHook(ctx *cli.Context) error {
 
 	valuesChecksum := os.Getenv("OVERRIDE_CHECKSUM")
 
-	timeoutCtx, cancel := context.WithTimeout(ctx.Context, timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var secret *corev1.Secret

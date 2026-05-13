@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +24,7 @@ const MAX_REQUEST = 100
 
 var ErrInjected = errors.New("random error")
 
-func ErrorInjector(t *testing.T, clientInit func() *fake.FakeDynamicClient, f func(ctx *cli.Context, client dynamic.Interface, injected *bool) bool) {
+func ErrorInjector(t *testing.T, clientInit func() *fake.FakeDynamicClient, f func(client dynamic.Interface, injected *bool) bool) {
 	for i := 0; i < MAX_REQUEST; i++ {
 
 		num := 0
@@ -63,11 +62,9 @@ func ErrorInjector(t *testing.T, clientInit func() *fake.FakeDynamicClient, f fu
 		client.PrependReactor("update", "*", handler)
 		client.PrependReactor("delete", "*", handler)
 
-		ctx := cli.NewContext(nil, nil, nil)
-
 		require.NoError(t, batchv1.AddToScheme(scheme.Scheme))
 
-		if cont := f(ctx, client, &injected); !cont {
+		if cont := f(client, &injected); !cont {
 			break
 		}
 	}
@@ -147,11 +144,10 @@ func TestIsFreshInstall(t *testing.T) {
 			ExpectedErr: true,
 		},
 	} {
-		ctx := cli.NewContext(nil, nil, nil)
 		client := fake.NewSimpleDynamicClient(scheme.Scheme,
 			loadObjectList(t, tc.TestData)...,
 		)
-		isFreshInstall, err := IsFreshInstall(ctx.Context, client, "neuvector")
+		isFreshInstall, err := IsFreshInstall(t.Context(), client, "neuvector")
 		if tc.ExpectedErr {
 			assert.NotNil(t, err)
 		} else {
@@ -184,7 +180,6 @@ func TestCreateJob(t *testing.T) {
 			ExpectedErr:  false,
 		},
 	} {
-		ctx := cli.NewContext(nil, nil, nil)
 		var testdata []runtime.Object
 		if tc.TestData != "" {
 			testdata = loadObjectList(t, tc.TestData)
@@ -195,7 +190,7 @@ func TestCreateJob(t *testing.T) {
 		client := fake.NewSimpleDynamicClient(scheme.Scheme,
 			testdata...,
 		)
-		job, err := CreatePostSyncJob(ctx.Context, client, "neuvector", "uid", false)
+		job, err := CreatePostSyncJob(t.Context(), client, "neuvector", "uid", false)
 
 		expectedJob := loadJob(t, tc.ExpectedData)
 		job.CreationTimestamp = v1.Time{}
@@ -212,8 +207,8 @@ func TestCreateJob(t *testing.T) {
 
 func TestCreateJobWithForcedK8sError(t *testing.T) {
 
-	ErrorInjector(t, nil, func(ctx *cli.Context, client dynamic.Interface, injected *bool) bool {
-		job, err := CreatePostSyncJob(ctx.Context, client, "neuvector", "uid2", false)
+	ErrorInjector(t, nil, func(client dynamic.Interface, injected *bool) bool {
+		job, err := CreatePostSyncJob(t.Context(), client, "neuvector", "uid2", false)
 
 		if *injected {
 			assert.Nil(t, job)

@@ -20,7 +20,7 @@ import (
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share/k8sutils"
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
@@ -939,13 +939,13 @@ type InternalCertUpgrader struct {
 }
 
 // Trigger the main logic of internal cert rotation.
-func PostSyncHook(ctx *cli.Context) error {
-	namespace := ctx.String("pod-namespace")
-	kubeconfig := ctx.String("kube-config")
-	timeout := ctx.Duration("timeout")
+func PostSyncHook(ctx context.Context, cmd *cli.Command) error {
+	namespace := cmd.String("pod-namespace")
+	kubeconfig := cmd.String("kube-config")
+	timeout := cmd.Duration("timeout")
 
 	// This flag is assigned by controller's init containers when all init containers coming from the same replica set.
-	timeoutCtx, cancel := context.WithTimeout(ctx.Context, timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	log.Info("Getting running namespace")
@@ -1000,15 +1000,15 @@ func PostSyncHook(ctx *cli.Context) error {
 
 	ic := InternalCertUpgrader{
 		namespace:              namespace,
-		secretName:             ctx.String("internal-secret-name"),
+		secretName:             cmd.String("internal-secret-name"),
 		client:                 client,
-		rolloutTimeout:         ctx.Duration("rollout-timeout"),
-		renewThreshold:         ctx.Duration("expiry-cert-threshold"),
-		CACertValidityDuration: ctx.Duration("ca-cert-validity-period"),
-		CertValidityDuration:   ctx.Duration("cert-validity-period"),
-		RSAKeyLength:           ctx.Int("rsa-key-length"),
-		enableRotation:         ctx.Bool("enable-rotation"),
-		freshInstall:           ctx.Bool("fresh-install"),
+		rolloutTimeout:         cmd.Duration("rollout-timeout"),
+		renewThreshold:         cmd.Duration("expiry-cert-threshold"),
+		CACertValidityDuration: cmd.Duration("ca-cert-validity-period"),
+		CertValidityDuration:   cmd.Duration("cert-validity-period"),
+		RSAKeyLength:           cmd.Int("rsa-key-length"),
+		enableRotation:         cmd.Bool("enable-rotation"),
+		freshInstall:           cmd.Bool("fresh-install"),
 	}
 
 	log.WithFields(log.Fields{
