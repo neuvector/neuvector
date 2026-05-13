@@ -686,7 +686,7 @@ func TestCheckRolesNotForDomain(t *testing.T) {
 
 	expected := []string{api.UserRoleCIOps, "custom-role-1"}
 	domainRoles := access.GetValidRoles(access.CONST_VISIBLE_DOMAIN_ROLE)
-	rolesNotForDomain := checkRolesNotForDomain(domainRoles)
+	rolesNotForDomain := filterRolesInvalidForDomain(domainRoles)
 	if len(rolesNotForDomain) != 2 {
 		t.Fatalf("Failed to check get the roles not for domain: expect=%v, got=%v.", expected, rolesNotForDomain)
 	}

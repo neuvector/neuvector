@@ -410,7 +410,7 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self user detail")
 }
 
-func checkRolesNotForDomain(domainRoles []string) []string {
+func filterRolesInvalidForDomain(domainRoles []string) []string {
 	permitsForDomain := make(map[string]*api.RESTRolePermitOptionInternal, len(access.PermissionOptions))
 	for _, p := range access.PermissionOptions {
 		if access.CONST_PERM_SUPPORT_DOMAIN == (p.SupportScope & access.CONST_PERM_SUPPORT_DOMAIN) {
@@ -418,10 +418,10 @@ func checkRolesNotForDomain(domainRoles []string) []string {
 		}
 	}
 
-	rolesNotForDomain := make([]string, 0, len(domainRoles))
+	rolesWithoutDomainPermission := make([]string, 0, len(domainRoles))
 	for _, role := range domainRoles {
 		if role == api.UserRoleCIOps {
-			rolesNotForDomain = append(rolesNotForDomain, role)
+			rolesWithoutDomainPermission = append(rolesWithoutDomainPermission, role)
 			continue
 		}
 		roleDetails := access.GetRoleDetails(role)
@@ -439,10 +439,10 @@ func checkRolesNotForDomain(domainRoles []string) []string {
 			}
 		}
 		if !hasDomainPermission {
-			rolesNotForDomain = append(rolesNotForDomain, role)
+			rolesWithoutDomainPermission = append(rolesWithoutDomainPermission, role)
 		}
 	}
-	return rolesNotForDomain
+	return rolesWithoutDomainPermission
 }
 
 func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -501,7 +501,7 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 	resp.GlobalRoles = access.GetValidRoles(access.CONST_VISIBLE_USER_ROLE)
 	resp.DomainRoles = access.GetValidRoles(access.CONST_VISIBLE_DOMAIN_ROLE)
-	resp.RolesNotForDomain = checkRolesNotForDomain(resp.DomainRoles)
+	resp.RolesNotForDomain = filterRolesInvalidForDomain(resp.DomainRoles)
 	sort.Slice(resp.Users, func(i, j int) bool { return resp.Users[i].Fullname < resp.Users[j].Fullname })
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get user list")
