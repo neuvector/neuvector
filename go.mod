@@ -1,8 +1,6 @@
 module github.com/neuvector/neuvector
 
-go 1.24.0
-
-toolchain go1.24.6
+go 1.25.0
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
@@ -40,7 +38,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/pquerna/cachecontrol v0.2.0
-	github.com/russellhaering/gosaml2 v0.10.0
+	github.com/russellhaering/gosaml2 v0.11.0
 	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spaolacci/murmur3 v1.1.0
