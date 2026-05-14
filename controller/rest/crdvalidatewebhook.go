@@ -530,7 +530,13 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		} else {
 			if ar.Request.DryRun != nil && *ar.Request.DryRun {
 				skip = true
-				resultMsg = fmt.Sprintf(" %s denied in dry-run", reqOp)
+				if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
+					log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name}).Debug("unsupported operation")
+					resultMsg = fmt.Sprintf(" %s denied: unsupported operation", reqOp)
+				} else {
+					allowed = true
+					resultMsg = fmt.Sprintf(" %s done in dry-run", reqOp)
+				}
 			} else {
 				allowed = true
 				if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
