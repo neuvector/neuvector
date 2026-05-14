@@ -73,10 +73,19 @@ func (ea *EncryptedAssertion) DecryptBytes(cert *tls.Certificate) ([]byte, error
 		// Remove zero bytes
 		data = bytes.TrimRight(data, "\x00")
 
-		// Calculate index to remove based on padding
-		padLength := data[len(data)-1]
-		lastGoodIndex := len(data) - int(padLength)
-		return data[:lastGoodIndex], nil
+		if len(data) == 0 {
+			return nil, fmt.Errorf("CBC decrypted data is empty after trimming zero bytes")
+		}
+
+		// Validate and remove padding. The pad length byte indicates
+		// how many bytes to strip. Bounds-check to prevent panics from
+		// crafted ciphertext.
+		padLength := int(data[len(data)-1])
+		if padLength == 0 || padLength > len(data) || padLength > k.BlockSize() {
+			return nil, fmt.Errorf("invalid CBC padding length: %d (data length: %d, block size: %d)", padLength, len(data), k.BlockSize())
+		}
+
+		return data[:len(data)-padLength], nil
 	default:
 		return nil, fmt.Errorf("unknown symmetric encryption method %#v", ea.EncryptionMethod.Algorithm)
 	}
