@@ -114,7 +114,7 @@ require (
 	github.com/alitto/pond v1.9.2
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/dmachard/go-clientsyslog v1.0.1
-	github.com/go-jose/go-jose/v3 v3.0.4
+	github.com/go-jose/go-jose/v3 v3.0.5
 	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/neuvector/go-rpmdb v0.0.0-20240605184921-0db4de14c27a
@@ -166,7 +166,7 @@ require (
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
