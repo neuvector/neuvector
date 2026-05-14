@@ -12321,6 +12321,11 @@ definitions:
         items:
           type: string
         example: ["role1", "role2"]
+      roles_not_for_domain:
+        type: array
+        items:
+          type: string
+        example: ["ciops", "role4"]
   RESTUserConfig:
     type: object
     required:

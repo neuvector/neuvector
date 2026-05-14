@@ -263,7 +263,7 @@ github.com/davecgh/go-spew/spew
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
-# github.com/dmachard/go-clientsyslog v1.0.1
+# github.com/dmachard/go-clientsyslog v1.0.4
 ## explicit; go 1.16
 github.com/dmachard/go-clientsyslog
 # github.com/docker/distribution v2.8.3+incompatible
@@ -312,8 +312,8 @@ github.com/fatih/camelcase
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
-# github.com/fsnotify/fsnotify v1.9.0 => github.com/fsnotify/fsnotify v1.9.0
-## explicit; go 1.17
+# github.com/fsnotify/fsnotify v1.10.1 => github.com/fsnotify/fsnotify v1.10.1
+## explicit; go 1.23
 github.com/fsnotify/fsnotify
 github.com/fsnotify/fsnotify/internal
 # github.com/fxamacker/cbor/v2 v2.7.0
@@ -341,8 +341,8 @@ github.com/go-jose/go-jose/v3/json
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
 github.com/go-jose/go-jose/v4/json
-# github.com/go-ldap/ldap/v3 v3.4.11
-## explicit; go 1.23.0
+# github.com/go-ldap/ldap/v3 v3.4.13
+## explicit; go 1.24.0
 github.com/go-ldap/ldap/v3
 # github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
@@ -367,7 +367,7 @@ github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
-# github.com/golang-jwt/jwt/v5 v5.3.0
+# github.com/golang-jwt/jwt/v5 v5.3.1
 ## explicit; go 1.21
 github.com/golang-jwt/jwt/v5
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
@@ -480,8 +480,8 @@ github.com/mattermost/xml-roundtrip-validator
 # github.com/mattn/go-isatty v0.0.17
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mattn/go-sqlite3 v1.14.28
-## explicit; go 1.19
+# github.com/mattn/go-sqlite3 v1.14.44
+## explicit; go 1.21
 github.com/mattn/go-sqlite3
 # github.com/mitchellh/go-homedir v1.1.0
 ## explicit
@@ -501,8 +501,8 @@ github.com/moby/docker-image-spec/specs-go/v1
 # github.com/moby/locker v1.0.1
 ## explicit; go 1.13
 github.com/moby/locker
-# github.com/moby/moby/api v1.54.0
-## explicit; go 1.24.0
+# github.com/moby/moby/api v1.54.2
+## explicit; go 1.24
 github.com/moby/moby/api/types
 github.com/moby/moby/api/types/blkiodev
 github.com/moby/moby/api/types/build
@@ -762,7 +762,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.43.0
+# golang.org/x/sys v0.44.0
 ## explicit; go 1.25.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
@@ -1594,5 +1594,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
+# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
 # k8s.io/cri-api => k8s.io/cri-api v0.25.16

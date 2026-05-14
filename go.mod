@@ -3,7 +3,7 @@ module github.com/neuvector/neuvector
 go 1.26.2
 
 replace (
-	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
 	k8s.io/cri-api => k8s.io/cri-api v0.25.16
 )
 
@@ -18,9 +18,9 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/doug-martin/goqu/v9 v9.19.0
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -30,7 +30,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/jrhouston/k8slock v0.2.0
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/mattn/go-sqlite3 v1.14.28
+	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neuvector/k8s v1.4.1-0.20240927235747-43bcf20a80a3
 	github.com/opencontainers/go-digest v1.0.0
@@ -47,7 +47,7 @@ require (
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/net v0.53.0
 	golang.org/x/oauth2 v0.34.0
-	golang.org/x/sys v0.43.0
+	golang.org/x/sys v0.44.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/grpc/security/advancedtls v1.0.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -110,13 +110,13 @@ require (
 require (
 	github.com/alitto/pond v1.9.2
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/dmachard/go-clientsyslog v1.0.1
+	github.com/dmachard/go-clientsyslog v1.0.4
 	github.com/glebarez/go-sqlite v1.20.3
 	github.com/go-jose/go-jose/v3 v3.0.5
-	github.com/go-ldap/ldap/v3 v3.4.11
+	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/mitchellh/pointerstructure v1.2.1
-	github.com/moby/moby/api v1.54.0
+	github.com/moby/moby/api v1.54.2
 	github.com/moby/moby/client v0.3.0
 	github.com/openvex/go-vex v0.2.8
 	github.com/quay/clair/v2 v2.1.8
