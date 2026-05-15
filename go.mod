@@ -1,6 +1,6 @@
 module github.com/neuvector/neuvector
 
-go 1.25.0
+go 1.26.2
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.9.0
@@ -125,7 +125,7 @@ require (
 require (
 	cyphar.com/go-pathrs v0.2.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
-	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
