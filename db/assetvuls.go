@@ -1100,8 +1100,6 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 		}
 
 		if len(tops) < 5 {
-			// temporarily revert critical cve logic
-			record.Critical = -1
 			tops = append(tops, record)
 		} else {
 			other.Critical += record.Critical
@@ -1110,9 +1108,6 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 			other.Low += record.Low
 		}
 	}
-
-	// temporarily revert critical cve logic
-	other.Critical = -1
 
 	tops = append(tops, other) // the 6th record is for other
 
@@ -1319,7 +1314,6 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 		}
 		asset.Registry = fmt.Sprintf("%s%s:%s", asset.Registry, asset.Name, asset.Tag)
 
-		asset.Critical = -1 // temporarily revert critical cve logic
 		assets = append(assets, asset)
 	}
 
