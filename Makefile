@@ -238,3 +238,5 @@ push-enforcer-image: buildx-machine
 		--builder $(MACHINE) $(IMAGE_ARGS) $(IID_FILE_FLAG) $(BUILDX_ARGS) \
 		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)" --push .
 	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)"
+test:
+	go test ./...
