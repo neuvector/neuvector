@@ -546,16 +546,17 @@ func main() {
 	var internalCertControllerCancel context.CancelFunc
 	var ctx context.Context
 
-	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
-
-		log.Info("start initializing k8s internal secret controller and wait for internal secret creation if it's not created")
-
+	// Healthz server handles internal cert migration (enabled by default) and readiness checks (always enabled in k8s).
+	if platform == share.PlatformKubernetes {
 		go func() {
 			if err := healthz.StartHealthzServer(); err != nil {
 				log.WithError(err).Warn("failed to start healthz server")
 			}
 		}()
+	}
 
+	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
+		log.Info("start initializing k8s internal secret controller and wait for internal secret creation if it's not created")
 		ctx, internalCertControllerCancel = context.WithCancel(context.Background())
 		defer internalCertControllerCancel()
 		// Initialize secrets.  Most of services are not running at this moment, so skip their reload functions.
