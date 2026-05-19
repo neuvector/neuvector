@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	registrytypes "github.com/docker/docker/api/types/registry"
+	registrytypes "github.com/moby/moby/api/types/registry"
 	log "github.com/sirupsen/logrus"
 )
 
