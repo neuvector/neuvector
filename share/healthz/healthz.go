@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 
+	"github.com/neuvector/neuvector/share/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,6 +44,15 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 func StartHealthzServer() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", HealthzHandler)
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		// This handles all errors in addition to the file not existing.
+		if _, err := os.Stat(utils.ReadyFile); err != nil {
+			log.WithError(err).Warn("ready file not accessible")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 
 	return http.ListenAndServe(fmt.Sprintf(":%d", healthzPort), mux)
 }

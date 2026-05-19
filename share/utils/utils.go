@@ -51,7 +51,7 @@ const cliAny string = "any"
 const reStrNonPrintable string = "[^\x20-\x7E]"
 const reStrURLReserved string = "[/?%& ]"
 
-const readyFile string = "/tmp/ready"
+const ReadyFile string = "/tmp/ready"
 
 var reNonPrintable, reURLReserved *regexp.Regexp
 
@@ -1194,7 +1194,7 @@ func Exec(dir string, bin string, args ...string) ([]byte, error) {
 
 func SetReady(value string) error {
 	log.WithFields(log.Fields{"value": value}).Info("")
-	f, err := os.Create(readyFile)
+	f, err := os.Create(ReadyFile)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "value": value}).Error("Unable to create ready file")
 		return err
@@ -1206,7 +1206,7 @@ func SetReady(value string) error {
 
 func UnsetReady() error {
 	log.Info("")
-	return os.Remove(readyFile)
+	return os.Remove(ReadyFile)
 }
 
 // Utilities: find group attribute from the grou's name definitions, based on controller/api/apis.go
