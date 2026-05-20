@@ -1730,19 +1730,26 @@ func getSAMLUserFromAttrs(attrs map[string][]string, customGroupClaim string) (s
 }
 
 // OpenID Connect has authenticated the user.
-func getOIDCUserFromClaims(claims map[string]interface{}, customGroupClaim string) (string, string, []string) {
+func getOIDCUserFromClaims(claims map[string]interface{}, customGroupClaim, customUsernameClaim string) (string, string, []string) {
 	var username, email string
 	if v, ok := claims[oldcEmailKey]; ok {
 		email, _ = v.(string)
 	}
-	if v, ok := claims[oidcPreferredNameKey]; ok {
-		username, _ = v.(string)
-	} else if v, ok := claims[oidcNameKey]; ok {
-		username, _ = v.(string)
-	} else if email != "" {
-		username = email
-	} else {
-		return "", email, nil
+	if customUsernameClaim != "" {
+		if v, ok := claims[customUsernameClaim]; ok {
+			username, _ = v.(string)
+		}
+	}
+	if username == "" {
+		if v, ok := claims[oidcPreferredNameKey]; ok {
+			username, _ = v.(string)
+		} else if v, ok := claims[oidcNameKey]; ok {
+			username, _ = v.(string)
+		} else if email != "" {
+			username = email
+		} else {
+			return "", email, nil
+		}
 	}
 
 	var groups []string
@@ -2820,7 +2827,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 
 			log.WithFields(log.Fields{"server": server, "claims": claims}).Debug("Token validation succeeded")
 
-			username, email, groups := getOIDCUserFromClaims(claims, cs.OIDC.GroupClaim)
+			username, email, groups := getOIDCUserFromClaims(claims, cs.OIDC.GroupClaim, cs.OIDC.UsernameClaim)
 			if username == "" {
 				err = errors.New("Unable to locate username")
 			} else {

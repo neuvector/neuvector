@@ -1013,8 +1013,9 @@ type CLUSServerOIDC struct {
 	ClientID     string   `json:"client_id"` // Must handle upgrade if it is cloaked
 	ClientSecret string   `json:"client_secret,cloak"`
 	Scopes       []string `json:"scopes"`
-	GroupClaim   string   `json:"group_claim"`
-	UseProxy     bool     `json:"use_proxy"`
+	GroupClaim     string   `json:"group_claim"`
+	UsernameClaim  string   `json:"username_claim"`
+	UseProxy       bool     `json:"use_proxy"`
 }
 
 type CLUSServer struct {
