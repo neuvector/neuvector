@@ -11,6 +11,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -24,7 +25,7 @@ func TestParseCrdSecurityRule(t *testing.T) {
 	var raw_string, err string
 	var raw []byte
 	var errCount int
-	var gfwrule resource.NvSecurityRule
+	var gfwrule v1.NvSecurityRule
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -296,7 +297,7 @@ func TestParseCrdSecurityRuleGroupReferral(t *testing.T) {
 	var raw_string, err string
 	var raw []byte
 	var errCount int
-	var gfwrule resource.NvSecurityRule
+	var gfwrule v1.NvSecurityRule
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)

@@ -23,6 +23,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -1175,7 +1176,7 @@ func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httpro
 	_importHandler(w, r, tid, share.IMPORT_TYPE_RESPONSE, share.PREFIX_IMPORT_RESPONSE, share.PERMS_RUNTIME_POLICIES, acc, login)
 }
 
-func genResponseRuleCrName(id uint32, scope string, crdRule resource.NvCrdResponseRule) (string, error) {
+func genResponseRuleCrName(id uint32, scope string, crdRule v1.NvCrdResponseRule) (string, error) {
 	rMini := api.RESTResponseRule{
 		ID:         id,
 		Event:      crdRule.Event,
@@ -1196,7 +1197,7 @@ func genResponseRuleCrName(id uint32, scope string, crdRule resource.NvCrdRespon
 	return crName, nil
 }
 
-func exportResponseRules(scope, gName string, id uint32, acc *access.AccessControl) ([]*resource.NvCrdResponseRule, error) {
+func exportResponseRules(scope, gName string, id uint32, acc *access.AccessControl) ([]*v1.NvCrdResponseRule, error) {
 	policyName := getResponseExportPolicyName(gName, id)
 	if id != 0 {
 		// export a specific response rule
@@ -1212,7 +1213,7 @@ func exportResponseRules(scope, gName string, id uint32, acc *access.AccessContr
 			}
 			return nil, fmt.Errorf("response rule %d is for group <%s>", id, r.Group)
 		}
-		crdRule := &resource.NvCrdResponseRule{
+		crdRule := &v1.NvCrdResponseRule{
 			PolicyName: policyName,
 			Event:      r.Event,
 			Actions:    r.Actions,
@@ -1221,15 +1222,15 @@ func exportResponseRules(scope, gName string, id uint32, acc *access.AccessContr
 			Webhooks:   r.Webhooks,
 			Conditions: r.Conditions,
 		}
-		return []*resource.NvCrdResponseRule{crdRule}, nil
+		return []*v1.NvCrdResponseRule{crdRule}, nil
 	}
 	if gName != "" {
-		var rules []*resource.NvCrdResponseRule
+		var rules []*v1.NvCrdResponseRule
 		// export all response rules that are for the group
 		allRules := cacher.GetAllResponseRules(scope, acc)
 		for _, r := range allRules {
 			if r.Group == gName {
-				crdRule := &resource.NvCrdResponseRule{
+				crdRule := &v1.NvCrdResponseRule{
 					PolicyName: policyName,
 					Event:      r.Event,
 					Actions:    r.Actions,

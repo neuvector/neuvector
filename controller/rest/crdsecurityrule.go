@@ -22,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
@@ -1706,7 +1707,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(cfgType share.TCfgType, crdConfig 
 // caller must own CLUSLockPolicyKey lock
 // This function is for handling per-group's response rules & response rules with empty group field.
 // There could be multiple response rules dependent on a specific group
-func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg map[string][]*resource.NvCrdResponseRule,
+func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg map[string][]*v1.NvCrdResponseRule,
 	cfgType share.TCfgType) ([]uint32, error) {
 	if len(grpResponseCfg) == 0 {
 		return nil, nil
@@ -1760,7 +1761,7 @@ func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg 
 // caller must own CLUSLockPolicyKey lock
 // This function is for handling the response rules that are for all groups only.
 // Every such response rule is a CR
-func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponseCfg *resource.NvCrdResponseRule,
+func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponseCfg *v1.NvCrdResponseRule,
 	cacheRecord *share.CLUSCrdSecurityRule, reviewType share.TReviewType) error {
 	var err error
 	scope := share.ScopeLocal
@@ -1768,9 +1769,9 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 		scope = share.ScopeFed
 	}
 
-	responseCfgs := []*resource.NvCrdResponseRule{crdResponseCfg}
+	responseCfgs := []*v1.NvCrdResponseRule{crdResponseCfg}
 	cacheRecord.ResponseRules.PolicyName = crdResponseCfg.PolicyName
-	grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+	grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 		"": responseCfgs,
 	}
 
@@ -2446,7 +2447,7 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 	return "", err
 }
 
-func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail resource.NvSecurityRuleDetail, ruleSet utils.Set,
+func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail v1.NvSecurityRuleDetail, ruleSet utils.Set,
 	reviewType share.TReviewType, owner string) (api.RESTPolicyRuleConfig, string, int) {
 
 	var buffer bytes.Buffer
@@ -2487,7 +2488,7 @@ func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail re
 	return ruleCfg, "", 0
 }
 
-func (h *nvCrdHandler) validateCrdResponseRule(idx int, gName string, cfgType share.TCfgType, rule resource.NvCrdResponseRule,
+func (h *nvCrdHandler) validateCrdResponseRule(idx int, gName string, cfgType share.TCfgType, rule v1.NvCrdResponseRule,
 	acc *access.AccessControl) (string, int) {
 	if gName != rule.Group {
 		return fmt.Sprintf("wrong group %s", rule.Group), 1
@@ -2623,7 +2624,7 @@ func (h *nvCrdHandler) validateCrdFileRules(rules []*api.RESTFileMonitorFilter) 
 
 }
 
-func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec) (string, int) {
+func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *v1.NvSecurityRuleSpec) (string, int) {
 	var errCnt int
 	var buffer bytes.Buffer
 
@@ -2657,7 +2658,7 @@ func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec)
 }
 
 // for CRD & group import
-func (h *nvCrdHandler) parseCurCrdGfwContent(scope string, gfwrule *resource.NvSecurityRule, recordList map[string]*share.CLUSCrdSecurityRule,
+func (h *nvCrdHandler) parseCurCrdGfwContent(scope string, gfwrule *v1.NvSecurityRule, recordList map[string]*share.CLUSCrdSecurityRule,
 	reviewType share.TReviewType, reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 	var buffer bytes.Buffer
 	var errNo int
@@ -2985,7 +2986,7 @@ targetpass:
 	}
 
 	// 6. Get response rules for the group
-	var responseRules []*resource.NvCrdResponseRule
+	var responseRules []*v1.NvCrdResponseRule
 	for i, ruleDetail := range gfwrule.Spec.ResponseRule {
 		// the contents will be justified
 		ruleDetail.Group = crdCfgRet.TargetName
@@ -3700,7 +3701,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 
 	if len(crdCfgRet.GroupResponseCfg) > 0 {
 		// handling response rules for the group
-		grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+		grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 			crdCfgRet.TargetName: crdCfgRet.GroupResponseCfg,
 		}
 		ruleIDs, err := h.crdHandleGroupResponseRules(share.ScopeLocal, grpResponseCfg, crdCfgRet.CfgType)
@@ -3854,8 +3855,8 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 	*resource.NvSecurityParse, int, string, string) {
 
 	var crdCfgRet *resource.NvSecurityParse
-	var gfwrule *resource.NvSecurityRule
-	var gfwruleObj resource.NvSecurityRule
+	var gfwrule *v1.NvSecurityRule
+	var gfwruleObj v1.NvSecurityRule
 	var grpDef *resource.NvGroupDefinition
 	var admCtrlSecRule *resource.NvAdmCtrlSecurityRule
 	var responseSecRule *resource.NvResponseSecurityRule
@@ -3868,11 +3869,11 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 
 	switch kind {
 	case resource.NvSecurityRuleKind:
-		gfwrule, ok = crdSecRule.(*resource.NvSecurityRule)
+		gfwrule, ok = crdSecRule.(*v1.NvSecurityRule)
 	case resource.NvClusterSecurityRuleKind:
 		var gfwruleTemp *resource.NvClusterSecurityRule
 		if gfwruleTemp, ok = crdSecRule.(*resource.NvClusterSecurityRule); ok {
-			gfwruleObj = resource.NvSecurityRule(*gfwruleTemp)
+			gfwruleObj = v1.NvSecurityRule(*gfwruleTemp)
 			gfwrule = &gfwruleObj
 		}
 	case resource.NvGroupDefKind:
@@ -4040,8 +4041,8 @@ func isExportSkipGroupName(name, owner string, alwaysAllowNsUser bool, acc *acce
 }
 
 func exportAttachRule(scope string, rule *api.RESTPolicyRule, owner string, acc *access.AccessControl, cnt int,
-	useNameReferral, alwaysAllowNsUser bool) (*resource.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
-	var detail resource.NvSecurityRuleDetail
+	useNameReferral, alwaysAllowNsUser bool) (*v1.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
+	var detail v1.NvSecurityRuleDetail
 	var group *api.RESTGroup
 	var nvGroupDefCfg resource.NvGroupDefCfg
 	var skip bool
@@ -4168,7 +4169,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	apiVersion := resource.NvSecurityRuleVersion
-	resp := resource.NvSecurityRuleList{
+	resp := v1.NvSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       resource.NvListKind,
 			APIVersion: apiVersion,
@@ -4235,7 +4236,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 		}
 
-		resptmp := resource.NvSecurityRule{
+		resptmp := v1.NvSecurityRule{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       targetKind,
 				APIVersion: apiversion,
@@ -4244,14 +4245,14 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				Name:      kindName,
 				Namespace: targetNs,
 			},
-			Spec: resource.NvSecurityRuleSpec{
-				Target: resource.NvSecurityTarget{
+			Spec: v1.NvSecurityRuleSpec{
+				Target: v1.NvSecurityTarget{
 					Selector: tgroup,
 				},
-				IngressRule: make([]resource.NvSecurityRuleDetail, 0),
-				EgressRule:  make([]resource.NvSecurityRuleDetail, 0),
-				ProcessRule: make([]resource.NvSecurityProcessRule, 0),
-				FileRule:    make([]resource.NvSecurityFileRule, 0),
+				IngressRule: make([]v1.NvSecurityRuleDetail, 0),
+				EgressRule:  make([]v1.NvSecurityRuleDetail, 0),
+				ProcessRule: make([]v1.NvSecurityProcessRule, 0),
+				FileRule:    make([]v1.NvSecurityFileRule, 0),
 			},
 		}
 		if isFedScope && tgroup.Name == api.LearnedExternal {
@@ -4341,7 +4342,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 					},
 				}
 
-				var detail *resource.NvSecurityRuleDetail
+				var detail *v1.NvSecurityRuleDetail
 				var nvGroupDefCfg resource.NvGroupDefCfg
 				if rule.To == gname {
 					fromFedGroup := strings.HasPrefix(rule.From, api.FederalGroupPrefix)
@@ -4448,7 +4449,7 @@ func (h *nvCrdHandler) crdGetFileRules(profile *api.RESTFileMonitorProfile) []sh
 	return rules
 }
 
-func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
+func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *v1.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if profile, err := cacher.GetProcessProfile(group, acc); err == nil {
 		if utils.DoesGroupHavePolicyMode(group) {
@@ -4456,7 +4457,7 @@ func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resour
 			if profile.Baseline == share.ProfileBasic {
 				baseline = share.ProfileBasic
 			}
-			secRule.ProcessProfile = &resource.NvSecurityProcessProfile{Baseline: &baseline}
+			secRule.ProcessProfile = &v1.NvSecurityProcessProfile{Baseline: &baseline}
 			if rconf.ProfileMode != "" {
 				secRule.ProcessProfile.Mode = &rconf.ProfileMode
 			} else if profile.Mode != "" {
@@ -4470,7 +4471,7 @@ func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resour
 			if !dupChecker.Contains(key) {
 				dupChecker.Add(key)
 				//
-				r := &resource.NvSecurityProcessRule{
+				r := &v1.NvSecurityProcessRule{
 					Name:            gproc.Name,
 					Path:            gproc.Path,
 					Action:          gproc.Action,
@@ -4486,7 +4487,7 @@ func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resour
 	return false
 }
 
-func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
+func exportFileRule(group string, rules *v1.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	// not include predefined list
 	if profile, err := cacher.GetFileMonitorProfile(group, acc, false); err == nil {
@@ -4496,7 +4497,7 @@ func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *acces
 			if !dupChecker.Contains(key) {
 				dupChecker.Add(key)
 				//
-				r := &resource.NvSecurityFileRule{
+				r := &v1.NvSecurityFileRule{
 					Filter:    ff.Filter,
 					Recursive: ff.Recursive,
 					Behavior:  ff.Behavior,
@@ -4513,7 +4514,7 @@ func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *acces
 	return false
 }
 
-func exportDlpWafGroup(group string, secRule *resource.NvSecurityRule, acc *access.AccessControl) {
+func exportDlpWafGroup(group string, secRule *v1.NvSecurityRule, acc *access.AccessControl) {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if dlpGroup, err := cacher.GetDlpGroup(group, acc); err == nil {
 		settings := make([]api.RESTCrdDlpGroupSetting, len(dlpGroup.Sensors))
@@ -4523,7 +4524,7 @@ func exportDlpWafGroup(group string, secRule *resource.NvSecurityRule, acc *acce
 				Action: s.Action,
 			}
 		}
-		secRule.Spec.DlpGroup = &resource.NvSecurityDlpGroup{
+		secRule.Spec.DlpGroup = &v1.NvSecurityDlpGroup{
 			Status:   dlpGroup.Status,
 			Settings: settings,
 		}
@@ -4539,7 +4540,7 @@ func exportDlpWafGroup(group string, secRule *resource.NvSecurityRule, acc *acce
 				Action: s.Action,
 			}
 		}
-		secRule.Spec.WafGroup = &resource.NvSecurityWafGroup{
+		secRule.Spec.WafGroup = &v1.NvSecurityWafGroup{
 			Status:   wafGroup.Status,
 			Settings: settings,
 		}

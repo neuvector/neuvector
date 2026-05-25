@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/neuvector/neuvector/controller/api"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -77,7 +78,7 @@ LOOP:
 				crUid := ""
 				req := ar.Request
 				var raw []byte
-				var secRulePartial resource.NvSecurityRulePartial
+				var secRulePartial v1.NvSecurityRulePartial
 				if req.Operation == "DELETE" {
 					raw = req.OldObject.Raw
 				} else {
@@ -285,7 +286,7 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 
 		var kind string
 		var rscType string
-		var secRulePartial resource.NvSecurityRulePartial
+		var secRulePartial v1.NvSecurityRulePartial
 		var crdSecRule interface{}
 		var errCount, cachedRecords int
 		var errMsg string
@@ -456,7 +457,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		if ar.Request.Name == "" {
 			req := ar.Request
 			if req != nil && reqOp == admissionv1beta1.Delete && req.Name == "" {
-				var secRulePartial resource.NvSecurityRulePartial
+				var secRulePartial v1.NvSecurityRulePartial
 				if err := json.Unmarshal(req.OldObject.Raw, &secRulePartial); err == nil {
 					req.Name = secRulePartial.GetName()
 				} else {
@@ -487,7 +488,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		if len(sizeErrMsg) == 0 && (reqOp == admissionv1beta1.Create || reqUpdateByK8sGC) {
 			mdName := ""
 			allowedNames := []string{}
-			var secRulePartial resource.NvSecurityRulePartial
+			var secRulePartial v1.NvSecurityRulePartial
 			req := ar.Request
 			if err := json.Unmarshal(req.Object.Raw, &secRulePartial); err == nil {
 				mdName = secRulePartial.GetName()
