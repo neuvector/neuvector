@@ -1009,7 +1009,7 @@ metadata: {}
 
 	{
 		// should fail when try to create a group that the same-name NvGroupDefKind CR exists but has different criteria
-		conf := api.RESTGroupConfig{Name: "g-14", Criteria: &[]api.RESTCriteriaEntry{{Key: "label/key", Value: "label/value", Op: "="}}}
+		conf := api.RESTGroupConfig{Name: "g-14", Criteria: &[]v1.CriteriaEntry{{Key: "label/key", Value: "label/value", Op: "="}}}
 		data := api.RESTGroupConfigData{Config: &conf}
 		body, _ := json.Marshal(data)
 		w := restCall("POST", "/v1/group", body, api.UserRoleAdmin)
@@ -1018,7 +1018,7 @@ metadata: {}
 		}
 
 		// should succeed when try to create a group that the same-name NvGroupDefKind CR exists and has same criteria
-		conf = api.RESTGroupConfig{Name: "g-14", Criteria: &[]api.RESTCriteriaEntry{{Key: "container", Value: "myServer14", Op: "="}}}
+		conf = api.RESTGroupConfig{Name: "g-14", Criteria: &[]v1.CriteriaEntry{{Key: "container", Value: "myServer14", Op: "="}}}
 		data = api.RESTGroupConfigData{Config: &conf}
 		body, _ = json.Marshal(data)
 		w = restCall("POST", "/v1/group", body, api.UserRoleAdmin)
@@ -1027,7 +1027,7 @@ metadata: {}
 		}
 
 		// should fail when try to update an existing group to different criteria from the same-name NvGroupDefKind CR's criteria
-		conf = api.RESTGroupConfig{Name: "g-43", Criteria: &[]api.RESTCriteriaEntry{{Key: "container", Value: "myServer-14001", Op: "="}}}
+		conf = api.RESTGroupConfig{Name: "g-43", Criteria: &[]v1.CriteriaEntry{{Key: "container", Value: "myServer-14001", Op: "="}}}
 		data = api.RESTGroupConfigData{Config: &conf}
 		body, _ = json.Marshal(data)
 		w = restCall("PATCH", "/v1/group/g-13", body, api.UserRoleAdmin)
@@ -1237,7 +1237,7 @@ metadata: {}
 					// if no parsing error, simulating reading CR from k8s
 					if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, "g-1"); err == nil {
 						if o, ok := obj.(*resource.NvGroupDefinition); ok {
-							// expectedCriteria := api.RESTCriteriaEntry{Key: "container", Op: "=", Value: "myServer12"}
+							// expectedCriteria := v1.CriteriaEntry{Key: "container", Op: "=", Value: "myServer12"}
 							if crdCfgRet.GroupCfgs[0].Comment != o.Spec.Selector.Comment ||
 								!common.SameGroupCriteria(crdCfgRet.GroupCfgs[0].Criteria, o.Spec.Selector.Criteria, false) ||
 								len(crdCfgRet.GroupCfgs[0].Criteria) == 0 {
@@ -1375,7 +1375,7 @@ spec:
 			}
 		}
 
-		// group g-1 criteria in kv = api.RESTCriteriaEntry{Key: "container", Op: "=", Value: "myServer1999"}
+		// group g-1 criteria in kv = v1.CriteriaEntry{Key: "container", Op: "=", Value: "myServer1999"}
 		if secRules, nvGrpDefs, err := parseGroupYamlFile(raw_string); err != nil {
 			t.Errorf("[9] parseGroupYamlFile failed: %s. Expect success", err)
 		} else {

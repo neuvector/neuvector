@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 )
 
@@ -1216,12 +1217,6 @@ type RESTConversationQueryData struct {
 	Query *RESTConversationQuery `json:"query"`
 }
 
-type RESTCriteriaEntry struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-	Op    string `json:"op"`
-}
-
 const (
 	CfgTypeLearned     = "learned"
 	CfgTypeUserCreated = "user_created"
@@ -1259,7 +1254,7 @@ type RESTGroupBrief struct {
 
 type RESTGroup struct {
 	RESTGroupBrief
-	Criteria      []RESTCriteriaEntry  `json:"criteria"`
+	Criteria      []v1.CriteriaEntry   `json:"criteria"`
 	Members       []*RESTWorkloadBrief `json:"members"`
 	PolicyRules   []uint32             `json:"policy_rules"`
 	ResponseRules []uint32             `json:"response_rules"`
@@ -1267,33 +1262,21 @@ type RESTGroup struct {
 
 type RESTGroupDetail struct {
 	RESTGroupBrief
-	Criteria      []RESTCriteriaEntry  `json:"criteria"`
+	Criteria      []v1.CriteriaEntry   `json:"criteria"`
 	Members       []*RESTWorkloadBrief `json:"members"`
 	PolicyRules   []*RESTPolicyRule    `json:"policy_rules"`
 	ResponseRules []*RESTResponseRule  `json:"response_rules"`
 }
 
 type RESTGroupConfig struct {
-	Name         string               `json:"name"`
-	Comment      *string              `json:"comment"`
-	Criteria     *[]RESTCriteriaEntry `json:"criteria,omitempty"`
-	CfgType      string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
-	MonMetric    *bool                `json:"monitor_metric,omitempty"`
-	GrpSessCur   *uint32              `json:"group_sess_cur,omitempty"`
-	GrpSessRate  *uint32              `json:"group_sess_rate,omitempty"`
-	GrpBandWidth *uint32              `json:"group_band_width,omitempty"`
-}
-
-type RESTCrdGroupConfig struct {
-	OriginalName string              `json:"original_name"`
 	Name         string              `json:"name"`
-	Comment      string              `json:"comment"`
-	NameReferral bool                `json:"name_referral,omitempty"`
-	Criteria     []RESTCriteriaEntry `json:"criteria,omitempty"`
-	MonMetric    *bool               `json:"mon_metric,omitempty"`
-	GrpSessCur   *uint32             `json:"grp_sess_cur,omitempty"`
-	GrpSessRate  *uint32             `json:"grp_sess_rate,omitempty"`
-	GrpBandWidth *uint32             `json:"grp_band_width,omitempty"`
+	Comment      *string             `json:"comment"`
+	Criteria     *[]v1.CriteriaEntry `json:"criteria,omitempty"`
+	CfgType      string              `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	MonMetric    *bool               `json:"monitor_metric,omitempty"`
+	GrpSessCur   *uint32             `json:"group_sess_cur,omitempty"`
+	GrpSessRate  *uint32             `json:"group_sess_rate,omitempty"`
+	GrpBandWidth *uint32             `json:"group_band_width,omitempty"`
 }
 
 type RESTGroupsData struct {
@@ -3260,14 +3243,9 @@ type RESTDlpRuleConfigData struct {
 	Config *RESTDlpRuleConfig `json:"config"`
 }
 
-type RESTCrdDlpGroupSetting struct {
-	Name   string `json:"name"`
-	Action string `json:"action"`
-}
-
 type RESTCrdDlpGroupConfig struct {
-	Status     bool                     `json:"status,omitempty"`
-	RepSensors []RESTCrdDlpGroupSetting `json:"replace,omitempty"` //replace list used by GUI
+	Status     bool                 `json:"status,omitempty"`
+	RepSensors []v1.DlpGroupSetting `json:"replace,omitempty"` //replace list used by GUI
 }
 
 type RESTDlpSensorExport struct {
@@ -3412,14 +3390,9 @@ type RESTWafGroupConfigData struct {
 	Config *RESTWafGroupConfig `json:"config"`
 }
 
-type RESTCrdWafGroupSetting struct {
-	Name   string `json:"name"`
-	Action string `json:"action"`
-}
-
 type RESTCrdWafGroupConfig struct {
-	Status     bool                     `json:"status,omitempty"`
-	RepSensors []RESTCrdWafGroupSetting `json:"replace,omitempty"` //replace list used by GUI
+	Status     bool                 `json:"status,omitempty"`
+	RepSensors []v1.WafGroupSetting `json:"replace,omitempty"` //replace list used by GUI
 }
 
 const (

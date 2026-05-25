@@ -1,10 +1,39 @@
 package v1
 
 import (
-	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// Group-related definition
+
+type DlpGroupSetting struct {
+	Name   string `json:"name"`
+	Action string `json:"action"`
+}
+
+type WafGroupSetting struct {
+	Name   string `json:"name"`
+	Action string `json:"action"`
+}
+
+type CriteriaEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	Op    string `json:"op"`
+}
+
+type GroupConfig struct {
+	OriginalName string          `json:"original_name"`
+	Name         string          `json:"name"`
+	Comment      string          `json:"comment"`
+	NameReferral bool            `json:"name_referral,omitempty"`
+	Criteria     []CriteriaEntry `json:"criteria,omitempty"`
+	MonMetric    *bool           `json:"mon_metric,omitempty"`
+	GrpSessCur   *uint32         `json:"grp_sess_cur,omitempty"`
+	GrpSessRate  *uint32         `json:"grp_sess_rate,omitempty"`
+	GrpBandWidth *uint32         `json:"grp_band_width,omitempty"`
+}
 
 type NvCrdResponseRule struct {
 	PolicyName string                     `json:"policy_name"`
@@ -19,17 +48,17 @@ type NvCrdResponseRule struct {
 
 // NvSecurityRule CRD
 type NvSecurityTarget struct {
-	PolicyMode *string                `json:"policymode,omitempty"`
-	Selector   api.RESTCrdGroupConfig `json:"selector"`
+	PolicyMode *string     `json:"policymode,omitempty"`
+	Selector   GroupConfig `json:"selector"`
 }
 
 type NvSecurityRuleDetail struct {
-	Selector     api.RESTCrdGroupConfig `json:"selector"`
-	Applications []string               `json:"applications"`
-	Ports        string                 `json:"ports"`
-	Action       string                 `json:"action"`
-	Name         string                 `json:"name"`
-	Priority     uint32                 `json:"priority"`
+	Selector     GroupConfig `json:"selector"`
+	Applications []string    `json:"applications"`
+	Ports        string      `json:"ports"`
+	Action       string      `json:"action"`
+	Name         string      `json:"name"`
+	Priority     uint32      `json:"priority"`
 }
 
 type NvSecurityProcessProfile struct {
@@ -52,13 +81,13 @@ type NvSecurityFileRule struct {
 }
 
 type NvSecurityDlpGroup struct {
-	Status   bool                         `json:"status"`
-	Settings []api.RESTCrdDlpGroupSetting `json:"settings"`
+	Status   bool              `json:"status"`
+	Settings []DlpGroupSetting `json:"settings"`
 }
 
 type NvSecurityWafGroup struct {
-	Status   bool                         `json:"status"`
-	Settings []api.RESTCrdWafGroupSetting `json:"settings"`
+	Status   bool              `json:"status"`
+	Settings []WafGroupSetting `json:"settings"`
 }
 
 type NvSecurityRuleSpec struct {
