@@ -34,10 +34,10 @@ import (
 
 var defGroups utils.Set = utils.NewSet(api.LearnedExternal, api.AllHostGroup, api.AllContainerGroup, api.FedAllHostGroup, api.FedAllContainerGroup)
 
-func criteria2REST(inEntries []share.CLUSCriteriaEntry) []api.RESTCriteriaEntry {
-	var outEntries []api.RESTCriteriaEntry
+func criteria2REST(inEntries []share.CLUSCriteriaEntry) []v1.CriteriaEntry {
+	var outEntries []v1.CriteriaEntry
 	for _, inC := range inEntries {
-		outC := api.RESTCriteriaEntry{
+		outC := v1.CriteriaEntry{
 			Key:   inC.Key,
 			Value: inC.Value,
 			Op:    inC.Op,
@@ -2124,10 +2124,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 					if hasDlpWafSetting, ok := targetGroupDlpWAF[grpCfgRet.TargetName]; ok && hasDlpWafSetting {
 						if grpCfgRet.DlpGroupCfg == nil {
-							grpCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]api.RESTCrdDlpGroupSetting, 0)}
+							grpCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]v1.DlpGroupSetting, 0)}
 						}
 						if grpCfgRet.WafGroupCfg == nil {
-							grpCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]api.RESTCrdWafGroupSetting, 0)}
+							grpCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]v1.WafGroupSetting, 0)}
 						}
 
 						txn := cluster.Transact()
@@ -2163,7 +2163,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 }
 
 // Create/update all the imported groups except for the reserved group, external/nodes/containers/Workload:ingress
-func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (utils.Set, bool, error) {
+func importGroup(scope, targetGroup string, groups []v1.GroupConfig) (utils.Set, bool, error) {
 	var targetGroupDlpWAF bool
 	updatedGroups := utils.NewSet()
 	acc := access.NewAdminAccessControl()
@@ -2175,7 +2175,7 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 		if isDefaultGroup(group.Name) {
 			continue
 		}
-		groupCriteria := []api.RESTCriteriaEntry{}
+		groupCriteria := []v1.CriteriaEntry{}
 		isNvIpGroup := strings.HasPrefix(group.Name, api.LearnedSvcGroupPrefix)
 		// keep processing imported nv.ip.xxx group that has empty criteria when the group is not learned yet on docker swarm
 		if len(group.Criteria) == 0 && !isNvIpGroup {

@@ -119,7 +119,7 @@ type NvSecurityParse struct {
 	PolicyModeCfg     *api.RESTServiceConfig
 	ProcessProfileCfg *api.RESTProcessProfile
 	FileProfileCfg    *api.RESTFileMonitorProfile
-	GroupCfgs         []api.RESTCrdGroupConfig
+	GroupCfgs         []v1.GroupConfig
 	RuleCfgs          []api.RESTPolicyRuleConfig
 	GroupResponseCfg  []*v1.NvCrdResponseRule    // response rules for specific group
 	DlpGroupCfg       *api.RESTCrdDlpGroupConfig // per-group's dlp sensor configuration
@@ -150,9 +150,9 @@ type NvClusterSecurityRuleList struct {
 }
 
 type NvGroupDefCfg struct {
-	Name     string                  `json:"name"`
-	Comment  string                  `json:"comment"`
-	Criteria []api.RESTCriteriaEntry `json:"criteria,omitempty"`
+	Name     string             `json:"name"`
+	Comment  string             `json:"comment"`
+	Criteria []v1.CriteriaEntry `json:"criteria,omitempty"`
 }
 
 type NvGroupDefinitionSpec struct {

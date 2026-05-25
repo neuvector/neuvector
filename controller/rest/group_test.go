@@ -7,6 +7,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
 )
@@ -140,13 +141,13 @@ func TestGroupCreate(t *testing.T) {
 		mockCluster.Init([]*share.CLUSPolicyRule{}, []*share.CLUSGroup{})
 		clusHelper = &mockCluster
 
-		ct1 := api.RESTCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual}
-		ct2 := api.RESTCriteriaEntry{Key: "label.key", Value: "label.value", Op: share.CriteriaOpContains}
-		ct3 := api.RESTCriteriaEntry{Key: "node", Value: "B3D5", Op: share.CriteriaOpPrefix}
-		ct4 := api.RESTCriteriaEntry{Key: "service", Value: "project:service", Op: share.CriteriaOpEqual}
-		ct5 := api.RESTCriteriaEntry{Key: "service", Value: "", Op: share.CriteriaOpEqual}
-		ct6 := api.RESTCriteriaEntry{Key: "label/key", Value: "label/value", Op: share.CriteriaOpEqual}
-		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]api.RESTCriteriaEntry{ct1, ct2, ct3, ct4, ct5, ct6}}
+		ct1 := v1.CriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual}
+		ct2 := v1.CriteriaEntry{Key: "label.key", Value: "label.value", Op: share.CriteriaOpContains}
+		ct3 := v1.CriteriaEntry{Key: "node", Value: "B3D5", Op: share.CriteriaOpPrefix}
+		ct4 := v1.CriteriaEntry{Key: "service", Value: "project:service", Op: share.CriteriaOpEqual}
+		ct5 := v1.CriteriaEntry{Key: "service", Value: "", Op: share.CriteriaOpEqual}
+		ct6 := v1.CriteriaEntry{Key: "label/key", Value: "label/value", Op: share.CriteriaOpEqual}
+		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]v1.CriteriaEntry{ct1, ct2, ct3, ct4, ct5, ct6}}
 		data := api.RESTGroupConfigData{Config: &conf}
 		body, _ := json.Marshal(data)
 
@@ -162,16 +163,16 @@ func TestGroupCreate(t *testing.T) {
 		mockCluster.Init([]*share.CLUSPolicyRule{}, []*share.CLUSGroup{})
 		clusHelper = &mockCluster
 
-		ct1 := api.RESTCriteriaEntry{Key: "address", Value: "1.2.3.4", Op: share.CriteriaOpEqual}
-		ct2 := api.RESTCriteriaEntry{Key: "address", Value: "1.2.3.4-1.2.4.5", Op: share.CriteriaOpEqual}
-		ct3 := api.RESTCriteriaEntry{Key: "address", Value: "1.2.3.4/17", Op: share.CriteriaOpEqual}
-		ct4 := api.RESTCriteriaEntry{Key: "address", Value: "abc", Op: share.CriteriaOpEqual}
-		ct5 := api.RESTCriteriaEntry{Key: "address", Value: "abc-.xyz_", Op: share.CriteriaOpEqual}
-		ct6 := api.RESTCriteriaEntry{Key: "address", Value: "abc.x.y.com", Op: share.CriteriaOpEqual}
-		ct7 := api.RESTCriteriaEntry{Key: "address", Value: "8.us", Op: share.CriteriaOpEqual}
-		ct8 := api.RESTCriteriaEntry{Key: "address", Value: "*.google.com", Op: share.CriteriaOpEqual}
-		ct9 := api.RESTCriteriaEntry{Key: "address", Value: "*.docs.google.com", Op: share.CriteriaOpEqual}
-		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]api.RESTCriteriaEntry{
+		ct1 := v1.CriteriaEntry{Key: "address", Value: "1.2.3.4", Op: share.CriteriaOpEqual}
+		ct2 := v1.CriteriaEntry{Key: "address", Value: "1.2.3.4-1.2.4.5", Op: share.CriteriaOpEqual}
+		ct3 := v1.CriteriaEntry{Key: "address", Value: "1.2.3.4/17", Op: share.CriteriaOpEqual}
+		ct4 := v1.CriteriaEntry{Key: "address", Value: "abc", Op: share.CriteriaOpEqual}
+		ct5 := v1.CriteriaEntry{Key: "address", Value: "abc-.xyz_", Op: share.CriteriaOpEqual}
+		ct6 := v1.CriteriaEntry{Key: "address", Value: "abc.x.y.com", Op: share.CriteriaOpEqual}
+		ct7 := v1.CriteriaEntry{Key: "address", Value: "8.us", Op: share.CriteriaOpEqual}
+		ct8 := v1.CriteriaEntry{Key: "address", Value: "*.google.com", Op: share.CriteriaOpEqual}
+		ct9 := v1.CriteriaEntry{Key: "address", Value: "*.docs.google.com", Op: share.CriteriaOpEqual}
+		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]v1.CriteriaEntry{
 			ct1, ct2, ct3, ct4, ct5, ct6, ct7, ct8, ct9,
 		}}
 		data := api.RESTGroupConfigData{Config: &conf}
@@ -195,8 +196,8 @@ func TestGroupCreateNegative(t *testing.T) {
 	clusHelper = &mockCluster
 
 	{
-		ct1 := api.RESTCriteriaEntry{Key: "label.key<", Value: "redis", Op: share.CriteriaOpEqual}
-		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]api.RESTCriteriaEntry{ct1}}
+		ct1 := v1.CriteriaEntry{Key: "label.key<", Value: "redis", Op: share.CriteriaOpEqual}
+		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]v1.CriteriaEntry{ct1}}
 		data := api.RESTGroupConfigData{Config: &conf}
 		body, _ := json.Marshal(data)
 
@@ -208,8 +209,8 @@ func TestGroupCreateNegative(t *testing.T) {
 	}
 
 	{
-		ct1 := api.RESTCriteriaEntry{Key: "", Value: "label.value", Op: share.CriteriaOpEqual}
-		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]api.RESTCriteriaEntry{ct1}}
+		ct1 := v1.CriteriaEntry{Key: "", Value: "label.value", Op: share.CriteriaOpEqual}
+		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]v1.CriteriaEntry{ct1}}
 		data := api.RESTGroupConfigData{Config: &conf}
 		body, _ := json.Marshal(data)
 
@@ -225,9 +226,9 @@ func TestGroupCreateNegative(t *testing.T) {
 		mockCluster.Init([]*share.CLUSPolicyRule{}, []*share.CLUSGroup{})
 		clusHelper = &mockCluster
 
-		ct1 := api.RESTCriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual}
-		ct2 := api.RESTCriteriaEntry{Key: "address", Value: "1.2.3.4", Op: share.CriteriaOpEqual}
-		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]api.RESTCriteriaEntry{ct1, ct2}}
+		ct1 := v1.CriteriaEntry{Key: "image", Value: "redis", Op: share.CriteriaOpEqual}
+		ct2 := v1.CriteriaEntry{Key: "address", Value: "1.2.3.4", Op: share.CriteriaOpEqual}
+		conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]v1.CriteriaEntry{ct1, ct2}}
 		data := api.RESTGroupConfigData{Config: &conf}
 		body, _ := json.Marshal(data)
 
@@ -263,8 +264,8 @@ func TestGroupCreateNegative(t *testing.T) {
 			"ab.*.com",
 		}
 		for _, addr := range addrs {
-			ct1 := api.RESTCriteriaEntry{Key: "address", Value: addr, Op: share.CriteriaOpEqual}
-			conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]api.RESTCriteriaEntry{ct1}}
+			ct1 := v1.CriteriaEntry{Key: "address", Value: addr, Op: share.CriteriaOpEqual}
+			conf := api.RESTGroupConfig{Name: "g1", Criteria: &[]v1.CriteriaEntry{ct1}}
 			data := api.RESTGroupConfigData{Config: &conf}
 			body, _ := json.Marshal(data)
 

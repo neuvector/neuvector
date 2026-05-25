@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/db"
@@ -203,13 +204,13 @@ func group2REST(cache *groupCache, view string, withCap bool) *api.RESTGroup {
 
 	r := api.RESTGroup{
 		RESTGroupBrief: *group2BriefREST(cache, withCap),
-		Criteria:       make([]api.RESTCriteriaEntry, len(group.Criteria)),
+		Criteria:       make([]v1.CriteriaEntry, len(group.Criteria)),
 		Members:        make([]*api.RESTWorkloadBrief, 0),
 		PolicyRules:    make([]uint32, cache.usedByPolicy.Cardinality()),
 		ResponseRules:  make([]uint32, cache.usedByResponseRules.Cardinality()),
 	}
 	for i, crt := range group.Criteria {
-		r.Criteria[i] = api.RESTCriteriaEntry{
+		r.Criteria[i] = v1.CriteriaEntry{
 			Key: crt.Key, Value: crt.Value, Op: crt.Op,
 		}
 	}
@@ -272,13 +273,13 @@ func groupDetail2REST(cache *groupCache, view string, withCap bool) *api.RESTGro
 
 	g := api.RESTGroupDetail{
 		RESTGroupBrief: *group2BriefREST(cache, withCap),
-		Criteria:       make([]api.RESTCriteriaEntry, len(group.Criteria)),
+		Criteria:       make([]v1.CriteriaEntry, len(group.Criteria)),
 		Members:        make([]*api.RESTWorkloadBrief, 0),
 		PolicyRules:    make([]*api.RESTPolicyRule, 0, cache.usedByPolicy.Cardinality()),
 		ResponseRules:  make([]*api.RESTResponseRule, 0, cache.usedByResponseRules.Cardinality()),
 	}
 	for i, crt := range group.Criteria {
-		g.Criteria[i] = api.RESTCriteriaEntry{
+		g.Criteria[i] = v1.CriteriaEntry{
 			Key: crt.Key, Value: crt.Value, Op: crt.Op,
 		}
 	}
