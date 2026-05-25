@@ -1,9 +1,15 @@
 package v1
 
 import (
-	"github.com/neuvector/neuvector/share"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// response rule
+
+type EventCondition struct {
+	CondType  string `json:"type,omitempty"`
+	CondValue string `json:"value,omitempty"`
+}
 
 // Group-related definition
 
@@ -36,14 +42,14 @@ type GroupConfig struct {
 }
 
 type NvCrdResponseRule struct {
-	PolicyName string                     `json:"policy_name"`
-	Event      string                     `json:"event"`
-	Group      string                     `json:"group,omitempty"`
-	Actions    []string                   `json:"actions"` // share.EventActionQuarantine / share.EventActionSuppressLog / share.EventActionWebhook
-	Comment    string                     `json:"comment,omitempty"`
-	Disable    bool                       `json:"disable,omitempty"`
-	Webhooks   []string                   `json:"webhooks,omitempty"`
-	Conditions []share.CLUSEventCondition `json:"conditions,omitempty"`
+	PolicyName string           `json:"policy_name"`
+	Event      string           `json:"event"`
+	Group      string           `json:"group,omitempty"`
+	Actions    []string         `json:"actions"` // "quarantine" / "suppress-log" / "webhook"
+	Comment    string           `json:"comment,omitempty"`
+	Disable    bool             `json:"disable,omitempty"`
+	Webhooks   []string         `json:"webhooks,omitempty"`
+	Conditions []EventCondition `json:"conditions,omitempty"`
 }
 
 // NvSecurityRule CRD

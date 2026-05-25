@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
@@ -1785,21 +1786,16 @@ type CLUSCustomCheckGroup struct {
 	Scripts []*CLUSCustomCheck `json:"scripts"`
 }
 
-type CLUSEventCondition struct {
-	CondType  string `json:"type,omitempty"`
-	CondValue string `json:"value,omitempty"`
-}
-
 type CLUSResponseRule struct {
-	ID         uint32               `json:"id"`
-	Event      string               `json:"event"`
-	Comment    string               `json:"comment,omitempty"`
-	Group      string               `json:"group,omitempty"`
-	Conditions []CLUSEventCondition `json:"conditions,omitempty"`
-	Actions    []string             `json:"actions"`
-	Webhooks   []string             `json:"webhooks"`
-	Disable    bool                 `json:"disable,omitempty"`
-	CfgType    TCfgType             `json:"cfg_type"`
+	ID         uint32              `json:"id"`
+	Event      string              `json:"event"`
+	Comment    string              `json:"comment,omitempty"`
+	Group      string              `json:"group,omitempty"`
+	Conditions []v1.EventCondition `json:"conditions,omitempty"`
+	Actions    []string            `json:"actions"`
+	Webhooks   []string            `json:"webhooks"`
+	Disable    bool                `json:"disable,omitempty"`
+	CfgType    TCfgType            `json:"cfg_type"`
 }
 
 func CLUSResponseRuleKey(policyName string, id uint32) string {
