@@ -1320,12 +1320,10 @@ func parseResponseYamlFile(importData []byte) ([]resource.NvResponseSecurityRule
 	}
 
 	if err == nil {
-		if err == nil {
-			for _, r := range nvSecRules {
-				if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvResponseSecurityRuleKind {
-					err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
-					break
-				}
+		for _, r := range nvSecRules {
+			if r.APIVersion != "neuvector.com/v1" || r.Kind != resource.NvResponseSecurityRuleKind {
+				err = fmt.Errorf("Invalid yaml, apiVersion: %s, kind: %s", r.APIVersion, r.Kind)
+				break
 			}
 		}
 	}
