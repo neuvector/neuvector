@@ -136,19 +136,6 @@ type NvSecurityParse struct {
 	CfgType           share.TCfgType
 }
 
-type NvClusterSecurityRule struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Spec              v1.NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-}
-
-type NvClusterSecurityRuleList struct {
-	metav1.TypeMeta  `json:",inline"`
-	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items            []NvClusterSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
-	XXX_unrecognized []byte                  `json:"-"`
-}
-
 type NvGroupDefCfg struct {
 	Name     string             `json:"name"`
 	Comment  string             `json:"comment"`

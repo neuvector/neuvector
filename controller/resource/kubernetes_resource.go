@@ -591,8 +591,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvClusterSecurityRule) },
-				func() metav1.ListInterface { return new(NvClusterSecurityRuleList) },
+				func() metav1.Object { return new(v1.NvClusterSecurityRule) },
+				func() metav1.ListInterface { return new(v1.NvClusterSecurityRuleList) },
 				xlateCrdNvClusterSecurityRule,
 				nil,
 			},
@@ -1130,7 +1130,7 @@ func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvClusterSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvClusterSecurityRule); ok {
+	if o, ok := obj.(*v1.NvClusterSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1468,8 +1468,8 @@ func (d *kubernetes) RegisterResource(rt string) error {
 			k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &v1.NvSecurityRule{})
 			k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &v1.NvSecurityRuleList{})
 		case RscTypeCrdClusterSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &v1.NvClusterSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &v1.NvClusterSecurityRuleList{})
 		case RscTypeCrdGroupDefinition:
 			k8s.Register("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinition{})
 			k8s.RegisterList("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinitionList{})

@@ -3871,8 +3871,8 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 	case resource.NvSecurityRuleKind:
 		gfwrule, ok = crdSecRule.(*v1.NvSecurityRule)
 	case resource.NvClusterSecurityRuleKind:
-		var gfwruleTemp *resource.NvClusterSecurityRule
-		if gfwruleTemp, ok = crdSecRule.(*resource.NvClusterSecurityRule); ok {
+		var gfwruleTemp *v1.NvClusterSecurityRule
+		if gfwruleTemp, ok = crdSecRule.(*v1.NvClusterSecurityRule); ok {
 			gfwruleObj = v1.NvSecurityRule(*gfwruleTemp)
 			gfwrule = &gfwruleObj
 		}
