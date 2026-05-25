@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -144,7 +145,7 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 	},
 	{
 		Event: share.EventRuntime,
-		Conditions: []share.CLUSEventCondition{
+		Conditions: []v1.EventCondition{
 			{
 				CondType:  share.EventCondTypeLevel,
 				CondValue: api.LogLevelERR,
@@ -156,7 +157,7 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 	},
 	{
 		Event: share.EventRuntime,
-		Conditions: []share.CLUSEventCondition{
+		Conditions: []v1.EventCondition{
 			{
 				CondType:  share.EventCondTypeName,
 				CondValue: api.EventNameContainerPrivilEscalate,
@@ -168,7 +169,7 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 	},
 	{
 		Event: share.EventCVEReport,
-		Conditions: []share.CLUSEventCondition{
+		Conditions: []v1.EventCondition{
 			{
 				CondType:  share.EventCondTypeCVEHigh,
 				CondValue: "10",
@@ -180,7 +181,7 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 	},
 	{
 		Event: share.EventEvent,
-		Conditions: []share.CLUSEventCondition{
+		Conditions: []v1.EventCondition{
 			{
 				CondType:  share.EventCondTypeName,
 				CondValue: api.EventNameContainerQuarantined,
@@ -192,7 +193,7 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 	},
 	{
 		Event: share.EventCompliance,
-		Conditions: []share.CLUSEventCondition{
+		Conditions: []v1.EventCondition{
 			{
 				CondType:  share.EventCondTypeName,
 				CondValue: "D.5.4",
@@ -207,7 +208,7 @@ var defaultResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 var defaultAdmCtrlResponseRules []share.CLUSResponseRule = []share.CLUSResponseRule{
 	{
 		Event: share.EventAdmCtrl,
-		Conditions: []share.CLUSEventCondition{
+		Conditions: []v1.EventCondition{
 			{
 				CondType:  share.EventCondTypeName,
 				CondValue: api.EventNameAdmCtrlK8sReqDenied,

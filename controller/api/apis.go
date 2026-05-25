@@ -3019,15 +3019,15 @@ type RESTResponseRuleOptionData struct {
 }
 
 type RESTResponseRule struct {
-	ID         uint32                     `json:"id"`
-	Event      string                     `json:"event"`
-	Comment    string                     `json:"comment"`
-	Group      string                     `json:"group"`
-	Conditions []share.CLUSEventCondition `json:"conditions"`
-	Actions    []string                   `json:"actions"`
-	Webhooks   []string                   `json:"webhooks"`
-	Disable    bool                       `json:"disable"`
-	CfgType    string                     `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	ID         uint32              `json:"id"`
+	Event      string              `json:"event"`
+	Comment    string              `json:"comment"`
+	Group      string              `json:"group"`
+	Conditions []v1.EventCondition `json:"conditions"`
+	Actions    []string            `json:"actions"`
+	Webhooks   []string            `json:"webhooks"`
+	Disable    bool                `json:"disable"`
+	CfgType    string              `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 }
 
 type RESTResponseRuleData struct {
@@ -3050,15 +3050,15 @@ type RESTResponseRuleActionData struct {
 
 // Omit fields indicate that it's not modified.
 type RESTResponseRuleConfig struct {
-	ID         uint32                      `json:"id"`
-	Comment    *string                     `json:"comment,omitempty"`
-	Group      *string                     `json:"group,omitempty"`
-	Event      *string                     `json:"event,omitempty"`
-	Conditions *[]share.CLUSEventCondition `json:"conditions,omitempty"`
-	Actions    *[]string                   `json:"actions,omitempty"`
-	Webhooks   *[]string                   `json:"webhooks,omitempty"`
-	Disable    *bool                       `json:"disable,omitempty"`
-	CfgType    string                      `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
+	ID         uint32               `json:"id"`
+	Comment    *string              `json:"comment,omitempty"`
+	Group      *string              `json:"group,omitempty"`
+	Event      *string              `json:"event,omitempty"`
+	Conditions *[]v1.EventCondition `json:"conditions,omitempty"`
+	Actions    *[]string            `json:"actions,omitempty"`
+	Webhooks   *[]string            `json:"webhooks,omitempty"`
+	Disable    *bool                `json:"disable,omitempty"`
+	CfgType    string               `json:"cfg_type"` // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 }
 
 type RESTResponseRuleConfigData struct {

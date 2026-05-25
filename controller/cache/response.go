@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -121,7 +122,7 @@ func (m CacheMethod) ResponseRule2REST(rule *share.CLUSResponseRule) *api.RESTRe
 		Disable: rule.Disable,
 		CfgType: common.TCfgTypeToApi(rule.CfgType),
 	}
-	restRule.Conditions = make([]share.CLUSEventCondition, len(rule.Conditions))
+	restRule.Conditions = make([]v1.EventCondition, len(rule.Conditions))
 	copy(restRule.Conditions, rule.Conditions)
 
 	if len(rule.Actions) == 0 {
@@ -228,7 +229,7 @@ func matchCVEWithFixConditions(condValue string, cveFixedInfo []scanUtils.FixedV
 	return true
 }
 
-func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {
+func matchConditions(desc *eventDesc, conds []v1.EventCondition) bool {
 	// AND op within a rule. Return false if one criterion doesn't match
 	var match = true
 	for _, d := range conds {
