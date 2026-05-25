@@ -994,7 +994,7 @@ func createFedDefDlpRules(withlock bool) {
 		dlpsensor = clusHelper.GetDlpSensor(defaultSensorAllDlpRule.Name)
 		if dlpsensor == nil {
 			e := "sensor cannot be created in cluster!"
-			log.WithFields(log.Fields{"sensor": dlpsensor.Name}).Error(e)
+			log.Error(e)
 			return
 		}
 		log.Debug("Creating predefined dlp sensor!")
@@ -1305,7 +1305,7 @@ func createFedDefWafRules(withlock bool) {
 		wafsensor = clusHelper.GetWafSensor(share.CLUSWafDefaultSensor)
 		if wafsensor == nil {
 			e := "sensor cannot be created in cluster!"
-			log.WithFields(log.Fields{"sensor": wafsensor.Name}).Error(e)
+			log.Error(e)
 			return
 		}
 		log.Debug("Creating default waf sensor!")

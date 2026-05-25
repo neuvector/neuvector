@@ -2417,7 +2417,8 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	if list != nil {
 		list.IDs = append(list.IDs, reqData.JointCluster.ID)
 	} else {
-		list.IDs = []string{reqData.JointCluster.ID}
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, "Fail to create cluster list")
+		return
 	}
 	if err = clusHelper.PutFedJointClusterList(list); err == nil {
 		resp := api.RESTFedJoinRespInternal{
@@ -2565,7 +2566,7 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	if clusHelper.PutFedMembership(m) != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFedOperationFailed, "failed to put fed membership")
 		return
 	}
 	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)

@@ -2005,7 +2005,7 @@ func (h *nvCrdHandler) crdHandleVulnProfile(vulnProfileCfg *resource.NvCrdVulnPr
 				Entries: make([]*share.CLUSVulnerabilityProfileEntry, 0),
 				CfgType: cfgType,
 			}
-		} else if cvp != nil && cvp.CfgType != cfgType && cvp.CfgType == share.GroundCfg {
+		} else if cvp.CfgType != cfgType && cvp.CfgType == share.GroundCfg {
 			log.WithFields(log.Fields{"name": vulnProfileCfg.Profile.Name}).Error("profile is managed by CRD")
 			return errors.New(restErrMessage[api.RESTErrOpNotAllowed])
 		}
@@ -2679,7 +2679,7 @@ func (h *nvCrdHandler) parseCurCrdGfwContent(scope string, gfwrule *resource.NvS
 	ruleSet := utils.NewSet()
 	errCount := 0
 
-	if gfwrule == nil || gfwrule.GetName() == "" {
+	if gfwrule.GetName() == "" {
 		errMsg := fmt.Sprintf("%s:  validation error", errMsgSubject)
 		return nil, 1, errMsg, ""
 	}
@@ -3723,7 +3723,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	// when it's CrossCheckCrd(), all cached records(i.e. recordList) should be the same.
 	if !h.crossCheck || crossCheckRecord == nil {
 		recordList[recordName] = crdRecord
-	} else if crossCheckRecord != nil {
+	} else {
 		recordList[recordName] = crossCheckRecord
 	}
 	if utils.HasGroupProfiles(crdCfgRet.TargetName) {

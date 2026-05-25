@@ -1354,8 +1354,8 @@ func handlerServerConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			restRespErrorMessage(w, status, code, err.Error())
 		}
 	} else {
-		log.WithFields(log.Fields{"error": err}).Error("Request error")
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+		log.Error("No server type specified")
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "No server type specified")
 	}
 }
 
