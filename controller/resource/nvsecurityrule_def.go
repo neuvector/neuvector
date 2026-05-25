@@ -3,6 +3,7 @@ package resource
 import (
 	//	"github.com/neuvector/k8s"
 	"github.com/neuvector/neuvector/controller/api"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -120,12 +121,12 @@ type NvSecurityParse struct {
 	FileProfileCfg    *api.RESTFileMonitorProfile
 	GroupCfgs         []api.RESTCrdGroupConfig
 	RuleCfgs          []api.RESTPolicyRuleConfig
-	GroupResponseCfg  []*NvCrdResponseRule       // response rules for specific group
+	GroupResponseCfg  []*v1.NvCrdResponseRule    // response rules for specific group
 	DlpGroupCfg       *api.RESTCrdDlpGroupConfig // per-group's dlp sensor configuration
 	WafGroupCfg       *api.RESTCrdWafGroupConfig // per-group's waf sensor configuration
 	AdmCtrlCfg        *NvCrdAdmCtrlConfig
 	AdmCtrlRulesCfg   map[string][]*NvCrdAdmCtrlRule // map key is "deny" / "exception"
-	ResponseCfg       *NvCrdResponseRule             // response rules for all groups
+	ResponseCfg       *v1.NvCrdResponseRule          // response rules for all groups
 	FedConfig         *api.RESTCrdFedConfig          // fed config(webhooks) defined by this crd object
 	DlpSensorCfg      *api.RESTDlpSensorConfig       // dlp sensor defined by this crd object
 	WafSensorCfg      *api.RESTWafSensorConfig       // waf sensor defined by this crd object
@@ -135,84 +136,10 @@ type NvSecurityParse struct {
 	CfgType           share.TCfgType
 }
 
-type NvSecurityTarget struct {
-	PolicyMode *string                `json:"policymode,omitempty"`
-	Selector   api.RESTCrdGroupConfig `json:"selector"`
-}
-
-type NvSecurityRuleDetail struct {
-	Selector     api.RESTCrdGroupConfig `json:"selector"`
-	Applications []string               `json:"applications"`
-	Ports        string                 `json:"ports"`
-	Action       string                 `json:"action"`
-	Name         string                 `json:"name"`
-	Priority     uint32                 `json:"priority"`
-}
-
-type NvSecurityProcessProfile struct {
-	Baseline *string `json:"baseline"`
-	Mode     *string `json:"mode"` // added in 5.4.1 for process/file profiles
-}
-
-type NvSecurityProcessRule struct {
-	Name            string `json:"name"`
-	Path            string `json:"path"`
-	Action          string `json:"action"`
-	AllowFileUpdate bool   `json:"allow_update"`
-}
-
-type NvSecurityFileRule struct {
-	Filter    string   `json:"filter"`
-	Recursive bool     `json:"recursive"`
-	Behavior  string   `json:"behavior"`
-	App       []string `json:"app"`
-}
-
-type NvSecurityDlpGroup struct {
-	Status   bool                         `json:"status"`
-	Settings []api.RESTCrdDlpGroupSetting `json:"settings"`
-}
-
-type NvSecurityWafGroup struct {
-	Status   bool                         `json:"status"`
-	Settings []api.RESTCrdWafGroupSetting `json:"settings"`
-}
-
-type NvSecurityRuleSpec struct {
-	Target         NvSecurityTarget          `json:"target"`
-	IngressRule    []NvSecurityRuleDetail    `json:"ingress"`
-	EgressRule     []NvSecurityRuleDetail    `json:"egress"`
-	ProcessProfile *NvSecurityProcessProfile `json:"process_profile,omitempty"`
-	ProcessRule    []NvSecurityProcessRule   `json:"process"`
-	FileRule       []NvSecurityFileRule      `json:"file"`
-	DlpGroup       *NvSecurityDlpGroup       `json:"dlp,omitempty"` // per-group's dlp sensor mapping data
-	WafGroup       *NvSecurityWafGroup       `json:"waf,omitempty"` // per-group's waf sensor mapping data
-	ResponseRule   []*NvCrdResponseRule      `json:"response"`      // response rules for the group
-}
-
-type NvSecurityRulePartial struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	XXX_unrecognized  []byte `json:"-"`
-}
-
-type NvSecurityRule struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Spec              NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-}
-
-type NvSecurityRuleList struct {
-	metav1.TypeMeta  `json:",inline"`
-	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items            []NvSecurityRule `json:"items" protobuf:"bytes,2,rep,name=items"`
-	XXX_unrecognized []byte           `json:"-"`
-}
-
 type NvClusterSecurityRule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Spec              NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec              v1.NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 type NvClusterSecurityRuleList struct {
@@ -281,19 +208,8 @@ type NvAdmCtrlSecurityRuleList struct {
 	XXX_unrecognized []byte                  `json:"-"`
 }
 
-type NvCrdResponseRule struct {
-	PolicyName string                     `json:"policy_name"`
-	Event      string                     `json:"event"`
-	Group      string                     `json:"group,omitempty"`
-	Actions    []string                   `json:"actions"` // share.EventActionQuarantine / share.EventActionSuppressLog / share.EventActionWebhook
-	Comment    string                     `json:"comment,omitempty"`
-	Disable    bool                       `json:"disable,omitempty"`
-	Webhooks   []string                   `json:"webhooks,omitempty"`
-	Conditions []share.CLUSEventCondition `json:"conditions,omitempty"`
-}
-
 type NvSecurityResponseSpec struct {
-	Rule NvCrdResponseRule `json:"rule"`
+	Rule v1.NvCrdResponseRule `json:"rule"`
 }
 
 // for non-group-dependent response rule

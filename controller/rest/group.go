@@ -22,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
@@ -1837,7 +1838,7 @@ func handlerGetGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprou
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get import status")
 }
 
-func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resource.NvGroupDefinition, error) {
+func parseGroupYamlFile(importData []byte) ([]v1.NvSecurityRule, []resource.NvGroupDefinition, error) {
 
 	importDataStr := string(importData)
 	yamlParts := strings.Split(importDataStr, "\n---\n")
@@ -1849,7 +1850,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 
 	var err error
 	var nvGrpDefs []resource.NvGroupDefinition
-	var nvSecRules []resource.NvSecurityRule
+	var nvSecRules []v1.NvSecurityRule
 
 	for i, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -1887,7 +1888,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 								nvGrpDefs = append(nvGrpDefs, nvGrpDefList.Items...)
 							}
 						case resource.NvClusterSecurityRuleKind, resource.NvSecurityRuleKind:
-							var nvSecRuleList resource.NvSecurityRuleList
+							var nvSecRuleList v1.NvSecurityRuleList
 							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
 								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
 							}
@@ -1903,7 +1904,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 							nvGrpDefs = append(nvGrpDefs, nvGrpDef)
 						}
 					case resource.NvClusterSecurityRuleKind, resource.NvSecurityRuleKind:
-						var nvSecRule resource.NvSecurityRule
+						var nvSecRule v1.NvSecurityRule
 						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
 							nvSecRules = append(nvSecRules, nvSecRule)
 						}
@@ -1951,7 +1952,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	var secRules []resource.NvSecurityRule
+	var secRules []v1.NvSecurityRule
 	var nvGrpDefs []resource.NvGroupDefinition
 	importData, err := os.ReadFile(importTask.TempFilename)
 	if err == nil {
@@ -2104,7 +2105,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 					if len(grpCfgRet.GroupResponseCfg) > 0 {
 						//  import response rules for this group
-						grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+						grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 							grpCfgRet.TargetName: grpCfgRet.GroupResponseCfg,
 						}
 						_, _ = crdHandler.crdHandleGroupResponseRules(importTask.Scope, grpResponseCfg, grpCfgRet.CfgType)

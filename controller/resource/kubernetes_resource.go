@@ -37,6 +37,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
@@ -577,8 +578,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvSecurityRule) },
-				func() metav1.ListInterface { return new(NvSecurityRuleList) },
+				func() metav1.Object { return new(v1.NvSecurityRule) },
+				func() metav1.ListInterface { return new(v1.NvSecurityRuleList) },
 				xlateCrdNvSecurityRule,
 				nil,
 			},
@@ -1121,7 +1122,7 @@ func xlateCrd(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvSecurityRule); ok {
+	if o, ok := obj.(*v1.NvSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1464,8 +1465,8 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		d.lock.Lock()
 		switch rt {
 		case RscTypeCrdSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &v1.NvSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &v1.NvSecurityRuleList{})
 		case RscTypeCrdClusterSecurityRule:
 			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRule{})
 			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRuleList{})
