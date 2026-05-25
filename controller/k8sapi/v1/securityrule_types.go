@@ -108,19 +108,25 @@ type NvSecurityRuleSpec struct {
 	ResponseRule   []*NvCrdResponseRule      `json:"response"`      // response rules for the group
 }
 
-// TODO: do we need this?
+// For parsing with NV custom client.
 type NvSecurityRulePartial struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	XXX_unrecognized  []byte `json:"-"`
 }
 
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:singular="nvsecurityrule",path="nvsecurityrules",scope="Namespaced"
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type NvSecurityRule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Spec              NvSecurityRuleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
+// +kubebuilder:object:root=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type NvSecurityRuleList struct {
 	metav1.TypeMeta  `json:",inline"`
 	metav1.ListMeta  `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
