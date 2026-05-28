@@ -4,6 +4,7 @@ go 1.26.4
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
+	github.com/neuvector/neuvector/controller/k8sapi => ./controller/k8sapi
 	k8s.io/cri-api => k8s.io/cri-api v0.25.16
 )
 
@@ -113,6 +114,7 @@ require (
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/moby/moby/api v1.54.2
 	github.com/moby/moby/client v0.4.1
+	github.com/neuvector/neuvector/controller/k8sapi v0.0.0-00010101000000-000000000000
 	github.com/openvex/go-vex v0.2.8
 	github.com/quay/clair/v2 v2.1.8
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
