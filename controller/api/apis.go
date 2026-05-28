@@ -4202,11 +4202,13 @@ type VulQueryFilterViewModel struct {
 
 	ServiceName   string `json:"serviceName"`
 	ImageName     string `json:"imageName"`
+	ImageBaseOS   string `json:"imageBaseOS"`
 	NodeName      string `json:"nodeName"`
 	ContainerName string `json:"containerName"`
 
 	ServiceNameMatchType   string `json:"matchTypeService"`
 	ImageNameMatchType     string `json:"matchTypeImage"`
+	ImageBaseOSMatchType   string `json:"matchTypeImageBaseOS"`
 	NodeNameMatchType      string `json:"matchTypeNode"`
 	ContainerNameMatchType string `json:"matchTypeContainer"`
 

@@ -801,6 +801,7 @@ func buildWhereClauseForImage(allowedID []string, queryFilter *api.VulQueryFilte
 		}
 	}
 
+	filterByImageName := false
 	part_image_equal := goqu.Ex{}
 	part_image_contains := make([]exp.Expression, 0)
 	if queryFilter.ImageNameMatchType != "" && queryFilter.ImageName != "" {
@@ -812,8 +813,33 @@ func buildWhereClauseForImage(allowedID []string, queryFilter *api.VulQueryFilte
 		case "contains":
 			part_image_contains = append(part_image_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.ImageName)))
 		}
+		filterByImageName = true
 	}
 
+	filterByImageOS := false
+	part_image_os_equal := goqu.Ex{}
+	part_image_os_contains := make([]exp.Expression, 0)
+	if queryFilter.ImageBaseOSMatchType != "" && queryFilter.ImageBaseOS != "" {
+		switch queryFilter.ImageBaseOSMatchType {
+		case "equals":
+			part_image_os_equal = goqu.Ex{
+				"I_base_os": queryFilter.ImageBaseOS,
+			}
+		case "contains":
+			part_image_os_contains = append(part_image_os_contains, goqu.C("I_base_os").Like(fmt.Sprintf("%%%s%%", queryFilter.ImageBaseOS)))
+		}
+		filterByImageOS = true
+	}
+
+	if filterByImageName && filterByImageOS {
+		return goqu.And(part1_assetType, part2_allowed,
+			part_image_equal, goqu.Or(part_image_contains...),
+			part_image_os_equal, goqu.Or(part_image_os_contains...))
+	}
+	if filterByImageOS {
+		return goqu.And(part1_assetType, part2_allowed,
+			part_image_os_equal, goqu.Or(part_image_os_contains...))
+	}
 	return goqu.And(part1_assetType, part2_allowed,
 		part_image_equal, goqu.Or(part_image_contains...))
 }
