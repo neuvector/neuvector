@@ -556,6 +556,9 @@ github.com/mxk/go-flowrate/flowrate
 # github.com/neuvector/k8s v1.4.1-0.20240927235747-43bcf20a80a3
 ## explicit; go 1.20
 github.com/neuvector/k8s
+# github.com/neuvector/neuvector/controller/k8sapi v0.0.0-00010101000000-000000000000 => ./controller/k8sapi
+## explicit; go 1.26.4
+github.com/neuvector/neuvector/controller/k8sapi/v1
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
@@ -1582,4 +1585,5 @@ sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
 # github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
+# github.com/neuvector/neuvector/controller/k8sapi => ./controller/k8sapi
 # k8s.io/cri-api => k8s.io/cri-api v0.25.16
