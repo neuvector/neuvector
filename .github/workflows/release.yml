@@ -83,7 +83,7 @@ jobs:
         cat sha256sum-controller-arm64 | sha256sum --check
 
     - name: Publish neuvector manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@dcb7716af5a318567115a231643164e1d8446021 # v0.67.2
+      uses: rancher/ecm-distro-tools/actions/publish-image@0e1697ecc955e85ec73970b66c8984241fa84a28 # v0.69.0
       with:
         push-to-public: true
         push-to-prime: false
@@ -97,7 +97,7 @@ jobs:
         public-username: ${{ env.DOCKER_USERNAME }}
         public-password: ${{ env.DOCKER_PASSWORD }}
     - name: Publish rancher manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@dcb7716af5a318567115a231643164e1d8446021 # v0.67.2
+      uses: rancher/ecm-distro-tools/actions/publish-image@0e1697ecc955e85ec73970b66c8984241fa84a28 # v0.69.0
       env:
         IMAGE_PREFIX: neuvector-
       with:
