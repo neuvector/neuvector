@@ -63,6 +63,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 
 	q.Filters.ServiceNameMatchType = validateOrDefault(q.Filters.ServiceNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.ImageNameMatchType = validateOrDefault(q.Filters.ImageNameMatchType, []string{"equals", "contains"}, "")
+	q.Filters.ImageBaseOSMatchType = validateOrDefault(q.Filters.ImageBaseOSMatchType, []string{"equals", "contains"}, "")
 	q.Filters.NodeNameMatchType = validateOrDefault(q.Filters.NodeNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.ContainerNameMatchType = validateOrDefault(q.Filters.ContainerNameMatchType, []string{"equals", "contains"}, "")
 
@@ -105,7 +106,8 @@ func (q *VulQueryFilter) GetAssestBasedFilters() map[string]int {
 		stats[AssetRuleNode] = 1
 	}
 
-	if (q.Filters.ImageNameMatchType == "equals" || q.Filters.ImageNameMatchType == "contains") && q.Filters.ImageName != "" {
+	if ((q.Filters.ImageNameMatchType == "equals" || q.Filters.ImageNameMatchType == "contains") && q.Filters.ImageName != "") ||
+		((q.Filters.ImageBaseOSMatchType == "equals" || q.Filters.ImageBaseOSMatchType == "contains") && q.Filters.ImageBaseOS != "") {
 		stats[AssetRuleImage] = 1
 	}
 
