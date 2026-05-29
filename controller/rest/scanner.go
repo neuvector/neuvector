@@ -384,10 +384,13 @@ func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScan
 }
 
 // filterAndSortCVE applies the filters to the CVEs and returns the filtered list.
-func filterAndSortCVE(filter *api.RESTVulScoreFilter, vuls []*api.RESTVulnerability) ([]*api.RESTVulnerability, error) {
+func filterAndSortCVE(scoreFilter *api.RESTVulScoreFilter, severityFilter string, vuls []*api.RESTVulnerability) ([]*api.RESTVulnerability, error) {
 	ret := []*api.RESTVulnerability{}
 	for _, vul := range vuls {
-		if filter != nil && skipCVE(*filter, vul) {
+		if scoreFilter != nil && skipCVE(*scoreFilter, vul) {
+			continue
+		}
+		if severityFilter != "" && severityFilter != vul.Severity {
 			continue
 		}
 		ret = append(ret, vul)
@@ -452,7 +455,7 @@ outer:
 	for _, asset = range cachedAssets {
 		vuls, _, _ := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
 
-		vuls, err = filterAndSortCVE(rconf.VulScoreFilter, vuls)
+		vuls, err = filterAndSortCVE(rconf.VulScoreFilter, rconf.SeverityFilter, vuls)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Warn("Failed to filter vulnerabilities.  Continue with unfiltered vulnerabilities")
 		}

@@ -2571,6 +2571,7 @@ type RESTAssetsScanReportQuery struct {
 	Cursor         RESTScanReportCursor         `json:"cursor"`             // last query stopped
 	ViewPod        *string                      `json:"view_pod,omitempty"` // for workloads only
 	VulScoreFilter *RESTVulScoreFilter          `json:"vul_score_filter,omitempty"`
+	SeverityFilter string                       `json:"severity_filter,omitempty"`
 	Filters        []RESTAssetsScanReportFilter `json:"filters,omitempty"`
 }
 

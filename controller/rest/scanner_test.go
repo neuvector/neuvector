@@ -500,7 +500,7 @@ func TestFilterAndSortCVE(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := filterAndSortCVE(tc.filter, tc.vuls)
+			result, err := filterAndSortCVE(tc.filter, "", tc.vuls)
 
 			if tc.shouldError {
 				assert.Error(t, err)
