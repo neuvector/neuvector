@@ -1622,7 +1622,7 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 		caCertPool.AppendCertsFromPEM(caCert)
 		whsvr.server.TLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		whsvr.server.TLSConfig.ClientCAs = caCertPool
-		whsvr.server.TLSConfig.MinVersion = tls.VersionTLS11
+		whsvr.server.TLSConfig.MinVersion = tls.VersionTLS12
 	}
 
 	// define http server and server handler

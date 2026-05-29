@@ -1991,7 +1991,7 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
-		MinVersion:               tls.VersionTLS11,
+		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
 	}
@@ -2061,7 +2061,7 @@ func startFedRestServer(fedPingInterval uint32) {
 	r.POST("/v1/fed/csp_support_internal", handlerCspSupportInternal)    // Skip API document, called from joint cluster to master cluster for collecting support config
 	r.GET("/v1/fed/healthcheck", handlerFedHealthCheck)                  // for fed master REST server health-check. no token required
 
-	config := &tls.Config{MinVersion: tls.VersionTLS11}
+	config := &tls.Config{MinVersion: tls.VersionTLS12}
 	server := &http.Server{
 		Addr:      addr,
 		Handler:   restLogger{r},
