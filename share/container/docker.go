@@ -302,7 +302,10 @@ func (d *dockerDriver) GetContainer(id string) (*ContainerMetaExtra, error) {
 	for pstr, bind := range info.Container.NetworkSettings.Ports {
 		if len(bind) > 0 {
 			ipproto, port := parsePortString(pstr.String())
-			hport, _ := strconv.Atoi(bind[0].HostPort)
+			hport, err := strconv.ParseUint(bind[0].HostPort, 10, 16)
+			if err != nil {
+				return nil, err
+			}
 			cp := share.CLUSProtoPort{
 				Port:    uint16(port),
 				IPProto: uint8(ipproto),
