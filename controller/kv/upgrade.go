@@ -1,8 +1,6 @@
 package kv
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -1391,8 +1389,8 @@ func ValidateWebhookCert() {
 						}
 					}
 					if cert != nil {
-						b := sha256.Sum256([]byte(cert.Cert))
-						log.WithFields(log.Fields{"cn": certInfo.cn, "cert": hex.EncodeToString(b[:])}).Info("sha256")
+						h, _ := common.HashPassword(cert.Cert, []byte(cert.Key))
+						log.WithFields(log.Fields{"cn": certInfo.cn, "cert": h}).Info("hash")
 						certInfo.verified = true
 					}
 				}

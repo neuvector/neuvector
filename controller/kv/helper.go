@@ -3,9 +3,7 @@ package kv
 import (
 	"bytes"
 	"cmp"
-	"crypto/sha256"
 	"encoding/gob"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -2558,9 +2556,9 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 				if !valid {
 					return cluster.Put(key, value)
 				} else {
-					b1 := sha256.Sum256([]byte(cert.Cert))
-					b2 := sha256.Sum256([]byte(certExisting.Cert))
-					log.WithFields(log.Fields{"cn": cn, "certIn": hex.EncodeToString(b1[:]), "certExisting": hex.EncodeToString(b2[:])}).Info("sha256")
+					h1, _ := common.HashPassword(cert.Cert, []byte(cert.Key))
+					h2, _ := common.HashPassword(certExisting.Cert, []byte(certExisting.Key))
+					log.WithFields(log.Fields{"cn": cn, "certIn": h1, "certExisting": h2}).Info("hash")
 					err1 := os.WriteFile(keyPath, []byte(certExisting.Key), 0600)
 					err2 := os.WriteFile(certPath, []byte(certExisting.Cert), 0600)
 					if err1 == nil && err2 == nil {
