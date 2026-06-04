@@ -2556,9 +2556,7 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 				if !valid {
 					return cluster.Put(key, value)
 				} else {
-					h1, _ := common.HashPassword(cert.Cert, []byte(cert.Key))
-					h2, _ := common.HashPassword(certExisting.Cert, []byte(certExisting.Key))
-					log.WithFields(log.Fields{"cn": cn, "certIn": h1, "certExisting": h2}).Info("hash")
+					log.WithFields(log.Fields{"cn": cn, "certChanged": cert.Cert != certExisting.Cert}).Info()
 					err1 := os.WriteFile(keyPath, []byte(certExisting.Key), 0600)
 					err2 := os.WriteFile(certPath, []byte(certExisting.Cert), 0600)
 					if err1 == nil && err2 == nil {
