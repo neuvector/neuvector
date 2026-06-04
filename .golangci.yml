@@ -9,6 +9,9 @@ linters:
     - unused
     - nolintlint # reports ill-formed or insufficient nolint directives
     - bodyclose
+  settings:
+    errcheck:
+      check-blank: true
   exclusions:
     generated: lax
     presets:
