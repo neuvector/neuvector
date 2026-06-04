@@ -504,11 +504,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	size := query.limit
-	if size == 0 {
-		size = 20
-	}
-	resp := api.RESTResponseRulesData{Rules: make([]*api.RESTResponseRule, 0, size)}
+	resp := api.RESTResponseRulesData{Rules: []*api.RESTResponseRule{}}
 	if cacher.GetResponseRuleCount(scope, acc) <= query.start {
 		restRespSuccess(w, r, &resp, acc, login, nil, "Get response rule list")
 		return
@@ -533,7 +529,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		collectedRules = rules[query.start:end]
 	}
 
-	resp.Rules = append(resp.Rules, collectedRules...)
+	resp.Rules = collectedRules
 
 	log.WithFields(log.Fields{"entries": len(resp.Rules)}).Debug("Response")
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get response rule list")
