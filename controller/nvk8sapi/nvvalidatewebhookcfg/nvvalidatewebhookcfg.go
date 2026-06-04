@@ -1,8 +1,6 @@
 package admission
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -182,8 +180,7 @@ func SetCABundle(svcName string, caBundle []byte) {
 		TagKey:  fmt.Sprintf("tag-%s", svcName),
 		EchoKey: fmt.Sprintf("echo-%s", svcName),
 	}
-	b := sha256.Sum256(caBundle)
-	log.WithFields(log.Fields{"svcName": svcName, "cert": hex.EncodeToString(b[:])}).Info("sha256")
+	log.WithFields(log.Fields{"svcName": svcName}).Info()
 
 	resource.GetK8sVersion()
 }
@@ -192,8 +189,7 @@ func ResetCABundle(svcName string, caBundle []byte) bool { // return true if res
 	newCert := string(caBundle)
 	oldCert := admCaBundle[svcName]
 	if len(newCert) > 0 && oldCert != newCert {
-		b := sha256.Sum256([]byte(oldCert))
-		log.WithFields(log.Fields{"svcName": svcName, "old": hex.EncodeToString(b[:])}).Info("sha256")
+		log.WithFields(log.Fields{"svcName": svcName}).Info()
 		admCaBundle[svcName] = newCert
 		return true
 	}

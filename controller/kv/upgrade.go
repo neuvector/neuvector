@@ -1389,8 +1389,7 @@ func ValidateWebhookCert() {
 						}
 					}
 					if cert != nil {
-						h, _ := common.HashPassword(cert.Cert, []byte(cert.Key))
-						log.WithFields(log.Fields{"cn": certInfo.cn, "cert": h}).Info("hash")
+						log.WithFields(log.Fields{"cn": certInfo.cn}).Info()
 						certInfo.verified = true
 					}
 				}
