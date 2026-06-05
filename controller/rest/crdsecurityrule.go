@@ -2,8 +2,6 @@ package rest
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +9,6 @@ import (
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/yaml"
 
 	"net/http"
@@ -4773,36 +4770,12 @@ func (h *nvCrdHandler) getCrInfo(crdSecRule interface{}) (string, bool, error) {
 		Annotations:       objectMeta.GetAnnotations(),
 		OwnerReferences:   objectMeta.GetOwnerReferences(),
 	}
-	// clear those variant fields in input metadata for calculating hash of the cr.
-	objectMeta.SetCreationTimestamp(metav1.Time{})
-	objectMeta.SetResourceVersion("")
-	objectMeta.SetGeneration(0)
-	objectMeta.SetUID(types.UID(""))
-	objectMeta.SetLabels(nil)
-	objectMeta.SetAnnotations(nil)
-	objectMeta.SetOwnerReferences(nil)
 
 	h.mdName = objectMeta.GetName()
-	ruleJsonValue, _ := json.Marshal(crdSecRule)
-	crdHash := h.calcCrdSecRuleHash(ruleJsonValue)
-
-	// revert those variant fields in input metadata to their original values.
-	objectMeta.SetCreationTimestamp(mdBackup.CreationTimestamp)
-	objectMeta.SetResourceVersion(mdBackup.ResourceVersion)
-	objectMeta.SetGeneration(mdBackup.Generation)
-	objectMeta.SetUID(mdBackup.UID)
-	objectMeta.SetLabels(mdBackup.Labels)
-	objectMeta.SetAnnotations(mdBackup.Annotations)
-	objectMeta.SetOwnerReferences(mdBackup.OwnerReferences)
+	// crdHash is for debugging purpose only. So simply leverage CR's uid & generation for composing crdHash
+	crdHash := fmt.Sprintf("%s/%v", string(mdBackup.UID), mdBackup.Generation)
 
 	return crdHash, false, nil
-}
-
-// calculate sha256 of the crd security rule(cr resource)
-// after sha256 is calculated, we need to revert those variant fields in metadata to their original values.
-func (h *nvCrdHandler) calcCrdSecRuleHash(ruleJsonValue []byte) string {
-	crdHashTemp := sha256.Sum256(ruleJsonValue)
-	return hex.EncodeToString(crdHashTemp[:])
 }
 
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
