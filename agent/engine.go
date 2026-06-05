@@ -2268,7 +2268,9 @@ func taskDPConnect() {
 			domainConfigNbeDp(c, newnbe)
 		}
 	}
-	pe.PushFqdnInfoToDP()
+	if err := pe.PushFqdnInfoToDP(); err != nil {
+		log.WithError(err).Warn("Failed to push FQDN info to datapath")
+	}
 	if !gInfo.disableNetPolicy {
 		pe.PushNetworkPolicyToDP()
 	}

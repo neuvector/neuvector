@@ -59,7 +59,10 @@ func (r *ibmcloud) aquireToken(password, ibmTokenUrl string) error {
 
 	data := []byte(params.Encode())
 
-	request, _ := http.NewRequest("POST", ibmTokenUrl, bytes.NewReader(data))
+	request, err := http.NewRequest("POST", ibmTokenUrl, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create token request: %w", err)
+	}
 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Accept", "application/json")
@@ -106,7 +109,10 @@ func (r *ibmcloud) getImages() ([]ibmImage, error) {
 	ur := r.ibmUrl("api/v1/images")
 	smd.scanLog.WithFields(log.Fields{"url": ur}).Debug("")
 
-	request, _ := http.NewRequest("GET", ur, nil)
+	request, err := http.NewRequest("GET", ur, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.iamOauthToken))
 	request.Header.Set("Account", r.account)
 	resp, err := r.apiClient.Do(request)

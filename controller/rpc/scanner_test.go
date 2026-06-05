@@ -321,7 +321,8 @@ func TestEdgeCaseMaxCreditCap(t *testing.T) {
 
 	// Releasing more times than max should not exceed max credit and should not panic
 	for i := 0; i < maxConns+3; i++ {
-		_ = mgr.releaseScanner(scanner.ID)
+		err := mgr.releaseScanner(scanner.ID)
+		require.NoError(t, err)
 	}
 
 	// Verify credit didn't exceed max

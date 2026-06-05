@@ -5,6 +5,7 @@ import "C"
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -202,8 +203,13 @@ func (e *Engine) ProcessPolicyLookup(name, id string, proc *share.CLUSProcessPro
 			}
 			if proc.Action == share.PolicyActionAllow {
 				if profile.HashEnable {
-					hash, _ := global.SYS.GetFileHash(pid, proc.Path)
-					if hash != nil {
+					hash, err := global.SYS.GetFileHash(pid, proc.Path)
+					if err != nil {
+						// Don't log if file doesn't exist - process may have exited or path inaccessible
+						if !errors.Is(err, os.ErrNotExist) {
+							log.WithError(err).WithFields(log.Fields{"group": name, "path": proc.Path}).Debug("PROC: failed to get file hash")
+						}
+					} else if hash != nil {
 						if len(matchedEntry.Hash) == 0 {
 							log.WithFields(log.Fields{"group": name, "path": proc.Path}).Debug("PROC: update hash")
 							matchedEntry.Hash = hash

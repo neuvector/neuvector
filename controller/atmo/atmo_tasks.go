@@ -1,6 +1,7 @@
 package atmo
 
 import (
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -25,8 +26,13 @@ type task struct {
 }
 
 // /////////////////////////////////////////////////////////////////
-func (t *task) StartTimer() {
-	t.timer, _ = t.timerWheel.AddTask(t, t.interval)
+func (t *task) StartTimer() error {
+	var err error
+	t.timer, err = t.timerWheel.AddTask(t, t.interval)
+	if err != nil {
+		return fmt.Errorf("failed to add timer task: %w", err)
+	}
+	return nil
 }
 
 func (t *task) CancelTimer() {
@@ -70,7 +76,10 @@ func (t *task) Expire() {
 		}()
 	} else {
 		// re-queued
-		t.StartTimer()
+		if err := t.StartTimer(); err != nil {
+			// Log error: this is timer expiration callback, cannot propagate error
+			log.WithError(err).Warn("Failed to restart timer task")
+		}
 	}
 }
 
@@ -130,7 +139,12 @@ func (ctx *automode_ctx) addMember(mover int, group string) bool {
 			cmplFunc:   ctx.finisher,
 		}
 		members[group] = t
-		t.StartTimer()
+		if err := t.StartTimer(); err != nil {
+			// Log error: addMember returns bool (part of interface), cannot propagate error
+			log.WithError(err).Warn("Failed to start timer for new task")
+			delete(members, group)
+			return false
+		}
 		return true
 	}
 	return false
