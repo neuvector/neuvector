@@ -422,7 +422,12 @@ func (p *Probe) Close() {
 
 func (p *Probe) getDockerCpInfo(pid int, id, containerName string,
 	toContainer bool) (path string, dockerCmds []string, user string, euid int, found bool) {
-	if cmds, _ := global.SYS.ReadCmdLine(pid); len(cmds) > 3 {
+	cmds, err := global.SYS.ReadCmdLine(pid)
+	if err != nil {
+		// Log error: process may have exited, empty cmds will result in found=false
+		log.WithError(err).Debug("Failed to read cmdline for docker cp check")
+	}
+	if len(cmds) > 3 {
 		if cmds[0] == "docker" && cmds[1] == "cp" {
 			var pathStr string
 			if toContainer {
