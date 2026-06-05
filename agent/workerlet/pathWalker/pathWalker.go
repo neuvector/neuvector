@@ -133,8 +133,11 @@ func (tm *taskMain) ProcessRequest(walkType string) error {
 	if err != nil {
 		return err
 	}
-	byteValue, _ := io.ReadAll(jsonFile)
+	byteValue, err := io.ReadAll(jsonFile)
 	jsonFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to read request file: %w", err)
+	}
 
 	// selector
 	switch walkType {

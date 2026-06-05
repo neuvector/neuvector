@@ -2,8 +2,10 @@ package probe
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -482,7 +484,12 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 		proc.user = p.getUserName(proc.pid, proc.euid)
 	}
 	if proc.path == "" {
-		proc.path, _ = global.SYS.GetFilePath(proc.pid)
+		if path, err := global.SYS.GetFilePath(proc.pid); err == nil {
+			proc.path = path
+		} else if !errors.Is(err, os.ErrNotExist) {
+			// Log debug: best-effort metadata collection, skip os.ErrNotExist (common for short-lived processes)
+			log.WithError(err).WithField("pid", proc.pid).Debug("Failed to get process file path")
+		}
 	}
 	if proc.name == "" {
 		proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
@@ -492,7 +499,12 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 	if ppid > 1 {
 		proc.ppid = ppid
 		proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
-		proc.ppath, _ = global.SYS.GetFilePath(proc.ppid)
+		if ppath, err := global.SYS.GetFilePath(proc.ppid); err == nil {
+			proc.ppath = ppath
+		} else if !errors.Is(err, os.ErrNotExist) {
+			// Log debug: best-effort metadata collection, skip os.ErrNotExist (common for short-lived processes)
+			log.WithError(err).WithField("ppid", proc.ppid).Debug("Failed to get parent process file path")
+		}
 	}
 }
 
@@ -813,9 +825,13 @@ func (p *Probe) evalNewRunningApp(pid int) {
 		p.unlockProcMux() // minimum section lock
 
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
-			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
-			if cmds != nil && cmds[0] != "" {
-				proc.cmds = cmds // caught the last movement
+			if cmds, err := global.SYS.ReadCmdLine(proc.pid); err == nil {
+				if cmds != nil && cmds[0] != "" {
+					proc.cmds = cmds // caught the last movement
+				}
+			} else if !errors.Is(err, os.ErrNotExist) {
+				// Log debug: best-effort metadata collection, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).WithField("pid", proc.pid).Debug("Failed to read process command line")
 			}
 		}
 
@@ -972,7 +988,12 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 		// construct parent process
 		p.updateProcess(parent)                              // get name, ppid, ruid, euid
 		parent.user = p.getUserName(parent.pid, parent.euid) // get parent's username
-		parent.path, _ = global.SYS.GetFilePath(parent.pid)  // get parent's executable name
+		if path, err := global.SYS.GetFilePath(parent.pid); err == nil {
+			parent.path = path // get parent's executable name
+		} else if !errors.Is(err, os.ErrNotExist) {
+			// Log debug: best-effort metadata collection, skip os.ErrNotExist (common for short-lived processes)
+			log.WithError(err).WithField("pid", parent.pid).Debug("Failed to get parent process file path")
+		}
 		p.pidProcMap[parent.pid] = parent
 		p.addContainerProcess(c, parent.pid) // add parent
 		log.WithFields(log.Fields{"pid": parent.pid, "ruid": parent.ruid}).Debug("PROC: patch parent")
@@ -1012,7 +1033,12 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 
 		if notAuth {
 			if len(parent.cmds) == 0 {
-				parent.cmds, _ = global.SYS.ReadCmdLine(proc.ppid)
+				if cmds, err := global.SYS.ReadCmdLine(proc.ppid); err == nil {
+					parent.cmds = cmds
+				} else if !errors.Is(err, os.ErrNotExist) {
+					// Log debug: best-effort metadata collection, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).WithField("ppid", proc.ppid).Debug("Failed to read parent command line")
+				}
 			}
 
 			if p.isSudoChild(proc) {
@@ -1035,7 +1061,12 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 				p.unlockProcMux() // minimum section lock
 				if ok {
 					if len(gp.cmds) == 0 {
-						gp.cmds, _ = global.SYS.ReadCmdLine(gp.pid)
+						if cmds, err := global.SYS.ReadCmdLine(gp.pid); err == nil {
+							gp.cmds = cmds
+						} else if !errors.Is(err, os.ErrNotExist) {
+							// Log debug: best-effort metadata collection, skip os.ErrNotExist (common for short-lived processes)
+							log.WithError(err).WithField("pid", gp.pid).Debug("Failed to read grandparent command line")
+						}
 					}
 
 					// filter false-positive cases: grandparent is root
