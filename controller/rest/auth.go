@@ -1510,18 +1510,21 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	return id, tokenString, &c, nil
 }
 
-func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
-	ticketString := jwtGenFedTicket(masterCluster.Secret, duration)
+func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) ([]byte, error) {
+	ticketString, err := jwtGenFedTicket(masterCluster.Secret, duration)
+	if err != nil {
+		return nil, err
+	}
 	c := joinToken{
 		MasterServer: masterCluster.RestInfo.Server,
 		MasterPort:   masterCluster.RestInfo.Port,
 		JoinTicket:   ticketString,
 	}
 	tokenBytes, _ := json.Marshal(&c)
-	return tokenBytes
+	return tokenBytes, nil
 }
 
-func jwtGenFedTicket(secret string, duration time.Duration) string {
+func jwtGenFedTicket(secret string, duration time.Duration) (string, error) {
 	now := time.Now()
 	c := joinTicket{
 		Salt:      mathRand.Intn(math.MaxInt32),
@@ -1556,7 +1559,7 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 			log.WithFields(log.Fields{"id": clusterID, "err": err}).Error("failed to sign token")
 			return "", err
 		}
-		return utils.EncryptSensitive(tokenString, []byte(secret)), nil
+		return utils.EncryptSensitive(tokenString, []byte(secret))
 	} else {
 		err = errors.New("empty private key")
 		log.WithFields(log.Fields{"id": clusterID, "err": err}).Error()

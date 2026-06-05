@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"reflect"
@@ -2256,7 +2257,10 @@ LOOP_ALL_IDS:
 						errMsg = fmt.Sprintf("failed to obtain file monitor profile %s(for rule %d)", grpName, id)
 						break LOOP_ALL_IDS
 					} else {
-						reservedLen := len(mon.Filters) + len(mon.FiltersCRD)
+						reservedLen, err := utils.SafeAddCapacityInt(len(mon.Filters), len(mon.FiltersCRD))
+						if err != nil {
+							reservedLen = math.MaxInt
+						}
 						pmap := make(map[string]*share.CLUSFileMonitorFilter, reservedLen)
 						for i, ffp := range mon.Filters {
 							pmap[ffp.Filter] = &mon.Filters[i]

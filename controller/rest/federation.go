@@ -1887,7 +1887,12 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 		duration = 60
 	}
 	var jwtFedJoinTokenLife = time.Minute * time.Duration(duration)
-	resp := api.RESTFedJoinToken{JoinToken: base64.StdEncoding.EncodeToString(jwtGenFedJoinToken(&masterCluster, jwtFedJoinTokenLife))}
+	joinToken, err := jwtGenFedJoinToken(&masterCluster, jwtFedJoinTokenLife)
+	if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
+		return
+	}
+	resp := api.RESTFedJoinToken{JoinToken: base64.StdEncoding.EncodeToString(joinToken)}
 	if resp.JoinToken == "" {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrRemoteUnauthorized,
 			"The join_ticket is either invalid or expires. Please get a new join_ticket from the primary cluster")
@@ -2138,9 +2143,13 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 		return membership, http.StatusInternalServerError, api.RESTErrObjectNotFound, common.ErrObjectNotFound
 	}
 
+	jointTicket, err := jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	if err != nil {
+		return membership, http.StatusInternalServerError, api.RESTErrServerError, err
+	}
 	reqTo := api.RESTFedLeaveReqInternal{
 		ID:          jointCluster.ID,
-		JointTicket: jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife),
+		JointTicket: jointTicket,
 		User:        login.fullname, // user on joint cluster who triggered leave-federation request
 		Remote:      login.remote,
 		UserRoles:   login.domainRoles,
@@ -2873,6 +2882,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 	nvUsage := cacher.GetNvUsage(api.FedRoleJoint)
 	doPoll := atomic.CompareAndSwapUint32(&_fedPollOngoing, 0, 1)
 	if doPoll {
+		var err error
 		defer atomic.StoreUint32(&_fedPollOngoing, 0)
 
 		accReadAll := access.NewReaderAccessControl()
@@ -2890,7 +2900,10 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 			return doPoll
 		}
 		reqTo.ID = jointCluster.ID
-		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		if err != nil {
+			return doPoll
+		}
 		reqTo.Revisions = cacher.GetAllFedRulesRevisions()
 		if forcePulling {
 			for ruleType := range reqTo.Revisions {
@@ -2904,7 +2917,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		var respData []byte
 		var statusCode int
 		var proxyUsed bool
-		var err = common.ErrObjectAccessDenied
+		err = common.ErrObjectAccessDenied
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/poll_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		for i := 0; i < tryTimes; i++ {
 			if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
@@ -2953,10 +2966,12 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 							updateClusterState(jointCluster.ID, "", _fedClusterSyncing, nil, accReadAll)
 							if workFedRules(&settings, respTo.Revisions, reqTo.Revisions, accReadAll) {
 								// if any fed rule is updated, re-send polling request simply for updating joint cluster info on master cluster
-								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
-								reqTo.Revisions = respTo.Revisions
-								bodyTo, _ := json.Marshal(&reqTo)
-								_, _, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
+								reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+								if err == nil {
+									reqTo.Revisions = respTo.Revisions
+									bodyTo, _ := json.Marshal(&reqTo)
+									_, _, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
+								}
 							}
 						}
 					}
@@ -3100,6 +3115,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	var deleted uint32
 	var delRegs uint32
 	var throttleTime int64
+	var err error
 
 	accReadAll := access.NewReaderAccessControl()
 	reqTo := api.RESTPollFedScanDataReq{
@@ -3127,7 +3143,10 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	}
 
 	reqTo.ID = jointCluster.ID
-	reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	if err != nil {
+		return 0, updated, deleted, delRegs, true
+	}
 	reqTo.RegConfigRev = *cachedRegConfigRev
 	reqTo.UpToDateRegs = upToDateRegs.ToStringSlice()
 	reqTo.ScanResultHash = reqScanResultHash
@@ -3144,7 +3163,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	var respData []byte
 	var statusCode int
 	var proxyUsed bool
-	var err = common.ErrObjectAccessDenied
+	err = common.ErrObjectAccessDenied
 	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/scan_data_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 	for i := 0; i < tryTimes; i++ {
 		if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,

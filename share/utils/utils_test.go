@@ -206,18 +206,24 @@ func TestUserTokenEncrypt(t *testing.T) {
 
 func TestPasswordEncrypt(t *testing.T) {
 	password := "123456"
-	encrypt := EncryptPassword(password)
+	encrypt, err := EncryptPassword(password)
+	if err != nil {
+		t.Errorf("Password encrypt error: password=%v err=%v\n", password, err)
+	}
 	decrypt := DecryptPassword(encrypt)
 	if decrypt != password {
 		t.Errorf("Password encrypt error: password=%v decrypt=%v\n", password, decrypt)
 	}
 
-	if EncryptPassword("") != "" {
+	if encrypt, _ := EncryptPassword(""); encrypt != "" {
 		t.Errorf("Empty password should be encrypted as emtpy string\n")
 	}
 
-	e1 := EncryptPassword(password)
-	e2 := EncryptPassword(password)
+	e1, err1 := EncryptPassword(password)
+	e2, err2 := EncryptPassword(password)
+	if err1 != nil || err2 != nil {
+		t.Errorf("Password encrypt error: password=%v err1=%v err2=%v\n", password, err1, err2)
+	}
 	if e1 == e2 {
 		t.Errorf("Encrypt same string twice gives same output\n")
 	}

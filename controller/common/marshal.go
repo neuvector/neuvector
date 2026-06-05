@@ -693,6 +693,7 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 				case cloakEncrypt:
 					var m string
 					if strVal := val.Interface().(string); strVal != "" {
+						var err2 error
 						if currentDekSeed.isAvailable() {
 							var err error
 							if m, err = aesGcmEncrypt(strVal); err != nil {
@@ -702,10 +703,13 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 								if err == ErrEmptyValue {
 									marshalResult.AddEmptyFieldToEncrypt(jsonTag)
 								}
-								m = utils.EncryptPassword(strVal)
+								m, err2 = utils.EncryptPassword(strVal)
 							}
 						} else {
-							m = utils.EncryptPassword(strVal)
+							m, err2 = utils.EncryptPassword(strVal)
+						}
+						if err2 != nil {
+							log.WithFields(log.Fields{"err2": err2, "jsonTag": jsonTag}).Error()
 						}
 					}
 					val = reflect.ValueOf(m)

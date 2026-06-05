@@ -64,7 +64,11 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		}
 
 		reqTo.ID = jointCluster.ID
-		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
+			return
+		}
 		bodyTo, _ := json.Marshal(&reqTo)
 		var data []byte
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/csp_support_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
