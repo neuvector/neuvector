@@ -242,14 +242,22 @@ func collectK8sObjectForDebug(k8sResInfo *ValidatingWebhookConfigInfo) {
 					k8sConfig.Webhooks[i].ClientConfig = admregv1.WebhookClientConfig{}
 					k8sConfig.ManagedFields = nil
 				}
-				value, _ := json.Marshal(k8sConfig)
+				value, err := json.Marshal(k8sConfig)
+				if err != nil {
+					log.WithError(err).Warn("Failed to marshal ValidatingWebhookConfiguration")
+					return
+				}
 				k8sResInfo.K8sManifest = string(value)
 			} else {
 				k8sConfig := obj.(*admregv1b1.ValidatingWebhookConfiguration)
 				for i := range k8sConfig.Webhooks {
 					k8sConfig.Webhooks[i].ClientConfig = admregv1b1.WebhookClientConfig{}
 				}
-				value, _ := json.Marshal(k8sConfig)
+				value, err := json.Marshal(k8sConfig)
+				if err != nil {
+					log.WithError(err).Warn("Failed to marshal ValidatingWebhookConfiguration")
+					return
+				}
 				k8sResInfo.K8sManifest = string(value)
 			}
 		}

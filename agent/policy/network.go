@@ -1157,9 +1157,14 @@ func add_unkn_ip_cache(uip_desc *unknown_ip_desc, polver uint16, iptype string, 
 	task.desc.sip = uip_desc.sip
 	task.desc.dip = uip_desc.dip
 
-	cache.timerTask, _ = aTimerWheel.AddTask(task, UNKN_IP_CACHE_TIMEOUT)
-	if cache.timerTask == "" {
-		log.Error("Fail to insert unknown IP cache timer")
+	var err error
+	cache.timerTask, err = aTimerWheel.AddTask(task, UNKN_IP_CACHE_TIMEOUT)
+	if err != nil {
+		// Log at debug: called per network connection for unknown IPs
+		log.WithError(err).Debug("Failed to add unknown IP cache timer task")
+	} else if cache.timerTask == "" {
+		// Log at debug: called per network connection for unknown IPs
+		log.Debug("Failed to insert unknown IP cache timer: empty task ID")
 	}
 	unknown_ip_map_mutex.Lock()
 	unknown_ip_map[*uip_desc] = cache
@@ -1490,11 +1495,20 @@ func (e *Engine) PushNetworkPolicyToDP() {
 	dp.DPCtrlConfigPolicyAddr(policyAddr)
 }
 
-func (e *Engine) PushFqdnInfoToDP() {
+func (e *Engine) PushFqdnInfoToDP() error {
 	fqdn_key := fmt.Sprintf("%s%s/", share.CLUSFqdnIpStore, e.HostID)
-	allKeys, _ := cluster.GetStoreKeys(fqdn_key)
+	allKeys, err := cluster.GetStoreKeys(fqdn_key)
+	if err != nil {
+		return fmt.Errorf("failed to get FQDN store keys: %w", err)
+	}
 	for _, key := range allKeys {
-		if value, _ := cluster.Get(key); value != nil {
+		value, err := cluster.Get(key)
+		if err != nil {
+			// Continue on individual key failures, don't fail entire operation
+			log.WithError(err).WithField("key", key).Warn("Failed to get FQDN value from cluster")
+			continue
+		}
+		if value != nil {
 			uzb := utils.GunzipBytes(value)
 			if uzb != nil {
 				var fqdnip share.CLUSFqdnIp
@@ -1505,6 +1519,7 @@ func (e *Engine) PushFqdnInfoToDP() {
 			}
 		}
 	}
+	return nil
 }
 
 // dlp
