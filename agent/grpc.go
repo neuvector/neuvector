@@ -185,7 +185,10 @@ func createControllerAgentServiceWrapper(conn *grpc.ClientConn) cluster.Service 
 }
 
 func getControllerServiceClient() (share.ControllerAgentServiceClient, error) {
-	ctrlEndpoint := getLeadGRPCEndpoint()
+	ctrlEndpoint, err := getLeadGRPCEndpoint()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lead controller endpoint: %w", err)
+	}
 	log.WithFields(log.Fields{"endpoint": ctrlEndpoint}).Debug("")
 
 	if ctrlEndpoint == "" {

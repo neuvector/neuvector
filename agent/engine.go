@@ -1247,8 +1247,15 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		}
 	}
 
-	c.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
-	c.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
+	var err error
+	c.cgroupMemory, err = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
+	if err != nil {
+		log.WithError(err).WithField("pid", info.Pid).Debug("Failed to get container memory cgroup path")
+	}
+	c.cgroupCPUAcct, err = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
+	if err != nil {
+		log.WithError(err).WithField("pid", info.Pid).Debug("Failed to get container cpuacct cgroup path")
+	}
 
 	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
 	c.propertyFilled = true

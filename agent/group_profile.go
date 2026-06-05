@@ -753,7 +753,11 @@ func GetPathRegexString(path, regex string, bRecursive bool) string {
 func BuildFileMatchRules(filters []share.CLUSFileMonitorFilter, cfgtype int) []*fileMatchRule {
 	rules := make([]*fileMatchRule, 0, len(filters)) // single allocation
 	for _, ff := range filters {
-		regex, _ := regexp.Compile(GetPathRegexString(ff.Path, ff.Regex, ff.Recursive))
+		regex, err := regexp.Compile(GetPathRegexString(ff.Path, ff.Regex, ff.Recursive))
+		if err != nil {
+			log.WithError(err).WithField("path", ff.Path).Warn("Failed to compile file monitor regex")
+			continue
+		}
 		// log.WithFields(log.Fields{"regex": regex, "ff": ff}).Debug("GRP: ")
 		rr := &fileMatchRule{
 			group:    ff.DerivedGroup,
