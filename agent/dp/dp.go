@@ -388,7 +388,13 @@ func listenDP() {
 	kind := "unixgram"
 	addr := net.UnixAddr{Name: ctrlServer, Net: kind}
 	defer os.Remove(ctrlServer)
-	conn, _ = net.ListenUnixgram(kind, &addr)
+	var err error
+	conn, err = net.ListenUnixgram(kind, &addr)
+	if err != nil {
+		// Log error: this is the top of goroutine and failure prevents all DP communication
+		log.WithError(err).Error("Failed to listen on DP control socket")
+		return
+	}
 	defer conn.Close()
 
 	for {

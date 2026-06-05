@@ -130,7 +130,11 @@ func DPCtrlAddTapPort(netns, iface string, epmac net.HardwareAddr) {
 			EPMAC: epmac.String(),
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddTapPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -143,7 +147,11 @@ func DPCtrlDelTapPort(netns, iface string) {
 			Iface: iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDelTapPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -161,7 +169,11 @@ func DPCtrlAddNfqPort(netns, iface string, qno int, epmac net.HardwareAddr, jumb
 	if jumboframe != nil {
 		data.AddNfqPort.JumboFrame = jumboframe
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddNfqPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -174,7 +186,11 @@ func DPCtrlDelNfqPort(netns, iface string) {
 			Iface: iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDelNfqPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -189,7 +205,11 @@ func DPCtrlAddSrvcPort(iface string, jumboframe *bool) {
 	if jumboframe != nil {
 		data.AddPort.JumboFrame = jumboframe
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddSrvcPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -201,7 +221,11 @@ func DPCtrlDelSrvcPort(iface string) {
 			Iface: iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDelSrvcPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -213,7 +237,11 @@ func DPCtrlSetSysConf(xffenabled *bool) {
 			XffEnabled: xffenabled,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPSysConfReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -225,7 +253,11 @@ func DPCtrlSetDisableNetPolicy(disableNetPolicy *bool) {
 			DisableNetPolicy: disableNetPolicy,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDisableNetPolicyReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -236,7 +268,11 @@ func DPCtrlSetDetectUnmanagedWl(detectUnmanagedWl *bool) {
 			DetectUnmanagedWl: detectUnmanagedWl,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDetectUnmanagedWlReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 

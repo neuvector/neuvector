@@ -650,7 +650,14 @@ func (fa *FileAccessCtrl) isAllowedByParentApp(cRoot *rootFd, pid int) (bool, st
 	// log.WithFields(log.Fields{name": name, "pgid": pgid, "ppid": ppid, "pid": pid}).Debug("FA:")
 	for _, s := range cRoot.allowProcList {
 		if name == s.name {
-			path, _ = global.SYS.GetFilePath(pgid)
+			var err error
+			path, err = global.SYS.GetFilePath(pgid)
+			if err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					// Log error: process may have exited, path matching will fail gracefully with empty path
+					log.WithError(err).Debug("FA: failed to get file path")
+				}
+			}
 			if s.path == "" || s.path == "*" || s.path == "/*" {
 				allowed = true
 			}
@@ -683,7 +690,13 @@ func (fa *FileAccessCtrl) checkAllowedShieldProcess(id, name, ppath, path, svcGr
 
 	sid, pgid := osutil.GetSessionId(pid), osutil.GetProcessGroupId(pid)
 	ppid, _, _, _, _ := osutil.GetProcessPIDs(pid)
-	cmds, _ := global.SYS.ReadCmdLine(pid)
+	cmds, err := global.SYS.ReadCmdLine(pid)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			// Log error: process may have exited, empty cmds is acceptable
+			log.WithError(err).Debug("FA: failed to read cmdline")
+		}
+	}
 	proc := &procInternal{pid: pid, name: name, path: path, cmds: cmds, ppid: ppid, ppath: ppath, sid: sid, pgid: pgid}
 	ppe := &share.CLUSProcessProfileEntry{Name: name, Path: path, Action: share.PolicyActionAllow, DerivedGroup: svcGroup}
 
@@ -708,7 +721,13 @@ func (fa *FileAccessCtrl) whiteListCheck(path string, pid int) (string, string, 
 	res := rule_allowed // allow
 	profileSetting := share.ProfileBasic
 	// check if the /proc/xxx/cgroup exists
-	id, _, _, found := global.SYS.GetContainerIDByPID(pid)
+	id, _, err, found := global.SYS.GetContainerIDByPID(pid)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			// Log error: process may have exited or not in a container, will bypass FA check
+			log.WithError(err).Debug("FA: failed to get container ID")
+		}
+	}
 	if !found || !fa.bEnabled {
 		log.WithFields(log.Fields{"id": id}).Debug("FA: bypass")
 		return id, profileSetting, svcGroup, nvRole, res // allow agent operations
@@ -754,11 +773,23 @@ func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string
 
 		// scenario: a parent process (ppid) tries to open a child executable (path)
 		ppid := (int)(ev.Pid)
-		if ppath, _ = global.SYS.GetFilePath(ppid); ppath == "" {
+		if ppath, err = global.SYS.GetFilePath(ppid); ppath == "" {
+			if err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					// Log error: process may have exited, will try pgid fallback
+					log.WithError(err).Debug("FA: failed to get file path for ppid")
+				}
+			}
 			// empty when executing a file created with
 			// via fexecve() or execveat(AT_EMPTY_PATH).mfd_create()
 			if pgid := osutil.GetProcessGroupId(ppid); pgid > 0 {
-				ppath, _ = global.SYS.GetFilePath(pgid)
+				ppath, err = global.SYS.GetFilePath(pgid)
+				if err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						// Log error: process may have exited, empty ppath is acceptable
+						log.WithError(err).Debug("FA: failed to get file path for pgid")
+					}
+				}
 			}
 		}
 
