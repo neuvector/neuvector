@@ -394,8 +394,12 @@ func (b *Bench) BenchLoop() {
 				}
 				b.remediations = b.loadRemediation(remediation)
 			}
-			if _, dbgError := b.doKubeBench(masterScript, workerScript, remediation); dbgError != nil {
-				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			errMaster, errWorker := b.doKubeBench(masterScript, workerScript, remediation)
+			if errMaster != nil {
+				log.WithError(errMaster).WithField("script", masterScript).Warn("Failed to run kubernetes master benchmark checks")
+			}
+			if errWorker != nil {
+				log.WithError(errWorker).WithField("script", workerScript).Warn("Failed to run kubernetes worker benchmark checks")
 			}
 		case <-b.conTimer.C:
 			containers := b.cloneAllNewContainers()
@@ -483,10 +487,6 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 		b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusRunning)
 		out, errMaster = b.runKubeBench(share.BenchKubeMaster, masterScriptSh, remediation)
 		if errMaster != nil {
-			log.WithFields(log.Fields{
-				"error": errMaster, "script": masterScriptSh,
-			}).Error("Failed to run kubernetes master benchmark checks")
-
 			b.logBenchFailure(benchPlatKube, share.BenchStatusKubeMasterFail)
 			b.putBenchReport(Host.ID, share.BenchKubeMaster, nil, share.BenchStatusKubeMasterFail)
 		} else {
@@ -503,10 +503,6 @@ func (b *Bench) doKubeBench(masterScript, workerScript, remediation string) (err
 		b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusRunning)
 		out, errWorker = b.runKubeBench(share.BenchKubeWorker, workerScriptSh, remediation)
 		if errWorker != nil {
-			log.WithFields(log.Fields{
-				"error": errWorker, "script": workerScriptSh,
-			}).Error("Failed to run kubernetes worker benchmark checks")
-
 			b.logBenchFailure(benchPlatKube, share.BenchStatusKubeWorkerFail)
 			b.putBenchReport(Host.ID, share.BenchKubeWorker, nil, share.BenchStatusKubeWorkerFail)
 		} else {
@@ -1289,7 +1285,11 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 		}
 	}
 
-	value, _ := json.Marshal(&report)
+	value, err := json.Marshal(&report)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal benchmark report")
+		return
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
