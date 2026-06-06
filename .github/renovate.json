@@ -26,6 +26,13 @@
         "release/v5.5",
         "release/v5.4"
       ]
+    },
+    {
+      "description": "Enable automerge for actions provided by GitHub (minimum age still applies)",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchPackageNames": ["/^actions\\/.*/"],
+      "automerge": true
     }
   ],
   "vulnerabilityAlerts": {
