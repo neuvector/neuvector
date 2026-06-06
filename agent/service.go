@@ -744,7 +744,11 @@ func (rs *RPCService) cbAgentCounter(buf []byte, param interface{}) bool {
 	// pid := os.Getpid()
 	// lsof, _ := sh.Command("lsof", "-Pn", "-p", strconv.Itoa(pid)).Command("grep", "-v", "IPv4\\|IPv6").Output()
 	lsof := []byte("lsof disabled")
-	ps, _ := sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(Agent.Pid)).Output()
+	ps, err := sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(Agent.Pid)).Output()
+	if err != nil {
+		// Suppress error: diagnostic ps output for counter reporting, failure is non-critical
+		log.WithError(err).Debug("Failed to get process list for counter")
+	}
 
 	offset := int(unsafe.Sizeof(*hdr))
 	r := bytes.NewReader(buf[offset:])

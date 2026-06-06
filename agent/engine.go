@@ -649,7 +649,11 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 	var lomac_str string
 	var lo_oldmac, lo_mac, lo_umac, lo_bmac net.HardwareAddr
 	lomac_str = fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
-	lo_mac, _ = net.ParseMAC(lomac_str)
+	var macErr error
+	lo_mac, macErr = net.ParseMAC(lomac_str)
+	if macErr != nil {
+		log.WithFields(log.Fields{"error": macErr, "mac": lomac_str}).Warn("Failed to parse proxy mesh lo MAC")
+	}
 
 	//pass parent containers IP to service mesh ep so that
 	//when src/dst IP are both 127.0.0.x, we can replace dst
@@ -727,7 +731,11 @@ func programDelProxyMeshDP(c *containerData, ns string) {
 	var lomac_str string
 	var lo_mac net.HardwareAddr
 	lomac_str = fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
-	lo_mac, _ = net.ParseMAC(lomac_str)
+	var macErr error
+	lo_mac, macErr = net.ParseMAC(lomac_str)
+	if macErr != nil {
+		log.WithFields(log.Fields{"error": macErr, "mac": lomac_str}).Warn("Failed to parse proxy mesh lo MAC")
+	}
 
 	if c.quar || c.inline {
 		//delete dp nfq handle if any then reset iptable rules

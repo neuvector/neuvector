@@ -262,7 +262,12 @@ func getPolicyConfig(newRuleKey string, slots, ruleslen int) []share.CLUSGroupIP
 	for i := 0; i < slots; i++ {
 		key := fmt.Sprintf("%s%v", newRuleKey, i)
 		//log.WithFields(log.Fields{"key": key,}).Debug("rule key")
-		if value, _ := cluster.Get(key); value != nil {
+		value, err := cluster.Get(key)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "key": key}).Warn("Failed to get policy config from cluster")
+			continue
+		}
+		if value != nil {
 			pol := make([]share.CLUSGroupIPPolicy, 0)
 			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
@@ -1120,7 +1125,12 @@ func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUS
 	for i := 0; i < slots; i++ {
 		key := fmt.Sprintf("%s%v", newRuleKey, i)
 		//log.WithFields(log.Fields{"key": key,}).Debug("rule key")
-		if value, _ := cluster.Get(key); value != nil {
+		value, err := cluster.Get(key)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "key": key}).Warn("Failed to get DLP config from cluster")
+			continue
+		}
+		if value != nil {
 			dlprule := share.CLUSWorkloadDlpRules{
 				DlpRuleList: make([]*share.CLUSDlpRule, 0),
 				DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, 0),
