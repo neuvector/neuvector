@@ -3,6 +3,7 @@ package probe
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"syscall"
 	"time"
@@ -259,8 +260,17 @@ func (p *Probe) patchProcessTables() {
 
 			p.updateProcess(proc)
 			proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
-			proc.path, _ = global.SYS.GetFilePath(proc.pid) // exe path
-			proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+			var err error
+			proc.path, err = global.SYS.GetFilePath(proc.pid) // exe path
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to get process executable path")
+			}
+			proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to read process cmdline")
+			}
 			if c, ok := p.addContainerCandidateFromProc(proc); ok {
 				p.addProcHistory(c.id, proc, true)
 			}
