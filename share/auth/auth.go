@@ -115,14 +115,21 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 		client.GroupFilter = fmt.Sprintf(ldapGroupFilter, cldap.GroupMemberAttr, username)
 	}
 
-	groups, _ := client.GetGroupsOfUser()
+	groups, err := client.GetGroupsOfUser()
+	if err != nil {
+		log.WithError(err).Warn("failed to get LDAP groups")
+	}
 	log.WithFields(log.Fields{"filter": client.GroupFilter, "groups": groups}).Debug("group member query")
 
 	// add nested group query for MSAD
 	if cldap.Type == api.ServerLDAPTypeMSAD {
 		client.GroupFilter = fmt.Sprintf(adNestedGroupFilter, dn)
 
-		groups2, _ := client.GetGroupsOfUser()
+		var groups2 []string
+		groups2, err = client.GetGroupsOfUser()
+		if err != nil {
+			log.WithError(err).Warn("failed to get LDAP nested groups")
+		}
 		log.WithFields(log.Fields{"filter": client.GroupFilter, "groups": groups2}).Debug("nested group member query")
 
 		groups = append(groups, groups2...)
@@ -139,7 +146,10 @@ func (a *remoteAuth) LDAPAuth(cldap *share.CLUSServerLDAP, username, password st
 		}
 
 		log.WithFields(log.Fields{"filter": client.GroupFilter}).Debug("group member query")
-		groups, _ = client.GetGroupsOfUser()
+		groups, err = client.GetGroupsOfUser()
+		if err != nil {
+			log.WithError(err).Warn("failed to get LDAP groups on retry")
+		}
 	}
 
 	return attrs, groups, nil

@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/system"
 )
@@ -133,7 +135,11 @@ func parsePortString(s string) (uint8, uint16) {
 		return 0, 0
 	}
 
-	port, _ := strconv.Atoi(tokens[0])
+	port, err := strconv.Atoi(tokens[0])
+	if err != nil {
+		log.WithError(err).Warn("failed to parse port string")
+		return 0, 0
+	}
 	if tokens[1] == "tcp" {
 		return syscall.IPPROTO_TCP, uint16(port)
 	} else {

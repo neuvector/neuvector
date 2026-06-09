@@ -336,7 +336,11 @@ func DPCtrlDelMAC(iface string, mac net.HardwareAddr) {
 			MAC:   mac.String(),
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DP delete MAC message")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -346,7 +350,11 @@ func DPCtrlRefreshApp() {
 	data := DPRefreshAppReq{
 		RefreshApp: &DPRefreshApp{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DP refresh app message")
+		return
+	}
 	dpSendMsg(msg)
 }
 
