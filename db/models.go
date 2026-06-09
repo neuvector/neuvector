@@ -497,7 +497,10 @@ func getBytesColumns(assetid string, columnFlags int) (map[int][]byte, error) {
 		paramMaps = append(paramMaps, COL_MODULES)
 	}
 
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"assetid": assetid}).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.Ex{"assetid": assetid}).Prepared(true).ToSQL()
+	if err != nil {
+		return results, fmt.Errorf("failed to build asset vuls query: %w", err)
+	}
 	rows, err := db.Query(statement, args...)
 	if err != nil {
 		return results, err

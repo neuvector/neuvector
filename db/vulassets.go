@@ -983,8 +983,11 @@ func DeleteAssetByID(assetType string, assetid string) error {
 	db := dbHandle
 
 	// delete asset in assetvul table
-	sql, args, _ := dialect.Delete(Table_assetvuls).Where(goqu.Ex{"type": assetType, "assetid": assetid}).Prepared(true).ToSQL()
-	_, err := db.Exec(sql, args...)
+	sql, args, err := dialect.Delete(Table_assetvuls).Where(goqu.Ex{"type": assetType, "assetid": assetid}).Prepared(true).ToSQL()
+	if err != nil {
+		return fmt.Errorf("failed to build asset delete query: %w", err)
+	}
+	_, err = db.Exec(sql, args...)
 	if err != nil {
 		return err
 	}

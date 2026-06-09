@@ -42,7 +42,10 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 			"type":             queryStat.Type,
 		},
 	)
-	sql, args, _ := ds.Prepared(true).ToSQL()
+	sql, args, err := ds.Prepared(true).ToSQL()
+	if err != nil {
+		return 0, fmt.Errorf("failed to build query stat insert query: %w", err)
+	}
 
 	// execute the statement
 	var lastErr error
@@ -167,13 +170,16 @@ func GetExceededSessions(loginName, loginID string, loginType int) ([]string, er
 
 func setFileDbState(queryToken string, newValue int) error {
 	dialect := goqu.Dialect("sqlite3")
-	sql, args, _ := dialect.Update(queryStatTablename).Where(goqu.C("token").Eq(queryToken)).Set(
+	sql, args, err := dialect.Update(queryStatTablename).Where(goqu.C("token").Eq(queryToken)).Set(
 		goqu.Record{
 			"filedb_ready": newValue,
 		},
 	).Prepared(true).ToSQL()
+	if err != nil {
+		return fmt.Errorf("failed to build file db state update query: %w", err)
+	}
 
-	_, err := dbHandle.Exec(sql, args...)
+	_, err = dbHandle.Exec(sql, args...)
 	if err != nil {
 		return err
 	}
@@ -189,7 +195,10 @@ func DeleteQuerySessionByToken(queryToken string) error {
 
 	// delete record in querystats table
 	dialect := goqu.Dialect("sqlite3")
-	sql, args, _ := dialect.Delete("querystats").Where(goqu.ExOr{"id": goqu.Op{"eq": qs.Db_ID}}).Prepared(true).ToSQL()
+	sql, args, err := dialect.Delete("querystats").Where(goqu.ExOr{"id": goqu.Op{"eq": qs.Db_ID}}).Prepared(true).ToSQL()
+	if err != nil {
+		return fmt.Errorf("failed to build query session delete query: %w", err)
+	}
 	_, err = dbHandle.Exec(sql, args...)
 	if err != nil {
 		return err
@@ -232,6 +241,10 @@ func deleteSessionTempTableInMemDb(queryToken string) error {
 }
 
 func isValidSessionTableName(name string) bool {
-	match, _ := regexp.MatchString("^[a-f0-9]+$", name)
+	match, err := regexp.MatchString("^[a-f0-9]+$", name)
+	if err != nil {
+		// Error: impossible since pattern is a literal valid regex
+		return false
+	}
 	return match
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"path"
 	"sync"
 	"time"
@@ -163,7 +164,12 @@ func (s *Semaphore) Acquire(stopCh <-chan struct{}) (<-chan struct{}, error) {
 		s.sessionRenew = make(chan struct{})
 		s.lockSession = sess
 		session := s.c.Session()
-		go func() { _ = session.RenewPeriodic(s.opts.SessionTTL, sess, nil, s.sessionRenew) }()
+		go func() {
+			// Log error: this is the top of goroutine
+			if err := session.RenewPeriodic(s.opts.SessionTTL, sess, nil, s.sessionRenew); err != nil {
+				log.Printf("[WARN] semaphore session renewal failed: %v", err)
+			}
+		}()
 
 		// If we fail to acquire the lock, cleanup the session
 		defer func() {

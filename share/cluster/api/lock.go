@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -151,7 +152,12 @@ func (l *Lock) Lock(stopCh <-chan struct{}) (<-chan struct{}, error) {
 		l.sessionRenew = make(chan struct{})
 		l.lockSession = s
 		session := l.c.Session()
-		go func() { _ = session.RenewPeriodic(l.opts.SessionTTL, s, nil, l.sessionRenew) }()
+		go func() {
+			// Log error: this is the top of goroutine
+			if err := session.RenewPeriodic(l.opts.SessionTTL, s, nil, l.sessionRenew); err != nil {
+				log.Printf("[WARN] lock session renewal failed: %v", err)
+			}
+		}()
 
 		// If we fail to acquire the lock, cleanup the session
 		defer func() {
@@ -218,7 +224,10 @@ WAIT:
 	if !locked {
 		// Determine why the lock failed
 		qOpts.WaitIndex = 0
-		pair, meta, _ = kv.Get(l.opts.Key, qOpts)
+		pair, meta, err = kv.Get(l.opts.Key, qOpts)
+		if err != nil {
+			log.Printf("[WARN] failed to read lock key: %v", err)
+		}
 		if pair != nil && pair.Session != "" {
 			//If the session is not null, this means that a wait can safely happen
 			//using a long poll

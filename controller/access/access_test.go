@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
@@ -61,7 +62,8 @@ func TestGlobalAccess(t *testing.T) {
 	preTest()
 
 	var obj globalObject
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/controller/12345", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/controller/12345", nil)
+	require.NoError(t, err)
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
@@ -106,7 +108,8 @@ func TestDomainAccess(t *testing.T) {
 	preTest()
 
 	var obj domainObject
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/workload/12345", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/workload/12345", nil)
+	require.NoError(t, err)
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
@@ -197,7 +200,8 @@ func TestWildcardDomainAccess(t *testing.T) {
 	obj1 := domainObjectTest{
 		CreatorDomains: []string{"ns-dev-*", "ns1"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/workload/12345", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/workload/12345", nil)
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,

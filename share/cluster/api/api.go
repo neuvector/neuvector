@@ -845,7 +845,9 @@ func (c *Client) write(endpoint string, in, out interface{}, q *WriteOptions) (*
 }
 
 func parseQueryMeta(resp *http.Response, q *QueryMeta) {
-	_ = parseQueryMetaWrapped(resp, q)
+	if err := parseQueryMetaWrapped(resp, q); err != nil {
+		log.Printf("[WARN] failed to parse query meta: %v", err)
+	}
 }
 
 // parseQueryMetaWrapped is used to help parse query meta-data
