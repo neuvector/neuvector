@@ -3853,7 +3853,7 @@ func (m clusterHelper) DeleteSigstoreRootOfTrust(rootName string) error {
 
 func (m clusterHelper) GetAllSigstoreRootsOfTrust() (rootOfTrust []*share.CLUSSigstoreRootOfTrust, err error) {
 	keys, err := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust)
-	if err != nil && err.Error() != "Empty store" {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		return nil, err
 	}
 	rootsOfTrust := []*share.CLUSSigstoreRootOfTrust{}
@@ -3967,7 +3967,7 @@ func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) ([]*share
 		return nil, fmt.Errorf("root \"%s\" does not exist", rootName)
 	}
 	keys, err := cluster.GetStoreKeys(share.CLUSSigstoreRootOfTrustKey(rootName) + "/")
-	if err != nil && err.Error() != "Empty store" {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		return nil, err
 	}
 	verifiers := []*share.CLUSSigstoreVerifier{}
