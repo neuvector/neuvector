@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/neuvector/neuvector/share/utils"
@@ -44,7 +45,10 @@ func (q *objectQueue) Flush() error {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	if len(q.queue) > 0 {
-		value, _ := json.Marshal(q.queue)
+		value, err := json.Marshal(q.queue)
+		if err != nil {
+			return fmt.Errorf("failed to marshal event queue: %w", err)
+		}
 		zb := utils.GzipBytes(value)
 		if err := PutBinary(q.key, zb); err != nil {
 			return err

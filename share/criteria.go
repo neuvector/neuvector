@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -279,10 +281,18 @@ func isCriterionMet(crt *CLUSCriteriaEntry, value string) (bool, bool) {
 	case CriteriaOpPrefix:
 		return strings.HasPrefix(value, crt.Value), true
 	case CriteriaOpRegex:
-		matched, _ := regexp.MatchString(crt.Value, value)
+		matched, err := regexp.MatchString(crt.Value, value)
+		if err != nil {
+			// Suppress error: invalid regex at high-frequency match path; treat as no match
+			log.WithError(err).WithFields(log.Fields{"key": crt.Key, "pattern": crt.Value, "op": crt.Op}).Debug("failed to match regex criterion")
+		}
 		return matched, true
 	case CriteriaOpNotRegex:
-		matched, _ := regexp.MatchString(crt.Value, value)
+		matched, err := regexp.MatchString(crt.Value, value)
+		if err != nil {
+			// Suppress error: invalid regex at high-frequency match path; treat as no match
+			log.WithError(err).WithFields(log.Fields{"key": crt.Key, "pattern": crt.Value, "op": crt.Op}).Debug("failed to match regex criterion")
+		}
 		return !matched, false
 	}
 

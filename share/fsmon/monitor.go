@@ -787,7 +787,10 @@ func (w *FileWatch) HandleWatchedFiles() {
 		//it is not useful if the container already leave
 		if osutil.IsPidValid(pid) { // for alive process
 			var event uint32
-			info, _ := os.Lstat(fullPath)
+			info, err := os.Lstat(fullPath)
+			if err != nil {
+				log.WithError(err).Debug("failed to stat monitored path")
+			}
 			if fmod.finfo.FileMode.IsDir() || (info != nil && info.IsDir()) {
 				event = w.handleDirEvents(fmod, info, fullPath, path, pid)
 			} else {
@@ -1028,7 +1031,11 @@ func (w *FileWatch) getDirFileList(pid int, res *workerlet.WalkPathResult, filte
 	base := strings.ReplaceAll(filter.Path, "\\.", ".")
 	baseD := base + "/"
 	flt := &filterRegex{path: filterIndexKey(filter), recursive: filter.Recursive}
-	flt.regex, _ = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
+	var err error
+	flt.regex, err = regexp.Compile(fmt.Sprintf("^%s$", flt.path))
+	if err != nil {
+		log.WithError(err).Warn("failed to compile fsmon filter regex")
+	}
 
 	var fpath string
 	for _, d := range res.Dirs {
