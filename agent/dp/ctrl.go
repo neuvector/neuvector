@@ -283,7 +283,11 @@ func DPCtrlSetEnableIcmpPolicy(enableIcmpPolicy *bool) {
 			EnableIcmpPolicy: enableIcmpPolicy,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPEnableIcmpPolicyReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -294,7 +298,11 @@ func DPCtrlSetStrictGroupMode(strictGroupMode *bool) {
 			StrictGroupMode: strictGroupMode,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPStrictGroupModeReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -323,7 +331,11 @@ func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr
 	if len(pips) <= 0 {
 		data.AddMAC.PIPS = nil
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddMACReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 

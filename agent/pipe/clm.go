@@ -11,8 +11,8 @@ var clmPipe clmPipeDriver = clmPipeDriver{}
 
 func (d *clmPipeDriver) AttachPortPair(pair *InterceptPair) (net.HardwareAddr, net.HardwareAddr) {
 	// 4e:65:75:56 - NeuV
-	ucmac, _ := net.ParseMAC("4e:65:75:56:00:00")
-	bcmac, _ := net.ParseMAC("ff:ff:ff:00:00:00")
+	ucmac := net.HardwareAddr{0x4e, 0x65, 0x75, 0x56, 0x00, 0x00}
+	bcmac := net.HardwareAddr{0xff, 0xff, 0xff, 0x00, 0x00, 0x00}
 	return ucmac, bcmac
 }
 

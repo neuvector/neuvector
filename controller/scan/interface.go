@@ -459,7 +459,10 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 			if sum, ok := rs.summary[id]; ok {
 				refreshScanCache(rs, id, sum, c, vpf)
 
-				reportVuls, _ := db.GetVulnerability(id)
+				reportVuls, err := db.GetVulnerability(id)
+				if err != nil {
+					log.WithFields(log.Fields{"id": id, "error": err}).Warn("Failed to get vulnerability data")
+				}
 				localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
 				nmap[id] = images2IDNames(rs, sum)
@@ -471,7 +474,10 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if acc.Authorize(sum, func(s string) share.AccessObject { return rs.config }) {
 					refreshScanCache(rs, id, sum, c, vpf)
 
-					reportVuls, _ := db.GetVulnerability(id)
+					reportVuls, err := db.GetVulnerability(id)
+					if err != nil {
+						log.WithFields(log.Fields{"id": id, "error": err}).Warn("Failed to get vulnerability data")
+					}
 					localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
 					nmap[id] = images2IDNames(rs, sum)
@@ -527,19 +533,29 @@ func (m *scanMethod) GetRegistryBenches(name string, tagMap map[string][]string,
 }
 
 func (m *scanMethod) getAllRegistryImageReport(id string, vpf scanUtils.VPFInterface, showTag string, tagMap map[string][]string, acc *access.AccessControl) (*api.RESTScanReport, error) {
-	rpt, _ := m.GetRegistryImageReport(common.RegistryRepoScanName, id, vpf, showTag, tagMap, acc)
+	// Suppress error: searching multiple registries; not found in one is expected
+	rpt, err := m.GetRegistryImageReport(common.RegistryRepoScanName, id, vpf, showTag, tagMap, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"registry": common.RegistryRepoScanName, "id": id, "error": err}).Debug("Report not found in registry")
+	}
 	if rpt != nil {
 		return rpt, nil
 	}
 
-	rpt, _ = m.GetRegistryImageReport(common.RegistryFedRepoScanName, id, vpf, showTag, tagMap, acc)
+	rpt, err = m.GetRegistryImageReport(common.RegistryFedRepoScanName, id, vpf, showTag, tagMap, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"registry": common.RegistryFedRepoScanName, "id": id, "error": err}).Debug("Report not found in registry")
+	}
 	if rpt != nil {
 		return rpt, nil
 	}
 
 	regs := regMapToArray(true, true)
 	for _, rs := range regs {
-		rpt, _ = m.GetRegistryImageReport(rs.config.Name, id, vpf, showTag, tagMap, acc)
+		rpt, err = m.GetRegistryImageReport(rs.config.Name, id, vpf, showTag, tagMap, acc)
+		if err != nil {
+			log.WithFields(log.Fields{"registry": rs.config.Name, "id": id, "error": err}).Debug("Report not found in registry")
+		}
 		if rpt != nil {
 			return rpt, nil
 		}

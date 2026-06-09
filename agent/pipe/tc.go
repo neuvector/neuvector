@@ -393,7 +393,10 @@ func (d *tcPipeDriver) Connect(jumboframe bool) {
 	d.prefs = utils.NewSet()
 	d.portMap = make(map[string]*tcPortInfo)
 
-	link, _ := netlink.LinkByName(nvVbrPortName)
+	link, err := netlink.LinkByName(nvVbrPortName)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("NV bridge port not found")
+	}
 	if link != nil {
 		d.delQDisc(nvVbrPortName)
 		if dbgError := netlink.LinkSetDown(link); dbgError != nil {
