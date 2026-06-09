@@ -526,6 +526,20 @@ func (m *MockCluster) GetScannerRev(id string) (*share.CLUSScanner, uint64, erro
 	return nil, 0, common.ErrObjectNotFound
 }
 
+func (m *MockCluster) GetScanner(id string, acc *access.AccessControl) (*share.CLUSScanner, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if scanner, ok := m.scanners[id]; ok {
+		clone := *scanner
+		if !acc.Authorize(&clone, nil) {
+			return nil, common.ErrObjectAccessDenied
+		}
+		return &clone, nil
+	}
+	return nil, cluster.ErrKeyNotFound
+}
+
 func (m *MockCluster) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

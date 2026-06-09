@@ -1223,12 +1223,22 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 					CVEDB:           make(map[string]*share.ScanVulnerability),
 				}
 
-				// Reassemble
-				dbs := clusHelper.GetScannerDB(newStore)
+				// Reassemble. Keep the current in-memory DB if the new store cannot be read
+				// or contains no usable entries.
+				dbs, err := clusHelper.GetScannerDB(newStore)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "store": newStore, "version": s.CVEDBVersion}).Error("Failed to load scanner DB")
+					return
+				}
 				for _, db := range dbs {
 					for _, cve := range db.CVEDB {
 						newDB.CVEDB[cve.Name] = cve
 					}
+				}
+
+				if len(newDB.CVEDB) == 0 {
+					log.WithFields(log.Fields{"store": newStore, "version": s.CVEDBVersion}).Error("Dropping empty scanner DB update")
+					return
 				}
 
 				log.WithFields(log.Fields{"cvedb": newDB.CVEDBVersion, "entries": len(newDB.CVEDB)}).Info()
