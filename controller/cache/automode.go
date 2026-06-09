@@ -135,7 +135,9 @@ func automode_log_event(group, mode string, modeType int) {
 		return
 	}
 	log.WithFields(log.Fields{"group": group, "mode": mode, "modeType": modeType}).Info("ATMO:")
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithFields(log.Fields{"group": group, "err": err}).Warn("failed to append auto-mode promotion event")
+	}
 }
 
 func automode_promote_mode(group, mode string, modeType int) error {
@@ -150,7 +152,11 @@ func automode_promote_mode(group, mode string, modeType int) error {
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	grp, _, _ := clusHelper.GetGroup(group, access.NewAdminAccessControl())
+	grp, _, err := clusHelper.GetGroup(group, access.NewAdminAccessControl())
+	if err != nil {
+		// Error is not returned: grp == nil check below handles both "not found" and error cases
+		log.WithFields(log.Fields{"group": group, "err": err}).Warn("failed to get group for auto-mode promotion")
+	}
 	if grp == nil {
 		log.WithFields(log.Fields{"group": group, "promote": mode}).Info("ATMO: no exist")
 		return common.ErrObjectNotFound
@@ -200,11 +206,15 @@ func automode_promote_mode(group, mode string, modeType int) error {
 		grp.ProfileMode = mode
 		if pp := clusHelper.GetProcessProfile(group); pp != nil {
 			pp.Mode = mode
-			_ = clusHelper.PutProcessProfile(group, pp)
+			if putErr := clusHelper.PutProcessProfile(group, pp); putErr != nil {
+				log.WithFields(log.Fields{"group": group, "err": putErr}).Warn("failed to update process profile mode")
+			}
 		}
 		if pp, rev := clusHelper.GetFileMonitorProfile(group); pp != nil {
 			pp.Mode = grp.ProfileMode
-			_ = clusHelper.PutFileMonitorProfile(group, pp, rev)
+			if putErr := clusHelper.PutFileMonitorProfile(group, pp, rev); putErr != nil {
+				log.WithFields(log.Fields{"group": group, "err": putErr}).Warn("failed to update file monitor profile mode")
+			}
 		}
 		log.WithFields(log.Fields{"group": group, "mode": mode}).Info("ATMO: profile mode upgraded")
 	case atmo.PolicyMode:
@@ -212,7 +222,9 @@ func automode_promote_mode(group, mode string, modeType int) error {
 		log.WithFields(log.Fields{"group": group, "mode": mode}).Info("ATMO: policy mode upgraded")
 	}
 
-	_ = clusHelper.PutGroup(grp, false)
+	if putErr := clusHelper.PutGroup(grp, false); putErr != nil {
+		log.WithFields(log.Fields{"group": group, "err": putErr}).Warn("failed to update group mode")
+	}
 	automode_log_event(group, mode, modeType)
 	return nil
 }
