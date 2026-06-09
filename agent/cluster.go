@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -800,7 +801,7 @@ func getLeadGRPCEndpoint() (string, error) {
 func clusterLoop(existing utils.Set) error {
 	// Remove non-existing containers from cluster
 	keys, err := cluster.GetStoreKeys(share.CLUSWorkloadHostStore(Host.ID))
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		return fmt.Errorf("failed to get workload store keys for cleanup: %w", err)
 	}
 	txn := cluster.Transact()
