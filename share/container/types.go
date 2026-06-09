@@ -555,7 +555,10 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 }
 
 func IsPidHost() bool { // pid host, pid-1 is the Linux bootup process
-	name, _ := os.Readlink("/proc/1/exe")
+	name, err := os.Readlink("/proc/1/exe")
+	if err != nil {
+		log.WithError(err).Debug("failed to read /proc/1/exe symlink")
+	}
 	// nv containers: "monitor" is for the controller
 	return name != "/usr/local/bin/monitor"
 }

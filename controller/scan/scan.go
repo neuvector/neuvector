@@ -175,9 +175,7 @@ func countVuln(vuls []*share.ScanVulnerability, vts []*scanUtils.VulTrait, alive
 		share.VulnSeverityMedium:   mediumVulPublishDate,
 	}
 
-	s := fmt.Sprintf("%d.%s", scoreTemp/10, strconv.Itoa(scoreTemp%10))
-	totalScore, _ := strconv.ParseFloat(s, 32)
-	return criticals, highs, meds, lows, criticalWithFix, highWithFix, float32(totalScore), vulPublishDate, otherVuls
+	return criticals, highs, meds, lows, criticalWithFix, highWithFix, float32(scoreTemp) / 10.0, vulPublishDate, otherVuls
 }
 
 func imageWatcher() {

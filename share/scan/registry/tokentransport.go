@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const dockerApiLogin = "https://hub.docker.com/v2/users/login/"
@@ -31,7 +33,10 @@ func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		// We need authentication.
 		// At this point, we don't need resp.Body anymore.  Consume its buffer and close it, so golang can reuse its TCP connection.
 		// While resp.Body.Close() and io.ReadAll() can fail, there is no point to stop the processing here.
-		_, _ = io.ReadAll(resp.Body)
+		if _, err := io.ReadAll(resp.Body); err != nil {
+			// Suppress error: draining body before retry; failure does not affect auth outcome
+			log.WithError(err).Debug("failed to drain response body before token auth")
+		}
 		_ = resp.Body.Close()
 		resp, err = t.authAndRetry(authService, req)
 	}

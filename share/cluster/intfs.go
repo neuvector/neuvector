@@ -134,7 +134,9 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 		lead = waitClusterReady(time.Second*2, 60)
 
 		// Set ready flag so the controller IP can participate selection after restart
-		_ = utils.SetReady("ctrl init done")
+		if err := utils.SetReady("ctrl init done"); err != nil {
+			log.WithError(err).Warn("failed to set cluster ready flag")
+		}
 
 		if lead == "" {
 			return "", errors.New("Failed to elect leader")
@@ -189,7 +191,10 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 
 			// If cluster cannot elect lead due to dns resolve issue, redo the resolve and
 			// restart cluster
-			lead, _ := driver.GetLead()
+			lead, err := driver.GetLead()
+			if err != nil {
+				log.WithError(err).Debug("failed to get cluster lead")
+			}
 			if lead != "" {
 				log.WithFields(log.Fields{"lead": lead}).Info("Lead elected")
 				retryCluster = 0
@@ -305,7 +310,10 @@ func ForceLeave(node string, server bool) {
 }
 
 func GetClusterLead() string {
-	lead, _ := driver.GetLead()
+	lead, err := driver.GetLead()
+	if err != nil {
+		log.WithError(err).Debug("failed to get cluster lead")
+	}
 	if lead != "" {
 		idx := strings.Index(lead, ":")
 		return lead[:idx]
@@ -323,7 +331,11 @@ func waitClusterReady(t time.Duration, maxRetry int) string {
 
 Wait:
 	for {
-		lead, _ = driver.GetLead()
+		var err error
+		lead, err = driver.GetLead()
+		if err != nil {
+			log.WithError(err).Debug("failed to get cluster lead")
+		}
 		if lead == "" {
 			time.Sleep(t)
 			retry++
@@ -994,7 +1006,9 @@ func FillClusterAddrs(cfg *ClusterConfig, sys *system.SystemTools) error {
 				// for lead election; if dns is resolved, other servers are already running - it's possible it's
 				// in the rolling upgrade process, don't make self ready until lead is found.
 				if retry == 1 && cfg.Server {
-					_ = utils.SetReady("cluster init")
+					if err := utils.SetReady("cluster init"); err != nil {
+						log.WithError(err).Warn("failed to set cluster ready flag")
+					}
 				}
 				time.Sleep(time.Second * (1 << retry))
 			} else {

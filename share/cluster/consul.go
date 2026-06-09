@@ -122,7 +122,10 @@ func createPeerFileV3(cc *ClusterConfig) error {
 	}
 
 	// peers := []peerInfoV3{peerInfoV3{ID: nodeID, Address: fmt.Sprintf("%s:%d", cc.AdvertiseAddr, cc.RPCPort), NonVoter: false}}
-	data, _ := json.Marshal(peers)
+	data, err := json.Marshal(peers)
+	if err != nil {
+		return fmt.Errorf("failed to marshal consul peers: %w", err)
+	}
 
 	_, err = f.WriteString(string(data[:]))
 	if err != nil {
@@ -222,7 +225,10 @@ func createConfigFile(cc *ClusterConfig) error {
 	} else {
 		cfg.Log_level = "ERROR"
 	}
-	value, _ := json.MarshalIndent(&cfg, "", "    ")
+	value, err := json.MarshalIndent(&cfg, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal consul config: %w", err)
+	}
 	if _, err := f.WriteString(string(value)); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to write consul config file")
 		return err
@@ -357,7 +363,9 @@ func (m *consulMethod) Start(cc *ClusterConfig, eCh chan error, recover bool) {
 		eCh <- err
 	}
 	if recover {
-		_ = createPeerFileV3(cc)
+		if err := createPeerFileV3(cc); err != nil {
+			log.WithError(err).Warn("failed to create consul peer file")
+		}
 	}
 	m.rpcPort = cc.RPCPort
 

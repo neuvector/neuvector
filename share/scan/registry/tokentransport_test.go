@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockData struct {
@@ -112,7 +113,7 @@ func TestDockerHubAuth(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			_ = transport.AddMockData(md)
+			require.NoError(t, transport.AddMockData(md))
 		}
 	}
 
@@ -244,7 +245,7 @@ func TestDockerHubReauth(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			_ = transport.AddMockData(md)
+			require.NoError(t, transport.AddMockData(md))
 		}
 	}
 
@@ -425,7 +426,7 @@ func TestDockerHubRoundTrip(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			_ = transport.AddMockData(md)
+			require.NoError(t, transport.AddMockData(md))
 		}
 	}
 

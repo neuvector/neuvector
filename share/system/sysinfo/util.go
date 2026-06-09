@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func joinLink(root, link, dir string) string {
@@ -36,7 +38,10 @@ func slurpFile(path string) string {
 // Write one-liner text files, add newline, ignore errors (best effort).
 func spewFile(path string, data string, perm os.FileMode) {
 	path = fmt.Sprintf("%s%s", rootPathPrefix, path)
-	_ = os.WriteFile(path, []byte(data+"\n"), perm)
+	if err := os.WriteFile(path, []byte(data+"\n"), perm); err != nil {
+		// Suppress error: best-effort write, failures expected on read-only filesystems
+		log.WithError(err).Debug("failed to write sysinfo file")
+	}
 }
 
 func openFile(path string) (*os.File, error) {

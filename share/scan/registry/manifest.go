@@ -121,7 +121,10 @@ func (r *Registry) ManifestRequest(ctx context.Context, repository, reference st
 		return "", nil, err
 	}
 
-	dg, _ := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
+	dg, err := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
+	if err != nil {
+		log.WithError(err).Debug("failed to parse Docker-Content-Digest header")
+	}
 
 	// log.WithFields(log.Fields{"schema": schema, "body": string(body[:])}).Debug()
 

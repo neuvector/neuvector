@@ -582,7 +582,10 @@ func CLUSWafGroupKey2Name(key string) string {
 
 func CLUSPolicyRuleKey2ID(key string) uint32 {
 	s := keyLastToken(key)
-	id, _ := strconv.Atoi(s)
+	id, err := strconv.Atoi(s)
+	if err != nil {
+		log.WithError(err).Debug("failed to parse policy rule ID from cluster key")
+	}
 	return uint32(id)
 }
 
