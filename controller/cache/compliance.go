@@ -61,7 +61,10 @@ func filterComplianceLog(audit *api.Audit) *api.Audit {
 	}
 
 	// Is the namespace tagged
-	tags, _ := cacher.GetDomainEffectiveTags(domain, access.NewReaderAccessControl())
+	tags, err := cacher.GetDomainEffectiveTags(domain, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithFields(log.Fields{"domain": domain, "err": err}).Warn("failed to get domain effective tags")
+	}
 	if len(tags) > 0 {
 		// namespace tagged
 		domainTags := utils.NewSetFromSliceKind(tags)

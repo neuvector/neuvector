@@ -326,7 +326,9 @@ func LeadChangeNotify(isLeader bool, leadAddr string) {
 	SchedulePruneGroups()
 
 	if localDev.Host.Platform == share.PlatformKubernetes {
-		_, _ = cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false)
+		if _, err := cacher.SyncAdmCtrlStateToK8s(resource.NvAdmSvcName, resource.NvAdmValidatingName, false); err != nil {
+			log.WithFields(log.Fields{"err": err}).Warn("failed to sync admission control state to k8s on leader promotion")
+		}
 	}
 }
 
@@ -1767,7 +1769,9 @@ func startWorkerThread(ctx *Context) {
 									cache.errCount++
 									if cache.errCount >= scannerClearnupErrorMax {
 										log.WithFields(log.Fields{"scanner": sid}).Info("Remove stalled internal scanner")
-										_ = clusHelper.DeleteScanner(sid)
+										if delErr := clusHelper.DeleteScanner(sid); delErr != nil {
+											log.WithFields(log.Fields{"scanner": sid, "err": delErr}).Warn("failed to delete stalled internal scanner")
+										}
 									}
 								} else {
 									cache.errCount = 0
@@ -1780,7 +1784,9 @@ func startWorkerThread(ctx *Context) {
 								cache.errCount++
 								if cache.errCount >= scannerClearnupErrorMax {
 									log.WithFields(log.Fields{"scanner": sid}).Info("Remove stalled external scanner")
-									_ = clusHelper.DeleteScanner(sid)
+									if delErr := clusHelper.DeleteScanner(sid); delErr != nil {
+										log.WithFields(log.Fields{"scanner": sid, "err": delErr}).Warn("failed to delete stalled external scanner")
+									}
 								}
 							} else {
 								cache.errCount = 0
@@ -2120,14 +2126,18 @@ func startWorkerThread(ctx *Context) {
 					}
 					log.WithFields(log.Fields{"event": ev.Event, "type": ev.ResourceType}).Info()
 					if o != nil && n == nil { // delete
-						_ = cluster.Put(share.CLUSConfigSecretPatternsKey, []byte("{}"))
+						if putErr := cluster.Put(share.CLUSConfigSecretPatternsKey, []byte("{}")); putErr != nil {
+							log.WithFields(log.Fields{"err": putErr}).Warn("failed to clear secret patterns config")
+						}
 					} else if n != nil && n.Data != nil {
 						if v, ok := n.Data[secretPatternsKey]; ok {
 							if json_data, err := yaml.YAMLToJSON([]byte(v)); err == nil {
 								var config secrets.SecretPatternConfig
 								if err := yaml.Unmarshal(json_data, &config); err == nil {
 									if data, err := json.Marshal(&config); err == nil {
-										_ = cluster.Put(share.CLUSConfigSecretPatternsKey, data)
+										if putErr := cluster.Put(share.CLUSConfigSecretPatternsKey, data); putErr != nil {
+											log.WithFields(log.Fields{"err": putErr}).Warn("failed to update secret patterns config")
+										}
 									} else {
 										log.WithFields(log.Fields{"error": err}).Error("marshal failed")
 									}
@@ -2150,20 +2160,31 @@ func checkKeyRotation() {
 		return
 	}
 
-	if valueBackup, _ := cluster.Get(share.CLUSSystemEncMigratedKey); len(valueBackup) > 0 {
+	valueBackup, err := cluster.Get(share.CLUSSystemEncMigratedKey)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to get encryption migration backup key")
+	}
+	if len(valueBackup) > 0 {
 		var cfgEncBackup share.CLUSSystemConfigEncMigrated
 		if err := json.Unmarshal(valueBackup, &cfgEncBackup); err == nil {
 			if time.Now().UTC().After(cfgEncBackup.EncDataExpirationTime) {
 				// the backup is expired
-				_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+				if delErr := cluster.Delete(share.CLUSSystemEncMigratedKey); delErr != nil {
+					log.WithFields(log.Fields{"err": delErr}).Warn("failed to delete expired encryption migration backup")
+				}
 				log.Info("encryption-migrated config backup is deleted")
 			}
 		}
 	}
 
-	value, _ := cluster.Get(share.CLUSNextKeyRotationTSKey)
+	value, err := cluster.Get(share.CLUSNextKeyRotationTSKey)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to get next key rotation timestamp")
+	}
 	if len(value) == 0 {
-		_ = kv.SetNextKeyRotationTime(cctx.KeyRotationDuration)
+		if setErr := kv.SetNextKeyRotationTime(cctx.KeyRotationDuration); setErr != nil {
+			log.WithFields(log.Fields{"err": setErr}).Warn("failed to set next key rotation time")
+		}
 		return
 	}
 	i, err := strconv.ParseInt(string(value), 10, 64)
@@ -2233,7 +2254,9 @@ func refreshK8sAdminWebhookStateCache(oldConfig, newConfig *resource.AdmissionWe
 				alog.Event = share.CLUSEvAdmCtrlK8sConfigFailed
 				alog.Msg = fmt.Sprintf("Failed to re-configure admission control after mismatched Kubernetes resource configuration found (%s).", config.Name)
 			}
-			_ = cctx.EvQueue.Append(&alog)
+			if appendErr := cctx.EvQueue.Append(&alog); appendErr != nil {
+				log.WithFields(log.Fields{"err": appendErr}).Warn("failed to append admission control k8s config event")
+			}
 		}
 	}
 }
@@ -2278,7 +2301,9 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 	// license update will update the limit and could trigger actions
 	licenseInit()
 	ruleid.SetGetGroupWithoutLockFunc(getGroupWithoutLock)
-	_ = clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey)
+	if err := clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey); err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to set controller admission state")
+	}
 	automode_init(ctx)
 
 	db.SetGetCVERecordFunc(GetCVERecord)
@@ -2297,14 +2322,16 @@ func Close() {
 
 func CacheEvent(ev share.TLogEvent, msg string) error {
 	if isLeader() {
-		log := share.CLUSEventLog{
+		eventLog := share.CLUSEventLog{
 			Event:          ev,
 			ReportedAt:     time.Now().UTC(),
 			ControllerID:   localDev.Ctrler.ID,
 			ControllerName: localDev.Ctrler.Name,
 			Msg:            msg,
 		}
-		_ = cctx.EvQueue.Append(&log)
+		if appendErr := cctx.EvQueue.Append(&eventLog); appendErr != nil {
+			log.WithFields(log.Fields{"err": appendErr}).Warn("failed to append cache event")
+		}
 		if ev == share.CLUSEvK8sNvRBAC {
 			cctx.EvQueue.Flush()
 		}
@@ -2393,22 +2420,34 @@ func pruneWorkloadKV(suspected utils.Set) {
 	// When it is confirmed by next cycle, it relative keys are deleted
 
 	// (1) bench reports: bench/<id>/report/<BenchType>
-	keys, _ := cluster.GetKeys(share.CLUSBenchStore, "/") // middle element
+	keys, err := cluster.GetKeys(share.CLUSBenchStore, "/") // middle element
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to get bench store keys")
+	}
 	removed := lookupPurgeWorkloadEntries(keys, 1, ids, suspected, confirmed, updated)
 	// log.WithFields(log.Fields{"keys": keys, "suspected": suspected}).Debug("bench reports")
 
 	// (2) bench scan state: scan/state/bench/workload/<id>
-	keys, _ = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ") // last element
+	keys, err = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ") // last element
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to get bench workload scan state keys")
+	}
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
 	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("bench wl state")
 
 	// (3) auto scan reports: scan/data/report/workload/<id>
-	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ") // last element
+	keys, err = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ") // last element
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to get scan data report keys")
+	}
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
 	// log.WithFields(log.Fields{"keys": keys, "confirmed": confirmed, "suspected": suspected}).Debug("auto scan reports")
 
 	// (4) scan state records: scan/state/report/workload/<id>
-	keys, _ = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ") // last element
+	keys, err = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ") // last element
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warn("failed to get scan state report keys")
+	}
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
 
 	// remove confirmed ids from the missing ids and pass into the next round
@@ -2427,7 +2466,9 @@ func pruneWorkloadKV(suspected utils.Set) {
 			for _, key := range removed {
 				txn.DeleteTree(key)
 			}
-			_, _ = txn.Apply()
+			if _, applyErr := txn.Apply(); applyErr != nil {
+				log.WithFields(log.Fields{"err": applyErr}).Warn("failed to apply workload entry purge transaction")
+			}
 			txn.Close()
 			log.WithFields(log.Fields{"pruned": len(removed), "removed": removed}).Info()
 		}

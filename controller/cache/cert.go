@@ -58,7 +58,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 		case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 			var cert share.CLUSX509Cert
 			var dec common.DecryptUnmarshaller
-			_ = dec.Unmarshal(value, &cert)
+			if err := dec.Unmarshal(value, &cert); err != nil {
+				log.WithFields(log.Fields{"err": err}).Warn("failed to unmarshal certificate")
+			}
 
 			if len(cert.Key) > 0 && len(cert.Cert) > 0 {
 				if err := os.WriteFile(pathInfo.keyPath, []byte(cert.Key), 0600); err == nil {

@@ -180,7 +180,9 @@ func initCache() {
 	for idx, ruleType := range ruleTypes {
 		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
 		if err != nil && err.Error() == cluster.ErrKeyNotFound.Error() {
-			_ = clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleType, arhs)
+			if putErr := clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleType, arhs); putErr != nil {
+				log.WithFields(log.Fields{"ruleType": ruleType, "err": putErr}).Warn("failed to init admission rule list")
+			}
 		}
 		ruleCaches[idx].RuleMap = make(map[uint32]*share.CLUSAdmissionRule, len(arhs)) // key is ruleID
 		ruleCaches[idx].RuleHeads = make([]*share.CLUSRuleHead, 0, len(arhs))
@@ -235,7 +237,10 @@ func initCache() {
 	}
 	if localDev.Host.Platform == share.PlatformKubernetes {
 		if admission.IsNsSelectorSupported() {
-			installID, _ := clusHelper.GetInstallationID()
+			installID, err := clusHelper.GetInstallationID()
+			if err != nil {
+				log.WithFields(log.Fields{"err": err}).Warn("failed to get installation ID")
+			}
 			admission.InitK8sNsSelectorInfo(allAllowedNS, allAllowedNsWild, defAllowedNS, installID, admStateCache.Enable)
 		}
 
@@ -501,7 +506,10 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 		switch cfgType {
 		case share.CLUSAdmissionCfgState:
 			var state share.CLUSAdmissionState
-			_ = json.Unmarshal(value, &state)
+			if err := json.Unmarshal(value, &state); err != nil {
+				log.WithFields(log.Fields{"err": err}).Warn("failed to unmarshal admission state")
+				return
+			}
 			updated, nvInstalled := updateNvDeployStatus(state.NvDeployStatus)
 			if updated && !nvInstalled {
 				atomic.StoreUint32(&nvDeployDeleted, 1)
@@ -547,7 +555,10 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			}
 		case share.CLUSAdmissionCfgRule:
 			var rule share.CLUSAdmissionRule
-			_ = json.Unmarshal(value, &rule)
+			if err := json.Unmarshal(value, &rule); err != nil {
+				log.WithFields(log.Fields{"err": err}).Warn("failed to unmarshal admission rule")
+				return
+			}
 			for _, crt := range rule.Criteria {
 				switch crt.Op {
 				case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
@@ -570,7 +581,10 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			log.WithFields(log.Fields{"nType": nType, "cfgType": cfgType, "rule.ID": rule.ID}).Debug("admissionConfigUpdate, add/modify to opa")
 		case share.CLUSAdmissionCfgRuleList:
 			var heads []*share.CLUSRuleHead
-			_ = json.Unmarshal(value, &heads)
+			if err := json.Unmarshal(value, &heads); err != nil {
+				log.WithFields(log.Fields{"err": err}).Warn("failed to unmarshal admission rule list")
+				return
+			}
 			admPolicyCache.RuleHeads = heads
 			ids := utils.NewSet()
 			for _, rh := range heads {
@@ -637,10 +651,18 @@ func isStringCriterionMet(crt *share.CLUSAdmRuleCriterion, value string) (bool, 
 	case share.CriteriaOpPrefix:
 		return strings.HasPrefix(value, crt.Value), true
 	case share.CriteriaOpRegex, share.CriteriaOpRegex_Deprecated:
-		matched, _ := regexp.MatchString(crt.Value, value)
+		matched, err := regexp.MatchString(crt.Value, value)
+		if err != nil {
+			// Suppress error: regex pattern should have been validated at creation; log at debug to avoid high frequency noise
+			log.WithFields(log.Fields{"pattern": crt.Value, "err": err}).Debug("invalid regex in admission criterion")
+		}
 		return matched, true
 	case share.CriteriaOpNotRegex, share.CriteriaOpNotRegex_Deprecated:
-		matched, _ := regexp.MatchString(crt.Value, value)
+		matched, err := regexp.MatchString(crt.Value, value)
+		if err != nil {
+			// Suppress error: regex pattern should have been validated at creation; log at debug to avoid high frequency noise
+			log.WithFields(log.Fields{"pattern": crt.Value, "err": err}).Debug("invalid regex in admission criterion")
+		}
 		return !matched, false
 	case share.CriteriaOpContainsAll, share.CriteriaOpContainsAny, share.CriteriaOpNotContainsAny, share.CriteriaOpContainsOtherThan,
 		share.CriteriaOpRegexContainsAny, share.CriteriaOpRegexNotContainsAny:
@@ -709,7 +731,11 @@ func isCveCountCriterionMet(crt *share.CLUSAdmRuleCriterion, checkWithFix bool, 
 	if len(crt.SubCriteria) > 0 {
 		for _, sc := range crt.SubCriteria {
 			if sc.Name == share.SubCriteriaPublishDays {
-				crtPublishDays, _ := strconv.ParseFloat(crt.SubCriteria[0].Value, 32)
+				crtPublishDays, err := strconv.ParseFloat(crt.SubCriteria[0].Value, 32)
+				if err != nil {
+					log.WithFields(log.Fields{"value": crt.SubCriteria[0].Value, "err": err}).Warn("failed to parse CVE publish days criterion")
+					continue
+				}
 				hoursValue := 24 * crtPublishDays // because criterion value is in days
 				if vulInfo != nil {
 					for _, vi := range vulInfo {
@@ -1547,7 +1573,11 @@ func isAdmissionRuleMet(admResObject *nvsysadmission.AdmResObject, c *nvsysadmis
 		}
 
 		ar2 := AdmissionReviewWrapper{Review: ar}
-		jsonData, _ := json.Marshal(ar2)
+		jsonData, err := json.Marshal(ar2)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "ruleID": ruleID}).Warn("failed to marshal admission review for OPA evaluation")
+			return false, ""
+		}
 
 		policyUrl := fmt.Sprintf("/v1/data/neuvector_policy_%d", ruleID)
 
@@ -1991,7 +2021,9 @@ func (m CacheMethod) SyncAdmCtrlStateToK8s(svcName, nvAdmName string, updateDete
 					Msg:        msg,
 					ReportedAt: time.Now().UTC(),
 				}
-				_ = cctx.EvQueue.Append(&alog)
+				if appendErr := cctx.EvQueue.Append(&alog); appendErr != nil {
+					log.WithFields(log.Fields{"err": appendErr}).Warn("failed to append admission webhook change event")
+				}
 			}
 			return skip, err
 		}
