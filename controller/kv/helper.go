@@ -134,14 +134,14 @@ type ClusterHelper interface {
 	DeleteProcessProfileTxn(txn *cluster.ClusterTransact, group string) error
 	GetAllProcessProfileSubKeys(scope string) utils.Set
 
-	GetScanner(id string, acc *access.AccessControl) *share.CLUSScanner
+	GetScanner(id string, acc *access.AccessControl) (*share.CLUSScanner, error)
 	GetAllScanner(acc *access.AccessControl) []*share.CLUSScanner
 	PutScannerTxn(txn *cluster.ClusterTransact, s *share.CLUSScanner) error
 	DeleteScanner(id string) error
 	GetScannerStats(id string) (*share.CLUSScannerStats, error)
 	CreateScannerStats(id string) error
 	PutScannerStats(id string, objType share.ScanObjectType, result *share.ScanResult) error
-	GetScannerDB(store string) []*share.CLUSScannerDB
+	GetScannerDB(store string) ([]*share.CLUSScannerDB, error)
 
 	// InitCreditOwners initializes the scan credit owners for the cluster.
 	InitCreditOwners() error
@@ -1502,7 +1502,7 @@ func (m clusterHelper) GetScannerStats(id string) (*share.CLUSScannerStats, erro
 	key := share.CLUSScannerStatsKey(id)
 	value, _, _ := m.get(key)
 	if value == nil {
-		return nil, common.ErrObjectNotFound
+		return nil, cluster.ErrKeyNotFound
 	}
 
 	_ = nvJsonUnmarshal(key, value, &s)
@@ -1578,20 +1578,25 @@ func (m clusterHelper) PutScannerStats(id string, objType share.ScanObjectType, 
 	return common.ErrAtomicWriteFail
 }
 
-func (m clusterHelper) GetScanner(id string, acc *access.AccessControl) *share.CLUSScanner {
+func (m clusterHelper) GetScanner(id string, acc *access.AccessControl) (*share.CLUSScanner, error) {
 	key := share.CLUSScannerKey(id)
-	value, _, _ := m.get(key)
+	value, _, err := m.get(key)
+	if err != nil {
+		return nil, err
+	}
 	if value != nil {
 		var s share.CLUSScanner
-		_ = nvJsonUnmarshal(key, value, &s)
-
-		if !acc.Authorize(&s, nil) {
-			return nil
+		if err := nvJsonUnmarshal(key, value, &s); err != nil {
+			return nil, err
 		}
 
-		return &s
+		if !acc.Authorize(&s, nil) {
+			return nil, common.ErrObjectAccessDenied
+		}
+
+		return &s, nil
 	}
-	return nil
+	return nil, cluster.ErrKeyNotFound
 }
 
 // GetScannerRev gets scanner with revision for internal operations (no auth check)
@@ -1599,7 +1604,8 @@ func (m clusterHelper) GetScannerRev(id string) (*share.CLUSScanner, uint64, err
 	key := share.CLUSScannerKey(id)
 	value, rev, err := m.get(key)
 	if err != nil || value == nil {
-		return nil, 0, common.ErrObjectNotFound
+		// Use cluster.ErrKeyNotFound to stay consistent with the KV store layer abstraction.
+		return nil, 0, cluster.ErrKeyNotFound
 	}
 
 	var s share.CLUSScanner
@@ -1617,28 +1623,33 @@ func (m clusterHelper) DeleteScanner(id string) error {
 	return cluster.Delete(key)
 }
 
-func (m clusterHelper) GetScannerDB(store string) []*share.CLUSScannerDB {
+func (m clusterHelper) GetScannerDB(store string) ([]*share.CLUSScannerDB, error) {
 	dbs := make([]*share.CLUSScannerDB, 0)
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list scanner db keys for %s: %w", store, err)
+	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read scanner db key %s: %w", key, err)
+		}
+		if value != nil {
 			var db share.CLUSScannerDB
 			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
-				log.Error("Failed to unzip data")
-				continue
+				return nil, fmt.Errorf("failed to unzip scanner db key %s: %w", key, err)
 			}
 
 			err := json.Unmarshal(uzb, &db)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Cannot decode db")
-				continue
+				return nil, fmt.Errorf("failed to decode scanner db key %s: %w", key, err)
 			}
 
 			dbs = append(dbs, &db)
 		}
 	}
-	return dbs
+	return dbs, nil
 }
 
 func (m clusterHelper) GetAvailableScanners() []share.CLUSScanner {
@@ -1729,7 +1740,7 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) er
 		scanner, rev, err := m.GetScannerRev(scannerId)
 		if err != nil {
 			// Check if scanner was deleted (object not found)
-			if errors.Is(err, common.ErrObjectNotFound) {
+			if errors.Is(err, cluster.ErrKeyNotFound) {
 				// Scanner has been deleted - credit is implicitly released with the scanner
 				log.WithFields(log.Fields{"scanner": scannerId}).Debug("Scanner not found during credit release, likely deleted")
 				return nil
