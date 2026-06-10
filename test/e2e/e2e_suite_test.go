@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"os"
@@ -20,6 +21,9 @@ import (
 
 //nolint:gochecknoglobals // provided by e2e-framework
 var testEnv env.Environment
+
+//nolint:gochecknoglobals // generated once in TestMain, read by all test features
+var nvAdminPassword string
 
 const (
 	helmRepoNotFoundString       = "no repo named"
@@ -45,6 +49,57 @@ func useExistingCluster() bool {
 	return os.Getenv("E2E_USE_EXISTING_CLUSTER") == "true"
 }
 
+// generateAdminPassword returns a 20-character alphanumeric password using crypto/rand.
+// Alphanumeric characters only to satisfy NeuVector's password character restrictions.
+func generateAdminPassword() string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 20)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("generate admin password: %v", err))
+	}
+	for i, c := range b {
+		b[i] = chars[c%byte(len(chars))]
+	}
+	return string(b)
+}
+
+// writeValuesFile writes a temporary Helm values override file (mode 0600) that:
+//   - Enables controller.secret so the admin password is stored in a Kubernetes Secret
+//   - Sets the admin password via userinitcfg.yaml
+//   - Exposes the controller REST API as a NodePort service
+//
+// The caller is responsible for removing the file when it is no longer needed.
+func writeValuesFile(password string) (string, error) {
+	content := fmt.Sprintf(`controller:
+  secret:
+    enabled: true
+    data:
+      userinitcfg.yaml:
+        always_reload: false
+        users:
+          - Fullname: admin
+            Password: %q
+            Role: admin
+`, password)
+
+	f, err := os.CreateTemp("", "neuvector-e2e-values-*.yaml")
+	if err != nil {
+		return "", fmt.Errorf("create temp values file: %w", err)
+	}
+	name := f.Name()
+	if err = os.Chmod(name, 0600); err != nil {
+		f.Close()
+		os.Remove(name)
+		return "", fmt.Errorf("chmod temp values file: %w", err)
+	}
+	if _, err = f.WriteString(content); err != nil {
+		f.Close()
+		os.Remove(name)
+		return "", fmt.Errorf("write temp values file: %w", err)
+	}
+	return name, f.Close()
+}
+
 type helmChart struct {
 	name          string
 	namespace     string
@@ -54,7 +109,7 @@ type helmChart struct {
 	helmOptions   []helm.Option
 }
 
-func getCharts() []helmChart {
+func getCharts(valuesFile string) []helmChart {
 	return []helmChart{
 		{
 			name:          nvReleaseName,
@@ -75,6 +130,10 @@ func getCharts() []helmChart {
 				// The chart's default global tag (nvChartTag) is used for manager.
 				// Scanner uses its own cve.scanner.image.tag (independent of global tag).
 				helm.WithVersion(os.Getenv("NV_CHART_VERSION")),
+				// Inject the admin password and init config via a Kubernetes Secret.
+				helm.WithArgs("--values", valuesFile),
+				// Expose the controller REST API as a NodePort so tests can reach it.
+				helm.WithArgs("--set", "controller.apisvc.type=NodePort"),
 			},
 		},
 	}
@@ -90,13 +149,25 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	charts := getCharts()
+	nvAdminPassword = generateAdminPassword()
+	valuesFile, err := writeValuesFile(nvAdminPassword)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to write helm values file: %v\n", err)
+		os.Exit(1)
+	}
+
+	charts := getCharts(valuesFile)
 	commonSetupFuncs := []env.Func{
 		uninstallHelmCharts(charts),
 		installHelmCharts(charts),
+		discoverAPIEndpoint(),
 	}
 	commonFinishFuncs := []env.Func{
 		uninstallHelmCharts(charts),
+		func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
+			os.Remove(valuesFile)
+			return ctx, nil
+		},
 	}
 
 	if useExistingCluster() {
