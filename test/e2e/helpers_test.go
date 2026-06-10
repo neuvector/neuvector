@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,9 +44,7 @@ func getNeuVectorDeploymentFeature() types.Feature {
 func setupSharedK8sClient(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 	t.Helper()
 	client, err := cfg.NewClient()
-	if err != nil {
-		t.Fatalf("failed to create k8s client: %v", err)
-	}
+	require.NoError(t, err, "create k8s client")
 	return context.WithValue(ctx, k8sClientKey, client)
 }
 
@@ -53,66 +52,62 @@ func getK8sClient(ctx context.Context) klient.Client {
 	return ctx.Value(k8sClientKey).(klient.Client)
 }
 
-func assessControllerDeployment(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+func assessControllerDeployment(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	client := getK8sClient(ctx)
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: controllerDeploymentName, Namespace: nvNamespace},
 	}
-	if err := wait.For(
+	err := wait.For(
 		conditions.New(client.Resources()).DeploymentConditionMatch(dep, appsv1.DeploymentAvailable, corev1.ConditionTrue),
 		wait.WithTimeout(assessTimeout),
-	); err != nil {
-		t.Fatalf("controller deployment not available: %v", err)
-	}
+	)
+	require.NoError(t, err, "controller deployment not available")
 	return ctx
 }
 
-func assessEnforcerDaemonSet(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+func assessEnforcerDaemonSet(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	client := getK8sClient(ctx)
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Name: enforcerDaemonSetName, Namespace: nvNamespace},
 	}
-	if err := wait.For(
+	err := wait.For(
 		conditions.New(client.Resources()).ResourceMatch(ds, func(obj k8s.Object) bool {
 			d := obj.(*appsv1.DaemonSet)
 			return d.Status.DesiredNumberScheduled > 0 &&
 				d.Status.DesiredNumberScheduled == d.Status.NumberReady
 		}),
 		wait.WithTimeout(assessTimeout),
-	); err != nil {
-		t.Fatalf("enforcer daemonset not ready: %v", err)
-	}
+	)
+	require.NoError(t, err, "enforcer daemonset not ready")
 	return ctx
 }
 
-func assessManagerDeployment(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+func assessManagerDeployment(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	client := getK8sClient(ctx)
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: managerDeploymentName, Namespace: nvNamespace},
 	}
-	if err := wait.For(
+	err := wait.For(
 		conditions.New(client.Resources()).DeploymentConditionMatch(dep, appsv1.DeploymentAvailable, corev1.ConditionTrue),
 		wait.WithTimeout(assessTimeout),
-	); err != nil {
-		t.Fatalf("manager deployment not available: %v", err)
-	}
+	)
+	require.NoError(t, err, "manager deployment not available")
 	return ctx
 }
 
-func assessScannerDeployment(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+func assessScannerDeployment(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	client := getK8sClient(ctx)
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: scannerDeploymentName, Namespace: nvNamespace},
 	}
-	if err := wait.For(
+	err := wait.For(
 		conditions.New(client.Resources()).DeploymentConditionMatch(dep, appsv1.DeploymentAvailable, corev1.ConditionTrue),
 		wait.WithTimeout(assessTimeout),
-	); err != nil {
-		t.Fatalf("scanner deployment not available: %v", err)
-	}
+	)
+	require.NoError(t, err, "scanner deployment not available")
 	return ctx
 }
