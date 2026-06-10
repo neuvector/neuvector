@@ -33,8 +33,14 @@ const (
 	nvHelmRepoURL  = "https://neuvector.github.io/neuvector-helm/"
 	nvChartPath    = "/core"
 
-	controllerImage = "neuvector/controller:latest"
-	enforcerImage   = "neuvector/enforcer:latest"
+	// nvChartTag must match the global "tag:" field in neuvector-helm/charts/core/values.yaml.
+	// Controller and enforcer are built locally and loaded into kind under this tag so that
+	// helm (which uses the global tag for all images) picks them up with imagePullPolicy=IfNotPresent.
+	// Manager and scanner then also use this released version, pulled from DockerHub.
+	nvChartTag = "5.5.1"
+
+	controllerImage = "neuvector/controller:" + nvChartTag
+	enforcerImage   = "neuvector/enforcer:" + nvChartTag
 )
 
 var defaultHelmTimeout = 10 * time.Minute
@@ -61,17 +67,16 @@ func getCharts() []helmChart {
 			repoURL:       nvHelmRepoURL,
 			path:          nvChartPath,
 			helmOptions: []helm.Option{
-				helm.WithArgs("--set", "tag=latest"),
 				// Reduce replicas to 1 to limit memory usage in the test cluster.
 				helm.WithArgs("--set", "controller.replicas=1"),
 				helm.WithArgs("--set", "cve.scanner.replicas=1"),
-				// Controller and enforcer use locally loaded images.
+				// Controller and enforcer are pre-loaded into kind under nvChartTag; use
+				// IfNotPresent so the kubelet picks up the local image instead of pulling.
 				helm.WithArgs("--set", "controller.image.imagePullPolicy=IfNotPresent"),
 				helm.WithArgs("--set", "enforcer.image.imagePullPolicy=IfNotPresent"),
-				// Manager pulls from DockerHub (no local build).
-				helm.WithArgs("--set", "manager.image.imagePullPolicy=Always"),
-				// Scanner lives under cve.scanner in the values hierarchy.
-				helm.WithArgs("--set", "cve.scanner.image.imagePullPolicy=Always"),
+				// Manager and scanner are not loaded locally; kubelet pulls them from DockerHub.
+				// The chart's default global tag (nvChartTag) is used for manager.
+				// Scanner uses its own cve.scanner.image.tag (independent of global tag).
 			},
 		},
 	}
