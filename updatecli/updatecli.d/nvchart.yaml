@@ -1,0 +1,70 @@
+---
+name: Bump Neuvector chart version
+
+pipelineid: "nv-chart-version"
+
+sources:
+  appVersion:
+    name: "Get latest neuvector chart app version"
+    kind: yaml
+    spec:
+      file: https://raw.githubusercontent.com/neuvector/neuvector-helm/release/v2.10/charts/core/Chart.yaml
+      key: $.appVersion
+  chartVersion:
+    name: "Get latest neuvector chart app version"
+    kind: yaml
+    spec:
+      file: https://raw.githubusercontent.com/neuvector/neuvector-helm/release/v2.10/charts/core/Chart.yaml
+      key: $.version
+
+targets:
+  chartVersion:
+    scmid: default
+    name: Update Chart Version to {{ source "chartVersion" }}
+    kind: file
+    sourceid: chartVersion
+    spec:
+      file: Makefile
+      matchpattern: 'NV_CHART_VERSION \?= .*'
+      replacepattern: 'NV_CHART_VERSION ?= {{ source "chartVersion" }}'
+  appVersion:
+    scmid: default
+    name: Update App Version to {{ source "appVersion" }}
+    kind: file
+    sourceid: appVersion
+    spec:
+      file: Makefile
+      matchpattern: 'NV_APP_VERSION \?= .*'
+      replacepattern: 'NV_APP_VERSION ?= {{ source "appVersion" }}'
+
+actions:
+  default:
+    title: 'chore: update nv helm chart version to {{ source "chartVersion" }}'
+    kind: github/pullrequest
+    scmid: default
+    spec:
+      automerge: false
+      mergemethod: squash
+      description: |
+        Automatic Helm chart {{ source "chartVersion" }} update.
+      draft: false
+      labels:
+        - "chore"
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: "{{ .github.author }}"
+      email: "{{ .github.email }}"
+      owner: "{{ requiredEnv .github.owner }}"
+      repository: "neuvector"
+      token: "{{ requiredEnv .github.token }}"
+      username: "{{ requiredEnv .github.user }}"
+      branch: "{{ .github.branch }}"
+      commitusingapi: true
+      commitmessage:
+        type: "chore"
+        scope: deps
+        title: "update nv chart version"
+        hidecredit: true
