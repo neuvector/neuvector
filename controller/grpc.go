@@ -172,7 +172,11 @@ func (ss *ScanService) HealthCheck(ctx context.Context, data *share.ScannerRegis
 	}
 
 	clusHelper := kv.GetClusterHelper()
-	s := clusHelper.GetScanner(scannerID, access.NewReaderAccessControl())
+	s, err := clusHelper.GetScanner(scannerID, access.NewReaderAccessControl())
+	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+		log.WithFields(log.Fields{"error": err, "scanner": scannerID}).Warn("Failed to get scanner during health check")
+		return nil, fmt.Errorf("failed to get scanner %s: %w", scannerID, err)
+	}
 	if s != nil {
 		visible = true
 	}
@@ -214,8 +218,18 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	}
 	defer clusHelper.ReleaseLock(lock)
 
+	hasCveDB := len(data.CVEDB) > 0
+	if !hasCveDB {
+		log.WithFields(log.Fields{"scanner": data.ID, "version": data.CVEDBVersion}).Warn("Skip empty scanner DB update")
+		return errors.New("scanner cvedb is empty")
+	}
+
 	// Check if the database is newer.
-	s := clusHelper.GetScanner(share.CLUSScannerDBVersionID, access.NewReaderAccessControl())
+	s, err := clusHelper.GetScanner(share.CLUSScannerDBVersionID, access.NewReaderAccessControl())
+	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+		log.WithFields(log.Fields{"error": err, "version": data.CVEDBVersion}).Warn("Failed to get scanner DB version record")
+		return fmt.Errorf("failed to get scanner DB version record: %w", err)
+	}
 	if s == nil {
 		writeDB = true
 	} else {
