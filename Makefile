@@ -240,3 +240,12 @@ push-enforcer-image: buildx-machine
 	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)"
 test:
 	go test ./...
+
+.PHONY: test-e2e
+test-e2e:
+ifneq ($(E2E_USE_EXISTING_CLUSTER),true)
+ifeq ($(E2E_NO_REBUILD),)
+	TAG=latest $(MAKE) build-controller-image build-enforcer-image
+endif
+endif
+	go test -C test/e2e -v -timeout 30m .
