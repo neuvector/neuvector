@@ -48,6 +48,7 @@ jobs:
           version: v2.12.2
           install-mode: binary
           args: --timeout=30m
+          skip-cache: true
   openapi-lint:
     runs-on: ubuntu-latest
     steps:
