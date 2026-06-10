@@ -155,12 +155,20 @@ func GetGuid() (string, error) {
 }
 
 func GetTimeUUID(t time.Time) string {
-	uuid, _ := simpleuuid.NewTime(t)
+	uuid, err := simpleuuid.NewTime(t)
+	if err != nil {
+		log.WithError(err).Warn("failed to create time UUID")
+		return ""
+	}
 	return uuid.String()
 }
 
 func GetStringUUID(s string) string {
-	uuid, _ := simpleuuid.NewString(s)
+	uuid, err := simpleuuid.NewString(s)
+	if err != nil {
+		log.WithError(err).Warn("failed to create string UUID")
+		return ""
+	}
 	return uuid.String()
 }
 
@@ -194,7 +202,10 @@ func GunzipBytes(buf []byte) []byte {
 		return nil
 	}
 	defer r.Close()
-	uzb, _ := io.ReadAll(r)
+	uzb, err := io.ReadAll(r)
+	if err != nil {
+		log.WithError(err).Warn("failed to read gzip data")
+	}
 	return uzb
 }
 
@@ -302,7 +313,11 @@ func NewEnvironParser(envs []string) *EnvironParser {
 				switch k {
 				case share.ENV_PLATFORM_INFO:
 					// platform=aliyun;if-eth0=local;if-eth1=global
-					p.platformEnv, _ = parseQuery(v)
+					var err error
+					p.platformEnv, err = parseQuery(v)
+					if err != nil {
+						log.WithError(err).Warn("failed to parse platform env")
+					}
 				case share.ENV_SYSTEM_GROUPS:
 					// NV_SYSTEM_GROUPS=ucp-*;calico-*
 					p.sysGroups = make([]*regexp.Regexp, 0)
@@ -829,7 +844,10 @@ func GetGID() uint64 {
 	b = b[:runtime.Stack(b, false)]
 	b = bytes.TrimPrefix(b, []byte("goroutine "))
 	b = b[:bytes.IndexByte(b, ' ')]
-	n, _ := strconv.ParseUint(string(b), 10, 64)
+	n, err := strconv.ParseUint(string(b), 10, 64)
+	if err != nil {
+		log.WithError(err).Debug("failed to parse goroutine ID")
+	}
 	return n
 }
 
@@ -1013,7 +1031,10 @@ func DecryptPassword(encrypted string) string {
 		return ""
 	}
 
-	password, _ := DecryptFromBase64(getPasswordSymKey(), encrypted)
+	password, err := DecryptFromBase64(getPasswordSymKey(), encrypted)
+	if err != nil {
+		log.WithError(err).Warn("failed to decrypt password")
+	}
 	return password
 }
 

@@ -93,7 +93,10 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	}
 
 	var sockPath string
-	id, _, _ := sys.GetSelfContainerID() // not relaible, could be sandboxID
+	id, _, err := sys.GetSelfContainerID() // not reliable, could be sandboxID
+	if err != nil {
+		log.WithError(err).Debug("failed to get self container ID")
+	}
 	id, _ = criGetSelfID(cri, ctx, id)
 	sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint) // update id
 	if err == nil {
@@ -114,7 +117,9 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 			log.WithFields(log.Fields{"error": err}).Error("Fail to get pause image info")
 		} else {
 			driver.podImgRepoDigest = repoDig
-			_ = driver.setPodImageInfo()
+			if err := driver.setPodImageInfo(); err != nil {
+				log.WithError(err).Warn("failed to set pod image info")
+			}
 			log.WithFields(log.Fields{"repoDig": driver.podImgRepoDigest, "imgID": driver.podImgID, "imgDigest": driver.podImgDigest}).Debug("CRIO:")
 		}
 	}
@@ -412,7 +417,11 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 		}
 
 		// image ID
-		if image, _ := d.GetImage(meta.Image); image != nil {
+		image, err := d.GetImage(meta.Image)
+		if err != nil {
+			log.WithError(err).Debug("failed to get image")
+		}
+		if image != nil {
 			meta.ImageID = image.ID
 			meta.Author = image.Author
 			meta.ImgCreateAt = image.CreatedAt
@@ -425,11 +434,15 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 		} else {
 			// 2nd chance
 			if meta.ImageID == "" && meta.ImageDigest != "" {
-				if image, _ := d.GetImage(cs.Status.ImageRef); image != nil {
-					meta.ImageID = image.ID
-					meta.Author = image.Author
-					meta.ImgCreateAt = image.CreatedAt
-					for k, v := range image.Labels {
+				image2, err := d.GetImage(cs.Status.ImageRef)
+				if err != nil {
+					log.WithError(err).Debug("failed to get image by ref")
+				}
+				if image2 != nil {
+					meta.ImageID = image2.ID
+					meta.Author = image2.Author
+					meta.ImgCreateAt = image2.CreatedAt
+					for k, v := range image2.Labels {
 						// Not to overwrite container labels when merging
 						if _, ok := meta.Labels[k]; !ok {
 							meta.Labels[k] = v
@@ -477,7 +490,11 @@ func (d *crioDriver) getContainer(id string, ctx context.Context) (*ContainerMet
 			meta.ImageDigest = d.podImgDigest
 		} else {
 			meta.ImageDigest = imageRef2Digest(meta.Image)
-			if imageMeta, _ := d.GetImage(meta.Image); imageMeta != nil {
+			imageMeta, err := d.GetImage(meta.Image)
+			if err != nil {
+				log.WithError(err).Debug("failed to get pod image")
+			}
+			if imageMeta != nil {
 				meta.ImageID = imageMeta.ID
 				meta.Author = imageMeta.Author
 			}

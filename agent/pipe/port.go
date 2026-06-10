@@ -235,8 +235,7 @@ func pullContainerPort(
 		}
 	}
 	// Temp. set MAC address
-	tmp, _ := net.ParseMAC("00:01:02:03:04:05")
-	if err = netlink.LinkSetHardwareAddr(link, tmp); err != nil {
+	if err = netlink.LinkSetHardwareAddr(link, net.HardwareAddr{0x00, 0x01, 0x02, 0x03, 0x04, 0x05}); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in changing MAC")
 		return 0, err
 	}

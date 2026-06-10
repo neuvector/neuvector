@@ -392,7 +392,11 @@ func DPCtrlConfigMAC(MACs []string, tap *bool, appMap map[share.CLUSProtoPort]*s
 		}
 		data.Cfg.Apps = &apps
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPConfigPort data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -405,7 +409,11 @@ func DPCtrlConfigNBE(MACs []string, nbe *bool) {
 	if nbe != nil {
 		data.Cfg.Nbe = nbe
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPConfigNBE data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -420,7 +428,11 @@ func DPCtrlAddPortPair(vex_iface, vin_iface string, epmac net.HardwareAddr, quar
 	if quar != nil {
 		data.AddPortPair.Quar = quar
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPAddPortPair data")
+		return
+	}
 	dpSendMsg(msg)
 }
 

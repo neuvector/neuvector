@@ -10,12 +10,14 @@ import (
 	"testing"
 
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/stretchr/testify/require"
 )
 
 // ////////////////////
 func TestSampleFiles(t *testing.T) {
-	path, _ := filepath.Abs("samples")
-	// path, _ := filepath.Abs("/etc")
+	path, err := filepath.Abs("samples")
+	require.NoError(t, err)
+	// path, err = filepath.Abs("/etc")
 
 	/////
 	var myFileSpec = []FileType{

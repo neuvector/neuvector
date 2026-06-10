@@ -1,13 +1,12 @@
 package utils
 
 import (
+	"net"
 	"testing"
 
-	"net"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/neuvector/neuvector/share"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalizeForURL(t *testing.T) {
@@ -80,8 +79,10 @@ func TestSubnetContains(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		_, n1, _ := net.ParseCIDR(c.n1)
-		_, n2, _ := net.ParseCIDR(c.n2)
+		_, n1, err := net.ParseCIDR(c.n1)
+		require.NoError(t, err)
+		_, n2, err := net.ParseCIDR(c.n2)
+		require.NoError(t, err)
 		contain, compare := SubnetContains(n1, n2)
 		if contain != c.contain || compare != c.compare {
 			t.Errorf("Error: n1=%v n2=%v\n", n1.String(), n2.String())
@@ -128,7 +129,8 @@ func TestSubnetLoose(t *testing.T) {
 		{"1.2.3.4/32", share.CLUSIPAddrScopeGlobal, "1.2.3.0/24"},
 	}
 	for _, c := range cases {
-		_, ipnet, _ := net.ParseCIDR(c.input)
+		_, ipnet, err := net.ParseCIDR(c.input)
+		require.NoError(t, err)
 		parsed := IPNet2SubnetLoose(ipnet, c.scope)
 		if parsed.String() != c.output {
 			t.Errorf("Error: input=%s scope=%s", c.input, c.scope)
