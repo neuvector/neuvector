@@ -354,7 +354,8 @@ func TestWildcardDomainAccess1(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: []string{"app-US-*"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -409,7 +410,8 @@ func TestWildcardDomainAccess2(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: []string{"app-1", "app-US-dev"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -463,7 +465,8 @@ func TestWildcardDomainAccess3(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: []string{"app-1", "app-US-*"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,

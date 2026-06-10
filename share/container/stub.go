@@ -1,6 +1,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -61,7 +62,10 @@ func InitStubRtDriver(sys *system.SystemTools) (Runtime, error) {
 	log.Info()
 	ppid := os.Getppid()
 
-	id, _, _, _ = sys.GetContainerIDByPID(ppid)
+	id, _, err, _ := sys.GetContainerIDByPID(ppid)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.WithError(err).Debug("failed to get container ID by PID")
+	}
 	if dat, err := os.ReadFile("/etc/hostname"); err == nil {
 		podname = strings.TrimSpace(string(dat))
 		if dat, err = os.ReadFile("/etc/hosts"); err == nil {

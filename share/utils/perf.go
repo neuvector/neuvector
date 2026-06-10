@@ -123,8 +123,15 @@ func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, pr
 		}
 
 		// get auxiliary data
-		lsof, _ := sh.Command("lsof", "+D", "/usr/local/bin").Output()
-		ps, _ := sh.Command("ps", "-o", "%cpu,pid,ppid,pgid,vsz,rss,ni,comm", "-g", strconv.Itoa(pid)).Output()
+		// Suppress error: these diagnostic commands may fail on some environments
+		lsof, err := sh.Command("lsof", "+D", "/usr/local/bin").Output()
+		if err != nil {
+			log.WithError(err).Debug("lsof command failed")
+		}
+		ps, err := sh.Command("ps", "-o", "%cpu,pid,ppid,pgid,vsz,rss,ni,comm", "-g", strconv.Itoa(pid)).Output()
+		if err != nil {
+			log.WithError(err).Debug("ps command failed")
+		}
 		data := snapshotData{
 			RecordedAt:        lastSnapshot,
 			MemoryLimit:       memLimit,
@@ -136,7 +143,11 @@ func PerfSnapshot(pid int, memLimit, profileLimit, usage uint64, folder, cid, pr
 			Lsof:              strings.Split(string(lsof), "\n"),
 			Ps:                strings.Split(string(ps), "\n"),
 		}
-		file, _ := json.MarshalIndent(data, "", " ")
+		file, err := json.MarshalIndent(data, "", " ")
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal snapshot data")
+			return
+		}
 
 		// get golang profiles
 		req := &share.CLUSProfilingRequest{

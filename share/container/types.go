@@ -491,11 +491,13 @@ func obtainRtEndpointFromKubelet(sys *system.SystemTools) (string, string, bool)
 		if files, err := d.Readdir(-1); err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("read")
 		} else {
-			var pid int
 			for _, file := range files {
 				if file.IsDir() {
 					// get all the process
-					pid, _ = strconv.Atoi(file.Name())
+					pid, err := strconv.Atoi(file.Name())
+					if err != nil {
+						continue // not a numeric PID directory
+					}
 					if cmds, err := sys.ReadCmdLine(pid); err == nil && len(cmds) > 0 {
 						if endpt, ok := isK3sLikely(cmds); ok {
 							return defaultK3sContainerdSock, endpt, true

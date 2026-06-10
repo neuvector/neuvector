@@ -79,7 +79,10 @@ func GetQueryStat(token string) (*QueryStat, error) {
 	dialect := goqu.Dialect("sqlite3")
 
 	columns := []interface{}{"id", "token", "create_timestamp", "login_type", "login_id", "login_name", "data1", "data2", "data3", "filedb_ready", "type"}
-	sql, args, _ := dialect.From(queryStatTablename).Select(columns...).Where(goqu.C("token").Eq(token)).Prepared(true).ToSQL()
+	sql, args, err := dialect.From(queryStatTablename).Select(columns...).Where(goqu.C("token").Eq(token)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
 
 	var lastErr error
 	for retry := 0; retry < 50; retry++ {
@@ -126,8 +129,11 @@ func GetExceededSessions(loginName, loginID string, loginType int) ([]string, er
 	if loginType == 1 {
 		nLimit = 2 // apikey
 	}
-	// sql, args, _ := dialect.From(Table_querystats).Select(columns...).Where(goqu.And(expLoginName, expLoginId)).Order(goqu.C("create_timestamp").Desc()).Limit(100).Offset(uint(nLimit)).Prepared(true).ToSQL()
-	sql, args, _ := dialect.From(Table_querystats).Select(columns...).Where(goqu.And(expLoginName)).Order(goqu.C("create_timestamp").Desc()).Limit(100).Offset(uint(nLimit)).Prepared(true).ToSQL()
+	// sql, args, err := dialect.From(Table_querystats).Select(columns...).Where(goqu.And(expLoginName, expLoginId)).Order(goqu.C("create_timestamp").Desc()).Limit(100).Offset(uint(nLimit)).Prepared(true).ToSQL()
+	sql, args, err := dialect.From(Table_querystats).Select(columns...).Where(goqu.And(expLoginName)).Order(goqu.C("create_timestamp").Desc()).Limit(100).Offset(uint(nLimit)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
 
 	rows, err := dbHandle.Query(sql, args...)
 	if err != nil {
@@ -147,7 +153,10 @@ func GetExceededSessions(loginName, loginID string, loginType int) ([]string, er
 
 	// exceed 2 hours of create_timestamp
 	t := time.Now().UTC().Unix() - 7200
-	sql, args, _ = dialect.From(Table_querystats).Select(columns...).Where(goqu.Ex{"create_timestamp": goqu.Op{"lt": t}}).Prepared(true).ToSQL()
+	sql, args, err = dialect.From(Table_querystats).Select(columns...).Where(goqu.Ex{"create_timestamp": goqu.Op{"lt": t}}).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build time-based query: %w", err)
+	}
 
 	rows, err = dbHandle.Query(sql, args...)
 	if err != nil {

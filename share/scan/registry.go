@@ -31,8 +31,10 @@ type RegClient struct {
 func NewRegClient(url, token, username, password, proxy string, trace httptrace.HTTPTrace) *RegClient {
 	log.WithFields(log.Fields{"url": url}).Debug("")
 
-	// Ignore errors
-	hub, _, _ := registry.New(url, token, username, password, proxy, trace)
+	hub, _, err := registry.New(url, token, username, password, proxy, trace)
+	if err != nil {
+		log.WithError(err).Warn("failed to create registry client")
+	}
 	return &RegClient{Registry: hub}
 }
 

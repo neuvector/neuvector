@@ -8,6 +8,8 @@ import (
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKubeProxy(t *testing.T) {
@@ -22,9 +24,7 @@ func TestKubeProxy(t *testing.T) {
 		},
 	}
 
-	if !driver.isKubeProxy(&wl) {
-		t.Errorf("Unable to ignore kube-proxy pod\n")
-	}
+	assert.True(t, driver.isKubeProxy(&wl), "Unable to ignore kube-proxy pod")
 
 	wl = share.CLUSWorkload{
 		Labels: map[string]string{
@@ -34,9 +34,7 @@ func TestKubeProxy(t *testing.T) {
 		},
 	}
 
-	if !driver.isKubeProxy(&wl) {
-		t.Errorf("Unable to ignore kube-proxy container\n")
-	}
+	assert.True(t, driver.isKubeProxy(&wl), "Unable to ignore kube-proxy container")
 }
 
 func TestKubeRancherImportService(t *testing.T) {
@@ -58,9 +56,9 @@ func TestKubeRancherImportService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Domain != "cattle-system" || svc.Name != "rancher-agent" {
-		t.Errorf("Invalid service for Rancher agent container: %+v\n", svc)
-	}
+	svc := driver.GetService(&meta, "")
+	assert.Equal(t, "cattle-system", svc.Domain, "Invalid service domain for Rancher agent container")
+	assert.Equal(t, "rancher-agent", svc.Name, "Invalid service name for Rancher agent container")
 
 	meta = container.ContainerMeta{
 		Labels: map[string]string{
@@ -97,9 +95,9 @@ func TestKubeRancherImportService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Domain != "cattle-system" || svc.Name != "core-services-metadata" {
-		t.Errorf("Invalid service for Rancher metadata container: %+v\n", svc)
-	}
+	svc = driver.GetService(&meta, "")
+	assert.Equal(t, "cattle-system", svc.Domain, "Invalid service domain for Rancher metadata container")
+	assert.Equal(t, "core-services-metadata", svc.Name, "Invalid service name for Rancher metadata container")
 }
 
 func TestKubeService(t *testing.T) {
@@ -120,9 +118,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Name != "httpserver-pod-20" {
-		t.Errorf("Invalid service name with matching hash: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "httpserver-pod-20", driver.GetService(&meta, "").Name, "10-digit hash: service name")
 
 	meta = container.ContainerMeta{
 		Labels: map[string]string{
@@ -139,9 +135,7 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Name != "httpserver-pod-20" {
-		t.Errorf("Invalid service name with matching hash: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "httpserver-pod-20", driver.GetService(&meta, "").Name, "9-digit hash: service name")
 
 	meta = container.ContainerMeta{
 		Labels: map[string]string{
@@ -158,9 +152,9 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Domain != "default" || svc.Name != "httpserver-pod-20" {
-		t.Errorf("Invalid service name without matching hash: %+v\n", svc)
-	}
+	svc := driver.GetService(&meta, "")
+	assert.Equal(t, "default", svc.Domain, "non-matching hash: service domain")
+	assert.Equal(t, "httpserver-pod-20", svc.Name, "non-matching hash: service name")
 
 	meta = container.ContainerMeta{
 		Labels: map[string]string{
@@ -176,9 +170,9 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Domain != "default" || svc.Name != "calico-node" {
-		t.Errorf("Invalid service name: %+v\n", svc)
-	}
+	svc = driver.GetService(&meta, "")
+	assert.Equal(t, "default", svc.Domain, "calico-node: service domain")
+	assert.Equal(t, "calico-node", svc.Name, "calico-node: service name")
 
 	meta = container.ContainerMeta{
 		Labels: map[string]string{
@@ -207,9 +201,9 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Domain != "connectservices" || svc.Name != "update-traveler-service" {
-		t.Errorf("Invalid service name: %+v\n", svc)
-	}
+	svc = driver.GetService(&meta, "")
+	assert.Equal(t, "connectservices", svc.Domain, "OpenShift: service domain")
+	assert.Equal(t, "update-traveler-service", svc.Name, "OpenShift: service name")
 
 	// IBM
 	meta = container.ContainerMeta{
@@ -224,9 +218,9 @@ func TestKubeService(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&meta, ""); svc.Domain != "kube-system" || svc.Name != "ibm-kube-fluentd" {
-		t.Errorf("Invalid service name: %+v\n", svc)
-	}
+	svc = driver.GetService(&meta, "")
+	assert.Equal(t, "kube-system", svc.Domain, "IBM: service domain")
+	assert.Equal(t, "ibm-kube-fluentd", svc.Name, "IBM: service name")
 }
 
 func TestScriptTemplate(t *testing.T) {
@@ -251,12 +245,8 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	_ = driver.createCleanupScript(&script, test)
-	e := strings.TrimSpace(ret)
-	r := strings.TrimSpace(script.String())
-	if e != r {
-		t.Errorf("Error: \nexpect=\n%v\nactual=\n%v\n", e, r)
-	}
+	require.NoError(t, driver.createCleanupScript(&script, test))
+	assert.Equal(t, strings.TrimSpace(ret), strings.TrimSpace(script.String()))
 
 	// --
 	test = map[string][]share.CLUSIPAddr{
@@ -282,12 +272,8 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	_ = driver.createCleanupScript(&script, test)
-	e = strings.TrimSpace(ret)
-	r = strings.TrimSpace(script.String())
-	if e != r {
-		t.Errorf("Error: \nexpect=\n%v\nactual=\n%v\n", e, r)
-	}
+	require.NoError(t, driver.createCleanupScript(&script, test))
+	assert.Equal(t, strings.TrimSpace(ret), strings.TrimSpace(script.String()))
 
 	// --
 	test = map[string][]share.CLUSIPAddr{
@@ -320,12 +306,8 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	_ = driver.createCleanupScript(&script, test)
-	e = strings.TrimSpace(ret)
-	r = strings.TrimSpace(script.String())
-	if e != r {
-		t.Errorf("Error: \nexpect=\n%v\nactual=\n%v\n", e, r)
-	}
+	require.NoError(t, driver.createCleanupScript(&script, test))
+	assert.Equal(t, strings.TrimSpace(ret), strings.TrimSpace(script.String()))
 
 	// --
 	test = map[string][]share.CLUSIPAddr{
@@ -340,12 +322,8 @@ if [ $? -eq 0 ]; then
 fi
 `
 	script.Reset()
-	_ = driver.createCleanupScript(&script, test)
-	e = strings.TrimSpace(ret)
-	r = strings.TrimSpace(script.String())
-	if e != r {
-		t.Errorf("Error: \nexpect=\n%v\nactual=\n%v\n", e, r)
-	}
+	require.NoError(t, driver.createCleanupScript(&script, test))
+	assert.Equal(t, strings.TrimSpace(ret), strings.TrimSpace(script.String()))
 }
 
 func TestKubeServiceName_nodename(t *testing.T) {
@@ -361,9 +339,7 @@ func TestKubeServiceName_nodename(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&pod_meta, "qalongruncluster4oc4-kxq6x-master-2"); svc.Name != "apiserver-watcher" {
-		t.Errorf("Invalid service name: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "apiserver-watcher", driver.GetService(&pod_meta, "qalongruncluster4oc4-kxq6x-master-2").Name)
 }
 
 func TestKubeServiceName_batchnumber_nodename(t *testing.T) {
@@ -379,9 +355,7 @@ func TestKubeServiceName_batchnumber_nodename(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&pod_meta, "qalongruncluster4oc4-kxq6x-master-2"); svc.Name != "installer" {
-		t.Errorf("Invalid service name: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "installer", driver.GetService(&pod_meta, "qalongruncluster4oc4-kxq6x-master-2").Name)
 }
 
 func TestIbmClusterID(t *testing.T) {
@@ -403,9 +377,7 @@ func TestIbmClusterID(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&pod_meta, ""); svc.Name != "rbac-sync-operator" {
-		t.Errorf("Invalid service name: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "rbac-sync-operator", driver.GetService(&pod_meta, "").Name)
 }
 
 func TestUUIDSuffix(t *testing.T) {
@@ -430,9 +402,7 @@ func TestUUIDSuffix(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&pod_meta, ""); svc.Name != "kubx-deployer" {
-		t.Errorf("Invalid service name: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "kubx-deployer", driver.GetService(&pod_meta, "").Name)
 }
 
 func TestKubxEtcdBackupApp(t *testing.T) {
@@ -455,7 +425,5 @@ func TestKubxEtcdBackupApp(t *testing.T) {
 		},
 	}
 
-	if svc := driver.GetService(&pod_meta, ""); svc.Name != "kubx-etcd-backup" {
-		t.Errorf("Invalid service name: %+v\n", svc.Name)
-	}
+	assert.Equal(t, "kubx-etcd-backup", driver.GetService(&pod_meta, "").Name)
 }

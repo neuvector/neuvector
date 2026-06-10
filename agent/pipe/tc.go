@@ -102,11 +102,8 @@ func (d *tcPipeDriver) AttachPortPair(pair *InterceptPair) (net.HardwareAddr, ne
 	idx := d.attachPort(pair.exPort)
 
 	// 4e:65:75:56 - NeuV
-	var mac_str string
-	mac_str = fmt.Sprintf("4e:65:75:56:%02x:%02x", (idx>>8)&0xff, idx&0xff)
-	ucmac, _ := net.ParseMAC(mac_str)
-	mac_str = fmt.Sprintf("ff:ff:ff:00:%02x:%02x", (idx>>8)&0xff, idx&0xff)
-	bcmac, _ := net.ParseMAC(mac_str)
+	ucmac := net.HardwareAddr{0x4e, 0x65, 0x75, 0x56, byte((idx >> 8) & 0xff), byte(idx & 0xff)}
+	bcmac := net.HardwareAddr{0xff, 0xff, 0xff, 0x00, byte((idx >> 8) & 0xff), byte(idx & 0xff)}
 	return ucmac, bcmac
 }
 
@@ -414,7 +411,10 @@ func (d *tcPipeDriver) Connect(jumboframe bool) {
 }
 
 func (d *tcPipeDriver) Cleanup() {
-	link, _ := netlink.LinkByName(nvVbrPortName)
+	link, err := netlink.LinkByName(nvVbrPortName)
+	if err != nil {
+		log.WithError(err).Debug("failed to find NV bridge port during cleanup")
+	}
 	if link != nil {
 		d.delQDisc(nvVbrPortName)
 		if dbgError := netlink.LinkSetDown(link); dbgError != nil {

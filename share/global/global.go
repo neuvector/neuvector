@@ -233,12 +233,12 @@ func IdentifyK8sContainerID(id string) (string, error) {
 }
 
 func (d *orchHub) SetFlavor(flavor string) error {
-	_ = d.Driver.SetFlavor(flavor)
+	var driverErr, resourceErr error
+	driverErr = d.Driver.SetFlavor(flavor)
 	if d.ResourceDriver != nil {
-		_ = d.ResourceDriver.SetFlavor(flavor)
+		resourceErr = d.ResourceDriver.SetFlavor(flavor)
 	}
-
-	return nil
+	return errors.Join(driverErr, resourceErr)
 }
 
 func SetPseudoOrchHub_UnitTest(platform, flavor, k8sVer, ocVer string, regResource RegisterDriverFunc) {
