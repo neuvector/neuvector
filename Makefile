@@ -242,17 +242,16 @@ push-enforcer-image: buildx-machine
 test:
 	go test $$(go list ./... | grep -v /e2e )
 
-# CHART_DEFAULT_TAG must match the global "tag:" field in neuvector-helm/charts/core/values.yaml.
-# Update when a new NeuVector release updates that field.
-CHART_DEFAULT_TAG ?= 5.5.1
+NV_CHART_VERSION ?= 2.10.2
+NV_APP_VERSION ?= 5.5.2
 
 .PHONY: test-e2e
 test-e2e:
 ifneq ($(E2E_USE_EXISTING_CLUSTER),true)
 ifeq ($(E2E_NO_REBUILD),)
 	TAG=latest $(MAKE) build-controller-image build-enforcer-image
-	docker tag neuvector/controller:latest neuvector/controller:$(CHART_DEFAULT_TAG)
-	docker tag neuvector/enforcer:latest neuvector/enforcer:$(CHART_DEFAULT_TAG)
+	docker tag neuvector/controller:latest neuvector/controller:$(NV_APP_VERSION)
+	docker tag neuvector/enforcer:latest neuvector/enforcer:$(NV_APP_VERSION)
 endif
 endif
-	go test -C test/e2e -v -timeout 30m .
+	NV_CHART_VERSION=${NV_CHART_VERSION} NV_APP_VERSION=${NV_APP_VERSION} go test -C test/e2e -v -timeout 30m .
