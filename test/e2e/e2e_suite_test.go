@@ -32,15 +32,11 @@ const (
 	nvHelmRepoName = nvE2EPrefix + "repo"
 	nvHelmRepoURL  = "https://neuvector.github.io/neuvector-helm/"
 	nvChartPath    = "/core"
+)
 
-	// nvChartTag must match the global "tag:" field in neuvector-helm/charts/core/values.yaml.
-	// Controller and enforcer are built locally and loaded into kind under this tag so that
-	// helm (which uses the global tag for all images) picks them up with imagePullPolicy=IfNotPresent.
-	// Manager and scanner then also use this released version, pulled from DockerHub.
-	nvChartTag = "5.5.1"
-
-	controllerImage = "neuvector/controller:" + nvChartTag
-	enforcerImage   = "neuvector/enforcer:" + nvChartTag
+var (
+	controllerImage = "neuvector/controller:" + os.Getenv("NV_APP_VERSION")
+	enforcerImage   = "neuvector/enforcer:" + os.Getenv("NV_APP_VERSION")
 )
 
 var defaultHelmTimeout = 10 * time.Minute
@@ -67,6 +63,7 @@ func getCharts() []helmChart {
 			repoURL:       nvHelmRepoURL,
 			path:          nvChartPath,
 			helmOptions: []helm.Option{
+				helm.WithArgs("--set", "tag="+os.Getenv("NV_APP_VERSION")), // --set tag=5.5.2
 				// Reduce replicas to 1 to limit memory usage in the test cluster.
 				helm.WithArgs("--set", "controller.replicas=1"),
 				helm.WithArgs("--set", "cve.scanner.replicas=1"),
@@ -77,12 +74,22 @@ func getCharts() []helmChart {
 				// Manager and scanner are not loaded locally; kubelet pulls them from DockerHub.
 				// The chart's default global tag (nvChartTag) is used for manager.
 				// Scanner uses its own cve.scanner.image.tag (independent of global tag).
+				helm.WithVersion(os.Getenv("NV_CHART_VERSION")),
 			},
 		},
 	}
 }
 
 func TestMain(m *testing.M) {
+	if os.Getenv("NV_CHART_VERSION") == "" {
+		fmt.Fprintf(os.Stderr, "NV_CHART_VERSION is not defined")
+		os.Exit(1)
+	}
+	if os.Getenv("NV_APP_VERSION") == "" {
+		fmt.Fprintf(os.Stderr, "NV_APP_VERSION is not defined")
+		os.Exit(1)
+	}
+
 	charts := getCharts()
 	commonSetupFuncs := []env.Func{
 		uninstallHelmCharts(charts),
