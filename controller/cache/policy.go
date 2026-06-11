@@ -1589,7 +1589,7 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 							break
 						}
 					}
-					if isFromEnforce && !isToEnforce {
+					if isFromEnforce && (!isToEnforce || rul.ID > share.DefaultGroupRuleID) {
 						for _, addr := range rul.From {
 							if hid, ok := wlNode[addr.WlID]; ok {
 								t := tmpNodePolicySGM[hid]
@@ -1721,7 +1721,7 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 						break
 					}
 				}
-				if isToEnforce && !isFromEnforce {
+				if isToEnforce && (!isFromEnforce || rul.ID > share.DefaultGroupRuleID) {
 					for _, addr := range rul.To {
 						if hid, ok := wlNode[addr.WlID]; ok {
 							t := tmpNodePolicySGM[hid]
