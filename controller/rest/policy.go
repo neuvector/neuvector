@@ -2257,6 +2257,10 @@ LOOP_ALL_IDS:
 						break LOOP_ALL_IDS
 					} else {
 						reservedLen := len(mon.Filters) + len(mon.FiltersCRD)
+						// KVValueSizeMax is 512 * 1024. So it's reasonable to assume there is no more than 512 * 1024 mon.Filters+mon.FiltersCRD entries
+						if reservedLen < 0 || reservedLen > cluster.KVValueSizeMax {
+							reservedLen = cluster.KVValueSizeMax
+						}
 						pmap := make(map[string]*share.CLUSFileMonitorFilter, reservedLen)
 						for i, ffp := range mon.Filters {
 							pmap[ffp.Filter] = &mon.Filters[i]

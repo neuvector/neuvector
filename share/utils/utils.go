@@ -922,11 +922,16 @@ func GetSupportedTLSCipherSuites() []uint16 {
 }
 
 func Encrypt(encryptionKey, text []byte) ([]byte, error) {
+	textLength := len(text)
+	if textLength >= (4294967296 - aes.BlockSize) {
+		return nil, fmt.Errorf("size too big: %v", textLength)
+	}
+	textLength += aes.BlockSize // max value: 4G
 	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return nil, err
 	}
-	ciphertext := make([]byte, aes.BlockSize+len(text))
+	ciphertext := make([]byte, textLength)
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, err
@@ -974,27 +979,6 @@ func DecryptFromBase64(encryptionKey []byte, b64 string) (string, error) {
 	}
 }
 
-func EncryptToRawStdBase64(key, text []byte) (string, error) {
-	if ciphertext, err := Encrypt(key, text); err == nil {
-		return base64.RawStdEncoding.EncodeToString(ciphertext), nil
-	} else {
-		return "", err
-	}
-}
-
-func DecryptFromRawStdBase64(key []byte, b64 string) (string, error) {
-	text, err := base64.RawStdEncoding.DecodeString(b64)
-	if err != nil {
-		return "", err
-	}
-
-	if text, err = Decrypt(key, text); err == nil {
-		return string(text), nil
-	} else {
-		return "", err
-	}
-}
-
 func EncryptToRawURLBase64(key, text []byte) (string, error) {
 	if ciphertext, err := Encrypt(key, text); err == nil {
 		return base64.RawURLEncoding.EncodeToString(ciphertext), nil
@@ -1033,13 +1017,12 @@ func DecryptPassword(encrypted string) string {
 	return password
 }
 
-func EncryptPassword(password string) string {
+func EncryptPassword(password string) (string, error) {
 	if password == "" {
-		return ""
+		return "", nil
 	}
 
-	encrypted, _ := EncryptToBase64(getPasswordSymKey(), []byte(password))
-	return encrypted
+	return EncryptToBase64(getPasswordSymKey(), []byte(password))
 }
 
 func DecryptSensitive(encrypted string, key []byte) string {
@@ -1051,13 +1034,12 @@ func DecryptSensitive(encrypted string, key []byte) string {
 	return data
 }
 
-func EncryptSensitive(data string, key []byte) string {
+func EncryptSensitive(data string, key []byte) (string, error) {
 	if data == "" {
-		return ""
+		return "", nil
 	}
 
-	encrypted, _ := EncryptToBase64(key, []byte(data))
-	return encrypted
+	return EncryptToBase64(key, []byte(data))
 }
 
 func DecryptUserToken(encrypted string, key []byte) (string, error) {

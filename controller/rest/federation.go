@@ -922,7 +922,11 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 		var data []byte
 		var statusCode int
 		var proxyUsed bool
-		body, _ := json.Marshal(reqTo)
+		body, err := json.Marshal(reqTo)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("failed to marshal request payload")
+			return "", err
+		}
 		// call joint cluster for generating a regular auth token
 		if _, statusCode, data, proxyUsed, err = sendReqToJointCluster(rc.RestInfo, clusterID, "", http.MethodPost, "v1/fed_auth",
 			"", jsonContentType, _tagAuthJointCluster, body, false, _notForward, false, true, acc); err == nil {
@@ -1256,8 +1260,12 @@ func notifyDeployFedRules(acc *access.AccessControl, login *loginSession) {
 			if !disabled {
 				jointCluster := cacher.GetFedJoinedCluster(id, acc)
 				if jointCluster.ID == id {
+					bodyTo, err := json.Marshal(&reqTo)
+					if err != nil {
+						log.WithFields(log.Fields{"id": id, "error": err}).Debug("failed to marshal request payload")
+						continue
+					}
 					notify++
-					bodyTo, _ := json.Marshal(&reqTo)
 					go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagDeployFedPolicy, bodyTo, ch, acc, login, nil)
 				}
 			}
@@ -1297,7 +1305,11 @@ func pingJointCluster(tag, urlStr string, jointCluster share.CLUSFedJointCluster
 			return 0, false, err
 		}
 	}
-	bodyTo, _ := json.Marshal(&reqTo)
+	bodyTo, err := json.Marshal(&reqTo)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("failed to marshal request payload")
+		return 0, false, err
+	}
 	cmdResp := cmdResponse{id: id, result: _fedClusterDisconnected}
 	var data []byte
 
@@ -1780,7 +1792,11 @@ func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *l
 		reqTo := api.RESTFedRemovedReqInternal{
 			User: login.fullname, // user on master cluster who issues demote request
 		}
-		bodyTo, _ := json.Marshal(&reqTo)
+		bodyTo, err := json.Marshal(&reqTo)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("failed to marshal request payload")
+			return membership, http.StatusInternalServerError, api.RESTErrServerError, err
+		}
 		dismiss := 0
 		ch := make(chan bool)
 		for _, id := range list.IDs {
@@ -1887,7 +1903,13 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 		duration = 60
 	}
 	var jwtFedJoinTokenLife = time.Minute * time.Duration(duration)
-	resp := api.RESTFedJoinToken{JoinToken: base64.StdEncoding.EncodeToString(jwtGenFedJoinToken(&masterCluster, jwtFedJoinTokenLife))}
+	joinToken, err := jwtGenFedJoinToken(&masterCluster, jwtFedJoinTokenLife)
+	if err != nil {
+		log.WithError(err).Warn("failed to generate fed join token")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrServerError)
+		return
+	}
+	resp := api.RESTFedJoinToken{JoinToken: base64.StdEncoding.EncodeToString(joinToken)}
 	if resp.JoinToken == "" {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrRemoteUnauthorized,
 			"The join_ticket is either invalid or expires. Please get a new join_ticket from the primary cluster")
@@ -1993,7 +2015,11 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 		reqTo.JointCluster.K8sUID = resource.GetK8sUID()
 	}
 
-	bodyTo, _ := json.Marshal(&reqTo)
+	bodyTo, err := json.Marshal(&reqTo)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("failed to marshal request payload")
+		return membership, http.StatusInternalServerError, api.RESTErrServerError, err
+	}
 	var data []byte
 	var statusCode int
 	var proxyUsed bool
@@ -2138,9 +2164,13 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 		return membership, http.StatusInternalServerError, api.RESTErrObjectNotFound, common.ErrObjectNotFound
 	}
 
+	jointTicket, err := jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	if err != nil {
+		return membership, http.StatusInternalServerError, api.RESTErrServerError, err
+	}
 	reqTo := api.RESTFedLeaveReqInternal{
 		ID:          jointCluster.ID,
-		JointTicket: jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife),
+		JointTicket: jointTicket,
 		User:        login.fullname, // user on joint cluster who triggered leave-federation request
 		Remote:      login.remote,
 		UserRoles:   login.domainRoles,
@@ -2250,8 +2280,12 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	reqTo := api.RESTFedRemovedReqInternal{
 		User: login.fullname, // user on master cluster who issues remove-from-federation request
 	}
-	bodyTo, _ := json.Marshal(&reqTo)
-	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login, nil)
+	bodyTo, err := json.Marshal(&reqTo)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("failed to marshal request payload")
+	} else {
+		talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", id, _tagKickJointCluster, bodyTo, nil, acc, login, nil)
+	}
 
 	status, code := removeFromFederation(&joinedCluster, acc) // remove the joint cluster's entry from master cluster
 	if status != http.StatusOK {
@@ -2675,8 +2709,12 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 		for _, id := range ids {
 			jointCluster := cacher.GetFedJoinedCluster(id, acc)
 			if jointCluster.ID == id && !jointCluster.Disabled {
+				bodyTo, err := json.Marshal(&reqTo)
+				if err != nil {
+					log.WithFields(log.Fields{"id": id, "error": err}).Debug("failed to marshal request payload")
+					continue
+				}
 				deploy++
-				bodyTo, _ := json.Marshal(&reqTo)
 				// make sure share.CLUSLockFedKey is not locked because talkToJointCluster may lock it !
 				go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagFedSyncPolicy, bodyTo, ch, acc, login, nil)
 			} else if jointCluster.Disabled && len(ids) == 1 {
@@ -2873,6 +2911,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 	nvUsage := cacher.GetNvUsage(api.FedRoleJoint)
 	doPoll := atomic.CompareAndSwapUint32(&_fedPollOngoing, 0, 1)
 	if doPoll {
+		var err error
 		defer atomic.StoreUint32(&_fedPollOngoing, 0)
 
 		accReadAll := access.NewReaderAccessControl()
@@ -2890,7 +2929,10 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 			return doPoll
 		}
 		reqTo.ID = jointCluster.ID
-		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		if err != nil {
+			return doPoll
+		}
 		reqTo.Revisions = cacher.GetAllFedRulesRevisions()
 		if forcePulling {
 			for ruleType := range reqTo.Revisions {
@@ -2899,12 +2941,16 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		}
 
 		status := _fedClusterDisconnected
-		bodyTo, _ := json.Marshal(&reqTo)
+		bodyTo, err := json.Marshal(&reqTo)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Debug("failed to marshal request payload")
+			return doPoll
+		}
 		// call master cluster for polling fed rules
 		var respData []byte
 		var statusCode int
 		var proxyUsed bool
-		var err = common.ErrObjectAccessDenied
+		err = common.ErrObjectAccessDenied
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/poll_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		for i := 0; i < tryTimes; i++ {
 			if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
@@ -2953,10 +2999,19 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 							updateClusterState(jointCluster.ID, "", _fedClusterSyncing, nil, accReadAll)
 							if workFedRules(&settings, respTo.Revisions, reqTo.Revisions, accReadAll) {
 								// if any fed rule is updated, re-send polling request simply for updating joint cluster info on master cluster
-								reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
-								reqTo.Revisions = respTo.Revisions
-								bodyTo, _ := json.Marshal(&reqTo)
-								_, _, _, _ = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
+								reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+								if err == nil {
+									var bodyTo []byte
+									reqTo.Revisions = respTo.Revisions
+									bodyTo, err = json.Marshal(&reqTo)
+									if err == nil {
+										_, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, true, nil, accReadAll)
+									}
+								}
+								if err != nil {
+									log.WithFields(log.Fields{"error": err}).Debug("failed to send polling request")
+									return doPoll
+								}
 							}
 						}
 					}
@@ -3100,6 +3155,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	var deleted uint32
 	var delRegs uint32
 	var throttleTime int64
+	var err error
 
 	accReadAll := access.NewReaderAccessControl()
 	reqTo := api.RESTPollFedScanDataReq{
@@ -3127,7 +3183,10 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	}
 
 	reqTo.ID = jointCluster.ID
-	reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+	if err != nil {
+		return 0, updated, deleted, delRegs, true
+	}
 	reqTo.RegConfigRev = *cachedRegConfigRev
 	reqTo.UpToDateRegs = upToDateRegs.ToStringSlice()
 	reqTo.ScanResultHash = reqScanResultHash
@@ -3144,7 +3203,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	var respData []byte
 	var statusCode int
 	var proxyUsed bool
-	var err = common.ErrObjectAccessDenied
+	err = common.ErrObjectAccessDenied
 	urlStr := fmt.Sprintf("https://%s:%d/v1/fed/scan_data_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 	for i := 0; i < tryTimes; i++ {
 		if respData, statusCode, proxyUsed, err = sendRestRequest("", http.MethodPost, urlStr,
@@ -3711,6 +3770,10 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 							rconf.Config.IBMSAEpDashboardURL = &msg
 							if bodyNew, err := json.Marshal(&rconf); err == nil {
 								body = bodyNew
+							} else {
+								log.WithFields(log.Fields{"error": err}).Error("failed to marshal request payload")
+								restRespError(w, http.StatusInternalServerError, api.RESTErrServerError)
+								return
 							}
 						}
 					}
