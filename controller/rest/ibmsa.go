@@ -262,7 +262,12 @@ func handlerGetIBMSASetupURL(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	installID, _ := clusHelper.GetInstallationID()
-	id := strings.ReplaceAll(jwtGenFedTicket(installID, time.Duration(jwtIbmSaTokenLife)), "/", "-")
+	ticketString, err := jwtGenFedTicket(installID, time.Duration(jwtIbmSaTokenLife))
+	if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
+		return
+	}
+	id := strings.ReplaceAll(ticketString, "/", "-")
 	resp := api.RESTIBMSASetupUrl{URL: fmt.Sprintf("/v1/partner/ibm_sa/%s/setup", url.QueryEscape(id))}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get IBM SA setup endpoint")
@@ -336,7 +341,12 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 			Locale:       common.OEMDefaultUserLocale,
 			PwdResetTime: time.Now().UTC(),
 		}
-		value, _ := json.Marshal(u)
+		value, err := json.Marshal(u)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("failed to marshal user data")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrServerError)
+			return
+		}
 		key := share.CLUSUserKey(common.ReservedUserNameIBMSA)
 		if err := cluster.PutIfNotExist(key, value, false); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
@@ -754,7 +764,11 @@ func ibmsaPostThreatFinding(f *api.IBMSAFinding) error {
 		occur.Finding.Severity = "LOW"
 	}
 
-	value, _ := json.Marshal(&occur)
+	value, err := json.Marshal(&occur)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("failed to marshal occurrence data")
+		return err
+	}
 	url := fmt.Sprintf("%s/%s/providers/%s/occurrences", ibmsaCfg.FindingsURL, ibmsaCfg.AccountID, ibmsaCfg.ProviderID)
 	return ibmsaCreateOccurence(url, value, &ibmsaCfg)
 }

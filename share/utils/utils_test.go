@@ -5,6 +5,8 @@ import (
 
 	"net"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/neuvector/neuvector/share"
 )
 
@@ -206,18 +208,23 @@ func TestUserTokenEncrypt(t *testing.T) {
 
 func TestPasswordEncrypt(t *testing.T) {
 	password := "123456"
-	encrypt := EncryptPassword(password)
+	encrypt, err := EncryptPassword(password)
+	assert.NoError(t, err)
 	decrypt := DecryptPassword(encrypt)
 	if decrypt != password {
 		t.Errorf("Password encrypt error: password=%v decrypt=%v\n", password, decrypt)
 	}
 
-	if EncryptPassword("") != "" {
-		t.Errorf("Empty password should be encrypted as emtpy string\n")
+	encrypt, err = EncryptPassword("")
+	assert.NoError(t, err)
+	if encrypt != "" {
+		t.Errorf("Encrypt empty string does not get empty output\n")
 	}
 
-	e1 := EncryptPassword(password)
-	e2 := EncryptPassword(password)
+	e1, err1 := EncryptPassword(password)
+	assert.NoError(t, err1)
+	e2, err2 := EncryptPassword(password)
+	assert.NoError(t, err2)
 	if e1 == e2 {
 		t.Errorf("Encrypt same string twice gives same output\n")
 	}
