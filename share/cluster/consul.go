@@ -182,7 +182,9 @@ func createConfigFile(cc *ClusterConfig) error {
 		Performance             tConsulConfigPerformance `json:"performance"`
 	}
 
-	_ = os.MkdirAll(consulDataDir, os.ModePerm)
+	if err := os.MkdirAll(consulDataDir, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create consul data directory: %w", err)
+	}
 	f, err := os.Create(consulConf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to create consul config file")
@@ -244,8 +246,7 @@ func isBootstrap(cc *ClusterConfig) bool {
 func (m *consulMethod) stopRunningInstance() error {
 	if m.pid > 0 {
 		if err := syscall.Kill((-1)*m.pid, syscall.SIGKILL); err != nil {
-			log.WithFields(log.Fields{"pid": m.pid, "error": err}).Error("can not signal")
-			return err
+			return fmt.Errorf("failed to signal consul pid %d: %w", m.pid, err)
 		}
 
 		// it should be very soon but we add some buffering time
@@ -259,8 +260,7 @@ func (m *consulMethod) stopRunningInstance() error {
 		}
 
 		if nWaitCnt == 0 {
-			log.WithFields(log.Fields{"pid": m.pid}).Error("can not stop")
-			return errors.New("Can not stop consul")
+			return fmt.Errorf("timed out stopping consul pid %d", m.pid)
 		}
 		m.pid = 0
 	}
@@ -277,7 +277,10 @@ func (m *consulMethod) getClient() (*api.Client, error) {
 }
 
 func (m *consulMethod) Start(cc *ClusterConfig, eCh chan error, recover bool) {
-	_ = m.stopRunningInstance()
+	if err := m.stopRunningInstance(); err != nil {
+		// Log error: stale consul process may still hold ports; starting a new one risks split-brain
+		log.WithError(err).Error("Failed to stop running consul instance")
+	}
 
 	args := []string{"agent", "-datacenter", cc.DataCenter, "-data-dir", consulDataDir}
 
@@ -415,7 +418,9 @@ func (m *consulMethod) Leave(server bool) error {
 	log.Info("Consul process exit")
 
 	if server {
-		_ = m.leaveRaft(m.clusterIP)
+		if err := m.leaveRaft(m.clusterIP); err != nil {
+			log.WithError(err).Warn("Failed to remove local node from raft")
+		}
 	}
 
 	cmd := exec.Command(consulExe, "leave")
@@ -433,7 +438,9 @@ func (m *consulMethod) Leave(server bool) error {
 func (m *consulMethod) ForceLeave(node string, server bool) error {
 
 	if server {
-		_ = m.leaveRaft(node)
+		if err := m.leaveRaft(node); err != nil {
+			log.WithError(err).Warn("Failed to remove node from raft")
+		}
 	}
 
 	c, err := m.getClient()

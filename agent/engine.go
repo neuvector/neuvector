@@ -1265,7 +1265,11 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		log.WithError(err).WithField("pid", info.Pid).Debug("Failed to get container cpuacct cgroup path")
 	}
 
-	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
+	c.upperDir, c.rootFs, err = lookupContainerLayerPath(c.pid, c.id)
+	if err != nil {
+		// Suppress error: storage driver may not support layer path lookup
+		log.WithError(err).Debug("Failed to lookup container layer path")
+	}
 	c.propertyFilled = true
 	log.WithFields(log.Fields{"uppDir": c.upperDir, "rootFs": c.rootFs, "id": c.id}).Debug()
 }
@@ -1734,7 +1738,12 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	if agentEnv.containerShieldMode {
 		prober.BuildProcessFamilyGroups(c.id, c.nvRole, c.pid, false, info.Privileged, nil)
 		pe.InsertNeuvectorProcessProfilePolicy(group, role)
-		c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
+		var err error
+		c.upperDir, c.rootFs, err = lookupContainerLayerPath(c.pid, c.id)
+		if err != nil {
+			// Suppress error: storage driver may not support layer path lookup
+			log.WithError(err).Debug("Failed to lookup container layer path")
+		}
 		// file monitors : protect mode, core-definitions, only modification alerts
 		fileWatcher.ContainerCleanup(c.pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
