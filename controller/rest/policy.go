@@ -2256,9 +2256,9 @@ LOOP_ALL_IDS:
 						errMsg = fmt.Sprintf("failed to obtain file monitor profile %s(for rule %d)", grpName, id)
 						break LOOP_ALL_IDS
 					} else {
-						reservedLen := len(mon.Filters) + len(mon.FiltersCRD)
+						reservedLen := min(len(mon.Filters), cluster.KVValueSizeMax) + min(len(mon.FiltersCRD), cluster.KVValueSizeMax)
 						// KVValueSizeMax is 512 * 1024. So it's reasonable to assume there is no more than 512 * 1024 mon.Filters+mon.FiltersCRD entries
-						if reservedLen < 0 || reservedLen > cluster.KVValueSizeMax {
+						if reservedLen > cluster.KVValueSizeMax {
 							reservedLen = cluster.KVValueSizeMax
 						}
 						pmap := make(map[string]*share.CLUSFileMonitorFilter, reservedLen)

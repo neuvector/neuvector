@@ -923,10 +923,10 @@ func GetSupportedTLSCipherSuites() []uint16 {
 
 func Encrypt(encryptionKey, text []byte) ([]byte, error) {
 	textLength := len(text)
-	if textLength >= (4294967296 - aes.BlockSize) {
+	if textLength >= (524288 - aes.BlockSize) {
 		return nil, fmt.Errorf("size too big: %v", textLength)
 	}
-	textLength += aes.BlockSize // max value: 4G
+	textLength += aes.BlockSize // max value: 512K
 	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return nil, err
