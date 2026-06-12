@@ -1004,7 +1004,9 @@ func InspectContainerPorts(pid int, existPairs []*InterceptPair) ([]*InterceptPa
 	}
 
 	var intcpPairs []*InterceptPair
-	intcpPairs, _ = readAllContainerPorts(pid, existPairMap)
+	if intcpPairs, err = readAllContainerPorts(pid, existPairMap); err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to read container ports")
+	}
 
 	// Switch back to original NS
 	log.WithFields(log.Fields{"ns": curNs}).Debug("Restore ns")

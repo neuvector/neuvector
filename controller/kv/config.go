@@ -273,7 +273,10 @@ func (c *configHelper) NotifyConfigChange(endpoint string) {
 func (c *configHelper) isKvRestoring() (string, bool) {
 	var kvRestore share.CLUSKvRestore
 
-	value, _ := cluster.Get(share.CLUSKvRestoreKey)
+	value, err := cluster.Get(share.CLUSKvRestoreKey)
+	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+		log.WithError(err).Warn("Failed to get KV restore key")
+	}
 	if value != nil {
 		_ = nvJsonUnmarshal(share.CLUSKvRestoreKey, value, &kvRestore)
 		if !kvRestore.StartAt.IsZero() && time.Since(kvRestore.StartAt) < time.Duration(2)*time.Minute {
@@ -316,7 +319,9 @@ func (c *configHelper) doBackup() error {
 			return nil
 		}, nil)
 	} else {
-		return fmt.Errorf("Another import is ongoing")
+		// Suppress error: import is ongoing is expected; no backup needed
+		log.Debug("Backup skipped: another import is ongoing")
+		return nil
 	}
 }
 

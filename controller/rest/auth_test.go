@@ -14,6 +14,7 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/stretchr/testify/require"
 )
 
 type passwordUser struct {
@@ -81,8 +82,9 @@ func (a *mockRemoteAuth) OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RE
 	}
 }
 
-func makeLocalUser(username, password, role string) *share.CLUSUser {
-	saltedPwdHash, _ := common.HashPassword(password, nil)
+func makeLocalUser(t *testing.T, username, password, role string) *share.CLUSUser {
+	saltedPwdHash, err := common.HashPassword(password, nil)
+	require.NoError(t, err)
 	return &share.CLUSUser{
 		Fullname:     username,
 		Username:     username,
@@ -92,8 +94,9 @@ func makeLocalUser(username, password, role string) *share.CLUSUser {
 	}
 }
 
-func makeLocalUserWithRole(username, password, role string, roleDomains map[string][]string) *share.CLUSUser {
-	saltedPwdHash, _ := common.HashPassword(password, nil)
+func makeLocalUserWithRole(t *testing.T, username, password, role string, roleDomains map[string][]string) *share.CLUSUser {
+	saltedPwdHash, err := common.HashPassword(password, nil)
+	require.NoError(t, err)
 	return &share.CLUSUser{
 		Fullname:     username,
 		Username:     username,
@@ -106,7 +109,10 @@ func makeLocalUserWithRole(username, password, role string, roleDomains map[stri
 
 func getLoginToken(w *mockResponseWriter) string {
 	var data api.RESTTokenData
-	_ = json.Unmarshal(w.body, &data)
+	if err := json.Unmarshal(w.body, &data); err != nil {
+		// testify doesn't work because this helper function doesn't have testing.T
+		return ""
+	}
 	return data.Token.Token
 }
 
@@ -141,7 +147,7 @@ func TestLocalLogin(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 
-	user := makeLocalUser("user", "pass", api.UserRoleReader)
+	user := makeLocalUser(t, "user", "pass", api.UserRoleReader)
 	if err := clusHelper.CreateUser(user); err != nil {
 		t.Errorf("CreateUser error: %v", err)
 	}
@@ -303,7 +309,7 @@ func TestLDAPLoginShadowUser(t *testing.T) {
 	fullname := utils.MakeUserFullname(ldap.Name, "user")
 
 	// Modify user's timeout and role by admin
-	admin := makeLocalUser("admin", "admin", api.UserRoleAdmin)
+	admin := makeLocalUser(t, "admin", "admin", api.UserRoleAdmin)
 	clusHelper.CreateUser(admin)
 	w = login("admin", "admin")
 	tokenAdmin := getLoginToken(w)
@@ -392,7 +398,7 @@ func TestLocalLoginServer(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 
-	user := makeLocalUser("user", "pass", api.UserRoleAdmin)
+	user := makeLocalUser(t, "user", "pass", api.UserRoleAdmin)
 	if err := clusHelper.CreateUser(user); err != nil {
 		t.Errorf("CreateUser error: %v", err)
 	}
@@ -631,7 +637,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 	logout(getLoginToken(w))
 
 	// Modify user's timeout and role by admin
-	admin := makeLocalUser("admin", "admin", api.UserRoleAdmin)
+	admin := makeLocalUser(t, "admin", "admin", api.UserRoleAdmin)
 	if err := clusHelper.CreateUser(admin); err != nil {
 		t.Errorf("CreateUser error: %v", err)
 	}
@@ -966,7 +972,7 @@ func TestOIDCLoginShadowUser(t *testing.T) {
 	fullname := utils.MakeUserFullname(oidc.Name, username)
 
 	// Modify user's timeout and role by admin
-	admin := makeLocalUser("admin", "admin", api.UserRoleAdmin)
+	admin := makeLocalUser(t, "admin", "admin", api.UserRoleAdmin)
 	clusHelper.CreateUser(admin)
 	w = login("admin", "admin")
 	tokenAdmin := getLoginToken(w)
