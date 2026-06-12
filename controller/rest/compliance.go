@@ -84,7 +84,10 @@ func filterComplianceChecks(items []*api.RESTBenchItem, cpf *complianceProfileFi
 		domain = api.DomainNodes
 	}
 
-	tags, _ := cacher.GetDomainEffectiveTags(domain, access.NewReaderAccessControl())
+	tags, err := cacher.GetDomainEffectiveTags(domain, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get domain effective tags")
+	}
 	if len(tags) > 0 {
 		// namespace tagged
 		domainTags := utils.NewSetFromSliceKind(tags)
@@ -505,7 +508,10 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 		if vpNames.Contains(name) {
 			continue
 		}
-		profile, _, _ := clusHelper.GetComplianceProfile(name, acc)
+		profile, _, err := clusHelper.GetComplianceProfile(name, acc)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "name": name}).Warn("Failed to get compliance profile")
+		}
 		if profile == nil {
 			e := "compliance profile doesn't exist"
 			log.WithFields(log.Fields{"name": name}).Error(e)
@@ -570,12 +576,14 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, err := os.ReadFile(importTask.TempFilename)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Failed to read import file")
+	}
 	var secRuleList resource.NvCompProfileSecurityRuleList
 	var secRule resource.NvCompProfileSecurityRule
 	var secRules = []resource.NvCompProfileSecurityRule{}
 	var invalidCrdKind bool
-	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
 			secRules = append(secRules, secRule)

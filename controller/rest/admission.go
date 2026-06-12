@@ -451,7 +451,12 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
 
 	var rconf api.RESTAdmissionConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -638,7 +643,9 @@ func handlerGetAdmissionOptions(w http.ResponseWriter, r *http.Request, ps httpr
 	resp.Options.PspCollection = pspCollection
 	resp.Options.PssCollections = cacher.GetAdmissionPssDesc()
 	sigstoreVerifiers := []string{}
-	if keys, _ := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust); len(keys) > 0 {
+	if keys, err := cluster.GetStoreKeys(share.CLUSConfigSigstoreRootsOfTrust); err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get sigstore roots of trust keys")
+	} else if len(keys) > 0 {
 		sigstoreVerifiers = make([]string, 0, len(keys))
 		for _, key := range keys {
 			if ss := strings.Split(key, "/"); len(ss) != 5 {
@@ -667,7 +674,10 @@ func replaceFedAdmissionRules(ruleType string, rulesNew *share.CLUSAdmissionRule
 	defer clusHelper.ReleaseLock(lock)
 
 	// get current rules header list first
-	rhsExisting, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+	rhsExisting, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get admission rule list")
+	}
 
 	// count total modified keys because of transaction's 64 keys limit
 	modKeysCount := 0
@@ -860,7 +870,10 @@ func deleteAdmissionRules(w http.ResponseWriter, scope string, ruleTypeKeys []st
 		}
 		delRuleType := &delRulesMetadata{delRules: utils.NewSet()}
 		delRuleTypes[ruleTypeKey] = delRuleType
-		arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
+		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get admission rule list")
+		}
 		for _, arh := range arhs {
 			if delRules.Contains(arh.ID) {
 				delRuleType.delRules.Add(arh.ID)
@@ -990,8 +1003,13 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var confData api.RESTAdmissionRuleConfigData
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &confData)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+	err = json.Unmarshal(body, &confData)
 	if err != nil || confData.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1050,11 +1068,23 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	ids := utils.NewSet()
 	var arhsAll [2][]*share.CLUSRuleHead
 	if cfgType == share.FederalCfg {
-		arhsAll[0], _ = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, share.FedAdmCtrlExceptRulesType)
-		arhsAll[1], _ = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, share.FedAdmCtrlDenyRulesType)
+		arhsAll[0], err = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, share.FedAdmCtrlExceptRulesType)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get admission rule list")
+		}
+		arhsAll[1], err = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, share.FedAdmCtrlDenyRulesType)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get admission rule list")
+		}
 	} else {
-		arhsAll[0], _ = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, api.ValidatingExceptRuleType)
-		arhsAll[1], _ = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, api.ValidatingDenyRuleType)
+		arhsAll[0], err = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, api.ValidatingExceptRuleType)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get admission rule list")
+		}
+		arhsAll[1], err = clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, api.ValidatingDenyRuleType)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get admission rule list")
+		}
 	}
 	for _, arhs := range arhsAll {
 		for _, arh := range arhs {
@@ -1160,8 +1190,13 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 	code := 0
 	var confData api.RESTAdmissionRuleConfigData
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &confData)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+	err = json.Unmarshal(body, &confData)
 	ruleCfg := confData.Config
 	if err != nil || confData.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1551,9 +1586,15 @@ func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImpo
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, err := os.ReadFile(importTask.TempFilename)
+	if err != nil {
+		msg := "Failed to read import file"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
+		return nil
+	}
 	var secRule resource.NvAdmCtrlSecurityRule
-	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
+	if err = json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvAdmCtrlSecurityRuleKind {
 		msg := "Invalid security rule(s)"
 		log.WithFields(log.Fields{"error": err}).Error(msg)
 		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_ADMCTRL)
@@ -1568,9 +1609,11 @@ func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImpo
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+		// Non-critical: progress update failure doesn't affect import result
+		log.WithFields(log.Fields{"error": putErr}).Debug("Failed to update import task progress")
+	}
 
-	var err error
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockAdmCtrlKey, importCallerRest)
 	if crdHandler.AcquireLock(clusterLockWait) {
@@ -1585,7 +1628,10 @@ func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImpo
 		} else {
 			progress += inc
 			importTask.Percentage = int(progress)
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+				// Non-critical: progress update failure doesn't affect import result
+				log.WithFields(log.Fields{"error": putErr}).Debug("Failed to update import task progress")
+			}
 
 			// [2] import admission control configuration described in the yaml file
 			if k8sPlatform && parsedCfg.AdmCtrlCfg != nil && importTask.Scope == share.ScopeLocal {
@@ -1602,7 +1648,10 @@ func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImpo
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+					// Non-critical: progress update failure doesn't affect import result
+					log.WithFields(log.Fields{"error": putErr}).Debug("Failed to update import task progress")
+				}
 			}
 			if err == nil && parsedCfg.AdmCtrlRulesCfg != nil {
 				// [3] delete all user-created non-default admission control rules

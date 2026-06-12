@@ -379,7 +379,10 @@ func handlecustomrolecfg(yaml_data []byte, load bool, skip *bool, context *confi
 			}
 		}
 		var newrole bool
-		role, rev, _ := clusHelper.GetCustomRoleRev(rrole.Name, accAdmin)
+		role, rev, err := clusHelper.GetCustomRoleRev(rrole.Name, accAdmin)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "name": rrole.Name}).Warn("Failed to get custom role")
+		}
 		if role == nil {
 			roledata := share.CLUSUserRole{Name: rrole.Name}
 			role = &roledata
@@ -475,7 +478,11 @@ func updateAdminPass(ruser *api.RESTUser, acc *access.AccessControl) {
 	}
 	empty := share.CLUSPwdProfile{}
 	if profile == empty {
-		if pprofile, _, _ := clusHelper.GetPwdProfileRev(share.CLUSDefPwdProfileName, acc); pprofile != nil {
+		pprofile, _, err := clusHelper.GetPwdProfileRev(share.CLUSDefPwdProfileName, acc)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get default password profile")
+		}
+		if pprofile != nil {
 			profile = *pprofile
 		}
 	}
@@ -580,7 +587,10 @@ func handlepwdprofilecfg(yaml_data []byte, load bool, skip *bool, context *confi
 			continue
 		}
 		var newprofile bool
-		profile, rev, _ := clusHelper.GetPwdProfileRev(rprofile.Name, accAdmin)
+		profile, rev, err := clusHelper.GetPwdProfileRev(rprofile.Name, accAdmin)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "name": rprofile.Name}).Warn("Failed to get password profile")
+		}
 		if profile == nil {
 			profiledata := share.CLUSPwdProfile{
 				Name: rprofile.Name,

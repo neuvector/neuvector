@@ -7,6 +7,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/kv"
+	"github.com/stretchr/testify/require"
 )
 
 func TestComplianceProfileConfig(t *testing.T) {
@@ -53,7 +54,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ := mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err := mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	v := cp.DisableSystem
 	if v != true {
 		t.Errorf("Compliance profile DisableSystem is not configured correctly: %v", v)
@@ -76,7 +78,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ = mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err = mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	if len(cp.Entries) != 3 {
 		t.Errorf("Compliance profile entries are not configured correctly: %v", len(cp.Entries))
 	}
@@ -94,7 +97,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ = mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err = mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	if len(cp.Entries) != 0 {
 		t.Errorf("Compliance profile entries are not configured correctly: %v", len(cp.Entries))
 	}
@@ -117,7 +121,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ = mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err = mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	if len(cp.Entries) != 2 {
 		t.Errorf("Compliance profile entries are not configured correctly: %v", len(cp.Entries))
 	}
@@ -137,7 +142,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ = mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err = mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	if len(cp.Entries) != 3 {
 		t.Errorf("Compliance profile entries are not configured correctly: %v", len(cp.Entries))
 	}
@@ -152,7 +158,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ = mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err = mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	if len(cp.Entries) != 3 {
 		t.Errorf("Compliance profile entries are not configured correctly: %v", len(cp.Entries))
 	}
@@ -172,7 +179,8 @@ func TestComplianceProfileConfig(t *testing.T) {
 		t.Errorf("Configure compliance profile failed: %v", w.status)
 	}
 
-	cp, _, _ = mockCluster.GetComplianceProfile("default", nil)
+	cp, _, err = mockCluster.GetComplianceProfile("default", nil)
+	require.NoError(t, err)
 	if len(cp.Entries) != 3 {
 		t.Errorf("Compliance profile entries are not configured correctly: %v", len(cp.Entries))
 	}

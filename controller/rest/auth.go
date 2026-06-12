@@ -541,7 +541,10 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 								pid = p.ID
 								subType = resource.SUBJECT_GROUP
 							}
-							pripDomainRoles, pripDomainPermits, _ := global.ORCH.GetUserRoles(pid, subType)
+							pripDomainRoles, pripDomainPermits, err := global.ORCH.GetUserRoles(pid, subType)
+							if err != nil {
+								log.WithFields(log.Fields{"error": err, "pid": pid}).Warn("Failed to get user roles from orchestrator")
+							}
 							if len(pripDomainRoles) == 0 && len(pripDomainPermits) == 0 {
 								log.WithFields(log.Fields{"pid": pid, "subType": subType}).Debug("no deduced role/permission")
 							} else {
@@ -625,14 +628,17 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 		} else {
 			parts := strings.Split(apikey[0], ":")
 			if len(parts) == 2 {
-				apikeyAccount, _, _ := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+				apikeyAccount, _, err := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Warn("Failed to get API key")
+					return nil, userInvalidRequest, rsessToken
+				}
 
 				if apikeyAccount == nil {
 					return nil, userInvalidRequest, rsessToken
 				}
 
 				// check password
-				var err error
 				var hash string
 				if ss := strings.Split(apikeyAccount.SecretKeyHash, "-"); len(ss) == 3 {
 					// new format salted hash
@@ -911,7 +917,10 @@ func lookupShadowUser(server, provider, username, userid, email, role string, ro
 	}
 	retry := 0
 	for retry < retryClusterMax {
-		user, rev, _ := clusHelper.GetUserRev(fullname, access.NewReaderAccessControl())
+		user, rev, err := clusHelper.GetUserRev(fullname, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "fullname": fullname}).Warn("Failed to get user")
+		}
 		if user == nil {
 			newUser = &share.CLUSUser{
 				Fullname:            fullname,
@@ -1643,7 +1652,10 @@ func getAuthServersInOrder(acc *access.AccessControl) []*share.CLUSServer {
 			if name == api.AuthServerLocal {
 				servers = append(servers, &share.CLUSServer{Name: api.AuthServerLocal})
 			} else {
-				cs, _, _ := clusHelper.GetServerRev(name, acc)
+				cs, _, err := clusHelper.GetServerRev(name, acc)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "server": name}).Warn("Failed to get server")
+				}
 				if cs != nil && isPasswordAuthServer(cs) && cs.Enable {
 					servers = append(servers, cs)
 				}
@@ -2058,8 +2070,12 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 	retry := 0
 	for retry < retryClusterMax {
 		var rev uint64
+		var err error
 
-		user, rev, _ = clusHelper.GetUserRev(pw.Username, acc)
+		user, rev, err = clusHelper.GetUserRev(pw.Username, acc)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get user")
+		}
 		if user == nil {
 			return nil, result, errors.New("User not found")
 		}
@@ -2071,7 +2087,10 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 		result.userFound = true
 		origFailedLoginCount := user.FailedLoginCount
 		origBlockLoginSince := user.BlockLoginSince
-		pwdProfile, _ := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+		pwdProfile, err := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get password profile")
+		}
 		if pwdProfile.EnableBlockAfterFailedLogin {
 			result.blockAfterFailedCount = pwdProfile.BlockAfterFailedCount
 		}
@@ -2212,7 +2231,10 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 
 	acc := access.NewAdminAccessControl()
 	// Retrieve user from the cluster
-	user, _, _ = clusHelper.GetUserRev(userName, acc)
+	user, _, err = clusHelper.GetUserRev(userName, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get user")
+	}
 	if userName == common.ReservedFedUser {
 		if user == nil {
 			newSaltedPwdHash, err := common.HashPassword(secret, nil)
@@ -2519,10 +2541,12 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rc int
-	var err error
 	var login *loginSession
 
-	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
+	fedRole, err := cacher.GetFedMembershipRole(accReadAll)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get federation membership role")
+	}
 	fedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
 	if fedRole == api.FedRoleJoint && (fedUserRoles.Contains(user.Role) || user.ExtraPermits.HasPermFed()) {
 		rc = userInvalidRequest
@@ -2745,7 +2769,11 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		case api.AuthServerPlatform:
 			user, err = platformPasswordAuth(data.Password)
 		default:
-			cs, _, _ := clusHelper.GetServerRev(server, accReadAll)
+			var cs *share.CLUSServer
+			cs, _, err = clusHelper.GetServerRev(server, accReadAll)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "server": server}).Warn("Failed to get server")
+			}
 			if cs == nil {
 				e := "Server not found"
 				log.WithFields(log.Fields{"server": server}).Error(e)
@@ -2784,7 +2812,10 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 			defaultPW = true
 		}
 	} else if data.Token != nil {
-		cs, _, _ := clusHelper.GetServerRev(server, accReadAll)
+		cs, _, err := clusHelper.GetServerRev(server, accReadAll)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "server": server}).Warn("Failed to get server")
+		}
 		if cs == nil {
 			log.WithFields(log.Fields{"server": server}).Error("Server not found")
 			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
@@ -2860,7 +2891,10 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
+	fedRole, err := cacher.GetFedMembershipRole(accReadAll)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get federation membership role")
+	}
 	// Login user accounting
 	login, rc := loginUser(user, nil, nil, remote, _interactiveSessionID, "", fedRole, &sso)
 	if rc != userOK {
