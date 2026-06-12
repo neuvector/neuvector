@@ -356,14 +356,22 @@ func putLocalInfo() {
 		return
 	}
 
-	value, _ := json.Marshal(Host)
+	value, err := json.Marshal(Host)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal host info")
+		return
+	}
 	key := share.CLUSHostKey(Host.ID, "agent")
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 	}
 
 	Agent.ClusterIP = selfAddr
-	value, _ = json.Marshal(Agent)
+	value, err = json.Marshal(Agent)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal agent info")
+		return
+	}
 	key = share.CLUSAgentKey(Host.ID, Agent.ID)
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -373,7 +381,11 @@ func putLocalInfo() {
 func putHostIfInfo() {
 	log.Debug()
 
-	value, _ := json.Marshal(Host)
+	value, err := json.Marshal(Host)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal host info")
+		return
+	}
 	key := share.CLUSHostKey(Host.ID, "agent")
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")

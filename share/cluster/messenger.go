@@ -156,7 +156,15 @@ func (msgr *msgrMethod) unicast(subject, key string, data []byte, cb UnicastCall
 	}
 
 	msg := CLUSUnicast{Expect: expect, Data: data}
-	value, _ := json.Marshal(msg)
+	value, err := json.Marshal(msg)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal unicast message")
+		if cb != nil {
+			msgr.unicastRemoveReceiver(expect)
+			cb(subject, nil, args...)
+		}
+		return err
+	}
 
 	if err := Put(key, value); err != nil {
 		if cb != nil {
@@ -178,7 +186,9 @@ func (msgr *msgrMethod) unicast(subject, key string, data []byte, cb UnicastCall
 	}
 
 	if delKey {
-		_ = Delete(key)
+		if err := Delete(key); err != nil {
+			log.WithError(err).Warn("Failed to delete unicast message key")
+		}
 	}
 
 	return nil
