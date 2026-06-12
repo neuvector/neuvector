@@ -134,20 +134,6 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 				restRespError(w, http.StatusInternalServerError, api.RESTErrFailReadCluster)
 				return
 			}
-			if nvUpgradeInfo.MinUpgradeVersion.Version != "" {
-				resp.TelemetryStatus.MinUpgradeVersion = api.RESTUpgradeVersionInfo{
-					Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
-					ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
-					Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
-				}
-			}
-			if nvUpgradeInfo.MaxUpgradeVersion.Version != "" {
-				resp.TelemetryStatus.MaxUpgradeVersion = api.RESTUpgradeVersionInfo{
-					Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
-					ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
-					Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
-				}
-			}
 			if !nvUpgradeInfo.LastUploadTime.IsZero() {
 				resp.TelemetryStatus.LastTeleUploadTime = api.RESTTimeString(nvUpgradeInfo.LastUploadTime)
 			}
@@ -2301,37 +2287,6 @@ func handlerMeterList(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	log.WithFields(log.Fields{"entries": len(resp.Meters)}).Debug()
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get meter list")
 }
-func getNvUpgradeInfo() *api.RESTCheckUpgradeInfo {
-	var nvUpgradeInfo share.CLUSCheckUpgradeInfo
-	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
-		if err := json.Unmarshal(value, &nvUpgradeInfo); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
-			return nil
-		}
-	}
-
-	empty := share.CLUSCheckUpgradeVersion{}
-	upgradeInfo := &api.RESTCheckUpgradeInfo{}
-	if nvUpgradeInfo.MinUpgradeVersion != empty {
-		upgradeInfo.MinUpgradeVersion = &api.RESTUpgradeInfo{
-			Version:     nvUpgradeInfo.MinUpgradeVersion.Version,
-			ReleaseDate: nvUpgradeInfo.MinUpgradeVersion.ReleaseDate,
-			Tag:         nvUpgradeInfo.MinUpgradeVersion.Tag,
-		}
-	}
-	if nvUpgradeInfo.MaxUpgradeVersion != empty {
-		upgradeInfo.MaxUpgradeVersion = &api.RESTUpgradeInfo{
-			Version:     nvUpgradeInfo.MaxUpgradeVersion.Version,
-			ReleaseDate: nvUpgradeInfo.MaxUpgradeVersion.ReleaseDate,
-			Tag:         nvUpgradeInfo.MaxUpgradeVersion.Tag,
-		}
-	}
-	if nvUpgradeInfo.MinUpgradeVersion == empty && nvUpgradeInfo.MaxUpgradeVersion == empty {
-		return nil
-	}
-
-	return upgradeInfo
-}
 
 func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]string, []string, []string, []string, []string, map[string]string, utils.Set) {
 	var clusterRoleErrors, clusterRoleBindingErrors, roleErrors, roleBindingErrors, nvCrdSchemaErrors []string
@@ -2471,16 +2426,7 @@ func handlerSystemGetAlerts(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	var resp api.RESTNvAlerts = api.RESTNvAlerts{
-		NvUpgradeInfo: &api.RESTCheckUpgradeInfo{},
-	}
-
-	// populate neuvector_upgrade_info
-	if nvUpgradeInfo := getNvUpgradeInfo(); nvUpgradeInfo != nil {
-		resp.NvUpgradeInfo = nvUpgradeInfo
-	} else {
-		resp.NvUpgradeInfo = nil
-	}
+	var resp api.RESTNvAlerts
 
 	// populate acceptable_alerts
 	clusterRoleAlerts, clusterRoleBindingAlerts, roleAlerts, roleBindingAlerts, nvCrdSchemaAlerts, otherAlerts, acceptedAlerts := getAcceptableAlerts(acc, login)
