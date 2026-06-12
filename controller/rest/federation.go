@@ -2166,6 +2166,7 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 
 	jointTicket, err := jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 	if err != nil {
+		log.WithFields(log.Fields{"id": jointCluster.ID, "error": err}).Debug("failed to gen fed ticket")
 		return membership, http.StatusInternalServerError, api.RESTErrServerError, err
 	}
 	reqTo := api.RESTFedLeaveReqInternal{
@@ -2931,6 +2932,7 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 		reqTo.ID = jointCluster.ID
 		reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 		if err != nil {
+			log.WithFields(log.Fields{"id": jointCluster.ID, "error": err}).Debug("failed to gen fed ticket")
 			return doPoll
 		}
 		reqTo.Revisions = cacher.GetAllFedRulesRevisions()
@@ -3185,6 +3187,7 @@ func pollFedScanData(cachedRegConfigRev *uint64, cachedScanResultHash map[string
 	reqTo.ID = jointCluster.ID
 	reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
 	if err != nil {
+		log.WithFields(log.Fields{"id": jointCluster.ID, "error": err}).Debug("failed to gen fed ticket")
 		return 0, updated, deleted, delRegs, true
 	}
 	reqTo.RegConfigRev = *cachedRegConfigRev
