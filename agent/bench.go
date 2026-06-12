@@ -1303,7 +1303,11 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 		default:
 			key = share.CLUSBenchStateWorkloadKey(id)
 		}
-		value, _ = json.Marshal(&share.CLUSBenchState{RunAt: now})
+		value, err = json.Marshal(&share.CLUSBenchState{RunAt: now})
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal bench state")
+			return
+		}
 		if dbgError := cluster.PutBinary(key, value); dbgError != nil {
 			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 		}

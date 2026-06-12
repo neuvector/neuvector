@@ -130,7 +130,10 @@ func applyTransaction(txn *cluster.ClusterTransact, importTask *share.CLUSImport
 				if importTask.Status != share.IMPORT_RUNNING {
 					importTask.Status = share.IMPORT_RUNNING
 				}
-				_ = clusHelper.PutImportTask(importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("Failed to update import task progress")
+				}
 			}
 		}
 	}
@@ -249,7 +252,10 @@ func (c *configHelper) startBackupThread() {
 		for {
 			select {
 			case <-c.backupTimer.C:
-				_ = c.doBackup()
+				if err := c.doBackup(); err != nil {
+					// Log error: this is the top of goroutine
+					log.WithError(err).Warn("Failed to backup config")
+				}
 			case <-c_sig:
 				break LOOP
 			}
@@ -273,9 +279,14 @@ func (c *configHelper) NotifyConfigChange(endpoint string) {
 func (c *configHelper) isKvRestoring() (string, bool) {
 	var kvRestore share.CLUSKvRestore
 
-	value, _ := cluster.Get(share.CLUSKvRestoreKey)
+	value, err := cluster.Get(share.CLUSKvRestoreKey)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get KV restore key")
+	}
 	if value != nil {
-		_ = nvJsonUnmarshal(share.CLUSKvRestoreKey, value, &kvRestore)
+		if err := nvJsonUnmarshal(share.CLUSKvRestoreKey, value, &kvRestore); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal KV restore state")
+		}
 		if !kvRestore.StartAt.IsZero() && time.Since(kvRestore.StartAt) < time.Duration(2)*time.Minute {
 			return kvRestore.CtrlerID, true
 		}
@@ -311,7 +322,9 @@ func (c *configHelper) doBackup() error {
 		fedRole, _ := getFedRole()
 		return c.foreachWithLock(cfgEndpoints, func(ep *cfgEndpoint, txn *cluster.ClusterTransact) error { // txn is not used for backup
 			if changes.Contains(ep.name) {
-				_ = ep.backup(fedRole)
+				if err := ep.backup(fedRole); err != nil {
+					log.WithError(err).Warn("Failed to backup endpoint")
+				}
 			}
 			return nil
 		}, nil)
@@ -335,7 +348,9 @@ func (c *configHelper) BackupAll() {
 	}
 	c.cfgMutex.Unlock()
 	c.backupTimer.Reset(backupDelayIdle)
-	_ = c.writeBackupVersion()
+	if err := c.writeBackupVersion(); err != nil {
+		log.WithError(err).Warn("Failed to write backup version")
+	}
 }
 
 func restoreEP(ep *cfgEndpoint, ch chan<- error, importInfo *fedRulesRevInfo) error {
@@ -387,7 +402,10 @@ func (c *configHelper) Restore(host share.CLUSHost, ctrler share.CLUSController)
 		scanRevs, rev, err := clusHelper.GetFedScanRevisions()
 		if err == nil && scanRevs.Restoring {
 			scanRevs.Restoring = false
-			_ = clusHelper.PutFedScanRevisions(&scanRevs, &rev)
+			err = clusHelper.PutFedScanRevisions(&scanRevs, &rev)
+			if err != nil {
+				log.WithError(err).Warn("Failed to put fed scan revisions")
+			}
 		}
 
 		return "", false, false, "", nil
@@ -402,7 +420,9 @@ func (c *configHelper) Restore(host share.CLUSHost, ctrler share.CLUSController)
 					log.WithFields(log.Fields{"id": id}).Info("Restoring is ongoing")
 					skipRestore = true
 				} else {
-					_ = cluster.Put(share.CLUSKvRestoreKey, kvRestoreValue)
+					if err := cluster.Put(share.CLUSKvRestoreKey, kvRestoreValue); err != nil {
+						log.WithError(err).Warn("Failed to set KV restore key")
+					}
 				}
 			} else {
 				log.WithFields(log.Fields{"ver": ver}).Info("No need")
@@ -495,20 +515,30 @@ func (c *configHelper) Restore(host share.CLUSHost, ctrler share.CLUSController)
 	c.cfgMutex.Unlock()
 
 	ver := getBackupVersion()
-	_ = putControlVersion(&ver)
+	if putErr := putControlVersion(&ver); putErr != nil {
+		log.WithError(putErr).Warn("Failed to write control version after restore")
+		if err == nil {
+			err = putErr // propagate only when no earlier restore error exists
+		}
+	}
 	log.WithFields(log.Fields{"version": ver}).Info("Done")
 
 	if len(importInfo.fedRulesRevValue) > 0 {
 		log.WithFields(log.Fields{"fedRulesRevValue": importInfo.fedRulesRevValue}).Info()
 		var fedRulesRev share.CLUSFedRulesRevision
 		if err := json.Unmarshal([]byte(importInfo.fedRulesRevValue), &fedRulesRev); err == nil {
-			_ = clusHelper.PutFedRulesRevision(nil, &fedRulesRev)
+			if err := clusHelper.PutFedRulesRevision(nil, &fedRulesRev); err != nil {
+				log.WithError(err).Warn("Failed to put fed rules revision")
+			}
 		} else {
 			log.WithFields(log.Fields{"err": err}).Info("Unmarshal")
 		}
 	}
 
-	_ = cluster.Delete(share.CLUSKvRestoreKey)
+	// use delErr to avoid overwriting the restore error accumulated in err
+	if delErr := cluster.Delete(share.CLUSKvRestoreKey); delErr != nil {
+		log.WithError(delErr).Warn("Failed to delete KV restore key")
+	}
 
 	return importInfo.fedRole, importInfo.defAdminRestored, true, ver.KVVersion, err
 }
@@ -687,7 +717,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	importTask.Percentage += 1
 	importTask.LastUpdateTime = time.Now().UTC()
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(importTask) // Ignore error because progress update is non-critical
+	if err := clusHelper.PutImportTask(importTask); err != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(err).Debug("Failed to update import task progress")
+	}
 
 	// Consul gets unexpectedly killed while importing a large file. We suspect the active write and watch
 	// actions triggers race conditions in consul, so here the object store watch is paused.
