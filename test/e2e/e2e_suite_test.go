@@ -163,7 +163,6 @@ func TestMain(m *testing.M) {
 		discoverAPIEndpoint(),
 	}
 	commonFinishFuncs := []env.Func{
-		uninstallHelmCharts(charts),
 		func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
 			os.Remove(valuesFile)
 			return ctx, nil

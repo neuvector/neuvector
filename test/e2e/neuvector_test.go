@@ -9,3 +9,7 @@ func TestNeuVectorDeployment(t *testing.T) {
 func TestNeuVectorLogin(t *testing.T) {
 	testEnv.Test(t, getNeuVectorLoginFeature())
 }
+
+func TestNeuVectorProcessProfile(t *testing.T) {
+	testEnv.Test(t, getProcessProfileFeature())
+}

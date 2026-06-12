@@ -16,6 +16,8 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/types"
 )
 
+type nvTokenKey struct{}
+
 type nvAuthRequest struct {
 	Password nvPasswordAuth `json:"password"`
 }
@@ -71,6 +73,43 @@ func assessAdminLogin(ctx context.Context, t *testing.T, _ *envconf.Config) cont
 	return ctx
 }
 
+// setupAuthToken performs admin login with retry and stores the bearer token in the context.
+// Use as a Setup step in features that need to call the NeuVector API.
+func setupAuthToken(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+
+	endpoint := getAPIEndpoint(ctx)
+	body, err := json.Marshal(nvAuthRequest{
+		Password: nvPasswordAuth{Username: "admin", Password: nvAdminPassword},
+	})
+	require.NoError(t, err, "marshal auth request")
+
+	client := newNVHTTPClient()
+	url := endpoint + "/v1/auth"
+
+	const (
+		loginRetryInterval = 10 * time.Second
+		loginTimeout       = 2 * time.Minute
+	)
+	deadline := time.Now().Add(loginTimeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		token, err := tryLoginForToken(client, url, body)
+		if err == nil {
+			return context.WithValue(ctx, nvTokenKey{}, token)
+		}
+		lastErr = err
+		t.Logf("login attempt failed (%v), retrying in %s", lastErr, loginRetryInterval)
+		time.Sleep(loginRetryInterval)
+	}
+	require.NoError(t, lastErr, "admin login to %s timed out after %s", url, loginTimeout)
+	return ctx
+}
+
+func getNVToken(ctx context.Context) string {
+	return ctx.Value(nvTokenKey{}).(string)
+}
+
 func tryLogin(client *http.Client, url string, body []byte) error {
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -91,4 +130,26 @@ func tryLogin(client *http.Client, url string, body []byte) error {
 		return fmt.Errorf("auth response contained empty token")
 	}
 	return nil
+}
+
+func tryLoginForToken(client *http.Client, url string, body []byte) (string, error) {
+	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("POST %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, raw)
+	}
+
+	var authResp nvAuthResponse
+	if err = json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
+		return "", fmt.Errorf("decode auth response: %w", err)
+	}
+	if authResp.Token.Token == "" {
+		return "", fmt.Errorf("auth response contained empty token")
+	}
+	return authResp.Token.Token, nil
 }
