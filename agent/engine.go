@@ -1852,6 +1852,9 @@ func examNetworkInterface(c *containerData) bool {
 		if intfAdded {
 			programBridge(c)
 			programDP(c, false, nil)
+		} else if schedErr := scheduleTask(c.id, c.info, TASK_REEXAM_INTF_CONTAINER, containerReexamIntfIPv4Min); schedErr != nil {
+			// If the interface is empty, schedule a task to reexam the interface 4s later.
+			log.WithFields(log.Fields{"id": c.id}).Error("schedule reexam intf failed")
 		}
 
 		if subnetChanged {
