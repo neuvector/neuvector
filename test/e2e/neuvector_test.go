@@ -13,3 +13,7 @@ func TestNeuVectorLogin(t *testing.T) {
 func TestNeuVectorProcessProfile(t *testing.T) {
 	testEnv.Test(t, getProcessProfileFeature())
 }
+
+func TestNeuVectorScannerCVEDB(t *testing.T) {
+	testEnv.Test(t, getScannerCVEDBFeature())
+}
