@@ -578,7 +578,10 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 
 	json_data, err := os.ReadFile(importTask.TempFilename)
 	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("Failed to read import file")
+		msg := "Failed to read import file"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
+		return nil
 	}
 	var secRuleList resource.NvCompProfileSecurityRuleList
 	var secRule resource.NvCompProfileSecurityRule

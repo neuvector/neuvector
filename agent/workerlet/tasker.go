@@ -49,19 +49,23 @@ func (ts *Tasker) putInputFile(request interface{}) (string, []string, error) {
 	var workingPath string
 	var args []string
 	var data []byte
+	var err error
 
 	switch req := request.(type) {
 	case WalkPathRequest:
 		args = append(args, "-t", "path")
-		data, _ = json.Marshal(req)
+		data, err = json.Marshal(req)
 	case WalkGetPackageRequest:
 		args = append(args, "-t", "pkg")
-		data, _ = json.Marshal(req)
+		data, err = json.Marshal(req)
 	case WalkSecretRequest:
 		args = append(args, "-t", "scrt")
-		data, _ = json.Marshal(req)
+		data, err = json.Marshal(req)
 	default:
 		return "", args, errors.New("Invalid type")
+	}
+	if err != nil {
+		return "", args, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	if ts.bShowDebug {
@@ -89,12 +93,15 @@ func (ts *Tasker) putInputFile(request interface{}) (string, []string, error) {
 
 func (ts *Tasker) openResult(workingFolder, file string) ([]byte, error) {
 	jsonFile, err := os.Open(filepath.Join(workingFolder, file))
-	if err == nil {
-		byteValue, _ := io.ReadAll(jsonFile)
-		jsonFile.Close()
-		return byteValue, nil
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	byteValue, err := io.ReadAll(jsonFile)
+	jsonFile.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read result file: %w", err)
+	}
+	return byteValue, nil
 }
 
 // ///

@@ -701,6 +701,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	// Validate token
 	claims, err := jwtValidateToken(token[0], "", nil)
 	if err != nil {
+		log.WithError(err).Warn("failed to call jwtValidateToken")
 		return nil, userInvalidRequest, rsessToken
 	}
 
@@ -1372,7 +1373,11 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	if secret == "" {
 		tokenString = encryptedToken
 	} else {
-		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
+		var err error
+		tokenString, err = utils.DecryptSensitive(encryptedToken, []byte(secret))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt token: %w", err)
+		}
 	}
 	if tokenString == "" {
 		return nil, fmt.Errorf("unrecognized token")
@@ -1439,7 +1444,10 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 }
 
 func validateEncryptedData(encryptedData, secret string, checkTime bool) error {
-	data := utils.DecryptSensitive(encryptedData, []byte(secret))
+	data, err := utils.DecryptSensitive(encryptedData, []byte(secret))
+	if err != nil {
+		return fmt.Errorf("failed to decrypt data: %w", err)
+	}
 	if data != "" {
 		var c joinTicket
 		if err := json.Unmarshal([]byte(data), &c); err == nil {

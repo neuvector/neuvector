@@ -1046,13 +1046,11 @@ func EncryptPassword(password string) (string, error) {
 	return EncryptToBase64(getPasswordSymKey(), []byte(password))
 }
 
-func DecryptSensitive(encrypted string, key []byte) string {
+func DecryptSensitive(encrypted string, key []byte) (string, error) {
 	if encrypted == "" {
-		return ""
+		return "", nil
 	}
-
-	data, _ := DecryptFromBase64(key, encrypted)
-	return data
+	return DecryptFromBase64(key, encrypted)
 }
 
 func EncryptSensitive(data string, key []byte) (string, error) {
@@ -1087,22 +1085,18 @@ func EncryptUserToken(token string, key []byte) (string, error) {
 	return EncryptToRawURLBase64(key, []byte(token))
 }
 
-func DecryptURLSafe(encrypted string) string {
+func DecryptURLSafe(encrypted string) (string, error) {
 	if encrypted == "" {
-		return ""
+		return "", nil
 	}
-
-	password, _ := DecryptFromRawURLBase64(getPasswordSymKey(), encrypted)
-	return password
+	return DecryptFromRawURLBase64(getPasswordSymKey(), encrypted)
 }
 
-func EncryptURLSafe(password string) string {
+func EncryptURLSafe(password string) (string, error) {
 	if password == "" {
-		return ""
+		return "", nil
 	}
-
-	encrypted, _ := EncryptToRawURLBase64(getPasswordSymKey(), []byte(password))
-	return encrypted
+	return EncryptToRawURLBase64(getPasswordSymKey(), []byte(password))
 }
 
 // Determine if a directory is a mountpoint, by comparing the device for the directory
