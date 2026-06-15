@@ -21,7 +21,8 @@ func TestDockerIDDebian(t *testing.T) {
 2:cpu:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
 `
 	r := strings.NewReader(cgroup)
-	id, _, _, _ := getContainerIDByCgroupReader(r)
+	id, _, err, _ := getContainerIDByCgroupReader(r)
+	require.NoError(t, err)
 	if id != "4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970" {
 		t.Errorf("Invalid Debian docker ID: %v\n", id)
 	}
@@ -41,7 +42,8 @@ func TestDockerIDCentOS(t *testing.T) {
 1:name=systemd:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
 `
 	r := strings.NewReader(cgroup)
-	id, _, _, _ := getContainerIDByCgroupReader(r)
+	id, _, err, _ := getContainerIDByCgroupReader(r)
+	require.NoError(t, err)
 	if id != "9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d" {
 		t.Errorf("Invalid CentOS docker ID: %v\n", id)
 	}

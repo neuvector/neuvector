@@ -530,8 +530,12 @@ func (m CacheMethod) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *
 // ---
 
 func benchHostDelete(id string, param interface{}) {
-	_ = cluster.DeleteTree(share.CLUSBenchKey(id))
-	_ = cluster.Delete(share.CLUSBenchStateHostKey(id))
+	if err := cluster.DeleteTree(share.CLUSBenchKey(id)); err != nil {
+		log.WithError(err).Warn("Failed to delete bench key tree")
+	}
+	if err := cluster.Delete(share.CLUSBenchStateHostKey(id)); err != nil {
+		log.WithError(err).Warn("Failed to delete bench state host key")
+	}
 }
 
 func benchAgentOnline(id string, param interface{}) {
@@ -556,7 +560,9 @@ func benchStateHandler(nType cluster.ClusterNotifyType, key string, value []byte
 	cctx.ScanLog.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug()
 
 	if nType == cluster.ClusterNotifyDelete {
-		_ = db.DeleteBenchByID(share.CLUSBenchStateKey2ID(key))
+		if err := db.DeleteBenchByID(share.CLUSBenchStateKey2ID(key)); err != nil {
+			log.WithError(err).Warn("Failed to delete bench by ID")
+		}
 		return
 	}
 

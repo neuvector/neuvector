@@ -44,7 +44,10 @@ func domainAdd(name string, labels map[string]string) {
 	retry := 0
 	for retry < retryClusterMax {
 		var prev *uint64
-		cd, rev, _ := clusHelper.GetDomain(name, accReadAll)
+		cd, rev, err := clusHelper.GetDomain(name, accReadAll)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get domain from cluster")
+		}
 		if cd == nil {
 			cd = initDomain(name, labels)
 		} else {

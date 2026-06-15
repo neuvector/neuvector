@@ -713,7 +713,10 @@ func prepareDlpSlots(rules share.CLUSWorkloadDlpRules) ([][]byte, int, int, erro
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
 			//printDefaultDlpRules(&plc)
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				return nil, 0, 0, fmt.Errorf("failed to marshal DLP slot %d: %w", i, err)
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip dlpwlrules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -741,15 +744,20 @@ func dlpRulesCleanup(ruleKeys []string) {
 	for _, key := range ruleKeys {
 		txn.Delete(key)
 	}
-	//Ignore failure, missed keys will be removed the next update.
-	_, _ = txn.Apply()
+	// Ignore failure: missed keys will be removed the next update
+	if _, err := txn.Apply(); err != nil {
+		log.WithError(err).Warn("Failed to apply DLP rules cleanup transaction")
+	}
 }
 
 func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
 	//DlpWorkloadRules is not directly watched by consul, to improve performance
 	//change key from "network/DlpWorkloadRules/" to "recalculate/dlp/DlpWorkloadRules/"
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalDlpWlRulesKey(share.DlpRulesDefaultName))
-	oldKeys, _ := cluster.GetStoreKeys(rule_key)
+	oldKeys, err := cluster.GetStoreKeys(rule_key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get old DLP rule keys")
+	}
 
 	verstr := fmt.Sprintf("ver.%d.%d", time.Now().UTC().UnixNano(), time.Now().UTC().UnixNano())
 	newRuleKey := fmt.Sprintf("%s%s/", rule_key, verstr)
@@ -766,7 +774,10 @@ func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
 		key := fmt.Sprintf("%s%d", newRuleKey, i)
 		if err = cluster.PutBinary(key, zb); err != nil {
 			log.WithFields(log.Fields{"error": err, "slot": i, "size": len(zb)}).Error()
-			newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+			newKeys, err2 := cluster.GetStoreKeys(newRuleKey)
+			if err2 != nil {
+				log.WithError(err2).Warn("Failed to get new DLP rule keys for cleanup")
+			}
 			dlpRulesCleanup(newKeys)
 			return
 		}
@@ -784,7 +795,10 @@ func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
 	clusHelper := kv.GetClusterHelper()
 	if err = clusHelper.PutDlpVer(&dlpVer); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to write dlp rules to the cluster")
-		newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+		newKeys, err2 := cluster.GetStoreKeys(newRuleKey)
+		if err2 != nil {
+			log.WithError(err2).Warn("Failed to get new DLP rule keys for cleanup")
+		}
 		dlpRulesCleanup(newKeys)
 		return
 	}

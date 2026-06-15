@@ -393,7 +393,9 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 
 			kv.DeletePolicyByGroup(group.Name)
 			kv.DeleteResponseRuleByGroup(group.Name)
-			_ = clusHelper.DeleteGroup(group.Name)
+			if err := clusHelper.DeleteGroup(group.Name); err != nil {
+				log.WithError(err).Warn("Failed to delete neuvector group")
+			}
 			log.WithFields(log.Fields{"group": group.Name}).Info("Delete neuvector group")
 			return
 		}

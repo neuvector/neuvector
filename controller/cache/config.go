@@ -45,7 +45,10 @@ func workloadConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSWorkloadConfig
-		_ = json.Unmarshal(value, &cconf)
+		if err := json.Unmarshal(value, &cconf); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal workload config")
+			return
+		}
 
 		cacheMutexLock()
 		if cache, ok := wlCacheMap[id]; ok {
@@ -63,7 +66,10 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSAgentConfig
-		_ = json.Unmarshal(value, &cconf)
+		if err := json.Unmarshal(value, &cconf); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal agent config")
+			return
+		}
 
 		cacheMutexLock()
 		if cache, ok := agentCacheMap[id]; ok {
@@ -191,7 +197,9 @@ func uniconfWorkloadDelete(id string, param interface{}) {
 	cache := param.(*workloadCache)
 	hostID := cache.workload.HostID
 	key := share.CLUSUniconfWorkloadKey(hostID, id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete workload config key")
+	}
 }
 
 func uniconfAgentDelete(id string, param interface{}) {
@@ -200,7 +208,9 @@ func uniconfAgentDelete(id string, param interface{}) {
 	}
 	agent := param.(*agentCache).agent
 	key := share.CLUSUniconfAgentKey(agent.HostID, id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete agent config key")
+	}
 }
 
 func uniconfControllerDelete(id string, param interface{}) {
@@ -515,7 +525,11 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		log.WithFields(log.Fields{"config": cfg}).Debug()
 
 		if nType == cluster.ClusterNotifyModify {
-			if valueBackup, _ := cluster.Get(share.CLUSSystemEncMigratedKey); len(valueBackup) > 0 {
+			valueBackup, err := cluster.Get(share.CLUSSystemEncMigratedKey)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get system enc migrated key")
+			}
+			if len(valueBackup) > 0 {
 				if !encMigratedConfigRestored {
 					encMigrateSystemConfig(valueBackup, value)
 				}
@@ -571,12 +585,14 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		httpsProxy := httpclient.ParseProxy(&cfg.RegistryHttpsProxy)
 
 		// NoProxy is empty for now.
-		_ = httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
+		if err := httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
 			TLSconfig: &tls.Config{
 				InsecureSkipVerify: !cfg.EnableTLSVerification,
 				RootCAs:            pool,
 			},
-		}, httpProxy, httpsProxy, "")
+		}, httpProxy, httpsProxy, ""); err != nil {
+			log.WithError(err).Warn("Failed to set default TLS client config")
+		}
 
 		go func() {
 			scannerConfigTimeout := DefaultScannerConfigUpdateTimeout
