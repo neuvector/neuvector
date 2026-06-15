@@ -72,7 +72,9 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 							},
 						},
 					}
-					_, _ = admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
+					if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState); err != nil {
+						log.WithError(err).Warn("Failed to configure k8s admission control for CRD")
+					}
 				}
 			}
 		case share.CLUSCrdContentCount:

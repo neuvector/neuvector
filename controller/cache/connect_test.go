@@ -6,6 +6,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/graph"
 	"github.com/neuvector/neuvector/share"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetAllEndpoints(t *testing.T) {
@@ -85,11 +86,13 @@ func TestAliasEndpoint(t *testing.T) {
 	ConfigEndpoint("1", "")
 	ConfigEndpoint("host:h1", "")
 
-	ep, _ := cacher.GetConverEndpoint("1", accReadAll)
+	ep, err := cacher.GetConverEndpoint("1", accReadAll)
+	require.NoError(t, err)
 	if ep.DisplayName != "container1" {
 		t.Errorf("Unexpected endpoint display name after reset: %+v\n", ep)
 	}
-	ep, _ = cacher.GetConverEndpoint("host:h1", accReadAll)
+	ep, err = cacher.GetConverEndpoint("host:h1", accReadAll)
+	require.NoError(t, err)
 	if ep.DisplayName != "h1" {
 		t.Errorf("Unexpected endpoint display name: %+v\n", ep)
 	}

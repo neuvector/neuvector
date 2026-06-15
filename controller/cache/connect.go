@@ -532,7 +532,9 @@ func groupMetricViolationEvent(ev share.TLogEvent, group string, vio_met uint8,
 		}
 	}
 	clog.Msg = fmt.Sprintf("Group %s exceed preconfigured metric threshold: %s.\n", group, vioMetStr)
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("Failed to append metric violation event")
+	}
 }
 
 func CheckGroupMetric() {
@@ -1969,11 +1971,13 @@ func (m CacheMethod) GetConverEndpoint(name string, acc *access.AccessControl) (
 
 func (m CacheMethod) getApplicationConver(src, dst string, acc *access.AccessControl) (*api.RESTConversationDetail, error) {
 	accReadAll := access.NewReaderAccessControl()
-	from, _ := m.GetConverEndpoint(src, accReadAll)
-	to, _ := m.GetConverEndpoint(dst, accReadAll)
-
-	if from == nil || to == nil {
-		return nil, common.ErrObjectNotFound
+	from, err := m.GetConverEndpoint(src, accReadAll)
+	if err != nil {
+		return nil, err
+	}
+	to, err := m.GetConverEndpoint(dst, accReadAll)
+	if err != nil {
+		return nil, err
 	}
 
 	graphMutexRLock()
@@ -2076,8 +2080,15 @@ func (m CacheMethod) GetApplicationConver(src, dst string, srcList, dstList []st
 		report.Entries = reportEntries
 
 		accReadAll := access.NewReaderAccessControl()
-		from, _ := m.GetConverEndpoint(src, accReadAll)
-		to, _ := m.GetConverEndpoint(dst, accReadAll)
+		// Endpoint lookup is best-effort; conversation data is valid even without endpoint metadata
+		from, err := m.GetConverEndpoint(src, accReadAll)
+		if err != nil {
+			log.WithError(err).Debug("Source endpoint not found for conversation")
+		}
+		to, err := m.GetConverEndpoint(dst, accReadAll)
+		if err != nil {
+			log.WithError(err).Debug("Destination endpoint not found for conversation")
+		}
 
 		conver := api.RESTConversationDetail{
 			RESTConversation: &api.RESTConversation{From: from, To: to, RESTConversationReport: &report},

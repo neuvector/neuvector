@@ -606,7 +606,10 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 			}
 		case share.CLUSAdmissionStatistics:
 			var stats share.CLUSAdmissionStats
-			_ = json.Unmarshal(value, &stats)
+			if err := json.Unmarshal(value, &stats); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal admission statistics")
+				return
+			}
 			atomic.StoreUint64(&admStats.K8sAllowedRequests, stats.K8sAllowedRequests)
 			atomic.StoreUint64(&admStats.K8sDeniedRequests, stats.K8sDeniedRequests)
 			atomic.StoreUint64(&admStats.K8sErroneousRequests, stats.K8sErroneousRequests)
@@ -1243,7 +1246,11 @@ func matchImageValue(crtOp, crtValue string, c *nvsysadmission.AdmContainerInfo)
 		}
 		switch crtOp {
 		case share.CriteriaOpRegex:
-			matched, _ = regexp.MatchString(crtValue, fullName)
+			var err error
+			matched, err = regexp.MatchString(crtValue, fullName)
+			if err != nil {
+				log.WithError(err).Warn("Failed to match image regex")
+			}
 		default:
 			matched = share.EqualMatch(crtValue, fullName)
 		}
