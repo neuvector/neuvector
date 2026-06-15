@@ -505,7 +505,8 @@ func TestWildcardDomainAccess4(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: nil,
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -543,7 +544,8 @@ func TestDualAccess(t *testing.T) {
 	preTest()
 
 	var obj dualObject
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/scan/workload/12345", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/scan/workload/12345", nil)
+	require.NoError(t, err)
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
@@ -657,7 +659,8 @@ func TestOwnAccess(t *testing.T) {
 	preTest()
 
 	obj := newOwnObject(nil)
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/user/12345", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/user/12345", nil)
+	require.NoError(t, err)
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
@@ -728,7 +731,8 @@ func TestWildcardOwnAccess(t *testing.T) {
 	obj1 := ownObject{
 		members: []string{"ns-dev-*", "ns1"},
 	}
-	req, _ := http.NewRequest(http.MethodPatch, "https://10.1.1.1/v1/workload/12345", nil)
+	req, err := http.NewRequest(http.MethodPatch, "https://10.1.1.1/v1/workload/12345", nil)
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:         "role-1",
 		ReadPermits:  share.PERMS_RUNTIME_POLICIES,
@@ -822,7 +826,8 @@ func TestWildcardOwnAccess1(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: []string{"app-1", "app-US-*"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -859,7 +864,8 @@ func TestWildcardOwnAccess2(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: []string{"app-1", "app-US-1"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -896,7 +902,8 @@ func TestWildcardOwnAccess3(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: []string{"app-US-*"},
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -934,7 +941,8 @@ func TestWildcardOwnAccess4(t *testing.T) {
 	obj := domainObjectTest{
 		CreatorDomains: nil,
 	}
-	req, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	req, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group/12345", nil) // method can be ignored because we use different op for testing later
+	require.NoError(t, err)
 	userRole1 := &share.CLUSUserRoleInternal{
 		Name:        "role-1",
 		ReadPermits: share.PERMS_RUNTIME_POLICIES,
@@ -971,7 +979,8 @@ func TestAllReaderAccess(t *testing.T) {
 	preTest()
 
 	var obj allReaderObject
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/scan/registry/12345", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/scan/registry/12345", nil)
+	require.NoError(t, err)
 
 	acc := NewAccessControl(r, AccessOPWrite, DomainRole{
 		"": api.UserRoleAdmin,
@@ -1758,7 +1767,8 @@ func TestGetUserPermissions(t *testing.T) {
 		var roleDomains map[string][]string
 		var extraPermitsDomains []share.CLUSPermitsAssigned
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
-		gPermitsList, dPermitsList, _ := GetUserPermissions("admin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
+		gPermitsList, dPermitsList, err := GetUserPermissions("admin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList := []*api.RESTRolePermission{
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
 			{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
@@ -1777,7 +1787,8 @@ func TestGetUserPermissions(t *testing.T) {
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
-		gPermitsList, dPermitsList, _ = GetUserPermissions("fedAdmin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
+		gPermitsList, dPermitsList, err = GetUserPermissions("fedAdmin", roleDomains, share.NvPermissions{}, extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList = append(expectedGPermitsList, &api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true, Write: true})
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 	}
@@ -1787,7 +1798,8 @@ func TestGetUserPermissions(t *testing.T) {
 
 		var extraPermitsDomains []share.CLUSPermitsAssigned
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
-		gPermitsList, dPermitsList, _ := GetUserPermissions("reader", nil, share.NvPermissions{}, extraPermitsDomains)
+		gPermitsList, dPermitsList, err := GetUserPermissions("reader", nil, share.NvPermissions{}, extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList := []*api.RESTRolePermission{
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
 			{ID: share.PERM_REG_SCAN_ID, Read: true},
@@ -1805,7 +1817,8 @@ func TestGetUserPermissions(t *testing.T) {
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
-		gPermitsList, dPermitsList, _ = GetUserPermissions("fedReader", nil, share.NvPermissions{}, extraPermitsDomains)
+		gPermitsList, dPermitsList, err = GetUserPermissions("fedReader", nil, share.NvPermissions{}, extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList = append(expectedGPermitsList, &api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true})
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
@@ -1816,11 +1829,12 @@ func TestGetUserPermissions(t *testing.T) {
 
 		var extraPermitsDomains []share.CLUSPermitsAssigned
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
-		gPermitsList, dPermitsList, _ := GetUserPermissions(
+		gPermitsList, dPermitsList, err := GetUserPermissions(
 			"admin",
 			nil,
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
 			extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList := []*api.RESTRolePermission{
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
 			{ID: share.PERM_REG_SCAN_ID, Read: true, Write: true},
@@ -1839,11 +1853,12 @@ func TestGetUserPermissions(t *testing.T) {
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
-		gPermitsList, dPermitsList, _ = GetUserPermissions(
+		gPermitsList, dPermitsList, err = GetUserPermissions(
 			"fedAdmin",
 			nil,
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
 			extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList = append(expectedGPermitsList, &api.RESTRolePermission{ID: share.PERM_FED_ID, Read: true, Write: true})
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 	}
@@ -1853,11 +1868,12 @@ func TestGetUserPermissions(t *testing.T) {
 
 		var extraPermitsDomains []share.CLUSPermitsAssigned
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
-		gPermitsList, dPermitsList, _ := GetUserPermissions(
+		gPermitsList, dPermitsList, err := GetUserPermissions(
 			"reader",
 			nil,
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN},
 			extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList := []*api.RESTRolePermission{
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
 			{ID: share.PERM_REG_SCAN_ID, Read: true},
@@ -1875,11 +1891,12 @@ func TestGetUserPermissions(t *testing.T) {
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
-		gPermitsList, dPermitsList, _ = GetUserPermissions(
+		gPermitsList, dPermitsList, err = GetUserPermissions(
 			"fedReader",
 			nil,
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_POLICIES, WriteValue: share.PERMS_RUNTIME_POLICIES},
 			extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList = []*api.RESTRolePermission{
 			{ID: share.PERM_FED_ID, Read: true},
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
@@ -1904,11 +1921,12 @@ func TestGetUserPermissions(t *testing.T) {
 
 		var extraPermitsDomains []share.CLUSPermitsAssigned
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
-		gPermitsList, dPermitsList, _ := GetUserPermissions(
+		gPermitsList, dPermitsList, err := GetUserPermissions(
 			"reader",
 			map[string][]string{"admin": {"nv-1"}},
 			share.NvPermissions{ReadValue: share.PERMS_RUNTIME_SCAN, WriteValue: share.PERMS_RUNTIME_SCAN},
 			extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList := []*api.RESTRolePermission{
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
 			{ID: share.PERM_REG_SCAN_ID, Read: true},
@@ -1940,7 +1958,7 @@ func TestGetUserPermissions(t *testing.T) {
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
 		//log.SetLevel(log.DebugLevel)
-		gPermitsList, dPermitsList, _ = GetUserPermissions(
+		gPermitsList, dPermitsList, err = GetUserPermissions(
 			"reader",
 			nil,
 			share.NvPermissions{WriteValue: share.PERMS_RUNTIME_SCAN},
@@ -1972,6 +1990,7 @@ func TestGetUserPermissions(t *testing.T) {
 					Domains: []string{"nv-4", "nv-5"},
 				},
 			})
+		require.NoError(t, err)
 		expectedGPermitsList = []*api.RESTRolePermission{
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true},
 			{ID: share.PERM_REG_SCAN_ID, Read: true},
@@ -2011,11 +2030,12 @@ func TestGetUserPermissions(t *testing.T) {
 
 		var extraPermitsDomains []share.CLUSPermitsAssigned
 		var expectedDPermitsList map[string][]*api.RESTRolePermission
-		gPermitsList, dPermitsList, _ := GetUserPermissions(
+		gPermitsList, dPermitsList, err := GetUserPermissions(
 			"admin",
 			nil,
 			share.NvPermissions{ReadValue: share.PERM_FED},
 			extraPermitsDomains)
+		require.NoError(t, err)
 		expectedGPermitsList := []*api.RESTRolePermission{
 			{ID: share.PERM_FED_ID, Read: true},
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true, Write: true},
@@ -2035,7 +2055,7 @@ func TestGetUserPermissions(t *testing.T) {
 		}
 		testObj.checkPermissionsResult(gPermitsList, expectedGPermitsList, dPermitsList, expectedDPermitsList)
 
-		gPermitsList, dPermitsList, _ = GetUserPermissions(
+		gPermitsList, dPermitsList, err = GetUserPermissions(
 			"fedReader",
 			nil,
 			share.NvPermissions{
@@ -2043,6 +2063,7 @@ func TestGetUserPermissions(t *testing.T) {
 			},
 			extraPermitsDomains,
 		)
+		require.NoError(t, err)
 		expectedGPermitsList = []*api.RESTRolePermission{
 			{ID: share.PERM_FED_ID, Read: true},
 			{ID: share.PERM_NV_RESOURCE_ID, Read: true},

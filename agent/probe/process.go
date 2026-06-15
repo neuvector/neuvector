@@ -484,7 +484,13 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 		proc.user = p.getUserName(proc.pid, proc.euid)
 	}
 	if proc.path == "" {
-		proc.path, _ = global.SYS.GetFilePath(proc.pid)
+		if path, err := global.SYS.GetFilePath(proc.pid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debug("failed to get file path for proc")
+			}
+		} else {
+			proc.path = path
+		}
 	}
 	if proc.name == "" {
 		proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
@@ -494,7 +500,13 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 	if ppid > 1 {
 		proc.ppid = ppid
 		proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
-		proc.ppath, _ = global.SYS.GetFilePath(proc.ppid)
+		if path, err := global.SYS.GetFilePath(proc.ppid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debug("failed to get file path for parent proc")
+			}
+		} else {
+			proc.ppath = path
+		}
 	}
 }
 
@@ -815,8 +827,11 @@ func (p *Probe) evalNewRunningApp(pid int) {
 		p.unlockProcMux() // minimum section lock
 
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
-			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
-			if cmds != nil && cmds[0] != "" {
+			if cmds, err := global.SYS.ReadCmdLine(proc.pid); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					log.WithError(err).Debug("failed to read cmdline for proc")
+				}
+			} else if cmds != nil && cmds[0] != "" {
 				proc.cmds = cmds // caught the last movement
 			}
 		}
@@ -974,7 +989,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 		// construct parent process
 		p.updateProcess(parent)                              // get name, ppid, ruid, euid
 		parent.user = p.getUserName(parent.pid, parent.euid) // get parent's username
-		parent.path, _ = global.SYS.GetFilePath(parent.pid)  // get parent's executable name
+		if path, err := global.SYS.GetFilePath(parent.pid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debug("failed to get file path for parent proc")
+			}
+		} else {
+			parent.path = path // get parent's executable name
+		}
 		p.pidProcMap[parent.pid] = parent
 		p.addContainerProcess(c, parent.pid) // add parent
 		log.WithFields(log.Fields{"pid": parent.pid, "ruid": parent.ruid}).Debug("PROC: patch parent")
@@ -1014,7 +1035,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 
 		if notAuth {
 			if len(parent.cmds) == 0 {
-				parent.cmds, _ = global.SYS.ReadCmdLine(proc.ppid)
+				if cmds, err := global.SYS.ReadCmdLine(proc.ppid); err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						log.WithError(err).Debug("failed to read cmdline for parent proc")
+					}
+				} else {
+					parent.cmds = cmds
+				}
 			}
 
 			if p.isSudoChild(proc) {
@@ -1037,7 +1064,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 				p.unlockProcMux() // minimum section lock
 				if ok {
 					if len(gp.cmds) == 0 {
-						gp.cmds, _ = global.SYS.ReadCmdLine(gp.pid)
+						if cmds, err := global.SYS.ReadCmdLine(gp.pid); err != nil {
+							if !errors.Is(err, os.ErrNotExist) {
+								log.WithError(err).Debug("failed to read cmdline for grandparent proc")
+							}
+						} else {
+							gp.cmds = cmds
+						}
 					}
 
 					// filter false-positive cases: grandparent is root
