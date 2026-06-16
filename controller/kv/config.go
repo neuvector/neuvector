@@ -377,7 +377,12 @@ func restoreEPs(eps utils.Set, ch chan error, importInfo *fedRulesRevInfo) error
 
 	for ep_ := range eps.Iter() {
 		ep := ep_.(*cfgEndpoint)
-		go func() { _ = restoreEP(ep, ch, importInfo) }()
+		go func() {
+			// Log error: goroutine top-level; error propagates to Restore() via ch without additional logging
+			if err := restoreEP(ep, ch, importInfo); err != nil {
+				log.WithError(err).Warn("Failed to restore endpoint")
+			}
+		}()
 	}
 	if ch != nil {
 		for j := 0; j < eps.Cardinality(); j++ {
@@ -742,10 +747,14 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	}
 
 	// Purge keys of the endpoints to be imported
-	_ = c.foreachWithLock(eps, func(ep *cfgEndpoint, txn *cluster.ClusterTransact) error {
-		_ = ep.purge(txn, importTask)
+	if err := c.foreachWithLock(eps, func(ep *cfgEndpoint, txn *cluster.ClusterTransact) error {
+		if err := ep.purge(txn, importTask); err != nil {
+			log.WithError(err).Debug("failed to purge endpoints")
+		}
 		return nil
-	}, importTask)
+	}, importTask); err != nil {
+		log.WithError(err).Warn("Failed to purge endpoints before import")
+	}
 
 	// delete/reset scan/state/scan_revisions key when necessary
 	if currFedRole == api.FedRoleJoint {
@@ -754,13 +763,19 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				key := share.CLUSScanStateKey(share.CLUSFedScanDataRevSubKey)
 				switch importFedRole {
 				case api.FedRoleNone:
-					_ = cluster.Delete(key)
+					if err := cluster.Delete(key); err != nil {
+						log.WithError(err).Warn("Failed to delete scan state key")
+					}
 				case api.FedRoleJoint:
 					scanRevs := share.CLUSFedScanRevisions{
 						ScannedRegRevs: make(map[string]uint64),
 					}
-					value, _ := json.Marshal(&scanRevs)
-					_ = cluster.Put(key, value)
+					value, err := json.Marshal(&scanRevs)
+					if err != nil {
+						log.WithError(err).Warn("Failed to marshal scan revisions")
+					} else if err := cluster.Put(key, value); err != nil {
+						log.WithError(err).Warn("Failed to put scan state key")
+					}
 				}
 				break
 			}
@@ -769,7 +784,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 
 	importTask.Percentage += 1
 	importTask.LastUpdateTime = time.Now().UTC()
-	_ = clusHelper.PutImportTask(importTask) // Ignore error because progress update is non-critical
+	if err := clusHelper.PutImportTask(importTask); err != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(err).Debug("Failed to update import task progress")
+	}
 
 	// Import key/value from files
 	var key, value string
@@ -815,7 +833,9 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						importFedRole = m.FedRole
 						if currFedRole == api.FedRoleJoint && importFedRole != api.FedRoleMaster {
 							// force a full fed rules sync because fed rules_revision is unavailable in non-master clusters' backup file
-							_ = clusHelper.PutFedRulesRevision(txn, share.CLUSEmptyFedRulesRevision())
+							if err := clusHelper.PutFedRulesRevision(txn, share.CLUSEmptyFedRulesRevision()); err != nil {
+								log.WithError(err).Warn("Failed to put fed rules revision")
+							}
 						}
 						log.WithFields(log.Fields{"fedRole": importFedRole}).Info("Will import from")
 					} else {
@@ -881,11 +901,17 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				if key == policyZipRuleListKey {
 					applyTransaction(txn, importTask, true, processedLines)
 					//compress rulelist before put to cluster
-					_ = clusHelper.PutPolicyRuleListZip(key, array)
+					if err := clusHelper.PutPolicyRuleListZip(key, array); err != nil {
+						log.WithError(err).Warn("Failed to put policy rule list")
+					}
 				} else {
-					_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
+					if err := clusHelper.DuplicateNetworkKeyTxn(txn, key, array); err != nil {
+						log.WithError(err).Warn("Failed to duplicate network key")
+					}
 					//for CLUSConfigSystemKey only
-					_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+					if err := clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array); err != nil {
+						log.WithError(err).Warn("Failed to duplicate network system key")
+					}
 					if needToZip(key, array) {
 						zb := utils.GzipBytes(array)
 						txn.PutBinary(key, zb)
@@ -930,7 +956,9 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 											},
 										},
 									}
-									_, _ = admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
+									if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState); err != nil {
+										log.WithError(err).Warn("Failed to configure k8s admission control")
+									}
 								}
 							}
 						}
@@ -959,7 +987,9 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				// For these 2 cases, we need to promote default admin to fedAdmin explicitly:
 				// 1. non-master cluster's All/User backup file(from 3.0/3.1) to master cluster (because default admin is overwritten to be non-fedAdmin)
 				// 2. master cluster's Policy backup file to standalone cluster (because default admin's role is not updated by Policy backup file)
-				_ = clusHelper.ConfigFedRole(common.DefaultAdminUser, api.UserRoleFedAdmin, accAdmin)
+				if err := clusHelper.ConfigFedRole(common.DefaultAdminUser, api.UserRoleFedAdmin, accAdmin); err != nil {
+					log.WithError(err).Warn("Failed to configure fed role")
+				}
 			} else if ((currFedRole == api.FedRoleNone && len(header.Sections) == 1 && header.Sections[0] == api.ConfSectionUser) ||
 				currFedRole == api.FedRoleJoint) && importFedRole == api.FedRoleMaster {
 				// For these 2 cases, we need to demote all fedAdmin users to admin explicitly explicitly:
@@ -983,13 +1013,17 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 		Name:    share.DefaultVulnerabilityProfileName,
 		Entries: make([]*share.CLUSVulnerabilityProfileEntry, 0),
 	}
-	_ = clusHelper.PutVulnerabilityProfileIfNotExist(profile)
+	if err := clusHelper.PutVulnerabilityProfileIfNotExist(profile); err != nil {
+		log.WithError(err).Warn("Failed to put vulnerability profile")
+	}
 	createDefaultComplianceProfile()
 
 	if len(importInfo.fedRulesRevValue) > 0 {
 		var fedRulesRev share.CLUSFedRulesRevision
 		if err := json.Unmarshal([]byte(importInfo.fedRulesRevValue), &fedRulesRev); err == nil {
-			_ = clusHelper.PutFedRulesRevision(nil, &fedRulesRev)
+			if err := clusHelper.PutFedRulesRevision(nil, &fedRulesRev); err != nil {
+				log.WithError(err).Warn("Failed to put fed rules revision")
+			}
 		} else {
 			log.WithFields(log.Fields{"err": err}).Info("Failed to unmarshal fed rules revision")
 		}

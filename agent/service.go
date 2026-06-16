@@ -860,7 +860,10 @@ func (rs *RPCService) GetDerivedPolicyRules(ctx context.Context, f *share.CLUSFi
 		}
 	}
 
-	value, _ := json.Marshal(ruleMap)
+	value, err := json.Marshal(ruleMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal rule map: %w", err)
+	}
 	zb := utils.GzipBytes(value)
 	return &share.CLUSDerivedPolicyRuleMap{RuleByte: zb}, nil
 }

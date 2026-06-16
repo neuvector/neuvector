@@ -403,7 +403,11 @@ func deleteAgentInfo() {
 
 // PUT-KEY: object/networkep/<host_id>/<id>
 func putNetworkEP(nep *share.CLUSNetworkEP) {
-	value, _ := json.Marshal(nep)
+	value, err := json.Marshal(nep)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal network endpoint")
+		return
+	}
 	key := share.CLUSNetworkEPKey(Host.ID, nep.ID)
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -419,7 +423,11 @@ func deleteNetworkEP(nepID string) {
 
 // PUT-KEY: object/workload/<host_id>/<id>
 func putWorkload(wl *share.CLUSWorkload) {
-	value, _ := json.Marshal(wl)
+	value, err := json.Marshal(wl)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal workload")
+		return
+	}
 	key := share.CLUSWorkloadKey(Host.ID, wl.ID)
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
