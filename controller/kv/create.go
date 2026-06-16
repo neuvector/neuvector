@@ -43,13 +43,25 @@ func createDefaultAdminUser() {
 	useBootstrapPwd := false
 	pwd := common.DefaultAdminPass
 	if orchPlatform == share.PlatformKubernetes {
-		if bootstrapPwd, _ := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
-			pwd = bootstrapPwd
-			resetPwdInNextLogin = true
-			useBootstrapPwd = true
+		bootstrapPwd, err := resource.RetrieveBootstrapPassword()
+		if err != nil {
+			log.WithError(err).Error("Failed to retrieve bootstrap password")
+			return
 		}
+		if bootstrapPwd == "" {
+			log.WithError(err).Error("Failed to generate valid bootstrap password")
+			return
+		}
+		pwd = bootstrapPwd
+		resetPwdInNextLogin = true
+		useBootstrapPwd = true
 	}
-	saltedPwdHash, _ := common.HashPassword(pwd, nil)
+	saltedPwdHash, err := common.HashPassword(pwd, nil)
+	if err != nil {
+		// Log error: admin user cannot be created without a password hash
+		log.WithError(err).Error("Failed to hash admin password")
+		return
+	}
 	admin := share.CLUSUser{
 		Fullname:            common.DefaultAdminUser,
 		Username:            common.DefaultAdminUser,
@@ -63,7 +75,11 @@ func createDefaultAdminUser() {
 		Locale:              common.OEMDefaultUserLocale,
 		PwdResetTime:        time.Now().UTC(),
 	}
-	value, _ := json.Marshal(admin)
+	value, err := json.Marshal(admin)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal admin user")
+		return
+	}
 	key := share.CLUSUserKey(common.DefaultAdminUser)
 	for {
 		if err := cluster.PutIfNotExist(key, value, false); err != nil {
@@ -241,9 +257,13 @@ func createResponseRules() {
 				ID:      r.ID,
 				CfgType: share.UserCreated,
 			}
-			_ = clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r)
+			if err := clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r); err != nil {
+				log.WithError(err).Warn("Failed to stage response rule")
+			}
 		}
-		_ = clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs)
+		if err := clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs); err != nil {
+			log.WithError(err).Warn("Failed to stage response rule list")
+		}
 		if _, err := txn.Apply(); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("")
 		}
@@ -316,7 +336,9 @@ func createDefAdmCtrlRules() {
 
 	for i, r := range defaultRules {
 		r.ID = uint32(i + 1)
-		_ = clusHelper.PutAdmissionRule(admission.NvAdmValidateType, api.ValidatingExceptRuleType, r)
+		if err := clusHelper.PutAdmissionRule(admission.NvAdmValidateType, api.ValidatingExceptRuleType, r); err != nil {
+			log.WithError(err).Warn("Failed to create default admission rule")
+		}
 		arh := &share.CLUSRuleHead{
 			ID:      r.ID,
 			CfgType: share.UserCreated,
@@ -344,7 +366,9 @@ func createDefAdmCtrlResponseRule() {
 	defer txn.Close()
 	for _, r := range defaultAdmCtrlResponseRules {
 		r.ID = maxID + 1
-		_ = clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r)
+		if err := clusHelper.PutResponseRuleTxn(share.DefaultPolicyName, txn, &r); err != nil {
+			log.WithError(err).Warn("Failed to stage admission ctrl response rule")
+		}
 		crh := &share.CLUSRuleHead{
 			ID:      r.ID,
 			CfgType: share.UserCreated,
@@ -352,7 +376,9 @@ func createDefAdmCtrlResponseRule() {
 		crhs = append(crhs, crh)
 		maxID = r.ID
 	}
-	_ = clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs)
+	if err := clusHelper.PutResponseRuleListTxn(share.DefaultPolicyName, txn, crhs); err != nil {
+		log.WithError(err).Warn("Failed to stage admission ctrl response rule list")
+	}
 	if _, err := txn.Apply(); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 	}
@@ -442,7 +468,9 @@ func createDefaultServiceMeshMonitor() {
 		modified = true
 	}
 	if modified {
-		_ = clusHelper.PutSystemConfigRev(cfg, rev)
+		if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+			log.WithError(err).Warn("Failed to save system config")
+		}
 	}
 }
 
@@ -613,9 +641,13 @@ func CreatePreDlpSensor(withlock bool) {
 						cdr.RuleListNames[rname] = rname
 					}
 				}
-				_ = clusHelper.PutDlpSensor(cdr, false)
+				if err := clusHelper.PutDlpSensor(cdr, false); err != nil {
+					log.WithError(err).Warn("Failed to update DLP pre-sensor")
+				}
 			} else {
-				_ = clusHelper.PutDlpSensor(cdr, true)
+				if err := clusHelper.PutDlpSensor(cdr, true); err != nil {
+					log.WithError(err).Warn("Failed to create DLP pre-sensor")
+				}
 			}
 		}
 	} else {
@@ -627,9 +659,13 @@ func CreatePreDlpSensor(withlock bool) {
 						cdr.RuleListNames[rname] = rname
 					}
 				}
-				_ = clusHelper.PutDlpSensor(cdr, false)
+				if err := clusHelper.PutDlpSensor(cdr, false); err != nil {
+					log.WithError(err).Warn("Failed to update DLP pre-sensor")
+				}
 			} else {
-				_ = clusHelper.PutDlpSensor(cdr, true)
+				if err := clusHelper.PutDlpSensor(cdr, true); err != nil {
+					log.WithError(err).Warn("Failed to create DLP pre-sensor")
+				}
 			}
 		}
 	}
@@ -715,9 +751,13 @@ func CreateDefDlpRules(withlock bool) {
 					defaultSensorAllDlpRule.PreRuleList[rname] = cdr_list
 				}
 			}
-			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false)
+			if err := clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false); err != nil {
+				log.WithError(err).Warn("Failed to update default DLP sensor")
+			}
 		} else {
-			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true)
+			if err := clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true); err != nil {
+				log.WithError(err).Warn("Failed to create default DLP sensor")
+			}
 		}
 	} else {
 		dlpsensor := clusHelper.GetDlpSensor(defaultSensorAllDlpRule.Name)
@@ -732,9 +772,13 @@ func CreateDefDlpRules(withlock bool) {
 					defaultSensorAllDlpRule.PreRuleList[rname] = cdr_list
 				}
 			}
-			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false)
+			if err := clusHelper.PutDlpSensor(defaultSensorAllDlpRule, false); err != nil {
+				log.WithError(err).Warn("Failed to update default DLP sensor")
+			}
 		} else {
-			_ = clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true)
+			if err := clusHelper.PutDlpSensor(defaultSensorAllDlpRule, true); err != nil {
+				log.WithError(err).Warn("Failed to create default DLP sensor")
+			}
 		}
 	}
 }
@@ -912,9 +956,13 @@ func createFedPreDlpSensor(withlock bool) {
 					cdr.RuleListNames[rname] = rname
 				}
 			}
-			_ = clusHelper.PutDlpSensor(cdr, false)
+			if err := clusHelper.PutDlpSensor(cdr, false); err != nil {
+				log.WithError(err).Warn("Failed to update fed DLP pre-sensor")
+			}
 		} else {
-			_ = clusHelper.PutDlpSensor(cdr, true)
+			if err := clusHelper.PutDlpSensor(cdr, true); err != nil {
+				log.WithError(err).Warn("Failed to create fed DLP pre-sensor")
+			}
 		}
 	}
 }
@@ -1017,7 +1065,9 @@ func createFedDefDlpRules(withlock bool) {
 			dlpsensor.PreRuleList[rname] = cdr_list
 		}
 	}
-	_ = clusHelper.PutDlpSensor(dlpsensor, false)
+	if err := clusHelper.PutDlpSensor(dlpsensor, false); err != nil {
+		log.WithError(err).Warn("Failed to update fed default DLP sensor")
+	}
 }
 
 func createFedDefDlpRuleSensor(withlock bool) {
@@ -1095,7 +1145,9 @@ func CreatePreWafSensor(withlock bool) {
 	for _, cdr := range PreWafSensors {
 		wafsensor := clusHelper.GetWafSensor(cdr.Name)
 		if wafsensor == nil {
-			_ = clusHelper.PutWafSensor(cdr, true)
+			if err := clusHelper.PutWafSensor(cdr, true); err != nil {
+				log.WithError(err).Warn("Failed to create WAF pre-sensor")
+			}
 		}
 	}
 }
@@ -1159,12 +1211,16 @@ func CreateDefWafRules(withlock bool) {
 				rule.ID = common.GetWafRuleID(defaultSensorAllWafRule)
 			}
 		}
-		_ = clusHelper.PutWafSensor(defaultSensorAllWafRule, false)
+		if err := clusHelper.PutWafSensor(defaultSensorAllWafRule, false); err != nil {
+			log.WithError(err).Warn("Failed to update default WAF sensor")
+		}
 	} else {
 		for _, rule := range defaultSensorAllWafRule.RuleList {
 			rule.ID = common.GetWafRuleID(defaultSensorAllWafRule)
 		}
-		_ = clusHelper.PutWafSensor(defaultSensorAllWafRule, true)
+		if err := clusHelper.PutWafSensor(defaultSensorAllWafRule, true); err != nil {
+			log.WithError(err).Warn("Failed to create default WAF sensor")
+		}
 	}
 }
 
@@ -1243,7 +1299,9 @@ func createFedPreWafSensor(withlock bool) {
 	for _, cdr := range PreWafFedSensors {
 		wafsensor := clusHelper.GetWafSensor(cdr.Name)
 		if wafsensor == nil {
-			_ = clusHelper.PutWafSensor(cdr, true)
+			if err := clusHelper.PutWafSensor(cdr, true); err != nil {
+				log.WithError(err).Warn("Failed to create fed WAF pre-sensor")
+			}
 		}
 	}
 }
@@ -1328,7 +1386,9 @@ func createFedDefWafRules(withlock bool) {
 			rule.ID = common.GetWafRuleID(wafsensor)
 		}
 	}
-	_ = clusHelper.PutWafSensor(wafsensor, false)
+	if err := clusHelper.PutWafSensor(wafsensor, false); err != nil {
+		log.WithError(err).Warn("Failed to update fed default WAF sensor")
+	}
 }
 
 func createFedDefWafRuleSensor(withlock bool) {
@@ -1394,9 +1454,15 @@ func createDefaultComplianceProfile() {
 }
 
 func createDefaultDomains() {
-	_ = clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainContainers, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
-	_ = clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainNodes, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
-	_ = clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainImages, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil)
+	if err := clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainContainers, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil); err != nil {
+		log.WithError(err).Warn("Failed to create containers domain")
+	}
+	if err := clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainNodes, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil); err != nil {
+		log.WithError(err).Warn("Failed to create nodes domain")
+	}
+	if err := clusHelper.PutDomain(&share.CLUSDomain{Name: api.DomainImages, Dummy: true, Tags: []string{}, Labels: map[string]string{}}, nil); err != nil {
+		log.WithError(err).Warn("Failed to create images domain")
+	}
 }
 
 func setDefaultUnusedGroupAging() {
@@ -1406,7 +1472,9 @@ func setDefaultUnusedGroupAging() {
 		return
 	}
 	cfg.UnusedGroupAging = share.UnusedGroupAgingDefault
-	_ = clusHelper.PutSystemConfigRev(cfg, rev)
+	if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+		log.WithError(err).Warn("Failed to set default unused group aging")
+	}
 }
 
 func createDefaultXffSetting() {
@@ -1414,7 +1482,9 @@ func createDefaultXffSetting() {
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	if !cfg.XffEnabled {
 		cfg.XffEnabled = true
-		_ = clusHelper.PutSystemConfigRev(cfg, rev)
+		if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+			log.WithError(err).Warn("Failed to save XFF setting")
+		}
 	}
 }
 
@@ -1422,7 +1492,9 @@ func EnforceNetSysConfig() {
 	acc := access.NewReaderAccessControl()
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	if cfg.XffEnabled || cfg.DisableNetPolicy || cfg.DetectUnmanagedWl || cfg.StrictGroupMode {
-		_ = clusHelper.PutSystemConfigRev(cfg, rev)
+		if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+			log.WithError(err).Warn("Failed to enforce net sys config")
+		}
 	}
 }
 
@@ -1431,7 +1503,9 @@ func createDefaultNetServiceSetting() {
 	cfg, rev := clusHelper.GetSystemConfigRev(acc)
 	cfg.NetServiceStatus = false
 	cfg.NetServicePolicyMode = share.PolicyModeLearn
-	_ = clusHelper.PutSystemConfigRev(cfg, rev)
+	if err := clusHelper.PutSystemConfigRev(cfg, rev); err != nil {
+		log.WithError(err).Warn("Failed to save default net service setting")
+	}
 }
 
 func createDefaultVulnerabilityProfile() {
@@ -1440,8 +1514,14 @@ func createDefaultVulnerabilityProfile() {
 		Name:    share.DefaultVulnerabilityProfileName,
 		Entries: make([]*share.CLUSVulnerabilityProfileEntry, 0),
 	}
-	value, _ := json.Marshal(profile)
-	_ = cluster.Put(key, value)
+	value, err := json.Marshal(profile)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal vulnerability profile")
+		return
+	}
+	if err := cluster.Put(key, value); err != nil {
+		log.WithError(err).Warn("Failed to create default vulnerability profile")
+	}
 }
 
 func createDefaultPwdProfile() {
@@ -1462,14 +1542,27 @@ func createDefaultPwdProfile() {
 		BlockAfterFailedCount:       5,
 		BlockMinutes:                60,
 	}
-	value, _ := json.Marshal(profile)
-	_ = cluster.Put(key, value)
+	value, err := json.Marshal(profile)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal pwd profile")
+		return
+	}
+	if err := cluster.Put(key, value); err != nil {
+		log.WithError(err).Warn("Failed to create default pwd profile")
+		// Continue: user PwdResetTime migration is independent of the profile write
+	}
 
 	cfg := &share.CLUSActivePwdProfileConfig{
 		Name: share.CLUSDefPwdProfileName,
 	}
-	value, _ = json.Marshal(cfg)
-	_ = cluster.Put(share.CLUSConfigPwdProfileStore, value)
+	value, err = json.Marshal(cfg)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal active pwd profile config")
+		return
+	}
+	if err := cluster.Put(share.CLUSConfigPwdProfileStore, value); err != nil {
+		log.WithError(err).Warn("Failed to store active pwd profile config")
+	}
 
 	// for rolling upgrade, enumerate all users & set their PwdResetTime to now
 	acc := access.NewAdminAccessControl()
@@ -1478,7 +1571,9 @@ func createDefaultPwdProfile() {
 		user.FailedLoginCount = 0
 		user.BlockLoginSince = time.Time{}
 		user.PwdResetTime = time.Now().UTC()
-		_ = clusHelper.PutUser(user)
+		if err := clusHelper.PutUser(user); err != nil {
+			log.WithError(err).Warn("Failed to update user pwd reset time")
+		}
 	}
 }
 
@@ -1516,7 +1611,9 @@ func addPredefinedFileRule(behavior, path, regexStr string) {
 			flt := share.CLUSFileMonitorFilter{Behavior: behavior, Path: path, Regex: regexStr}
 			flt.Filter = common.FsmonFilterToRest(flt.Path, flt.Regex)
 			fmp.Filters = append(fmp.Filters, flt)
-			_ = clusHelper.PutFileMonitorProfile(group, fmp, 0)
+			if err := clusHelper.PutFileMonitorProfile(group, fmp, 0); err != nil {
+				log.WithError(err).Warn("Failed to update file monitor profile")
+			}
 
 			// file access rule
 			far, rev := clusHelper.GetFileAccessRule(group) // associated with "mon"
@@ -1529,7 +1626,9 @@ func addPredefinedFileRule(behavior, path, regexStr string) {
 
 			idx := utils.FilterIndexKey(flt.Path, flt.Regex)
 			far.Filters[idx] = &share.CLUSFileAccessFilterRule{Apps: make([]string, 0), CreatedAt: tm, UpdatedAt: tm, Behavior: behavior}
-			_ = clusHelper.PutFileAccessRule(group, far, rev)
+			if err := clusHelper.PutFileAccessRule(group, far, rev); err != nil {
+				log.WithError(err).Warn("Failed to update file access rule")
+			}
 		}
 	}
 }
