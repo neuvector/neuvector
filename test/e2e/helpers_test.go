@@ -2,10 +2,13 @@ package e2e_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	api "github.com/neuvector/neuvector/controller/api"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -110,4 +113,45 @@ func assessScannerDeployment(ctx context.Context, t *testing.T, _ *envconf.Confi
 	)
 	require.NoError(t, err, "scanner deployment not available")
 	return ctx
+}
+
+// findWorkloadInNVAPI polls /v2/workload until a workload matching namespace and
+// serviceGroup is found. If displayName is non-empty, it must also match. Returns
+// the workload ID of the matched workload.
+func findWorkloadInNVAPI(ctx context.Context, t *testing.T, namespace, serviceGroup, displayName string) string {
+	t.Helper()
+	endpoint := getAPIEndpoint(ctx)
+	token := getNVToken(ctx)
+	httpClient := newNVHTTPClient()
+
+	var workloadID string
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v2/workload", nil)
+		if err != nil {
+			return false
+		}
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			return false
+		}
+		defer resp.Body.Close()
+		var list api.RESTWorkloadsDataV2
+		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+			return false
+		}
+		for _, w := range list.Workloads {
+			if w.WlBrief.Domain == namespace &&
+				w.WlBrief.ServiceGroup == serviceGroup &&
+				(displayName == "" || w.WlBrief.DisplayName == displayName) {
+				workloadID = w.WlBrief.ID
+				return true
+			}
+		}
+		return false
+	}, assessTimeout, retryInterval,
+		"workload in namespace %q with service_group %q not found in /v2/workload after %s",
+		namespace, serviceGroup, assessTimeout)
+
+	return workloadID
 }
