@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -34,6 +35,8 @@ func getProcessProfileFeature() types.Feature {
 		Setup(deployTestWorkload).
 		Setup(setupAuthToken).
 		Assess("workload is visible in NeuVector API with correct service group", assessWorkloadInNVAPI).
+		Assess("group is learned with nginx container member", assessGroupLearnedWithMember).
+		Assess("process profile contains nginx entry", assessProcessProfileHasNginx).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
@@ -135,5 +138,87 @@ func teardownWorkloadNamespace(ctx context.Context, t *testing.T, _ *envconf.Con
 	if err := client.Resources().Delete(ctx, ns); err != nil {
 		t.Logf("warning: failed to delete namespace %s: %v", workloadNamespace, err)
 	}
+	return ctx
+}
+
+func assessGroupLearnedWithMember(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+	endpoint := getAPIEndpoint(ctx)
+	token := getNVToken(ctx)
+	httpClient := newNVHTTPClient()
+
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/group", nil)
+		if err != nil {
+			return false
+		}
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			return false
+		}
+		defer resp.Body.Close()
+		var data api.RESTGroupsData
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return false
+		}
+		for _, g := range data.Groups {
+			if g.Name != workloadServiceGroup {
+				continue
+			}
+			for _, m := range g.Members {
+				if m.DisplayName == workloadDeployName {
+					return true
+				}
+			}
+		}
+		return false
+	}, assessTimeout, retryInterval,
+		"group %q with member display_name=%q not found in /v1/group",
+		workloadServiceGroup, workloadDeployName)
+
+	return ctx
+}
+
+func assessProcessProfileHasNginx(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+	endpoint := getAPIEndpoint(ctx)
+	token := getNVToken(ctx)
+	httpClient := newNVHTTPClient()
+
+	const (
+		expectedProcessName = "nginx"
+		expectedProcessPath = "/usr/sbin/nginx"
+	)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("%s/v1/process_profile/%s", endpoint, workloadServiceGroup)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return false
+		}
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			return false
+		}
+		defer resp.Body.Close()
+		var data api.RESTProcessProfileData
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return false
+		}
+		if data.Profile == nil {
+			return false
+		}
+		for _, p := range data.Profile.ProcessList {
+			if p.Name == expectedProcessName && p.Path == expectedProcessPath {
+				return true
+			}
+		}
+		return false
+	}, assessTimeout, retryInterval,
+		"process profile for %q missing entry name=%q path=%q in /v1/process_profile/:name",
+		workloadServiceGroup, expectedProcessName, expectedProcessPath)
+
 	return ctx
 }
