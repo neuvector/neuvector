@@ -484,7 +484,10 @@ func connectUpdate(nType cluster.ClusterNotifyType, key string, value []byte, mo
 		}
 
 		var conns []*share.CLUSConnection
-		_ = json.Unmarshal(uzb, &conns)
+		if err := json.Unmarshal(uzb, &conns); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal connections")
+			return
+		}
 
 		UpdateConnections(conns)
 

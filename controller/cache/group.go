@@ -595,15 +595,27 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			evhdls.Trigger(EV_GROUP_DELETE, name, cache)
 		}
 
+		// Partial transaction failures are acceptable: unregistered operations are skipped but the
+		// transaction is still applied with whichever deletions succeeded.
 		var err error
 		txn := cluster.Transact()
-		_ = clusHelper.DeleteProcessProfileTxn(txn, name)
-		_ = clusHelper.DeleteFileMonitorTxn(txn, name)
-		if cache != nil && cache.group != nil && cache.group.Kind == share.GroupKindContainer {
-			_ = clusHelper.DeleteDlpGroup(txn, name)
-			_ = clusHelper.DeleteWafGroup(txn, name)
+		if err = clusHelper.DeleteProcessProfileTxn(txn, name); err != nil {
+			log.WithError(err).Warn("Failed to add process profile deletion to transaction")
 		}
-		_ = clusHelper.DeleteCustomCheckConfig(txn, name)
+		if err = clusHelper.DeleteFileMonitorTxn(txn, name); err != nil {
+			log.WithError(err).Warn("Failed to add file monitor deletion to transaction")
+		}
+		if cache != nil && cache.group != nil && cache.group.Kind == share.GroupKindContainer {
+			if err = clusHelper.DeleteDlpGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to add DLP group deletion to transaction")
+			}
+			if err = clusHelper.DeleteWafGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to add WAF group deletion to transaction")
+			}
+		}
+		if err = clusHelper.DeleteCustomCheckConfig(txn, name); err != nil {
+			log.WithError(err).Warn("Failed to add custom check config deletion to transaction")
+		}
 		dispatchHelper.GroupDeleted(name, txn)
 		_, err = txn.Apply()
 		txn.Close()
@@ -633,7 +645,11 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	svc := utils.MakeServiceName(domain, name)
 	gname := makeServiceIPGroupName(svc)
 	if gCfgType == 0 {
-		if cg, _, _ := clusHelper.GetGroup(gname, access.NewAdminAccessControl()); cg != nil {
+		cg, _, err := clusHelper.GetGroup(gname, access.NewAdminAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("Failed to get service IP group")
+		}
+		if cg != nil {
 			gCfgType = cg.CfgType
 		}
 	}
@@ -673,9 +689,13 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 			txn := cluster.Transact()
 			defer txn.Close()
 
-			_ = clusHelper.PutPolicyRuleListTxn(txn, keeps)
+			if err := clusHelper.PutPolicyRuleListTxn(txn, keeps); err != nil {
+				log.WithError(err).Warn("Failed to add policy rule list update to transaction")
+			}
 			for id := range dels.Iter() {
-				_ = clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+				if err := clusHelper.DeletePolicyRuleTxn(txn, id.(uint32)); err != nil {
+					log.WithError(err).Warn("Failed to add policy rule deletion to transaction")
+				}
 			}
 			if ok, err := txn.Apply(); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("")
@@ -688,7 +708,9 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	}
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
-		_ = clusHelper.DeleteGroup(gname)
+		if err := clusHelper.DeleteGroup(gname); err != nil {
+			log.WithError(err).Warn("Failed to delete service IP group")
+		}
 	}
 }
 

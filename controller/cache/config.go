@@ -143,7 +143,10 @@ func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte)
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSControllerConfig
-		_ = json.Unmarshal(value, &cconf)
+		if err := json.Unmarshal(value, &cconf); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal controller config")
+			return
+		}
 
 		cacheMutexLock()
 		if cache, ok := ctrlCacheMap[id]; ok {
@@ -218,7 +221,9 @@ func uniconfControllerDelete(id string, param interface{}) {
 		return
 	}
 	key := share.CLUSUniconfControllerKey(id, id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete controller uniconfig key")
+	}
 }
 
 func getNewServicePolicyMode() (string, string) {
@@ -499,11 +504,15 @@ func encMigrateSystemConfig(valueBackup, value []byte) {
 							encMigratedConfigRestored = true
 						}
 					} else {
-						_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+						if err := cluster.Delete(share.CLUSSystemEncMigratedKey); err != nil {
+							log.WithError(err).Warn("Failed to delete encryption-migrated config backup key")
+						}
 						log.Info("encryption-migrated config backup is deleted")
 					}
 				} else {
-					_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+					if err := cluster.Delete(share.CLUSSystemEncMigratedKey); err != nil {
+						log.WithError(err).Warn("Failed to delete encryption-migrated config backup key")
+					}
 					log.WithFields(log.Fields{"err": err}).Error("failed to json unmarshal encryption-migrated config")
 				}
 			} else if err != nil {
@@ -521,7 +530,10 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	bSchedulePolicy := false
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		_ = json.Unmarshal(value, &cfg)
+		if err := json.Unmarshal(value, &cfg); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal system config")
+			return
+		}
 		log.WithFields(log.Fields{"config": cfg}).Debug()
 
 		if nType == cluster.ClusterNotifyModify {

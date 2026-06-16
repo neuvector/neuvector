@@ -534,11 +534,16 @@ func admissionConfigUpdate(nType cluster.ClusterNotifyType, key string, value []
 						if oldState := admStateCache.CtrlStates[admType]; oldState != nil {
 							if oldState.Uri != ctrlState.Uri || oldState.NvStatusUri != ctrlState.NvStatusUri {
 								var param interface{} = &resource.NvAdmSvcName
-								_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+								if err := cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param); err != nil {
+									log.WithError(err).Warn("Failed to restart webhook server")
+								}
 							}
 						}
 					}
-					_ = setAdmCtrlStateCache(admType, category, &state, ctrlState.Uri, ctrlState.NvStatusUri)
+					if err := setAdmCtrlStateCache(admType, category, &state, ctrlState.Uri, ctrlState.NvStatusUri); err != nil {
+						// Suppress log: error is already logged at Error level inside setAdmCtrlStateCache
+						log.WithError(err).Debug("setAdmCtrlStateCache failed")
+					}
 				}
 				if admStateCache.Enable && !state.Enable {
 					whRevertCount = 0
