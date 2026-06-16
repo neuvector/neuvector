@@ -17,3 +17,7 @@ func TestNeuVectorProcessProfile(t *testing.T) {
 func TestNeuVectorScannerCVEDB(t *testing.T) {
 	testEnv.Test(t, getScannerCVEDBFeature())
 }
+
+func TestNeuVectorWorkloadScan(t *testing.T) {
+	testEnv.Test(t, getScannerWorkloadScanFeature())
+}

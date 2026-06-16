@@ -86,34 +86,7 @@ func deployTestWorkload(ctx context.Context, t *testing.T, _ *envconf.Config) co
 
 func assessWorkloadInNVAPI(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
-	endpoint := getAPIEndpoint(ctx)
-	token := getNVToken(ctx)
-	httpClient := newNVHTTPClient()
-
-	require.Eventually(t, func() bool {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v2/workload", nil)
-		if err != nil {
-			return false
-		}
-		req.Header.Set("X-Auth-Token", token)
-		resp, err := httpClient.Do(req)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			return false
-		}
-		defer resp.Body.Close()
-		var list api.RESTWorkloadsDataV2
-		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-			return false
-		}
-		for _, w := range list.Workloads {
-			if w.WlBrief.Domain == workloadNamespace && w.WlBrief.ServiceGroup == workloadServiceGroup {
-				return true
-			}
-		}
-		return false
-	}, assessTimeout, retryInterval, "workload %s/%s with service_group %q not found in /v2/workload",
-		workloadNamespace, workloadDeployName, workloadServiceGroup)
-
+	findWorkloadInNVAPI(ctx, t, workloadNamespace, workloadServiceGroup, "")
 	return ctx
 }
 
