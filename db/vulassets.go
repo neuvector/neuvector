@@ -309,6 +309,9 @@ func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {
 }
 
 func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return nil, nil, err
+	}
 	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
@@ -385,6 +388,9 @@ func addAssetsToSet(assetsIDStr string, assetSet utils.Set) {
 }
 
 func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	// create a new db file using the sessionToken as filename
 	db, err := createSessionFileDb(sessionToken)
 	if err != nil {
@@ -418,6 +424,9 @@ func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
 }
 
 func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memoryDb bool) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
@@ -427,6 +436,12 @@ func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memo
 }
 
 func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
+	if requesetQuery != nil {
+		if err := vaildateQueryToken(requesetQuery.QueryToken); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	getOrderColumn := func(filters *api.VulQueryFilterViewModel) exp.OrderedExpression {
 		column := "name"
 		if filters.OrderByColumn == "name" || filters.OrderByColumn == "score" || filters.OrderByColumn == "score_v3" || filters.OrderByColumn == "published_timestamp" || filters.OrderByColumn == "feed_rating" {
@@ -655,6 +670,10 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 }
 
 func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
+
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
@@ -687,6 +706,9 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 }
 
 func CreateSessionAssetTable(sessionToken string, memoryDb bool) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle

@@ -45,7 +45,13 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// save the data to querystat table (do this before put request to Consul)
-	queryFilter.QueryToken = utils.GetRandomID(6, "") // do not change the length
+	queryFilter.QueryToken, err = db.GenQueryToken()
+	if err != nil {
+		errMsg := "failed to generate query token"
+		log.WithFields(log.Fields{"err": err}).Error(errMsg)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, errMsg)
+		return
+	}
 
 	queryFilterb, err := json.Marshal(queryFilter)
 	if err != nil {
@@ -613,7 +619,13 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a query session
-	queryFilter.QueryToken = utils.GetRandomID(6, "") // do not change the length
+	queryFilter.QueryToken, err = db.GenQueryToken()
+	if err != nil {
+		errMsg := "failed to generate query token"
+		log.WithFields(log.Fields{"err": err}).Error(errMsg)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, errMsg)
+		return
+	}
 
 	queryFilterb, _ := json.Marshal(queryFilter)
 	err = createQueryStat(login, db.QueryStateType_Asset, queryFilter.QueryToken, string(queryFilterb))

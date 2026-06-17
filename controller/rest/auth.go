@@ -1475,7 +1475,11 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extraDomainPermits access.DomainPermissions,
 	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim, error) {
 
-	id := utils.GetRandomID(idLength, "")
+	id, err := utils.GetRandomID(idLength, "")
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("failed to generate id")
+		return "", "", nil, err
+	}
 	installID, err := clusHelper.GetInstallationID()
 	if err != nil {
 		log.WithError(err).Error("failed to get installation ID")
@@ -1602,7 +1606,11 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 		return "", common.ErrObjectAccessDenied
 	}
 
-	id := utils.GetRandomID(idLength, "")
+	id, err := utils.GetRandomID(idLength, "")
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Debug()
+		return "", err
+	}
 
 	//installID, _ := clusHelper.GetInstallationID()	// no need because it's not verified for master token(multi-clusters)
 	now := time.Now()
@@ -1632,7 +1640,11 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 
 func jwtGenFedPingToken(callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) (string, error) {
 	// rsaPrivateKey being non-nil is for validating new public/private keys purpose
-	id := utils.GetRandomID(idLength, "")
+	id, err := utils.GetRandomID(idLength, "")
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Debug()
+		return "", err
+	}
 
 	//installID, _ := clusHelper.GetInstallationID()	// no need because it's not verified for master token(multi-clusters)
 	now := time.Now()

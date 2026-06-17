@@ -76,6 +76,9 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 }
 
 func GetQueryStat(token string) (*QueryStat, error) {
+	if err := vaildateQueryToken(token); err != nil {
+		return nil, err
+	}
 	dialect := goqu.Dialect("sqlite3")
 
 	columns := []interface{}{"id", "token", "create_timestamp", "login_type", "login_id", "login_name", "data1", "data2", "data3", "filedb_ready", "type"}
