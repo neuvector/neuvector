@@ -1526,7 +1526,11 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 }
 
 func configOneGroupRolesMapping(groupRoleMapping *share.GroupRoleMapping, clusGroupMappedRoles []*share.GroupRoleMapping, acc *access.AccessControl) ([]*share.GroupRoleMapping, error) {
-	newSettings := make([]*share.GroupRoleMapping, 0, len(clusGroupMappedRoles)+1)
+	capacity := len(clusGroupMappedRoles)
+	if capacity < common.MaxGroupRoleMappings {
+		capacity++
+	}
+	newSettings := make([]*share.GroupRoleMapping, 0, capacity)
 	newSettings = append(newSettings, clusGroupMappedRoles...)
 
 	foundIdx := -1

@@ -35,6 +35,9 @@ const ScanPlatformID = "platform"
 
 const DefaultCtrlLogLevel string = "info"
 
+const MaxFedManagedClusters = 1024
+const MaxGroupRoleMappings = 4096
+
 var CtrlLogLevel string = DefaultCtrlLogLevel
 
 type LocalDevice struct {

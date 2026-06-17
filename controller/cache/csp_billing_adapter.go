@@ -48,7 +48,11 @@ func (m CacheMethod) GetNvUsage(fedRole string) api.RESTNvUsage {
 		unreachable := 0
 		cspUsages := make(map[string]int)
 		fedCacheMutexRLock()
-		memberUsages := make([]*api.RESTClusterCspUsage, 0, len(fedJoinedClusterStatusCache)+1)
+		capacity := len(fedJoinedClusterStatusCache)
+		if capacity < common.MaxFedManagedClusters {
+			capacity++
+		}
+		memberUsages := make([]*api.RESTClusterCspUsage, 0, capacity)
 		for _, cached := range fedJoinedClusterStatusCache {
 			if connectedStates.Contains(cached.Status) {
 				_, memberCspType := common.GetMappedCspType(nil, &cached.CspType)
