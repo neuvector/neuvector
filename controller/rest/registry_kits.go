@@ -340,7 +340,13 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 			}
 		}
 
-		tid = utils.GetRandomID(tidLength, "")
+		tid, err = utils.GetRandomID(tidLength, "")
+		if err != nil {
+			errMsg := "failed to generate task id"
+			log.WithFields(log.Fields{"err": err}).Error(errMsg)
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, errMsg)
+			return
+		}
 
 		task = &regTestTask{tid: tid, config: &config}
 		regTestLock.Lock()

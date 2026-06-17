@@ -19,7 +19,6 @@ import (
 	"hash/fnv"
 	"io"
 	"math/big"
-	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -172,12 +171,13 @@ func GetStringUUID(s string) string {
 	return uuid.String()
 }
 
-func GetRandomID(length int, prefix string) string {
+func GetRandomID(length int, prefix string) (string, error) {
 	id := make([]byte, length)
 	if _, err := rand.Read(id); err != nil {
 		log.WithFields(log.Fields{"err": err, "prefix": prefix}).Error()
+		return "", err
 	}
-	return fmt.Sprintf("%s%s", prefix, hex.EncodeToString(id))
+	return fmt.Sprintf("%s%s", prefix, hex.EncodeToString(id)), nil
 }
 
 func HashPassword(password string) string {
@@ -1385,19 +1385,6 @@ func Dns1123NameChg(name string) string {
 		}
 	}
 	return name
-}
-
-func RandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz"
-
-	var seededRand = mathrand.New(
-		mathrand.NewSource(time.Now().UnixNano()))
-
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
 }
 
 func CompressToZipFile(source, targetFile string) error {

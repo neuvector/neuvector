@@ -27,6 +27,10 @@ import (
 type BuildWhereClauseFunc func(allowedID []string, queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 
+const (
+	queryTokenIdLen = 6 // do not change the length
+)
+
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, err := dialect.From(Table_assetvuls).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
@@ -992,6 +996,29 @@ func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages ma
 	})
 }
 
+func GenQueryToken() (string, error) {
+	queryToken, err := utils.GetRandomID(queryTokenIdLen, "") // do not change the length
+	if err != nil {
+		return "", err
+	}
+	return queryToken, nil
+}
+
+func vaildateQueryToken(queryToken string) error {
+	invalidToken := errors.New("invalid query token")
+	if len(queryToken) != queryTokenIdLen*2 {
+		return invalidToken
+	}
+	for i := 0; i < len(queryToken); i++ {
+		c := queryToken[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+			continue
+		}
+		return invalidToken
+	}
+	return nil
+}
+
 func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 	q := &AssetQueryFilter{
 		Filters: &api.AssetQueryFilterViewModel{},
@@ -1030,6 +1057,11 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 }
 
 func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter) (int, []*api.AssetCVECount, error) {
+	if queryFilter != nil {
+		if err := vaildateQueryToken(queryFilter.QueryToken); err != nil {
+			return 0, nil, err
+		}
+	}
 	dialect := goqu.Dialect("sqlite3")
 	db := dbHandle
 
@@ -1166,6 +1198,9 @@ func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAsset
 }
 
 func DupAssetSessionTableToFile(sessionToken string) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	dialect := goqu.Dialect("sqlite3")
 	sessionDb, err := createSessionFileDb(sessionToken)
 	if err != nil {
@@ -1227,7 +1262,11 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 }
 
 func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetViewV2, int, error) {
-
+	if queryFilter != nil {
+		if err := vaildateQueryToken(queryFilter.QueryToken); err != nil {
+			return nil, 0, err
+		}
+	}
 	getOrderColumn := func(queryFilter *AssetQueryFilter) []exp.OrderedExpression {
 		if queryFilter.Filters.OrderByColumn == "cvecount" {
 			if queryFilter.Filters.OrderByType == "desc" {

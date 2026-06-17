@@ -2837,8 +2837,15 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 
 	var tmpfile *os.File
 	if tmpfile, err = os.CreateTemp(importBackupDir, tempFilePrefix); err == nil {
+		tid, err := utils.GetRandomID(tidLength, "")
+		if err != nil {
+			errMsg := "failed to generate task id"
+			log.WithFields(log.Fields{"err": err}).Error(errMsg)
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailImport, errMsg)
+			return
+		}
 		importTask := share.CLUSImportTask{
-			TID:            utils.GetRandomID(tidLength, ""),
+			TID:            tid,
 			ImportType:     importType,
 			Scope:          scope,
 			CtrlerID:       localDev.Ctrler.ID,
