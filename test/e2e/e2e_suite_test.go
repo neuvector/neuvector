@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/e2e-framework/klient/conf"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
@@ -44,10 +43,6 @@ var (
 )
 
 var defaultHelmTimeout = 10 * time.Minute
-
-func useExistingCluster() bool {
-	return os.Getenv("E2E_USE_EXISTING_CLUSTER") == "true"
-}
 
 // generateAdminPassword returns a 20-character alphanumeric password using crypto/rand.
 // Alphanumeric characters only to satisfy NeuVector's password character restrictions.
@@ -169,30 +164,24 @@ func TestMain(m *testing.M) {
 		},
 	}
 
-	if useExistingCluster() {
-		path := conf.ResolveKubeConfigFile()
-		cfg := envconf.NewWithKubeConfig(path)
-		testEnv = env.NewWithConfig(cfg)
-	} else {
-		cfg, err := envconf.NewFromFlags()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to process e2e config: %v\n", err)
-			os.Exit(1)
-		}
-		testEnv = env.NewWithConfig(cfg)
-		kindClusterName := envconf.RandomName(nvE2EPrefix, 32)
-
-		commonSetupFuncs = append([]env.Func{
-			envfuncs.CreateCluster(kind.NewProvider(), kindClusterName),
-			envfuncs.LoadImageToCluster(kindClusterName, controllerImage, "--verbose", "--mode", "direct"),
-			envfuncs.LoadImageToCluster(kindClusterName, enforcerImage, "--verbose", "--mode", "direct"),
-		}, commonSetupFuncs...)
-
-		commonFinishFuncs = append([]env.Func{
-			envfuncs.ExportClusterLogs(kindClusterName, "./logs"),
-		}, commonFinishFuncs...)
-		commonFinishFuncs = append(commonFinishFuncs, envfuncs.DestroyCluster(kindClusterName))
+	cfg, err := envconf.NewFromFlags()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to process e2e config: %v\n", err)
+		os.Exit(1)
 	}
+	testEnv = env.NewWithConfig(cfg)
+	kindClusterName := envconf.RandomName(nvE2EPrefix, 32)
+
+	commonSetupFuncs = append([]env.Func{
+		envfuncs.CreateCluster(kind.NewProvider(), kindClusterName),
+		envfuncs.LoadImageToCluster(kindClusterName, controllerImage, "--verbose", "--mode", "direct"),
+		envfuncs.LoadImageToCluster(kindClusterName, enforcerImage, "--verbose", "--mode", "direct"),
+	}, commonSetupFuncs...)
+
+	commonFinishFuncs = append([]env.Func{
+		envfuncs.ExportClusterLogs(kindClusterName, "./logs"),
+	}, commonFinishFuncs...)
+	commonFinishFuncs = append(commonFinishFuncs, envfuncs.DestroyCluster(kindClusterName))
 
 	testEnv.Setup(commonSetupFuncs...)
 	testEnv.Finish(commonFinishFuncs...)
