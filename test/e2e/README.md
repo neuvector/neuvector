@@ -29,7 +29,6 @@ This will:
 
 | Variable | Default (Makefile) | Description |
 |----------|--------------------|-------------|
-| `E2E_USE_EXISTING_CLUSTER` | _(unset)_ | Not supported right now |
 | `E2E_NO_REBUILD` | _(unset)_ | Set to any non-empty value to skip rebuilding Docker images before the test run |
 
 ### Skip image rebuild
