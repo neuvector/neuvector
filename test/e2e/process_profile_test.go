@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	api "github.com/neuvector/neuvector/controller/api"
+	"github.com/neuvector/neuvector/share"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +25,8 @@ const (
 	workloadDeployName = "nginx"
 	// NeuVector forms service groups as "nv.<app-label>.<namespace>"
 	workloadServiceGroup = "nv." + workloadDeployName + "." + workloadNamespace
+	// /v1/service and /v1/service/config expect the name without the "nv." prefix
+	workloadServiceName = workloadDeployName + "." + workloadNamespace
 
 	retryInterval = 10 * time.Second
 )
@@ -37,6 +41,15 @@ func getProcessProfileFeature() types.Feature {
 		Assess("workload is visible in NeuVector API with correct service group", assessWorkloadInNVAPI).
 		Assess("group is learned with nginx container member", assessGroupLearnedWithMember).
 		Assess("process profile contains nginx entry", assessProcessProfileHasNginx).
+		Assess("service exists in Discover mode",
+			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeLearn})).
+		Assess("PATCH service ProfileMode to Monitor",
+			assessPatchServiceConfig(serviceBatchPatch{
+				Services:    []string{workloadServiceName},
+				ProfileMode: share.PolicyModeEvaluate,
+			})).
+		Assess("service ProfileMode is now Monitor",
+			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
@@ -195,3 +208,105 @@ func assessProcessProfileHasNginx(ctx context.Context, t *testing.T, _ *envconf.
 
 	return ctx
 }
+
+// serviceStateExpectation holds the service fields to assert on GET /v1/service/:name.
+// Any field left as "" is skipped during the check.
+type serviceStateExpectation struct {
+	ProfileMode     string
+	PolicyMode      string
+	BaselineProfile string
+}
+
+// assessServiceHasState returns an assess function that polls GET /v1/service/{serviceName}
+// until all non-empty fields in want match the response. Reusable for any service name and
+// any combination of ProfileMode, PolicyMode, and BaselineProfile.
+func assessServiceHasState(serviceName string, want serviceStateExpectation) func(context.Context, *testing.T, *envconf.Config) context.Context {
+	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+		t.Helper()
+		endpoint := getAPIEndpoint(ctx)
+		token := getNVToken(ctx)
+		httpClient := newNVHTTPClient()
+
+		require.Eventually(t, func() bool {
+			url := fmt.Sprintf("%s/v1/service/%s", endpoint, serviceName)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			if err != nil {
+				return false
+			}
+			req.Header.Set("X-Auth-Token", token)
+			resp, err := httpClient.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				return false
+			}
+			defer resp.Body.Close()
+			var data api.RESTServiceData
+			if err := json.NewDecoder(resp.Body).Decode(&data); err != nil || data.Service == nil {
+				return false
+			}
+			svc := data.Service
+			if want.ProfileMode != "" && svc.ProfileMode != want.ProfileMode {
+				return false
+			}
+			if want.PolicyMode != "" && svc.PolicyMode != want.PolicyMode {
+				return false
+			}
+			if want.BaselineProfile != "" && svc.BaselineProfile != want.BaselineProfile {
+				return false
+			}
+			return true
+		}, assessTimeout, retryInterval,
+			"service %q did not reach expected state %+v within %s",
+			serviceName, want, assessTimeout)
+
+		return ctx
+	}
+}
+
+// serviceBatchPatch holds the fields to update via PATCH /v1/service/config.
+// Any field left as "" is omitted from the request body (sent as nil pointer).
+type serviceBatchPatch struct {
+	Services        []string
+	PolicyMode      string
+	ProfileMode     string
+	BaselineProfile string
+}
+
+// assessPatchServiceConfig returns an assess function that sends a single PATCH /v1/service/config
+// request and asserts HTTP 200. Reusable for any combination of services and mode fields.
+func assessPatchServiceConfig(patch serviceBatchPatch) func(context.Context, *testing.T, *envconf.Config) context.Context {
+	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+		t.Helper()
+		endpoint := getAPIEndpoint(ctx)
+		token := getNVToken(ctx)
+		httpClient := newNVHTTPClient()
+
+		cfg := &api.RESTServiceBatchConfig{Services: patch.Services}
+		if patch.PolicyMode != "" {
+			cfg.PolicyMode = &patch.PolicyMode
+		}
+		if patch.ProfileMode != "" {
+			cfg.ProfileMode = &patch.ProfileMode
+		}
+		if patch.BaselineProfile != "" {
+			cfg.BaselineProfile = &patch.BaselineProfile
+		}
+
+		body, err := json.Marshal(api.RESTServiceBatchConfigData{Config: cfg})
+		require.NoError(t, err)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPatch,
+			endpoint+"/v1/service/config", bytes.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("X-Auth-Token", token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode,
+			"PATCH /v1/service/config for services %v failed", patch.Services)
+
+		return ctx
+	}
+}
+
