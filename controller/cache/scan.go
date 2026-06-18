@@ -1330,7 +1330,7 @@ func ScanUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte
 	}
 }
 
-func scanLicenseUpdate(id string, param interface{}) {
+func initScanMap() {
 
 	// Cache lock must be within scan lock, so get the map first
 	wls := make(map[string]struct{ a, d string }, len(wlCacheMap))

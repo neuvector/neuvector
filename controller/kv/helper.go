@@ -244,7 +244,6 @@ type ClusterHelper interface {
 	UpdateFedRulesRevision(ruleTypes []string) bool
 	PutFedRulesRevision(txn *cluster.ClusterTransact, settings *share.CLUSFedRulesRevision) error
 	FedTriggerInstantPingPoll(cmd, fullPolling uint32)
-	EnableDisableJointClusters(ids []string, toDisable bool, fedKeyLocked bool)
 	ConfigFedRole(userName, role string, acc *access.AccessControl) error
 	GetFedSettings() share.CLUSFedSettings
 	PutFedSettings(txn *cluster.ClusterTransact, cfg share.CLUSFedSettings) error
@@ -2999,42 +2998,6 @@ func (m clusterHelper) FedTriggerInstantPingPoll(cmd, fullPolling uint32) {
 	key := share.CLUSFedKey(share.CLUSFedToPingPollSubKey)
 	value, _ = json.Marshal(&p)
 	_ = cluster.Put(key, value)
-}
-
-// caller may/not own share.CLUSLockFedKey lock
-func (m clusterHelper) EnableDisableJointClusters(ids []string, toDisable bool, fedKeyLocked bool) {
-	if ids == nil {
-		list := m.GetFedJointClusterList()
-		ids = list.IDs
-	}
-	if len(ids) == 0 {
-		return
-	}
-
-	if !fedKeyLocked {
-		lock, err := m.AcquireLock(share.CLUSLockFedKey, clusterLockWait)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("Failed to acquire cluster lock")
-			return
-		}
-		defer m.ReleaseLock(lock)
-	}
-
-	data := share.CLUSFedClusterStatus{}
-	if toDisable {
-		data.Status = 207 // _fedLicenseDisallowed
-	} else {
-		data.Status = 208 // _fedClusterPinging
-	}
-	for _, id := range ids {
-		c := m.GetFedJointCluster(id)
-		if c.ID == id && c.Disabled != toDisable {
-			c.Disabled = toDisable
-			if err := m.PutFedJointCluster(c); err == nil {
-				_ = clusHelper.PutFedJointClusterStatus(id, &data)
-			}
-		}
-	}
 }
 
 func (m clusterHelper) ConfigFedRole(userName, role string, acc *access.AccessControl) error {

@@ -90,11 +90,6 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	body, _ := io.ReadAll(r.Body)
 
 	var sconf api.RESTScanConfigData
@@ -155,11 +150,6 @@ func handlerScanWorkloadReq(w http.ResponseWriter, r *http.Request, ps httproute
 
 	id := ps.ByName("id")
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	if err := cacher.ScanWorkload(id, acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -182,11 +172,6 @@ func handlerScanHostReq(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	id := ps.ByName("id")
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	if err := cacher.ScanHost(id, acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -204,11 +189,6 @@ func handlerScanPlatformReq(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	} else if !acc.HasRequiredPermissions() {
 		restRespAccessDenied(w, login)
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 
@@ -1181,11 +1161,6 @@ func handlerScanCacheStat(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	id := ps.ByName("id")
 	if res, err := rpc.ScanCacheGetStat(id); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
@@ -1206,11 +1181,6 @@ func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 

@@ -57,7 +57,6 @@ const (
 	CFGEndpointServer               = "server"
 	CFGEndpointGroup                = "group"
 	CFGEndpointPolicy               = "policy"
-	CFGEndpointLicense              = "license"
 	CFGEndpointResponseRule         = "response_rule"
 	CFGEndpointProcessProfile       = "process_profile"
 	CFGEndpointRegistry             = "registry"
@@ -90,7 +89,6 @@ const CLUSConfigUserStore string = CLUSConfigStore + CFGEndpointUser + "/"
 const CLUSConfigServerStore string = CLUSConfigStore + CFGEndpointServer + "/"
 const CLUSConfigGroupStore string = CLUSConfigStore + CFGEndpointGroup + "/"
 const CLUSConfigPolicyStore string = CLUSConfigStore + CFGEndpointPolicy + "/"
-const CLUSConfigLicenseKey string = CLUSConfigStore + CFGEndpointLicense
 const CLUSConfigResponseRuleStore string = CLUSConfigStore + CFGEndpointResponseRule + "/"
 const CLUSConfigProcessProfileStore string = CLUSConfigStore + CFGEndpointProcessProfile + "/"
 const CLUSConfigRegistryStore string = CLUSConfigStore + CFGEndpointRegistry + "/"
@@ -132,7 +130,6 @@ const CLUSAuditLogStore string = CLUSObjectStore + "auditlog/"
 const CLUSCloudStore string = CLUSObjectStore + "cloud/"
 const CLUSCrdProcStore string = "crdcontent/"
 const CLUSCertStore string = CLUSObjectStore + "cert/"
-const CLUSLicenseStore string = CLUSObjectStore + "license/"
 const CLUSTelemetryStore string = CLUSObjectStore + "telemetry/"
 const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 
@@ -1551,7 +1548,6 @@ type CLUSEventLog struct {
 	RESTRequest    string                   `json:"rest_request,omitempty"`
 	RESTBody       string                   `json:"rest_body,omitempty"`
 	EnforcerLimit  int                      `json:"enforcer_limit,omitempty"`
-	LicenseExpire  time.Time                `json:"license_expire,omitempty"`
 	GroupName      string                   `json:"group_name"`
 	Msg            string                   `json:"message"`
 }

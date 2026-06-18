@@ -1,7 +1,6 @@
 package common
 
 import (
-	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 )
 
@@ -20,8 +19,4 @@ func OEMIgnoreWorkload(wl *share.CLUSWorkload) bool {
 
 func OEMIgnoreImageRepo(img *share.CLUSImage) bool {
 	return false
-}
-
-func OEMLicenseValidate(info *api.RESTLicenseInfo) bool {
-	return true
 }

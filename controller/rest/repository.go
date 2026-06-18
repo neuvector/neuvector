@@ -193,11 +193,6 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	body, _ := io.ReadAll(r.Body)
 
 	var data api.RESTScanRepoReqData
@@ -292,11 +287,6 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 		return
 	} else if !acc.Authorize(&share.CLUSCIScanDummy{}, nil) {
 		restRespAccessDenied(w, login)
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 

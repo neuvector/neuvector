@@ -98,8 +98,6 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 	{name: share.CFGEndpointApikey, key: share.CLUSConfigApikeyStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockApikeyKey},
 
-	{name: share.CFGEndpointLicense, key: share.CLUSConfigLicenseKey, isStore: false,
-		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 	{name: share.CFGEndpointEULA, key: share.CLUSConfigEULAKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 

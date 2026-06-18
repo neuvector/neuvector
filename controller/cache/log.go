@@ -1491,9 +1491,6 @@ func eventLog2API(ev *share.CLUSEventLog) *api.Event {
 	rlog.RESTMethod = ev.RESTMethod
 	rlog.RESTRequest = ev.RESTRequest
 	rlog.RESTBody = ev.RESTBody
-	if !ev.LicenseExpire.IsZero() {
-		rlog.LicenseExpire = ev.LicenseExpire.Format("2006-01-02")
-	}
 	rlog.EnforcerLimit = ev.EnforcerLimit
 	if ev.Msg != "" {
 		rlog.Msg = ev.Msg

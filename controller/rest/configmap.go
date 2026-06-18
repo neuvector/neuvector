@@ -890,7 +890,7 @@ func LoadInitCfg(load bool, platform string) bool {
 	var loaded, failed []string
 	var defAdminLoaded bool
 	var skip bool
-	// After that if configmap have license it will overwrite the consol and eventually write back to .lc
+
 	type configMap struct {
 		FileName    string
 		Type        string

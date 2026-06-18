@@ -118,10 +118,6 @@ func (m *mockCache) Policy2CLUS(rule *api.RESTPolicyRule) *share.CLUSPolicyRule 
 	return &c
 }
 
-func (m *mockCache) GetCurrentLicense(acc *access.AccessControl) api.RESTLicenseInfo {
-	return api.RESTLicenseInfo{}
-}
-
 func (m *mockCache) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemConfig {
 	return &m.systemConfig
 }
