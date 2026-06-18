@@ -1350,10 +1350,6 @@ func pingJointCluster(tag, urlStr string, jointCluster share.CLUSFedJointCluster
 }
 
 func pingJointClusters() bool {
-	if !licenseAllowFed(1) {
-		return true
-	}
-
 	acc := access.NewReaderAccessControl()
 	doPing := atomic.CompareAndSwapUint32(&_fedPingOngoing, 0, 1)
 	if doPing {
@@ -2662,10 +2658,6 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
 
-	if !licenseAllowFed(1) {
-		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
-		return
-	}
 	acc, login := isFedOpAllowed(api.FedRoleMaster, _fedAdminRequired, w, r)
 	if acc == nil || login == nil {
 		return
@@ -2718,9 +2710,6 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 				deploy++
 				// make sure share.CLUSLockFedKey is not locked because talkToJointCluster may lock it !
 				go talkToJointCluster(&jointCluster, http.MethodPost, "v1/fed/command_internal", id, _tagFedSyncPolicy, bodyTo, ch, acc, login, nil)
-			} else if jointCluster.Disabled && len(ids) == 1 {
-				restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
-				return
 			}
 		}
 		oneSuccess := false
@@ -3041,13 +3030,6 @@ func pollFedRules(forcePulling bool, tryTimes int) bool {
 			switch statusCode {
 			case http.StatusGone:
 				updateClusterState(jointCluster.ID, "", _fedClusterKicked, nil, accReadAll)
-			case http.StatusNotFound:
-				var restErr api.RESTError
-				if json.Unmarshal(respData, &restErr) == nil {
-					if restErr.Code == api.RESTErrLicenseFail {
-						updateClusterState(jointCluster.ID, "", _fedLicenseDisallowed, nil, accReadAll)
-					}
-				}
 			}
 		}
 		updateClusterState(masterCluster.ID, masterCluster.ID, status, nil, accReadAll)
@@ -3286,9 +3268,6 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 		}
 		restRespError(w, statusCode, api.RESTErrInvalidRequest)
 		return
-	} else if jointCluster.Disabled {
-		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
-		return
 	}
 	if err = jwtValidateFedJoinTicket(req.JointTicket, jointCluster.Secret); err != nil {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed, err.Error())
@@ -3374,9 +3353,6 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 				statusCode = http.StatusGone
 			}
 			restRespError(w, statusCode, api.RESTErrInvalidRequest)
-			return
-		} else if jointCluster.Disabled {
-			restRespError(w, http.StatusNotFound, api.RESTErrInvalidRequest)
 			return
 		} else {
 			if err = jwtValidateFedJoinTicket(jointTicket, jointCluster.Secret); err != nil {
@@ -3530,9 +3506,6 @@ func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 		restRespError(w, statusCode, api.RESTErrInvalidRequest)
 		return
-	} else if jointCluster.Disabled {
-		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
-		return
 	}
 	if err = jwtValidateFedJoinTicket(req.JointTicket, jointCluster.Secret); err != nil {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrFedOperationFailed, err.Error())
@@ -3588,10 +3561,6 @@ var forbiddenFwUrlRegex []tForbiddenFwUrlInfo = []tForbiddenFwUrlInfo{
 }
 
 func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprouter.Params, method string) {
-	if !licenseAllowFed(1) {
-		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
-		return
-	}
 	accCaller, login := isFedOpAllowed(api.FedRoleMaster, _fedReaderRequired, w, r) // reject non-FedAdmin/FedReader & non-PERM_FED login
 	if accCaller == nil || login == nil {
 		return
@@ -3709,9 +3678,6 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 	rc := cacher.GetFedJoinedCluster(id, acc)
 	if rc.ID == "" {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteUnauthorized, "Unable to authenticate with the cluster")
-		return
-	} else if rc.Disabled {
-		restRespError(w, http.StatusNotFound, api.RESTErrLicenseFail)
 		return
 	}
 	body, _ := io.ReadAll(r.Body)

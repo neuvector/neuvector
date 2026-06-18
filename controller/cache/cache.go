@@ -2297,9 +2297,9 @@ func Init(ctx *Context, leader bool, leadAddr, restoredFedRole string) CacheInte
 
 	crdInit()
 	fedInit(restoredFedRole)
-	// Keep license update at last. Data structure preparation should be done before this point,
-	// license update will update the limit and could trigger actions
-	licenseInit()
+	// Keep initScanMap() at last. Data structure preparation should be done before this point,
+	// initScanMap will update the limit and could trigger actions
+	initScanMap()
 	ruleid.SetGetGroupWithoutLockFunc(getGroupWithoutLock)
 	if err := clusHelper.SetCtrlState(share.CLUSCtrlNodeAdmissionKey); err != nil {
 		log.WithFields(log.Fields{"err": err}).Warn("failed to set controller admission state")

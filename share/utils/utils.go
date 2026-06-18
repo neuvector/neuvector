@@ -1022,10 +1022,6 @@ func getPasswordSymKey() []byte {
 	return passwordSymKey
 }
 
-func GetLicenseInfo(license string) (string, error) { // returns license json string
-	return "", nil
-}
-
 func DecryptPassword(encrypted string) string {
 	if encrypted == "" {
 		return ""

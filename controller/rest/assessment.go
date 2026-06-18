@@ -32,9 +32,6 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	acc, login := getAccessControl(w, r, access.AccessOPRead)
 	if acc == nil {
 		return
-	} else if !licenseAllowEnforce() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
 	} else if _, err := cacher.GetAdmissionState(acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return

@@ -238,11 +238,6 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	var data api.RESTRegistryConfigData
 	body, _ := io.ReadAll(r.Body)
 
@@ -582,11 +577,6 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 
@@ -1092,11 +1082,6 @@ func handlerRegistryStart(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	name := ps.ByName("name")
 
 	// To start scanning on a registry, the caller only needs reg_scan:w permission on one of the registry's domains
@@ -1133,11 +1118,6 @@ func handlerRegistryStop(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	name := ps.ByName("name")
 
 	// To stop scanning on a registry, the caller only needs reg_scan:w permission on one of the registry's domains
@@ -1171,11 +1151,6 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 

@@ -474,13 +474,6 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
 	}
-	if state.Mode != nil && *state.Mode == share.AdmCtrlModeProtect {
-		if !licenseAllowEnforce() {
-			e := "The policy mode is not enabled in the license"
-			log.WithFields(log.Fields{"mode": *state.Mode}).Error(e)
-			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrLicenseFail, e)
-		}
-	}
 
 	if !*currState.Enable && (state.Enable == nil || !*state.Enable) && (state.Mode != nil || state.DefaultAction != nil || state.AdmClientMode != nil || state.FailurePolicy != nil) {
 		restRespError(w, http.StatusBadRequest, api.RESTErrWebhookIsDisabled)

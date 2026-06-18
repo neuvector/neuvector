@@ -227,11 +227,6 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	var data api.RESTRegistryTestData
 	body, _ := io.ReadAll(r.Body)
 	var err error
@@ -391,11 +386,6 @@ func handlerRegistryTestCancel(w http.ResponseWriter, r *http.Request, ps httpro
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 

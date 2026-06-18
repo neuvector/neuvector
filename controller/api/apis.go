@@ -2689,46 +2689,6 @@ type RESTScanPkgReportData struct {
 	Report *RESTScanPkgReport `json:"report"`
 }
 
-const LicenseIDTypeHost string = "host"
-
-type RESTLicenseRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
-}
-
-type RESTLicenseRequestData struct {
-	Request *RESTLicenseRequest `json:"license_request"`
-}
-
-type RESTLicenseInfo struct {
-	Name           string `json:"name"`
-	Email          string `json:"email"`
-	Phone          string `json:"phone"`
-	ID             string `json:"id,omitempty"`
-	IDType         string `json:"id_type,omitempty"`
-	InstallationID string `json:"installation_id"` // nv installation id
-}
-
-type RESTLicenseShow struct {
-	Info *RESTLicenseInfo `json:"info"`
-}
-
-type RESTLicenseShowData struct {
-	License *RESTLicenseShow `json:"license"`
-}
-
-type RESTLicenseKey struct {
-	LicenseKey string `json:"license_key,cloak"`
-}
-type RESTLicenseKeyCfgMap struct {
-	RESTLicenseKey
-	AlwaysReload bool `json:"always_reload"`
-}
-type RESTLicenseCode struct {
-	LicenseCode string `json:"license_code"`
-}
-
 type RESTSnifferArgs struct {
 	FileNumber *uint32 `json:"file_number,omitempty"`
 	Duration   *uint32 `json:"duration,omitempty"`
