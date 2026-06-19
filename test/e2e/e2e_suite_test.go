@@ -108,18 +108,11 @@ var (
 
 var defaultHelmTimeout = 10 * time.Minute
 
-// generateAdminPassword returns a 20-character alphanumeric password using crypto/rand.
-// Alphanumeric characters only to satisfy NeuVector's password character restrictions.
+// generateAdminPassword returns a cryptographically random password.
+// rand.Text() uses the base32 alphabet (A-Z, 2-7), so "Aa1" is appended to
+// guarantee NeuVector's default profile (MinUpperCount=1, MinLowerCount=1, MinDigitCount=1).
 func generateAdminPassword() string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, 20)
-	if _, err := rand.Read(b); err != nil {
-		panic(fmt.Sprintf("generate admin password: %v", err))
-	}
-	for i, c := range b {
-		b[i] = chars[c%byte(len(chars))]
-	}
-	return string(b)
+	return rand.Text() + "Aa1"
 }
 
 // writeValuesFile writes a temporary Helm values override file (mode 0600) that:
