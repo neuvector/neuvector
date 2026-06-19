@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -12,6 +13,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -98,6 +102,51 @@ func assessScannerDeployment(ctx context.Context, t *testing.T, _ *envconf.Confi
 	)
 	require.NoError(t, err, "scanner deployment not available")
 	return ctx
+}
+
+// tryExecCommandInPod is like execCommandInPod but does not fail the test when
+// the command exits with a non-zero status or is blocked by the container
+// runtime (e.g. NeuVector FA enforcement in Protect mode). Errors are logged.
+func tryExecCommandInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, command []string) {
+	t.Helper()
+	restConfig := getK8sClient(ctx).RESTConfig()
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	require.NoError(t, err, "build kubernetes clientset")
+
+	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	require.NoError(t, err, "list pods in %s with selector %s", namespace, labelSelector)
+
+	var target *corev1.Pod
+	for i := range pods.Items {
+		if pods.Items[i].Status.Phase == corev1.PodRunning {
+			target = &pods.Items[i]
+			break
+		}
+	}
+	require.NotNil(t, target, "no running pod in %s matching %s", namespace, labelSelector)
+
+	req := clientset.CoreV1().RESTClient().Post().
+		Resource("pods").Name(target.Name).Namespace(namespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: containerName,
+			Command:   command,
+			Stdout:    true,
+			Stderr:    true,
+		}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(restConfig, http.MethodPost, req.URL())
+	require.NoError(t, err, "create SPDY executor for pod exec")
+
+	if err := executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: io.Discard,
+		Stderr: io.Discard,
+	}); err != nil {
+		t.Logf("exec %v in pod %s/%s exited with error (may be expected if blocked): %v",
+			command, namespace, target.Name, err)
+	}
 }
 
 // findWorkloadInNVAPI polls /v2/workload until a workload matching namespace and

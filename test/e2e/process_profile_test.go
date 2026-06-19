@@ -50,6 +50,8 @@ func getProcessProfileFeature() types.Feature {
 			})).
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
+		Assess("exec unapproved bash in nginx pod", execBashInNginxPod).
+		Assess("security event reports bash as incident", assessSecurityEventHasBashIncident).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
@@ -162,6 +164,56 @@ func assessGroupLearnedWithMember(ctx context.Context, t *testing.T, _ *envconf.
 	}, assessTimeout, retryInterval,
 		"group %q with member display_name=%q not found in /v1/group",
 		workloadServiceGroup, workloadDeployName)
+
+	return ctx
+}
+
+func execBashInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+	// In Monitor mode NeuVector allows the process to run but generates an alert
+	// incident. Tolerate a non-zero exit in case the container lacks bash or
+	// the runtime returns an error for any other reason.
+	tryExecCommandInPod(ctx, t,
+		workloadNamespace,
+		"app="+workloadDeployName,
+		"nginx",
+		[]string{"/usr/bin/bash", "-c", "sleep 5"},
+	)
+	return ctx
+}
+
+func assessSecurityEventHasBashIncident(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+	endpoint := getAPIEndpoint(ctx)
+	token := getNVToken(ctx)
+	httpClient := newNVHTTPClient()
+
+	const bashPath = "/usr/bin/bash"
+
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
+		if err != nil {
+			return false
+		}
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			return false
+		}
+		defer resp.Body.Close()
+		var data api.RESTSecurityData
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return false
+		}
+		for _, incident := range data.Incidents {
+			if incident.ProcPath == bashPath && incident.WorkloadService == workloadServiceName {
+				return true
+			}
+		}
+		return false
+	}, assessTimeout, retryInterval,
+		"security incident with proc_path=%q and workload_service=%q not found in /v1/log/security",
+		bashPath, workloadServiceName)
 
 	return ctx
 }
@@ -309,4 +361,3 @@ func assessPatchServiceConfig(patch serviceBatchPatch) func(context.Context, *te
 		return ctx
 	}
 }
-
