@@ -418,7 +418,11 @@ func (c *configHelper) Restore(host share.CLUSHost, ctrler share.CLUSController)
 		return "", false, false, "", nil
 	} else {
 		kvRestore := share.CLUSKvRestore{StartAt: time.Now(), CtrlerID: c.id}
-		kvRestoreValue, _ := json.Marshal(&kvRestore)
+		kvRestoreValue, err := json.Marshal(&kvRestore)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal KV restore value")
+			return "", false, false, "", nil
+		}
 		if lock, err := clusHelper.AcquireLock(share.CLUSLockRestoreKey, time.Duration(time.Second)); err == nil {
 			skipRestore := false
 			ver := GetControlVersion()
@@ -599,14 +603,18 @@ func (c *configHelper) Export(w *bufio.Writer, sections utils.Set) error {
 		}
 	}
 
-	value, _ := json.Marshal(header)
+	value, err := json.Marshal(header)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal export header")
+		return ErrIOWrite
+	}
 	line := fmt.Sprintf("%s\n", value)
-	if _, err := w.WriteString(line); err != nil {
+	if _, err = w.WriteString(line); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to write header")
 		return ErrIOWrite
 	}
 
-	err := c.foreachWithLock(cfgEndpoints, func(ep *cfgEndpoint, txn *cluster.ClusterTransact) error { // txn is not used for export
+	err = c.foreachWithLock(cfgEndpoints, func(ep *cfgEndpoint, txn *cluster.ClusterTransact) error { // txn is not used for export
 		if sections.Contains(ep.section) {
 			if err := ep.write(w, fedRole); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Failed to write key/value")
@@ -654,7 +662,9 @@ func (c *configHelper) Import(rpcEps []*common.RPCEndpoint, localCtrlerID, local
 		}
 		for _, rpcEp := range rpcEps {
 			if rpcEp.ClusterIP != localCtrlerIP {
-				_ = pauseResumeStoreWatcher(rpcEp.ClusterIP, rpcEp.RPCServerPort, watcherInfo)
+				if err := pauseResumeStoreWatcher(rpcEp.ClusterIP, rpcEp.RPCServerPort, watcherInfo); err != nil {
+					log.WithError(err).Warn("Failed to resume store watcher on remote controller")
+				}
 			}
 		}
 	}
@@ -742,7 +752,9 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 	}
 	for _, rpcEp := range rpcEps {
 		if rpcEp.ClusterIP != localCtrlerIP {
-			_ = pauseResumeStoreWatcher(rpcEp.ClusterIP, rpcEp.RPCServerPort, watcherInfo)
+			if err := pauseResumeStoreWatcher(rpcEp.ClusterIP, rpcEp.RPCServerPort, watcherInfo); err != nil {
+				log.WithError(err).Warn("Failed to pause store watcher on remote controller")
+			}
 		}
 	}
 
@@ -824,8 +836,12 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 				case share.CLUSFedMembershipSubKey:
 					if ignoreFed {
 						var m share.CLUSFedMembership
-						b, _ := json.Marshal(m)
-						value = string(b)
+						b, err := json.Marshal(m)
+						if err != nil {
+							log.WithError(err).Warn("Failed to marshal empty fed membership")
+						} else {
+							value = string(b)
+						}
 					}
 					var m share.CLUSFedMembership
 					var dec common.DecryptUnmarshaller

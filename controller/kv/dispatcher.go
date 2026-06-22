@@ -365,7 +365,9 @@ func (dpt *kvDispatcher) NodeLeave(node string, bLeader bool) {
 
 	if bLeader {
 		// delete the kv tree under the node
-		_ = cluster.DeleteTree(share.CLUSNodeProfileStoreKey(node))
+		if err := cluster.DeleteTree(share.CLUSNodeProfileStoreKey(node)); err != nil {
+			log.WithError(err).Warn("Failed to delete node profile store")
+		}
 	}
 }
 

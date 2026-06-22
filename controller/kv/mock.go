@@ -3,6 +3,7 @@ package kv
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -223,8 +224,13 @@ func (m *MockCluster) GetUserRev(fullname string, acc *access.AccessControl) (*s
 	if user, ok := m.usersCluster[fullname]; ok {
 		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
 		var clone share.CLUSUser
-		value, _ := json.Marshal(user)
-		_ = json.Unmarshal(value, &clone)
+		value, err := json.Marshal(user)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal user: %w", err)
+		}
+		if err = json.Unmarshal(value, &clone); err != nil {
+			return nil, 0, fmt.Errorf("failed to unmarshal user: %w", err)
+		}
 		if !acc.Authorize(&clone, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
 		}
@@ -659,8 +665,13 @@ func (m *MockCluster) GetApikeyRev(fullname string, acc *access.AccessControl) (
 	if user, ok := m.apikeysCluster[fullname]; ok {
 		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
 		var clone share.CLUSApikey
-		value, _ := json.Marshal(user)
-		_ = json.Unmarshal(value, &clone)
+		value, err := json.Marshal(user)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal apikey: %w", err)
+		}
+		if err = json.Unmarshal(value, &clone); err != nil {
+			return nil, 0, fmt.Errorf("failed to unmarshal apikey: %w", err)
+		}
 		if !acc.Authorize(&clone, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
 		}
