@@ -4,14 +4,8 @@ name: Bump Neuvector chart version
 pipelineid: "nv-chart-version"
 
 sources:
-  appVersion:
-    name: "Get latest neuvector chart app version"
-    kind: yaml
-    spec:
-      file: https://raw.githubusercontent.com/neuvector/neuvector-helm/release/v2.10/charts/core/Chart.yaml
-      key: $.appVersion
   chartVersion:
-    name: "Get latest neuvector chart app version"
+    name: "Get latest neuvector chart version"
     kind: yaml
     spec:
       file: https://raw.githubusercontent.com/neuvector/neuvector-helm/release/v2.10/charts/core/Chart.yaml
@@ -27,15 +21,6 @@ targets:
       file: Makefile
       matchpattern: 'NV_CHART_VERSION \?= .*'
       replacepattern: 'NV_CHART_VERSION ?= {{ source "chartVersion" }}'
-  appVersion:
-    scmid: default
-    name: Update App Version to {{ source "appVersion" }}
-    kind: file
-    sourceid: appVersion
-    spec:
-      file: Makefile
-      matchpattern: 'NV_APP_VERSION \?= .*'
-      replacepattern: 'NV_APP_VERSION ?= {{ source "appVersion" }}'
 
 actions:
   default:

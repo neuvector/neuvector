@@ -242,14 +242,11 @@ push-enforcer-image: buildx-machine
 test:
 	go test $$(go list ./... | grep -v /e2e )
 
-NV_CHART_VERSION ?= 2.10.2
-NV_APP_VERSION ?= 5.5.2
+NV_CHART_VERSION ?= 2.10.3
 
 .PHONY: test-e2e
 test-e2e:
 ifeq ($(E2E_NO_REBUILD),)
 	TAG=latest $(MAKE) build-controller-image build-enforcer-image
-	docker tag neuvector/controller:latest neuvector/controller:$(NV_APP_VERSION)
-	docker tag neuvector/enforcer:latest neuvector/enforcer:$(NV_APP_VERSION)
 endif
-	NV_CHART_VERSION=${NV_CHART_VERSION} NV_APP_VERSION=${NV_APP_VERSION} go test -C test/e2e -v -timeout 30m .
+	NV_CHART_VERSION=${NV_CHART_VERSION} go test -C test/e2e -v -timeout 30m .

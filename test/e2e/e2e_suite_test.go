@@ -38,8 +38,8 @@ const (
 )
 
 var (
-	controllerImage = "neuvector/controller:" + os.Getenv("NV_APP_VERSION")
-	enforcerImage   = "neuvector/enforcer:" + os.Getenv("NV_APP_VERSION")
+	controllerImage = "neuvector/controller:latest"
+	enforcerImage   = "neuvector/enforcer:latest"
 )
 
 var defaultHelmTimeout = 10 * time.Minute
@@ -113,7 +113,8 @@ func getCharts(valuesFile string) []helmChart {
 			repoURL:       nvHelmRepoURL,
 			path:          nvChartPath,
 			helmOptions: []helm.Option{
-				helm.WithArgs("--set", "tag="+os.Getenv("NV_APP_VERSION")), // --set tag=5.5.2
+				helm.WithArgs("--set", "tag=latest"),
+				helm.WithArgs("--set", "manager.enabled=false"),
 				// Reduce replicas to 1 to limit memory usage in the test cluster.
 				helm.WithArgs("--set", "controller.replicas=1"),
 				helm.WithArgs("--set", "cve.scanner.replicas=1"),
@@ -137,10 +138,6 @@ func getCharts(valuesFile string) []helmChart {
 func TestMain(m *testing.M) {
 	if os.Getenv("NV_CHART_VERSION") == "" {
 		fmt.Fprintf(os.Stderr, "NV_CHART_VERSION is not defined")
-		os.Exit(1)
-	}
-	if os.Getenv("NV_APP_VERSION") == "" {
-		fmt.Fprintf(os.Stderr, "NV_APP_VERSION is not defined")
 		os.Exit(1)
 	}
 

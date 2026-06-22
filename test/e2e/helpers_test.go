@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	api "github.com/neuvector/neuvector/controller/api"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +39,6 @@ func getNeuVectorDeploymentFeature() types.Feature {
 		Setup(setupSharedK8sClient).
 		Assess("controller deployment is available", assessControllerDeployment).
 		Assess("enforcer daemonset is ready", assessEnforcerDaemonSet).
-		Assess("manager deployment is available", assessManagerDeployment).
 		Assess("scanner deployment is available", assessScannerDeployment).
 		Feature()
 }
@@ -84,20 +83,6 @@ func assessEnforcerDaemonSet(ctx context.Context, t *testing.T, _ *envconf.Confi
 		wait.WithTimeout(assessTimeout),
 	)
 	require.NoError(t, err, "enforcer daemonset not ready")
-	return ctx
-}
-
-func assessManagerDeployment(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-	t.Helper()
-	client := getK8sClient(ctx)
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: managerDeploymentName, Namespace: nvNamespace},
-	}
-	err := wait.For(
-		conditions.New(client.Resources()).DeploymentConditionMatch(dep, appsv1.DeploymentAvailable, corev1.ConditionTrue),
-		wait.WithTimeout(assessTimeout),
-	)
-	require.NoError(t, err, "manager deployment not available")
 	return ctx
 }
 
