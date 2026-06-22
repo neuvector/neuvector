@@ -425,7 +425,10 @@ func nvJsonUnmarshal(key string, data []byte, v any) error {
 // when this function returns, sensitive fields in 'obj' are encrypted by DEK
 func nvJsonUnmarshalReEncrypt(key string, data []byte, obj any) (bool, utils.Set, error) {
 	if !common.IsDEKSeedAvailable() {
-		_ = nvJsonUnmarshal(key, data, obj)
+		// Suppress error: re-encrypt is unavailable; best-effort unmarshal, caller proceeds with zero-value obj on failure
+		if err := nvJsonUnmarshal(key, data, obj); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal JSON")
+		}
 		return false, nil, nil
 	}
 
@@ -474,7 +477,10 @@ func getAllSubKeys(scope, store string) utils.Set {
 	case share.ScopeFed:
 		getFed = true
 	}
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get store keys for file monitor groups")
+	}
 	for _, key := range keys {
 		name := share.CLUSFileMonitorKey2Group(key)
 		if strings.HasPrefix(name, api.FederalGroupPrefix) {
@@ -514,7 +520,7 @@ func (m clusterHelper) AcquireLock(key string, wait time.Duration) (cluster.Lock
 	} else if lostCh == nil {
 		err = fmt.Errorf("Unable to acquire lock after %v", wait)
 		msg := fmt.Sprintf("Acquire lock error: %s", err.Error())
-		if value, _ := cluster.Get(lKey); value != nil {
+		if value, err := cluster.Get(lKey); err == nil && value != nil {
 			// Print locked-by info
 			var locker share.CLUSDistLocker
 			caller := utils.GetCaller(2, []string{"AcquireLock", "lockClusKey"})
@@ -543,14 +549,19 @@ func (m clusterHelper) AcquireLock(key string, wait time.Duration) (cluster.Lock
 	fn := utils.GetCaller(2, []string{"AcquireLock", "lockClusKey"})
 	locker := &share.CLUSDistLocker{LockedBy: m.id, Caller: fn, LockedAt: time.Now()}
 	value, _ := json.Marshal(locker)
-	_ = cluster.Put(lKey, value)
+	// Suppress error: storing lock holder info is best-effort debug metadata
+	if err := cluster.Put(lKey, value); err != nil {
+		log.WithError(err).Debug("Failed to store lock holder info")
+	}
 
 	return lock, nil
 }
 
 func (m clusterHelper) ReleaseLock(lock cluster.LockInterface) {
 	// Delete locked-by key
-	_ = cluster.Delete(share.CLUSCtrlDistLockKey(lock.Key()))
+	if err := cluster.Delete(share.CLUSCtrlDistLockKey(lock.Key())); err != nil {
+		log.WithError(err).Warn("Failed to delete lock holder key")
+	}
 	err := lock.Unlock()
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "key": lock.Key()}).Error()
@@ -685,7 +696,11 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 			return err
 		}
 
-		if value, _ := cluster.Get(share.CLUSNextKeyRotationTSKey); len(value) == 0 {
+		value, err = cluster.Get(share.CLUSNextKeyRotationTSKey)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get key rotation timestamp")
+		}
+		if len(value) == 0 {
 			_ = SetNextKeyRotationTime(m.keyRotationDuration)
 		}
 
@@ -731,7 +746,10 @@ func (m *clusterHelper) GetInstallationID() (string, error) {
 
 func (m clusterHelper) GetAllEnforcers() []*share.CLUSAgent {
 	store := share.CLUSAgentStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get enforcer store keys")
+	}
 	all := make([]*share.CLUSAgent, 0)
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
@@ -770,11 +788,17 @@ func (m clusterHelper) SetCtrlState(key string) error {
 }
 
 func (m clusterHelper) UnsetCtrlState(key string) {
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to unset controller state")
+	}
 }
 
 func (m clusterHelper) GetCtrlState(key string) bool {
-	value, _, _ := m.get(key)
+	value, _, err := m.get(key)
+	if err != nil {
+		// Log error: this is polled frequently; use Debug to avoid flooding
+		log.WithError(err).Debug("Failed to get controller state")
+	}
 	return value != nil
 }
 
@@ -782,7 +806,10 @@ func (m clusterHelper) GetSystemConfigRev(acc *access.AccessControl) (*share.CLU
 	var conf share.CLUSSystemConfig
 
 	key := share.CLUSConfigSystemKey
-	value, rev, _ := m.get(key)
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get system config")
+	}
 	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &conf)
 
@@ -805,9 +832,11 @@ func (m clusterHelper) GetSystemConfigRev(acc *access.AccessControl) (*share.CLU
 
 func (m clusterHelper) PutSystemConfigRev(conf *share.CLUSSystemConfig, rev uint64) error {
 	key := share.CLUSConfigSystemKey
-	value, _ := enc.Marshal(conf)
-	err := cluster.PutRev(key, value, rev)
-	if err == nil {
+	value, err := enc.Marshal(conf)
+	if err != nil {
+		return fmt.Errorf("failed to marshal system config: %w", err)
+	}
+	if err = cluster.PutRev(key, value, rev); err == nil {
 		return cluster.Put(share.NetworkSystemKey, value)
 	}
 	return err
@@ -817,7 +846,10 @@ func (m clusterHelper) GetScanConfigRev(acc *access.AccessControl) (*share.CLUSS
 	var conf share.CLUSScanConfig
 
 	key := share.CLUSConfigScanKey
-	value, rev, _ := m.get(key)
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get scan config")
+	}
 	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &conf)
 
@@ -855,7 +887,10 @@ func (m clusterHelper) GetFedSystemConfigRev(acc *access.AccessControl) (*share.
 func (m clusterHelper) PutFedSystemConfigRev(conf *share.CLUSSystemConfig, rev uint64) error {
 	key := share.CLUSFedKey(share.CFGEndpointSystem)
 	conf.CfgType = share.FederalCfg
-	value, _ := enc.Marshal(conf)
+	value, err := enc.Marshal(conf)
+	if err != nil {
+		return fmt.Errorf("failed to marshal fed system config: %w", err)
+	}
 	if rev == 0 {
 		return cluster.Put(key, value)
 	} else {
@@ -1028,7 +1063,9 @@ func (m clusterHelper) PutGroupTxn(txn *cluster.ClusterTransact, group *share.CL
 }
 
 func (m clusterHelper) DeleteGroup(name string) error {
-	_ = cluster.Delete(share.CLUSGroupKey(name))
+	if err := cluster.Delete(share.CLUSGroupKey(name)); err != nil {
+		log.WithError(err).Warn("Failed to delete group key")
+	}
 	return cluster.Delete(share.CLUSGroupNetworkKey(name))
 }
 
@@ -1285,7 +1322,10 @@ func (m clusterHelper) GetServerRev(name string, acc *access.AccessControl) (*sh
 
 func (m clusterHelper) PutServerRev(server *share.CLUSServer, rev uint64) error {
 	key := share.CLUSServerKey(server.Name)
-	value, _ := enc.Marshal(server)
+	value, err := enc.Marshal(server)
+	if err != nil {
+		return fmt.Errorf("failed to marshal server: %w", err)
+	}
 	return cluster.PutRev(key, value, rev)
 }
 
@@ -1516,8 +1556,7 @@ func (m clusterHelper) CreateScannerStats(id string) error {
 	if err != nil {
 		return err
 	}
-	_ = cluster.PutRev(key, value, 0)
-	return nil
+	return cluster.PutRev(key, value, 0)
 }
 
 func (m clusterHelper) PutScannerStats(id string, objType share.ScanObjectType, result *share.ScanResult) error {
@@ -2016,7 +2055,7 @@ func (m clusterHelper) PutRegistryImageSummary(name, id string, sum *share.CLUSR
 
 func (m clusterHelper) GetRegistryImageSummary(name, id string) *share.CLUSRegistryImageSummary {
 	key := share.CLUSRegistryImageStateKey(name, id)
-	if value, _ := cluster.Get(key); value != nil {
+	if value, err := cluster.Get(key); err == nil && value != nil {
 		var summary share.CLUSRegistryImageSummary
 		_ = nvJsonUnmarshal(key, value, &summary)
 		return &summary
@@ -2102,7 +2141,9 @@ func (m clusterHelper) DeleteRegistryImageSummaryAndReport(name, id, fedRole str
 	}
 
 	if fedRole == api.FedRoleMaster {
-		_ = m.UpdateFedScanDataRevisions("", resource.Delete, name, id)
+		if err := m.UpdateFedScanDataRevisions("", resource.Delete, name, id); err != nil {
+			log.WithError(err).Warn("Failed to update fed scan data revisions after delete")
+		}
 	}
 
 	if m.persist {
@@ -2120,7 +2161,9 @@ func (m clusterHelper) PutRegistryImageSummaryAndReport(name, id, fedRole string
 	key := share.CLUSRegistryImageDataKey(name, id)
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	_ = enc.Encode(report)
+	if err := enc.Encode(report); err != nil {
+		return fmt.Errorf("failed to encode scan report: %w", err)
+	}
 	zbRpt := utils.GzipBytes(buf.Bytes())
 	txn.PutBinary(key, zbRpt)
 
@@ -2138,7 +2181,9 @@ func (m clusterHelper) PutRegistryImageSummaryAndReport(name, id, fedRole string
 	}
 
 	if fedRole == api.FedRoleMaster {
-		_ = m.UpdateFedScanDataRevisions("", resource.Update, name, id)
+		if err := m.UpdateFedScanDataRevisions("", resource.Update, name, id); err != nil {
+			log.WithError(err).Warn("Failed to update fed scan data revisions after update")
+		}
 	}
 
 	if m.persist {
@@ -2338,9 +2383,14 @@ func (m clusterHelper) GetScanReport(key string) *share.CLUSScanReport {
 				log.WithFields(log.Fields{"key": key}).Debug("Convert json scan report")
 				var buf bytes.Buffer
 				enc := gob.NewEncoder(&buf)
-				_ = enc.Encode(&report)
-				zb := utils.GzipBytes(buf.Bytes())
-				_ = cluster.PutQuiet(key, zb)
+				if err := enc.Encode(&report); err != nil {
+					log.WithError(err).Warn("Failed to encode scan report for migration")
+				} else {
+					zb := utils.GzipBytes(buf.Bytes())
+					if err := cluster.PutQuiet(key, zb); err != nil {
+						log.WithError(err).Warn("Failed to store migrated scan report")
+					}
+				}
 				return &report
 			}
 		}
@@ -2557,7 +2607,11 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 		// don't know why: after rolling upgrade(replicas/maxSurge=3), there could be a short period that controller cannot get/put kv
 		// (GetRev returns "Key not found" error & Put/PutRev return "CAS put error" & PutIfNotExist returns nil : is it because kv is not syned yet?)
 		// so we get again to see whether kv is accessible
-		if certExisting, _, _ := clusHelper.GetObjectCertRev(cn); !certExisting.IsEmpty() {
+		certExisting, _, getErr := clusHelper.GetObjectCertRev(cn)
+		if getErr != nil {
+			log.WithError(getErr).Warn("Failed to get existing cert for confirmation")
+		}
+		if !certExisting.IsEmpty() {
 			if cert.Key != certExisting.Key || cert.Cert != certExisting.Cert {
 				var valid bool
 				if cn != share.CLUSRootCAKey {
@@ -2997,13 +3051,18 @@ func (m clusterHelper) FedTriggerInstantPingPoll(cmd, fullPolling uint32) {
 	var value []byte
 	key := share.CLUSFedKey(share.CLUSFedToPingPollSubKey)
 	value, _ = json.Marshal(&p)
-	_ = cluster.Put(key, value)
+	if err := cluster.Put(key, value); err != nil {
+		log.WithError(err).Warn("Failed to trigger instant ping poll")
+	}
 }
 
 func (m clusterHelper) ConfigFedRole(userName, role string, acc *access.AccessControl) error {
 	// Check if user already exists
-	var err error
-	if user, rev, _ := m.GetUserRev(userName, acc); user != nil {
+	user, rev, err := m.GetUserRev(userName, acc)
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
+		return fmt.Errorf("failed to get user %q for fed role config: %w", userName, err)
+	}
+	if user != nil {
 		user.Role = role
 		if err = m.PutUserRev(user, rev); err != nil {
 			log.WithFields(log.Fields{"error": err, "user": userName, "role": role}).Error("Config fed role failed")
@@ -3575,7 +3634,9 @@ func (m clusterHelper) RestoreNetworkKeys() {
 				if value, _, _ := m.get(key); value != nil {
 					profile := fmt.Sprintf("%s%s", share.CLUSNodeCommonStoreKey, profileKey)
 					// log.WithFields(log.Fields{"from": key, "to": profile}).Debug("DPT: profile")
-					_ = cluster.PutQuiet(profile, utils.GzipBytes(value))
+					if err := cluster.PutQuiet(profile, utils.GzipBytes(value)); err != nil {
+						log.WithError(err).Warn("Failed to restore network profile key")
+					}
 				}
 			}
 		}
@@ -3748,7 +3809,7 @@ func (m clusterHelper) CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstore
 	if txn != nil {
 		txn.Put(rootKey, value)
 	} else {
-		_ = cluster.Put(rootKey, value)
+		return cluster.Put(rootKey, value)
 	}
 
 	return nil
@@ -3774,9 +3835,9 @@ func (m clusterHelper) UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstore
 		}
 	} else {
 		if rev != nil {
-			_ = cluster.PutRev(rootKey, value, *rev)
+			return cluster.PutRev(rootKey, value, *rev)
 		} else {
-			_ = cluster.Put(rootKey, value)
+			return cluster.Put(rootKey, value)
 		}
 	}
 
@@ -3885,9 +3946,9 @@ func (m clusterHelper) UpdateSigstoreVerifier(rootName string, verifier *share.C
 		}
 	} else {
 		if rev != nil {
-			_ = cluster.PutRev(verifierKey, value, *rev)
+			return cluster.PutRev(verifierKey, value, *rev)
 		} else {
-			_ = cluster.Put(verifierKey, value)
+			return cluster.Put(verifierKey, value)
 		}
 	}
 

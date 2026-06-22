@@ -167,7 +167,10 @@ func restoreToCluster(reg, fedRole string) string {
 }
 
 func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
-	scanRevs, _, _ := clusHelper.GetFedScanRevisions()
+	scanRevs, _, err := clusHelper.GetFedScanRevisions()
+	if err != nil {
+		log.WithError(err).Warn("Failed to get fed scan revisions")
+	}
 	if scanRevs.Restoring {
 		if elapsed := time.Since(scanRevs.RestoreAt); elapsed > time.Duration(5)*time.Minute {
 			log.WithFields(log.Fields{"restored_at": scanRevs.RestoreAt}).Info()
@@ -186,7 +189,9 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 			}
 			scanRevs.Restoring = true
 			scanRevs.RestoreAt = time.Now().UTC()
-			_ = clusHelper.PutFedScanRevisions(&scanRevs, nil)
+			if err := clusHelper.PutFedScanRevisions(&scanRevs, nil); err != nil {
+				log.WithError(err).Warn("Failed to put fed scan revisions")
+			}
 
 			randRev := uint64(rand.Uint32())
 			if randRev == 0 {
@@ -201,7 +206,11 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 				if info.IsDir() && name != "" && name != "." {
 					skip := false
 					// no matter deployRegScanData/deployRepoScanData is true or not, always restore fed registry/repo scan result(if any in backup)
-					if config, _, _ := clusHelper.GetRegistry(name, acc); config == nil {
+					config, _, err := clusHelper.GetRegistry(name, acc)
+					if err != nil {
+						log.WithError(err).Warn("Failed to get registry during restore")
+					}
+					if config == nil {
 						if name != common.RegistryFedRepoScanName && name != common.RegistryRepoScanName {
 							if strings.HasPrefix(name, api.FederalGroupPrefix) && importInfo.fedRole == api.FedRoleJoint {
 								// when a fed registry's scan result is restored on joint cluster, its fed registry key may not exist in kv yet.

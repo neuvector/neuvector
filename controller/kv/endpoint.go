@@ -180,7 +180,10 @@ func purgeGroupFilter(epName, key string) bool {
 	accAdmin := access.NewFedAdminAccessControl()
 
 	name := share.CLUSGroupKey2Name(key)
-	group, _, _ := clusHelper.GetGroup(name, accAdmin)
+	group, _, err := clusHelper.GetGroup(name, accAdmin)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group during purge filter")
+	}
 
 	// Keep the learned, ground group & reserved local/fed groups
 	return group == nil || ((group.CfgType == share.FederalCfg || group.CfgType == share.UserCreated) && !group.Reserved)
@@ -225,7 +228,10 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 	case _filterFedPolicyObjects:
 		policyRulePrefix := share.CLUSConfigPolicyStore + "default/rule/"
 		if strings.HasPrefix(key, policyRulePrefix) {
-			idRaw, _ := strconv.Atoi(key[len(policyRulePrefix):])
+			idRaw, err := strconv.Atoi(key[len(policyRulePrefix):])
+			if err != nil {
+				log.WithError(err).Warn("Failed to parse policy rule id from key")
+			}
 			id := uint32(idRaw)
 			if id > api.PolicyFedRuleIDBase && id < api.PolicyFedRuleIDMax {
 				return true, nil
@@ -554,11 +560,17 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 			if key == policyZipRuleListKey {
 				applyTransaction(txn, nil, false, 0)
 				//zip rulelist before put to cluster during restore
-				_ = clusHelper.PutPolicyRuleListZip(key, array)
+				if err = clusHelper.PutPolicyRuleListZip(key, array); err != nil {
+					log.WithError(err).Warn("Failed to put policy rule list zip during restore")
+				}
 			} else {
-				_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
+				if err = clusHelper.DuplicateNetworkKeyTxn(txn, key, array); err != nil {
+					log.WithError(err).Warn("Failed to duplicate network key in transaction")
+				}
 				//for CLUSConfigSystemKey only
-				_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+				if err = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array); err != nil {
+					log.WithError(err).Warn("Failed to duplicate network system key in transaction")
+				}
 				if needToZip(key, array) {
 					zb := utils.GzipBytes(array)
 					txn.PutBinary(key, zb)
@@ -662,7 +674,10 @@ func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 
 func (ep cfgEndpoint) purge(txn *cluster.ClusterTransact, importTask *share.CLUSImportTask) error {
 	if ep.isStore {
-		keys, _ := cluster.GetStoreKeys(ep.key)
+		keys, err := cluster.GetStoreKeys(ep.key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get store keys for purge")
+		}
 		if len(keys) > 0 {
 			for _, key := range keys {
 				if ep.purgeFilter == nil || ep.purgeFilter(ep.name, key) {
