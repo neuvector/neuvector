@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -13,10 +15,72 @@ import (
 
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
-	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
-	"sigs.k8s.io/e2e-framework/support/kind"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
+
+func createMinikubeCluster(profile, kubeconfigPath string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		cmd := exec.CommandContext(ctx, "minikube", "start",
+			"--driver=kvm2",
+			"--profile", profile,
+			"--cpus=4",
+			"--memory=6144mb",
+			"--container-runtime=containerd",
+			"--wait=all",
+		)
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return ctx, fmt.Errorf("minikube start: %w", err)
+		}
+		cfg.WithKubeconfigFile(kubeconfigPath)
+		return ctx, nil
+	}
+}
+
+func loadImageToMinikube(profile, image string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		cmd := exec.CommandContext(ctx, "minikube", "image", "load", image, "--profile", profile)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return ctx, fmt.Errorf("minikube image load %s: %w", image, err)
+		}
+		return ctx, nil
+	}
+}
+
+func exportMinikubeLogs(profile, destDir string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			return ctx, err
+		}
+		logFile := filepath.Join(destDir, "minikube.log")
+		f, err := os.Create(logFile)
+		if err != nil {
+			return ctx, err
+		}
+		defer f.Close()
+		cmd := exec.CommandContext(ctx, "minikube", "logs", "--profile", profile)
+		cmd.Stdout = f
+		cmd.Stderr = f
+		_ = cmd.Run()
+		return ctx, nil
+	}
+}
+
+func destroyMinikubeCluster(profile string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		cmd := exec.CommandContext(ctx, "minikube", "delete", "--profile", profile)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return ctx, fmt.Errorf("minikube delete: %w", err)
+		}
+		return ctx, nil
+	}
+}
 
 //nolint:gochecknoglobals // provided by e2e-framework
 var testEnv env.Environment
@@ -118,7 +182,7 @@ func getCharts(valuesFile string) []helmChart {
 				// Reduce replicas to 1 to limit memory usage in the test cluster.
 				helm.WithArgs("--set", "controller.replicas=1"),
 				helm.WithArgs("--set", "cve.scanner.replicas=1"),
-				// Controller and enforcer are pre-loaded into kind under nvChartTag; use
+				// Controller and enforcer are pre-loaded into the cluster; use
 				// IfNotPresent so the kubelet picks up the local image instead of pulling.
 				helm.WithArgs("--set", "controller.image.imagePullPolicy=IfNotPresent"),
 				helm.WithArgs("--set", "enforcer.image.imagePullPolicy=IfNotPresent"),
@@ -167,18 +231,19 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	testEnv = env.NewWithConfig(cfg)
-	kindClusterName := envconf.RandomName(nvE2EPrefix, 32)
+	clusterProfile := envconf.RandomName(nvE2EPrefix, 32)
+	kubeconfigPath := filepath.Join(os.TempDir(), clusterProfile+".kubeconfig")
 
 	commonSetupFuncs = append([]env.Func{
-		envfuncs.CreateCluster(kind.NewProvider(), kindClusterName),
-		envfuncs.LoadImageToCluster(kindClusterName, controllerImage, "--verbose", "--mode", "direct"),
-		envfuncs.LoadImageToCluster(kindClusterName, enforcerImage, "--verbose", "--mode", "direct"),
+		createMinikubeCluster(clusterProfile, kubeconfigPath),
+		loadImageToMinikube(clusterProfile, controllerImage),
+		loadImageToMinikube(clusterProfile, enforcerImage),
 	}, commonSetupFuncs...)
 
 	commonFinishFuncs = append([]env.Func{
-		envfuncs.ExportClusterLogs(kindClusterName, "./logs"),
+		exportMinikubeLogs(clusterProfile, "./logs"),
 	}, commonFinishFuncs...)
-	commonFinishFuncs = append(commonFinishFuncs, envfuncs.DestroyCluster(kindClusterName))
+	commonFinishFuncs = append(commonFinishFuncs, destroyMinikubeCluster(clusterProfile))
 
 	testEnv.Setup(commonSetupFuncs...)
 	testEnv.Finish(commonFinishFuncs...)
