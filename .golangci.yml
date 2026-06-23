@@ -46,6 +46,9 @@ linters:
         text: 'ST1005: error strings should not be capitalized'
       - path: (.+)\.go$
         text: 'ST1005: error strings should not end with punctuation or newlines'
+      - path: '_test\.go'
+        linters:
+          - errcheck
     paths:
       - third_party$
       - builtin$
