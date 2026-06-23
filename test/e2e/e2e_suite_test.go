@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -13,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/third_party/helm"
@@ -66,6 +70,56 @@ func exportMinikubeLogs(profile, destDir string) env.Func {
 		cmd.Stdout = f
 		cmd.Stderr = f
 		_ = cmd.Run()
+		return ctx, nil
+	}
+}
+
+func exportPodLogs(destDir string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		client, err := cfg.NewClient()
+		if err != nil {
+			return ctx, fmt.Errorf("export pod logs: create client: %w", err)
+		}
+		clientset, err := kubernetes.NewForConfig(client.RESTConfig())
+		if err != nil {
+			return ctx, fmt.Errorf("export pod logs: create clientset: %w", err)
+		}
+
+		pods, err := clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return ctx, fmt.Errorf("export pod logs: list pods: %w", err)
+		}
+
+		for i := range pods.Items {
+			pod := &pods.Items[i]
+			containers := append(pod.Spec.InitContainers, pod.Spec.Containers...)
+			for _, c := range containers {
+				func() {
+					logPath := filepath.Join(destDir, "pods", pod.Namespace, pod.Name, c.Name+".log")
+					if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+						slog.WarnContext(ctx, "export pod logs: mkdir", "path", logPath, "error", err)
+						return
+					}
+					stream, err := clientset.CoreV1().Pods(pod.Namespace).
+						GetLogs(pod.Name, &corev1.PodLogOptions{Container: c.Name}).
+						Stream(ctx)
+					if err != nil {
+						slog.WarnContext(ctx, "export pod logs: stream", "pod", pod.Name, "container", c.Name, "error", err)
+						return
+					}
+					defer stream.Close()
+					f, err := os.Create(logPath)
+					if err != nil {
+						slog.WarnContext(ctx, "export pod logs: create file", "path", logPath, "error", err)
+						return
+					}
+					defer f.Close()
+					if _, err := io.Copy(f, stream); err != nil {
+						slog.WarnContext(ctx, "export pod logs: copy", "pod", pod.Name, "container", c.Name, "error", err)
+					}
+				}()
+			}
+		}
 		return ctx, nil
 	}
 }
@@ -233,8 +287,10 @@ func TestMain(m *testing.M) {
 		loadImageToMinikube(clusterProfile, enforcerImage),
 	}, commonSetupFuncs...)
 
+	logDir := filepath.Join("logs", clusterProfile)
 	commonFinishFuncs = append([]env.Func{
-		exportMinikubeLogs(clusterProfile, "./logs"),
+		exportMinikubeLogs(clusterProfile, logDir),
+		exportPodLogs(logDir),
 	}, commonFinishFuncs...)
 	commonFinishFuncs = append(commonFinishFuncs, destroyMinikubeCluster(clusterProfile))
 
