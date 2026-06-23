@@ -875,7 +875,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						for k, v := range currFedRulesRev.Revisions {
 							currFedRulesRev.Revisions[k] = v + 1
 						}
-						fedRulesRev, _ := json.Marshal(*currFedRulesRev)
+						fedRulesRev, err := json.Marshal(*currFedRulesRev)
+						if err != nil {
+							log.WithError(err).Warn("Failed to marshal fed rules revision")
+						}
 						importInfo.fedRulesRevValue = string(fedRulesRev)
 						// do not write to kv now. postpone it at the last write
 						return nil
@@ -892,7 +895,10 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 					u.FailedLoginCount = 0
 					u.BlockLoginSince = time.Time{}
 					u.PwdResetTime = time.Now().UTC()
-					data, _ := json.Marshal(&u)
+					data, err := json.Marshal(&u)
+					if err != nil {
+						log.WithError(err).Warn("Failed to marshal user during import")
+					}
 					value = string(data)
 				} else {
 					log.WithFields(log.Fields{"err": err}).Info("Unmarshal")
@@ -1108,7 +1114,10 @@ func (c *configHelper) writeBackupVersion() error {
 		CtrlVersion: c.version,
 		KVVersion:   latestKVVersion(),
 	}
-	value, _ := json.Marshal(&ver)
+	value, err := json.Marshal(&ver)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ctrl version: %w", err)
+	}
 	fmt.Fprintf(f, "%s\n", value)
 
 	return nil

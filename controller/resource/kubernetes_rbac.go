@@ -1946,7 +1946,10 @@ func GetSaFromJwtToken(tokenStr string) (string, error) {
 	var sa string
 	var err error
 
-	if token, _ := jwt.Parse(tokenStr, nil); token != nil {
+	// jwt.Parse with a nil key function parses the token without signature verification;
+	// it always returns an error even when the token is structurally valid.
+	token, jwtErr := jwt.Parse(tokenStr, nil)
+	if token != nil {
 		claims, _ := token.Claims.(jwt.MapClaims)
 	LOOP:
 		for k, v := range claims {
@@ -1973,6 +1976,9 @@ func GetSaFromJwtToken(tokenStr string) (string, error) {
 			}
 		}
 	} else {
+		if jwtErr != nil {
+			log.WithError(jwtErr).Debug("Failed to parse JWT token for service account")
+		}
 		err = fmt.Errorf("invalid token")
 		log.WithFields(log.Fields{"len": len(tokenStr), "error": err}).Error()
 	}
