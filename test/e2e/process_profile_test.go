@@ -51,7 +51,17 @@ func getProcessProfileFeature() types.Feature {
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
 		Assess("exec unapproved bash in nginx pod", execBashInNginxPod).
-		Assess("security event reports bash as incident", assessSecurityEventHasBashIncident).
+		Assess("security event reports bash as incident", assessSecurityEventHasProcessIncident("/usr/bin/bash", "")).
+		Assess("PATCH service ProfileMode to Protect",
+			assessPatchServiceConfig(serviceBatchPatch{
+				Services:    []string{workloadServiceName},
+				ProfileMode: share.PolicyModeEnforce,
+			})).
+		Assess("service ProfileMode is now Protect",
+			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEnforce})).
+		Assess("wait for Protect mode to propagate to enforcer", assessSleep(10*time.Second)).
+		Assess("exec bash in nginx pod is blocked by protect mode", execBashInNginxPod).
+		Assess("security event reports bash as denied in protect mode", assessSecurityEventHasProcessIncident("/usr/bin/bash", share.PolicyActionDeny)).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
@@ -182,40 +192,45 @@ func execBashInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) co
 	return ctx
 }
 
-func assessSecurityEventHasBashIncident(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-	t.Helper()
-	endpoint := getAPIEndpoint(ctx)
-	token := getNVToken(ctx)
-	httpClient := newNVHTTPClient()
+// assessSecurityEventHasProcessIncident returns an assess function that polls
+// GET /v1/log/security until an incident matching procPath and workloadServiceName
+// is found. If action is non-empty, the incident's action field must also match.
+func assessSecurityEventHasProcessIncident(procPath, action string) func(context.Context, *testing.T, *envconf.Config) context.Context {
+	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+		t.Helper()
+		endpoint := getAPIEndpoint(ctx)
+		token := getNVToken(ctx)
+		httpClient := newNVHTTPClient()
 
-	const bashPath = "/usr/bin/bash"
-
-	require.Eventually(t, func() bool {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
-		if err != nil {
-			return false
-		}
-		req.Header.Set("X-Auth-Token", token)
-		resp, err := httpClient.Do(req)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			return false
-		}
-		defer resp.Body.Close()
-		var data api.RESTSecurityData
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			return false
-		}
-		for _, incident := range data.Incidents {
-			if incident.ProcPath == bashPath && incident.WorkloadService == workloadServiceName {
-				return true
+		require.Eventually(t, func() bool {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
+			if err != nil {
+				return false
 			}
-		}
-		return false
-	}, assessTimeout, retryInterval,
-		"security incident with proc_path=%q and workload_service=%q not found in /v1/log/security",
-		bashPath, workloadServiceName)
+			req.Header.Set("X-Auth-Token", token)
+			resp, err := httpClient.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				return false
+			}
+			defer resp.Body.Close()
+			var data api.RESTSecurityData
+			if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+				return false
+			}
+			for _, incident := range data.Incidents {
+				if incident.ProcPath == procPath &&
+					incident.WorkloadService == workloadServiceName &&
+					(action == "" || incident.Action == action) {
+					return true
+				}
+			}
+			return false
+		}, assessTimeout, retryInterval,
+			"security incident proc_path=%q workload_service=%q action=%q not found in /v1/log/security",
+			procPath, workloadServiceName, action)
 
-	return ctx
+		return ctx
+	}
 }
 
 func assessProcessProfileHasNginx(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
@@ -259,6 +274,14 @@ func assessProcessProfileHasNginx(ctx context.Context, t *testing.T, _ *envconf.
 		workloadServiceGroup, expectedProcessName, expectedProcessPath)
 
 	return ctx
+}
+
+func assessSleep(d time.Duration) func(context.Context, *testing.T, *envconf.Config) context.Context {
+	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+		t.Helper()
+		time.Sleep(d)
+		return ctx
+	}
 }
 
 // serviceStateExpectation holds the service fields to assert on GET /v1/service/:name.
