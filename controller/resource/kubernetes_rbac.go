@@ -1946,28 +1946,28 @@ func GetSaFromJwtToken(tokenStr string) (string, error) {
 	var sa string
 	var err error
 
-	// jwt.Parse with a nil key function parses the token without signature verification;
-	// it always returns an error even when the token is structurally valid.
-	token, jwtErr := jwt.Parse(tokenStr, nil)
-	if token != nil {
-		claims, _ := token.Claims.(jwt.MapClaims)
-	LOOP:
-		for k, v := range claims {
-			if k == "kubernetes.io/serviceaccount/service-account.name" {
-				sa = v.(string)
-				break LOOP
-			} else if k == "kubernetes.io" {
-				vTemp := reflect.ValueOf(v)
-				if vTemp.Kind() == reflect.Map {
-					for _, k2Temp := range vTemp.MapKeys() {
-						if k2, ok := k2Temp.Interface().(string); ok && k2 == "serviceaccount" {
-							if v2Temp := reflect.ValueOf(vTemp.MapIndex(k2Temp)); v2Temp.Kind() == reflect.Struct {
-								if saStruct := fmt.Sprintf("%v\n", v2Temp.Interface()); strings.HasPrefix(saStruct, "map[name:") {
-									saStruct = saStruct[len("map[name:"):]
-									if ss := strings.Split(saStruct, " "); len(ss) > 0 {
-										sa = ss[0]
-										break LOOP
-									}
+	// Here we don't verify the JWT token.  Instead we parse the token to see the service account name.
+	token, _, err := jwt.NewParser().ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return "", fmt.Errorf("failed to  parse JWT token for service account: %w", err)
+	}
+	claims, _ := token.Claims.(jwt.MapClaims)
+LOOP:
+	for k, v := range claims {
+		if k == "kubernetes.io/serviceaccount/service-account.name" {
+			sa = v.(string)
+			break LOOP
+		} else if k == "kubernetes.io" {
+			vTemp := reflect.ValueOf(v)
+			if vTemp.Kind() == reflect.Map {
+				for _, k2Temp := range vTemp.MapKeys() {
+					if k2, ok := k2Temp.Interface().(string); ok && k2 == "serviceaccount" {
+						if v2Temp := reflect.ValueOf(vTemp.MapIndex(k2Temp)); v2Temp.Kind() == reflect.Struct {
+							if saStruct := fmt.Sprintf("%v\n", v2Temp.Interface()); strings.HasPrefix(saStruct, "map[name:") {
+								saStruct = saStruct[len("map[name:"):]
+								if ss := strings.Split(saStruct, " "); len(ss) > 0 {
+									sa = ss[0]
+									break LOOP
 								}
 							}
 						}
@@ -1975,14 +1975,7 @@ func GetSaFromJwtToken(tokenStr string) (string, error) {
 				}
 			}
 		}
-	} else {
-		if jwtErr != nil {
-			log.WithError(jwtErr).Debug("Failed to parse JWT token for service account")
-		}
-		err = fmt.Errorf("invalid token")
-		log.WithFields(log.Fields{"len": len(tokenStr), "error": err}).Error()
 	}
-
 	return sa, err
 }
 
