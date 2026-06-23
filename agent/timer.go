@@ -284,7 +284,11 @@ func putFqdnIps() {
 
 	for _, fqdnip := range fqdnips {
 		key := share.CLUSFqdnIpKey(Host.ID, fqdnip.FqdnName)
-		value, _ := json.Marshal(fqdnip)
+		value, err := json.Marshal(fqdnip)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal fqdnip")
+			continue
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key, "fqdnip": fqdnip}).Debug("Put fqdn ip")
 		if err := cluster.PutBinary(key, zb); err != nil {
@@ -321,7 +325,11 @@ func putThreatLogs() {
 
 	if len(tlogs) > 0 {
 		key := share.CLUSThreatLogKey(Host.ID, Agent.ID)
-		value, _ := json.Marshal(tlogs)
+		value, err := json.Marshal(tlogs)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal threat logs")
+			return
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key}).Debug("Put threat log")
 		if err := cluster.PutBinary(key, zb); err != nil {
@@ -339,7 +347,11 @@ func putIncidentLogs() {
 
 	if len(tmp) > 0 {
 		key := share.CLUSIncidentLogKey(Host.ID, Agent.ID)
-		value, _ := json.Marshal(tmp)
+		value, err := json.Marshal(tmp)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal incident logs")
+			return
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key, "len": len(tmp)}).Debug("Put incident log")
 		if err := cluster.PutBinary(key, zb); err != nil {

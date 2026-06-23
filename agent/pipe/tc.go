@@ -382,11 +382,19 @@ func (d *tcPipeDriver) GetPortPairRules(pair *InterceptPair) (string, string, st
 
 	if inInfo, ok := d.portMap[pair.inPort]; ok {
 		cmd = fmt.Sprintf("tc filter show dev %v pref %v parent ffff:", nvVbrPortName, inInfo.pref)
-		inEnfRules, _ = shellCombined(cmd)
+		inEnfRules, err = shellCombined(cmd)
+		if err != nil {
+			// Suppress error: diagnostic command, failures are non-fatal
+			log.WithFields(log.Fields{"error": err}).Debug("Failed to get in enforcement rules")
+		}
 	}
 	if exInfo, ok := d.portMap[pair.exPort]; ok {
 		cmd = fmt.Sprintf("tc filter show dev %v pref %v parent ffff:", nvVbrPortName, exInfo.pref)
-		exEnfRules, _ = shellCombined(cmd)
+		exEnfRules, err = shellCombined(cmd)
+		if err != nil {
+			// Suppress error: diagnostic command, failures are non-fatal
+			log.WithFields(log.Fields{"error": err}).Debug("Failed to get ex enforcement rules")
+		}
 	}
 
 	return strings.ReplaceAll(string(inRules[:]), "\t", "    "),

@@ -1138,7 +1138,10 @@ func rmEmptyGroupsFromCluster() {
 	defer txn.Close()
 
 	for _, name := range groups {
-		cg, _, _ := clusHelper.GetGroup(name, accAll)
+		cg, _, err := clusHelper.GetGroup(name, accAll)
+		if err != nil {
+			log.WithFields(log.Fields{"group": name, "error": err}).Warn("Failed to get group from kv")
+		}
 		if cg == nil {
 			log.WithFields(log.Fields{"group": name}).Error("Group doesn't exist in kv")
 			delete(groupCacheMap, name)
@@ -1331,7 +1334,9 @@ func hostWorkloadStart(id string, param interface{}) {
 		}
 		host.runningCntrs.Add(wl.ID)
 		host.workloads.Add(wl.ID)
-		_ = db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
+		if err := db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality()); err != nil {
+			log.WithError(err).Warn("Failed to update host container count")
+		}
 	}
 }
 
@@ -1359,7 +1364,9 @@ func hostWorkloadDelete(id string, param interface{}) {
 		host.runningPods.Remove(wl.ID)
 		host.runningCntrs.Remove(wl.ID)
 		host.workloads.Remove(wl.ID)
-		_ = db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
+		if err := db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality()); err != nil {
+			log.WithError(err).Warn("Failed to update host container count")
+		}
 	}
 }
 
@@ -1986,16 +1993,28 @@ func (m CacheMethod) DeleteGroupCache(name string, acc *access.AccessControl) er
 
 	txn := cluster.Transact()
 	//delete group related policy
-	_ = clusHelper.DeleteProcessProfileTxn(txn, name)
-	_ = clusHelper.DeleteFileMonitorTxn(txn, name)
+	if err := clusHelper.DeleteProcessProfileTxn(txn, name); err != nil {
+		log.WithError(err).Warn("Failed to delete process profile txn")
+	}
+	if err := clusHelper.DeleteFileMonitorTxn(txn, name); err != nil {
+		log.WithError(err).Warn("Failed to delete file monitor txn")
+	}
 	if cache != nil && cache.group != nil {
 		if cache.group.Kind == share.GroupKindContainer {
-			_ = clusHelper.DeleteDlpGroup(txn, name)
-			_ = clusHelper.DeleteWafGroup(txn, name)
+			if err := clusHelper.DeleteDlpGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to delete DLP group")
+			}
+			if err := clusHelper.DeleteWafGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to delete WAF group")
+			}
 		}
 	}
-	_ = clusHelper.DeleteCustomCheckConfig(txn, name)
-	_, _ = txn.Apply()
+	if err := clusHelper.DeleteCustomCheckConfig(txn, name); err != nil {
+		log.WithError(err).Warn("Failed to delete custom check config")
+	}
+	if ok, err := txn.Apply(); err != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err}).Warn("Failed to apply group deletion transaction")
+	}
 	txn.Close()
 
 	return nil

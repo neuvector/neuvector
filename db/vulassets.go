@@ -135,7 +135,10 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 
 	columns := []interface{}{"id", "type", "assetid", "idns", "vulsb"}
 
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, 0, perf, CVEDBReady, fmt.Errorf("failed to build asset query: %w", err)
+	}
 	log.WithFields(log.Fields{"statement": statement, "args": args, "CVEDBReady": CVEDBReady}).Debug("GetVulAssetSessionV2, fetch assets")
 	rows, err := db.Query(statement, args...)
 	if err != nil {
@@ -319,7 +322,10 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 		"vectors", "score_v3", "vectors_v3", "published_timestamp", "last_modified_timestamp",
 		"workloads", "nodes", "images", "platforms"}
 
-	statement, args, _ := dialect.From(sessionTemp).Select(columns...).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(sessionTemp).Select(columns...).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build session vul query: %w", err)
+	}
 
 	queryStat, err := GetQueryStat(sessionToken)
 	if err != nil {
@@ -508,10 +514,14 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
 	var args []interface{}
+	var sqlErr error
 	if row == -1 {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
+		statement, args, sqlErr = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
 	} else {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+		statement, args, sqlErr = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+	}
+	if sqlErr != nil {
+		return nil, nil, fmt.Errorf("failed to build session query: %w", sqlErr)
 	}
 
 	// if file db is ready, use it..
