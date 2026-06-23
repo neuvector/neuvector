@@ -2138,7 +2138,11 @@ func GetK8sVersion() (int, int) {
 		SetK8sVersion(k8sVer)
 		if ocVersionMajor == 0 {
 			if ss := strings.Split(ocVer, "."); len(ss) > 0 {
-				ocVersionMajor, _ = strconv.Atoi(ss[0])
+				var err error
+				ocVersionMajor, err = strconv.Atoi(ss[0])
+				if err != nil {
+					log.WithError(err).Warn("Failed to parse OC version major")
+				}
 			}
 		}
 	}
@@ -2156,7 +2160,11 @@ func SetK8sVersion(k8sVer string) {
 		}
 	}
 	if len(ss) >= 2 {
-		k8sVersionMinor, _ = strconv.Atoi(ss[1])
+		var err error
+		k8sVersionMinor, err = strconv.Atoi(ss[1])
+		if err != nil {
+			log.WithError(err).Warn("Failed to parse k8s version minor")
+		}
 	}
 }
 

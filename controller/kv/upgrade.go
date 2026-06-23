@@ -401,7 +401,9 @@ func upgradeAdmissionCert(value []byte) (*share.CLUSAdmissionCertCloaked, bool, 
 		valueNew, _ := enc.Marshal(&certNew) // valueNew is byte slice of cloaked object
 		// we need to do json.Unmarshal here so the return of doUpgrade() can be json.Marshal and wtitten to kv later
 		var cert share.CLUSAdmissionCertCloaked
-		_ = json.Unmarshal(valueNew, &cert)
+		if err := json.Unmarshal(valueNew, &cert); err != nil {
+			log.WithFields(log.Fields{"err": err}).Warn("Failed to unmarshal cloaked admission cert")
+		}
 		// cert.CaKeyNew / cert.CaCertNew / cert.KeyNew / cert.CertNew are still cloaked
 		return &cert, true, true
 	} else {
@@ -886,7 +888,10 @@ func getControlVersion() *share.CLUSCtrlVersion {
 	var ver share.CLUSCtrlVersion
 
 	key := share.CLUSCtrlVerKey
-	value, _ := cluster.Get(key)
+	value, err := cluster.Get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get control version")
+	}
 	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &ver)
 		return &ver
@@ -920,7 +925,9 @@ func (m clusterHelper) UpgradeClusterKV(version string) (verUpdated bool) {
 			for _, user := range users {
 				if len(user.AcceptedAlerts) > 0 {
 					user.AcceptedAlerts = nil
-					_ = m.PutUser(user)
+					if err := m.PutUser(user); err != nil {
+						log.WithError(err).Warn("Failed to update user during upgrade")
+					}
 				}
 			}
 		}
@@ -944,7 +951,9 @@ func (m clusterHelper) UpgradeClusterKV(version string) (verUpdated bool) {
 	}
 	if ver != newVer {
 		_ = putControlVersion(newVer)
-		_ = cfgHelper.writeBackupVersion()
+		if err := cfgHelper.writeBackupVersion(); err != nil {
+			log.WithError(err).Warn("Failed to write backup version")
+		}
 
 		if !strings.HasPrefix(version, "interim/") {
 			if ver.CtrlVersion != version {
@@ -989,7 +998,9 @@ func (m clusterHelper) UpgradeClusterImport(importVer *share.CLUSCtrlVersion) {
 	}
 	if cur_ver == nil || cur_ver.CtrlVersion != newVer.CtrlVersion || cur_ver.KVVersion != newVer.KVVersion {
 		_ = putControlVersion(newVer)
-		_ = cfgHelper.writeBackupVersion()
+		if err := cfgHelper.writeBackupVersion(); err != nil {
+			log.WithError(err).Warn("Failed to write backup version")
+		}
 		log.WithFields(log.Fields{"new": newVer}).Info("After import write new version")
 	}
 	log.WithFields(log.Fields{"imported": importVer, "current": cur_ver, "new": newVer}).Info("After import upgrade")
@@ -1336,7 +1347,11 @@ func ValidateWebhookCert() {
 				continue
 			}
 			if !certInfo.verified {
-				if cert, _, _ := clusHelper.GetObjectCertRev(certInfo.cn); cert.IsEmpty() {
+				cert, _, err := clusHelper.GetObjectCertRev(certInfo.cn)
+				if err != nil {
+					log.WithError(err).Warn("Failed to get object cert rev")
+				}
+				if cert.IsEmpty() {
 					// cert is not found under new kv key
 					if !restoreKeyCertFromOldKvKey(certInfo.certSvcNames, certInfo.svcName, certInfo.cn, certInfo.keyPath, certInfo.certPath) {
 						// cert is still not found under new kv key after restoring from old kv key. re-gen key/cert.
@@ -1378,7 +1393,10 @@ func ValidateWebhookCert() {
 								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
 									log.WithError(err).Error("failed to generate Webhook certs in ValidateWebhookCert()")
 								}
-								cert, _, _ = clusHelper.GetObjectCertRev(certInfo.cn)
+								cert, _, err = clusHelper.GetObjectCertRev(certInfo.cn)
+								if err != nil {
+									log.WithError(err).Warn("Failed to refresh object cert rev")
+								}
 							}
 						}
 					} else {
@@ -1404,7 +1422,11 @@ func ValidateWebhookCert() {
 		if certInfo.k8sEnvOnly && orchPlatform != share.PlatformKubernetes {
 			continue
 		}
-		if cert, _, _ := clusHelper.GetObjectCertRev(certInfo.cn); !cert.IsEmpty() {
+		cert, _, err := clusHelper.GetObjectCertRev(certInfo.cn)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get object cert")
+		}
+		if !cert.IsEmpty() {
 			certData := []byte(cert.Cert)
 			err1 := os.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
 			err2 := os.WriteFile(certInfo.certPath, certData, 0600)
@@ -1489,13 +1511,21 @@ func renameCustomReservedRoles() {
 		// a pre-existing custom role with reserved name is found
 		if reservedRoleNames.Contains(roleName) {
 			log.WithFields(log.Fields{"roleName": roleName}).Info("Found pre-existing custom role with reserved name")
-			if role, _, _ := clusHelper.GetCustomRoleRev(roleName, accAdmin); role != nil {
+			role, _, err := clusHelper.GetCustomRoleRev(roleName, accAdmin)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get custom role rev")
+			}
+			if role != nil {
 				newRoleName := roleName + "-renamed"
 				roleNameMapping[roleName] = newRoleName
 				role.Name = newRoleName
 				role.Comment += " (renamed)"
-				_ = clusHelper.CreateCustomRole(role, accAdmin)
-				_ = clusHelper.DeleteCustomRole(roleName)
+				if err = clusHelper.CreateCustomRole(role, accAdmin); err != nil {
+					log.WithError(err).Warn("Failed to create renamed custom role")
+				}
+				if err = clusHelper.DeleteCustomRole(roleName); err != nil {
+					log.WithError(err).Warn("Failed to delete old custom role")
+				}
 			}
 		}
 	}
@@ -1587,7 +1617,12 @@ func upgradeServerGroupRoles() {
 	for _, key := range keys {
 		updated = false
 		name := key[len(share.CLUSConfigServerStore):]
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		var cs *share.CLUSServer
+		var rev uint64
+		cs, rev, err = clusHelper.GetServerRev(name, acc)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get server rev during upgrade")
+		}
 		if cs != nil {
 			if cs.LDAP != nil {
 				if len(cs.LDAP.RoleGroups) > 0 {
@@ -1779,11 +1814,13 @@ func initFedScanRevKey() {
 					scannedRegRevs[currName] = currRev
 				}
 			}
-			_ = clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{
+			if err = clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{
 				RegConfigRev:   regConfigRev,
 				ScannedRegRevs: scannedRegRevs,
 				ScannedRepoRev: scannedRepoRev,
-			}, nil)
+			}, nil); err != nil {
+				log.WithError(err).Warn("Failed to put fed scan revisions during upgrade")
+			}
 		} else if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to read scan revision key")
 		}
@@ -1793,7 +1830,11 @@ func initFedScanRevKey() {
 func upgradeDefSecRisksProfiles() {
 	acc := access.NewAdminAccessControl()
 	// vulnerability profile
-	_, _, _ = clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc)
+	if _, _, err := clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc); err != nil {
+		log.WithError(err).Warn("Failed to get vulnerability profile during upgrade")
+	}
 	// compliance profile
-	_, _, _ = clusHelper.GetComplianceProfile(share.DefaultComplianceProfileName, acc)
+	if _, _, err := clusHelper.GetComplianceProfile(share.DefaultComplianceProfileName, acc); err != nil {
+		log.WithError(err).Warn("Failed to get compliance profile during upgrade")
+	}
 }

@@ -753,7 +753,10 @@ func addToNetworkEPGroup(nep *share.CLUSNetworkEP) *share.CLUSGroup {
 
 	// only the lead modify the group synchronously
 	accAll := access.NewAdminAccessControl()
-	cg, _, _ := clusHelper.GetGroup(gname, accAll)
+	cg, _, err := clusHelper.GetGroup(gname, accAll)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group")
+	}
 	if cg == nil {
 		cg = &share.CLUSGroup{
 			Name:     gname,
@@ -811,7 +814,10 @@ func removeFromNetworkEPGroup(nepID string) {
 
 	// only the lead modify the group synchronously
 	accAll := access.NewAdminAccessControl()
-	cg, _, _ := clusHelper.GetGroup(gname, accAll)
+	cg, _, err := clusHelper.GetGroup(gname, accAll)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group")
+	}
 	if cg == nil {
 		return
 	}
@@ -922,7 +928,11 @@ func createServiceIPGroup(r *resource.Service) *share.CLUSGroup {
 		Kind:     share.GroupKindIPService,
 		CapIntcp: false,
 	}
-	if g, _, _ := clusHelper.GetGroup(cg.Name, access.NewAdminAccessControl()); g != nil {
+	g, _, err := clusHelper.GetGroup(cg.Name, access.NewAdminAccessControl())
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group")
+	}
+	if g != nil {
 		// if there is an existing nv.ip.xxx group, do not change its CfgType
 		cg.CfgType = g.CfgType
 	}
@@ -1059,7 +1069,9 @@ func groupRemoveEvent(ev share.TLogEvent, group string) {
 		ReportedAt: time.Now().UTC(),
 	}
 	clog.Msg = fmt.Sprintf("Auto remove unused group: %s and related network/response rules.\n", group)
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("Failed to append group remove event")
+	}
 }
 
 const groupsPruneDelay = time.Duration(time.Minute * 10)
@@ -1184,7 +1196,11 @@ func scheduleGroupRemoval(cache *groupCache) {
 	task := &groupRemovalEvent{
 		groupname: cache.group.Name,
 	}
-	cache.timerTask, _ = cctx.TimerWheel.AddTask(task, groupRemovalDelay)
+	var err error
+	cache.timerTask, err = cctx.TimerWheel.AddTask(task, groupRemovalDelay)
+	if err != nil {
+		log.WithError(err).Warn("Failed to add timer task for group removal")
+	}
 	if cache.timerTask == "" {
 		log.Error("Fail to insert timer")
 	}
@@ -1218,7 +1234,10 @@ func SchedulePruneGroups() {
 		return
 	}
 	task := &groupPruneEvent{}
-	timertask, _ := cctx.TimerWheel.AddTask(task, groupsPruneDelay)
+	timertask, err := cctx.TimerWheel.AddTask(task, groupsPruneDelay)
+	if err != nil {
+		log.WithError(err).Warn("Failed to add timer task for group pruning")
+	}
 	log.WithFields(log.Fields{"timertask": timertask}).Info("group prune timertask scheduled")
 	if timertask == "" {
 		log.Error("Fail to insert timer")

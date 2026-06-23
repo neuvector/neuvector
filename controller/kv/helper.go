@@ -701,7 +701,9 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 			log.WithError(err).Warn("Failed to get key rotation timestamp")
 		}
 		if len(value) == 0 {
-			_ = SetNextKeyRotationTime(m.keyRotationDuration)
+			if err = SetNextKeyRotationTime(m.keyRotationDuration); err != nil {
+				log.WithError(err).Warn("Failed to set next key rotation time")
+			}
 		}
 
 		if err = cluster.PutRev(key, []byte(id), index); err != nil {
@@ -754,7 +756,9 @@ func (m clusterHelper) GetAllEnforcers() []*share.CLUSAgent {
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			var agent share.CLUSAgent
-			_ = nvJsonUnmarshal(key, value, &agent)
+			if err = nvJsonUnmarshal(key, value, &agent); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal enforcer agent")
+			}
 			all = append(all, &agent)
 		} else {
 			log.WithFields(log.Fields{"error": err}).Debug()
@@ -774,7 +778,9 @@ func (m clusterHelper) GetAllControllers() ([]*share.CLUSController, error) {
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			var ctrl share.CLUSController
-			_ = nvJsonUnmarshal(key, value, &ctrl)
+			if err = nvJsonUnmarshal(key, value, &ctrl); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal controller")
+			}
 			all = append(all, &ctrl)
 		} else {
 			log.WithFields(log.Fields{"error": err}).Debug()
@@ -875,7 +881,10 @@ func (m clusterHelper) GetFedSystemConfigRev(acc *access.AccessControl) (*share.
 	}
 
 	key := share.CLUSFedKey(share.CFGEndpointSystem)
-	value, rev, _ := m.get(key)
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get fed system config")
+	}
 	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &conf)
 		return &conf, rev
@@ -900,7 +909,11 @@ func (m clusterHelper) PutFedSystemConfigRev(conf *share.CLUSSystemConfig, rev u
 
 func (m clusterHelper) GetDomain(name string, acc *access.AccessControl) (*share.CLUSDomain, uint64, error) {
 	key := share.CLUSDomainKey(name)
-	if value, rev, _ := m.get(key); value != nil {
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get domain")
+	}
+	if value != nil {
 		var domain share.CLUSDomain
 		_ = nvJsonUnmarshal(key, value, &domain)
 
@@ -938,9 +951,16 @@ func (m clusterHelper) GetAllLearnedGroups(acc *access.AccessControl) map[string
 	groups := make(map[string]*share.CLUSGroup)
 
 	store := share.CLUSConfigGroupStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get learned group store keys")
+	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get group")
+		}
+		if value != nil {
 			var group share.CLUSGroup
 			_ = nvJsonUnmarshal(key, value, &group)
 			if !acc.Authorize(&group, nil) {
@@ -968,7 +988,10 @@ func (m clusterHelper) GetAllGroups(scope string, acc *access.AccessControl) map
 		getFed = true
 	}
 	store := share.CLUSConfigGroupStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group store keys")
+	}
 	for _, key := range keys {
 		gprName := share.CLUSGroupKey2Name(key)
 		if (getFed && strings.HasPrefix(gprName, api.FederalGroupPrefix)) || (getLocal && !strings.HasPrefix(gprName, api.FederalGroupPrefix)) {
@@ -1288,7 +1311,10 @@ func (m clusterHelper) DeleteResponseRuleTxn(policyName string, txn *cluster.Clu
 func (m clusterHelper) GetAllServers(acc *access.AccessControl) map[string]*share.CLUSServer {
 	servers := make(map[string]*share.CLUSServer)
 
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get server store keys")
+	}
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {
 			var cs share.CLUSServer
@@ -1331,7 +1357,10 @@ func (m clusterHelper) PutServerRev(server *share.CLUSServer, rev uint64) error 
 
 func (m clusterHelper) PutServerIfNotExist(server *share.CLUSServer) error {
 	key := share.CLUSServerKey(server.Name)
-	value, _ := enc.Marshal(server)
+	value, err := enc.Marshal(server)
+	if err != nil {
+		return fmt.Errorf("failed to marshal server: %w", err)
+	}
 	return cluster.PutIfNotExist(key, value, true)
 }
 
@@ -1494,7 +1523,9 @@ func (m clusterHelper) DeleteProcessProfileTxn(txn *cluster.ClusterTransact, gro
 	key1 := share.CLUSProfileConfigKey(group)
 	key2 := share.CLUSProfileKey(group)
 	if txn == nil {
-		_ = cluster.Delete(key1)
+		if err := cluster.Delete(key1); err != nil {
+			log.WithError(err).Warn("Failed to delete process profile config key")
+		}
 		return cluster.Delete(key2)
 	} else {
 		txn.Delete(key1)
@@ -1656,7 +1687,9 @@ func (m clusterHelper) GetScannerRev(id string) (*share.CLUSScanner, uint64, err
 
 func (m clusterHelper) DeleteScanner(id string) error {
 	key := share.CLUSScannerStatsKey(id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete scanner stats key")
+	}
 	key = share.CLUSScannerKey(id)
 	return cluster.Delete(key)
 }
@@ -2280,13 +2313,19 @@ func (m clusterHelper) GetAllRegistry(scope string) []*share.CLUSRegistryConfig 
 
 func (m clusterHelper) PutRegistry(config *share.CLUSRegistryConfig, rev uint64) error {
 	key := share.CLUSRegistryConfigKey(config.Name)
-	value, _ := enc.Marshal(config)
+	value, err := enc.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal registry config: %w", err)
+	}
 	return cluster.PutRev(key, value, rev)
 }
 
 func (m clusterHelper) PutRegistryIfNotExist(config *share.CLUSRegistryConfig) error {
 	key := share.CLUSRegistryConfigKey(config.Name)
-	value, _ := enc.Marshal(config)
+	value, err := enc.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal registry config: %w", err)
+	}
 	if m.persist {
 		_ = createRegistryDir(config.Name)
 	}
@@ -2297,8 +2336,12 @@ func (m clusterHelper) DeleteRegistry(txn *cluster.ClusterTransact, name string)
 	key1 := share.CLUSRegistryConfigKey(name)
 	key2 := share.CLUSRegistryStateKey(name)
 	if txn == nil {
-		_ = cluster.Delete(key1)
-		_ = cluster.Delete(key2)
+		if err := cluster.Delete(key1); err != nil {
+			log.WithError(err).Warn("Failed to delete registry config key")
+		}
+		if err := cluster.Delete(key2); err != nil {
+			log.WithError(err).Warn("Failed to delete registry state key")
+		}
 	} else {
 		txn.Delete(key1)
 		txn.Delete(key2)
@@ -3437,7 +3480,11 @@ func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error 
 
 func (m clusterHelper) GetCrdEventQueueCount() int {
 	key := share.CLUSCrdContentCountKey()
-	if value, _ := cluster.Get(key); value != nil {
+	value, err := cluster.Get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get CRD event queue count")
+	}
+	if value != nil {
 		var queueInfo share.CLUSCrdEventQueueInfo
 		_ = nvJsonUnmarshal(key, value, &queueInfo)
 		return queueInfo.Count
@@ -3920,7 +3967,7 @@ func (m clusterHelper) CreateSigstoreVerifier(rootName string, verifier *share.C
 	if txn != nil {
 		txn.Put(verifierKey, value)
 	} else {
-		_ = cluster.Put(verifierKey, value)
+		return cluster.Put(verifierKey, value)
 	}
 
 	return nil
@@ -4031,9 +4078,9 @@ func (m clusterHelper) PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *u
 		}
 	} else {
 		if rev != nil {
-			_ = cluster.PutRev(timestampKey, value, *rev)
+			return cluster.PutRev(timestampKey, value, *rev)
 		} else {
-			_ = cluster.Put(timestampKey, value)
+			return cluster.Put(timestampKey, value)
 		}
 	}
 

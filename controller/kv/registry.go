@@ -216,7 +216,9 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 								// when a fed registry's scan result is restored on joint cluster, its fed registry key may not exist in kv yet.
 								// when this happens, we need to create a pseudo fed registry key so that the scan result can be restored successfully
 								log.WithFields(log.Fields{"name": name}).Info("add pseudo fed registry key")
-								_ = clusHelper.PutRegistryIfNotExist(&share.CLUSRegistryConfig{Name: name, CfgType: share.FederalCfg})
+								if err := clusHelper.PutRegistryIfNotExist(&share.CLUSRegistryConfig{Name: name, CfgType: share.FederalCfg}); err != nil {
+									log.WithError(err).Warn("Failed to create pseudo fed registry key")
+								}
 								time.Sleep(time.Second)
 							} else {
 								log.WithFields(log.Fields{"name": name}).Error("registry not found")
@@ -275,7 +277,9 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 								ReportedAt: time.Now().UTC(),
 								Msg:        fmt.Sprintf("Restored scan data: %s", restoreResults),
 							}
-							_ = evqueue.Append(&clog)
+							if err := evqueue.Append(&clog); err != nil {
+								log.WithError(err).Warn("Failed to append scan data restored event")
+							}
 						}
 						break
 					}
