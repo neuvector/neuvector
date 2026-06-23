@@ -248,7 +248,11 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 	pkgs := apps.marshal()
 	files := make(tarutil.FilesMap)
 	files[AppFileName] = pkgs
-	buf, _ := utils.MakeTar(files)
+	buf, err := utils.MakeTar(files)
+	if err != nil {
+		log.WithError(err).Warn("Failed to create tar from app packages")
+		return nil, nil, share.ScanErrorCode_ScanErrFileSystem
+	}
 	appPkgs := apps.Data()[path]
 	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone
 }

@@ -109,7 +109,10 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var domain share.CLUSDomain
-		_ = json.Unmarshal(value, &domain)
+		if err := json.Unmarshal(value, &domain); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal domain")
+			return
+		}
 
 		domainMutex.Lock()
 		oDomain := domainCacheMap[name]

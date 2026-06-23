@@ -993,14 +993,18 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 						enableAutoScanHost = *scanCfg.EnableAutoScanHost
 					}
 					if enableAutoScanHost && incd.ID == share.CLUSIncidHostPackageUpdated {
-						_ = cacher.ScanHost(incd.HostID, access.NewReaderAccessControl())
+						if err := cacher.ScanHost(incd.HostID, access.NewReaderAccessControl()); err != nil {
+							log.WithError(err).Warn("Failed to trigger host scan")
+						}
 					}
 					enableAutoScanWorkload := scanCfg.AutoScan
 					if scanCfg.EnableAutoScanWorkload != nil {
 						enableAutoScanWorkload = *scanCfg.EnableAutoScanWorkload
 					}
 					if enableAutoScanWorkload && incd.ID == share.CLUSIncidContainerPackageUpdated {
-						_ = cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl())
+						if err := cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl()); err != nil {
+							log.WithError(err).Warn("Failed to trigger workload scan")
+						}
 					}
 				}
 			}
@@ -1788,11 +1792,26 @@ func auditLog2API(audit *share.CLUSAuditLog) *api.Audit {
 					rlog.AggregationFrom = t.Unix()
 				}
 			case nvsysadmission.AuditLogPropCriticalVulsCnt:
-				rlog.CriticalCnt, _ = strconv.Atoi(v)
+				cnt, err := strconv.Atoi(v)
+				if err != nil {
+					// Suppress error: audit log field may be malformed
+					log.WithError(err).Debug("Failed to parse critical vuln count")
+				}
+				rlog.CriticalCnt = cnt
 			case nvsysadmission.AuditLogPropHighVulsCnt:
-				rlog.HighCnt, _ = strconv.Atoi(v)
+				cnt, err := strconv.Atoi(v)
+				if err != nil {
+					// Suppress error: audit log field may be malformed
+					log.WithError(err).Debug("Failed to parse high vuln count")
+				}
+				rlog.HighCnt = cnt
 			case nvsysadmission.AuditLogPropMedVulsCnt:
-				rlog.MediumCnt, _ = strconv.Atoi(v)
+				cnt, err := strconv.Atoi(v)
+				if err != nil {
+					// Suppress error: audit log field may be malformed
+					log.WithError(err).Debug("Failed to parse medium vuln count")
+				}
+				rlog.MediumCnt = cnt
 			case nvsysadmission.AuditLogPropPVCName:
 				rlog.PVCName = v
 			case nvsysadmission.AuditLogPVCStorageClassName:
@@ -2131,7 +2150,10 @@ func auditSuppressSetIdRpts(rlog *api.Audit) {
 
 func checkDefAdminPwd(throttleMinutes uint) {
 	acc := access.NewReaderAccessControl()
-	u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+	u, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get default admin user")
+	}
 	if u == nil || common.IsSaltedPasswordHash(u.PasswordHash) {
 		return
 	}
@@ -2140,7 +2162,10 @@ func checkDefAdminPwd(throttleMinutes uint) {
 		var evtsTime share.CLUSThrottledEvents
 		id := share.CLUSEvAuthDefAdminPwdUnchanged
 		key := share.CLUSThrottledEventStore + "events"
-		value, rev, _ := cluster.GetRev(key)
+		value, rev, err := cluster.GetRev(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get throttled events from cluster")
+		}
 		if value != nil {
 			_ = json.Unmarshal(value, &evtsTime)
 		}
@@ -2160,9 +2185,13 @@ func checkDefAdminPwd(throttleMinutes uint) {
 			evtsTime.LastReportTime[id] = now.Unix()
 			value, _ := json.Marshal(&evtsTime)
 			if rev == 0 {
-				_ = cluster.Put(key, value)
+				if err := cluster.Put(key, value); err != nil {
+					log.WithError(err).Warn("Failed to put throttled events to cluster")
+				}
 			} else {
-				_ = cluster.PutRev(key, value, rev)
+				if err := cluster.PutRev(key, value, rev); err != nil {
+					log.WithError(err).Warn("Failed to put throttled events with rev to cluster")
+				}
 			}
 		}
 	}

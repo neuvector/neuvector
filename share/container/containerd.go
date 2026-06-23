@@ -89,7 +89,12 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 			log.WithFields(log.Fields{"error": err}).Error("cri info")
 		}
 
-		id, _ = criGetSelfID(cri, ctx, id)
+		var criErr error
+		id, criErr = criGetSelfID(cri, ctx, id)
+		if criErr != nil {
+			// Suppress error: best-effort self ID detection via CRI
+			log.WithError(criErr).Debug("Failed to get self container ID via CRI")
+		}
 		sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
 		if err == nil {
 			log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()

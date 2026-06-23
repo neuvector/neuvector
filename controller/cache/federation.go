@@ -251,7 +251,10 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		case share.CLUSFedClustersStatusSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
 			var status share.CLUSFedClusterStatus
-			_ = json.Unmarshal(value, &status)
+			if err := json.Unmarshal(value, &status); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal federation cluster status")
+				return
+			}
 			if status.Nodes == 0 {
 				status.Nodes = 1
 			}

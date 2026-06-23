@@ -131,7 +131,11 @@ func scheduleHostRemoval(cache *hostCache) {
 	task := &hostRemovalEvent{
 		hostID: cache.host.ID,
 	}
-	cache.timerTask, _ = cctx.TimerWheel.AddTask(task, hostRemovalDelay)
+	var err error
+	cache.timerTask, err = cctx.TimerWheel.AddTask(task, hostRemovalDelay)
+	if err != nil {
+		log.WithError(err).Warn("Failed to add host removal timer task")
+	}
 	if cache.timerTask == "" {
 		log.Error("Fail to insert timer")
 	} else {

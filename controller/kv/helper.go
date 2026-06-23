@@ -995,7 +995,11 @@ func (m clusterHelper) GetAllGroups(scope string, acc *access.AccessControl) map
 	for _, key := range keys {
 		gprName := share.CLUSGroupKey2Name(key)
 		if (getFed && strings.HasPrefix(gprName, api.FederalGroupPrefix)) || (getLocal && !strings.HasPrefix(gprName, api.FederalGroupPrefix)) {
-			if value, _, _ := m.get(key); value != nil {
+			value, _, err := m.get(key)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get group from cluster")
+			}
+			if value != nil {
 				var group share.CLUSGroup
 				_ = nvJsonUnmarshal(key, value, &group)
 
@@ -1022,7 +1026,11 @@ func (m clusterHelper) GetGroup(name string, acc *access.AccessControl) (*share.
 	var group share.CLUSGroup
 
 	key := share.CLUSGroupKey(name)
-	if value, rev, _ := m.get(key); value != nil {
+	value, rev, err := m.get(key)
+	if err != nil {
+		return nil, 0, err
+	}
+	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &group)
 		if !acc.Authorize(&group, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
@@ -1104,7 +1112,11 @@ func (m clusterHelper) GetPolicyRuleList() []*share.CLUSRuleHead {
 	//since 3.2.1 rulelist key is changed to
 	//CLUSPolicyZipRuleListKey from CLUSPolicyRuleListKey
 	key := share.CLUSPolicyZipRuleListKey(share.DefaultPolicyName)
-	if value, _, _ := m.get(key); value != nil {
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get policy rule list from cluster")
+	}
+	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &crhs)
 		return crhs
 	}
@@ -1374,7 +1386,10 @@ func (m clusterHelper) DeleteServer(name string) error {
 func (m clusterHelper) GetAllUsers(acc *access.AccessControl) map[string]*share.CLUSUser {
 	users := make(map[string]*share.CLUSUser)
 
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigUserStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigUserStore)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get user store keys")
+	}
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {
 			var user share.CLUSUser
@@ -1394,7 +1409,10 @@ func (m clusterHelper) GetAllUsers(acc *access.AccessControl) map[string]*share.
 func (m clusterHelper) GetAllUsersNoAuth() map[string]*share.CLUSUser {
 	users := make(map[string]*share.CLUSUser)
 
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigUserStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigUserStore)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get user store keys")
+	}
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {
 			var user share.CLUSUser
@@ -1962,7 +1980,10 @@ func (m clusterHelper) RecoverOrphanedCredits(controllerId string) error {
 func (m clusterHelper) GetAllComplianceProfiles(acc *access.AccessControl) []*share.CLUSComplianceProfile {
 	cps := make([]*share.CLUSComplianceProfile, 0)
 
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigComplianceProfileStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigComplianceProfileStore)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get compliance profile store keys")
+	}
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {
 			var cp share.CLUSComplianceProfile
@@ -2518,7 +2539,9 @@ func (m clusterHelper) DeleteFileMonitorTxn(txn *cluster.ClusterTransact, name s
 	key1 := share.CLUSFileMonitorKey(name)
 	key2 := share.CLUSFileMonitorNetworkKey(name)
 	if txn == nil {
-		_ = cluster.Delete(key1)
+		if err := cluster.Delete(key1); err != nil {
+			log.WithError(err).Warn("Failed to delete file monitor key")
+		}
 		return cluster.Delete(key2)
 	} else {
 		txn.Delete(key1)
@@ -2583,7 +2606,9 @@ func (m clusterHelper) PutFileAccessRuleTxn(txn *cluster.ClusterTransact, name s
 }
 
 func (m clusterHelper) DeleteFileAccessRule(name string) error {
-	_ = cluster.Delete(share.CLUSFileAccessRuleKey(name))
+	if err := cluster.Delete(share.CLUSFileAccessRuleKey(name)); err != nil {
+		log.WithError(err).Warn("Failed to delete file access rule key")
+	}
 	return cluster.Delete(share.CLUSFileAccessRuleNetworkKey(name))
 }
 
@@ -2644,8 +2669,11 @@ func (m clusterHelper) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64,
 // returns pre-existing cert object in kv if it already in kv
 func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
 	key := share.CLUSObjectCertKey(cn)
-	value, _ := enc.Marshal(cert)
-	err := cluster.PutIfNotExist(key, value, true)
+	value, err := enc.Marshal(cert)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cert %q: %w", cn, err)
+	}
+	err = cluster.PutIfNotExist(key, value, true)
 	if err == nil {
 		// don't know why: after rolling upgrade(replicas/maxSurge=3), there could be a short period that controller cannot get/put kv
 		// (GetRev returns "Key not found" error & Put/PutRev return "CAS put error" & PutIfNotExist returns nil : is it because kv is not syned yet?)
@@ -2690,8 +2718,11 @@ func (m clusterHelper) PutObjectCert(cn, keyPath, certPath string, cert *share.C
 // If index == 0, it will not overwrite the data. (PutIfNotExist)
 func (m clusterHelper) PutObjectCertMemory(cn string, in *share.CLUSX509Cert, out *share.CLUSX509Cert, index uint64) error {
 	key := share.CLUSObjectCertKey(cn)
-	value, _ := enc.Marshal(in)
-	err := cluster.PutRev(key, value, index)
+	value, err := enc.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cert %q: %w", cn, err)
+	}
+	err = cluster.PutRev(key, value, index)
 	if err != nil {
 		return err
 	}
@@ -2940,7 +2971,10 @@ func (m clusterHelper) GetFedMembership() *share.CLUSFedMembership {
 
 func (m clusterHelper) PutFedMembership(s *share.CLUSFedMembership) error {
 	key := share.CLUSFedKey(share.CLUSFedMembershipSubKey)
-	value, _ := enc.Marshal(s)
+	value, err := enc.Marshal(s)
+	if err != nil {
+		return fmt.Errorf("failed to marshal fed membership: %w", err)
+	}
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 		return err
@@ -3018,7 +3052,9 @@ func (m clusterHelper) PutFedJointCluster(jointCluster *share.CLUSFedJointCluste
 
 func (m clusterHelper) DeleteFedJointCluster(id string) error {
 	key := share.CLUSFedJointClusterStatusKey(id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete fed joint cluster status key")
+	}
 	key = share.CLUSFedJointClusterKey(id)
 	return cluster.Delete(key)
 }
