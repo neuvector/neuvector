@@ -75,7 +75,11 @@ func handleProfileReport(gproc map[string][]*share.CLUSProcessProfileEntry) erro
 		accReadAll := access.NewReaderAccessControl()
 		if profile = clusHelper.GetProcessProfile(group); profile != nil {
 			if len(profile.Process) == 0 {
-				if exist, _, _ := clusHelper.GetGroup(group, accReadAll); exist != nil {
+				exist, _, err := clusHelper.GetGroup(group, accReadAll)
+				if err != nil {
+					log.WithFields(log.Fields{"group": group}).WithError(err).Warn("Fail to get group")
+				}
+				if exist != nil {
 					if profile.Mode == "" {
 						update = true
 						if !utils.IsGroupNodes(group) { // not apply to "nodes"
@@ -88,9 +92,6 @@ func handleProfileReport(gproc map[string][]*share.CLUSProcessProfileEntry) erro
 							_, profile.Mode = getNewServicePolicyMode()
 						}
 					}
-				} else {
-					log.WithFields(log.Fields{"group": group}).Error("Fail to get group")
-					return errors.New("fail to find group")
 				}
 			}
 			for _, proc := range procs {
@@ -120,7 +121,11 @@ func handleProfileReport(gproc map[string][]*share.CLUSProcessProfileEntry) erro
 			}
 
 			//the cache group maybe slow than this
-			if exist, _, _ := clusHelper.GetGroup(group, accReadAll); exist != nil && exist.ProfileMode != "" {
+			exist, _, err := clusHelper.GetGroup(group, accReadAll)
+			if err != nil {
+				log.WithError(err).Warn("failed to get group for profile mode")
+			}
+			if exist != nil && exist.ProfileMode != "" {
 				profile.Mode = exist.ProfileMode // replaced
 			} else {
 				_, profile.Mode = getNewServicePolicyMode()
@@ -176,7 +181,9 @@ func createProcessProfile(txn *cluster.ClusterTransact, group, mode, baseline st
 			return false
 		}
 	} else {
-		_ = clusHelper.PutProcessProfileTxn(txn, group, profile)
+		if err := clusHelper.PutProcessProfileTxn(txn, group, profile); err != nil {
+			log.WithError(err).Warn("failed to put process profile in transaction")
+		}
 	}
 	return true
 }
@@ -382,7 +389,11 @@ func ProcReportBkgSvc() {
 				processEntries = make([]map[string][]*share.CLUSProcessProfileEntry, 0)
 				processEntryMux.Unlock()
 			} else {
-				if lock, _ := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait); lock != nil {
+				lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
+				if err != nil {
+					log.WithError(err).Warn("failed to acquire policy lock for profile sync")
+				}
+				if lock != nil {
 					var gprocs []map[string][]*share.CLUSProcessProfileEntry
 					index := len
 					if index > 32 { // TODO: 32 entries

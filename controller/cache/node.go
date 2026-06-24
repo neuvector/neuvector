@@ -234,9 +234,10 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 				hostID:  ac.agent.HostID,
 				agentID: ac.agent.ID,
 			}
-			ac.timerTask, _ = cctx.TimerWheel.AddTask(task, disconnectRemovalDelay)
-			if ac.timerTask == "" {
-				log.Error("Fail to insert timer")
+			var err error
+			ac.timerTask, err = cctx.TimerWheel.AddTask(task, disconnectRemovalDelay)
+			if err != nil {
+				log.WithError(err).Error("Fail to insert timer") // Log error: critical - agent timer setup failed
 			}
 
 			cacheMutexUnlock()
@@ -264,9 +265,10 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 				hostID:  ac.agent.HostID,
 				agentID: ac.agent.ID,
 			}
-			ac.timerTask, _ = cctx.TimerWheel.AddTask(task, deleteRemovalDelay)
-			if ac.timerTask == "" {
-				log.Error("Fail to insert timer")
+			var err error
+			ac.timerTask, err = cctx.TimerWheel.AddTask(task, deleteRemovalDelay)
+			if err != nil {
+				log.WithError(err).Error("Fail to insert timer") // Log error: critical - agent timer setup failed
 			}
 
 			cacheMutexUnlock()
@@ -309,9 +311,10 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 				ctrlID:    cc.ctrl.ID,
 				clusterIP: cc.ctrl.ClusterIP,
 			}
-			cc.timerTask, _ = cctx.TimerWheel.AddTask(task, disconnectRemovalDelay)
-			if cc.timerTask == "" {
-				log.Error("Fail to insert cc timer")
+			var err error
+			cc.timerTask, err = cctx.TimerWheel.AddTask(task, disconnectRemovalDelay)
+			if err != nil {
+				log.WithError(err).Error("Fail to insert cc timer") // Log error: critical - controller timer setup failed
 			}
 
 		case cluster.ClusterNotifyDelete:
@@ -337,9 +340,10 @@ func memberStateUpdateHandler(nType cluster.ClusterNotifyType, member string, ag
 				ctrlID:    cc.ctrl.ID,
 				clusterIP: cc.ctrl.ClusterIP,
 			}
-			cc.timerTask, _ = cctx.TimerWheel.AddTask(task, deleteRemovalDelay)
-			if cc.timerTask == "" {
-				log.Error("Fail to insert cc timer")
+			var err error
+			cc.timerTask, err = cctx.TimerWheel.AddTask(task, deleteRemovalDelay)
+			if err != nil {
+				log.WithError(err).Error("Fail to insert cc timer") // Log error: critical - controller timer setup failed
 			}
 		}
 	}
@@ -353,26 +357,43 @@ func deleteHostFromCluster(hostID string) {
 	log.WithFields(log.Fields{"hostID": hostID}).Info()
 
 	store := share.CLUSWorkloadHostStore(hostID)
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get workload store keys for host cleanup")
+	}
 	for _, key := range keys {
-		_ = cluster.Delete(key)
+		if err := cluster.Delete(key); err != nil {
+			log.WithError(err).Warn("failed to delete host workload key from cluster")
+		}
 	}
 
 	store = share.CLUSNetworkEPHostStore(hostID)
-	keys, _ = cluster.GetStoreKeys(store)
+	keys, err = cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get network EP store keys for host cleanup")
+	}
 	for _, key := range keys {
-		_ = cluster.Delete(key)
+		if err := cluster.Delete(key); err != nil {
+			log.WithError(err).Warn("failed to delete host network EP key from cluster")
+		}
 	}
 
 	//remove wildcard fqdn->ip mapping saved in kv
 	fqdn_store := fmt.Sprintf("%s%s/", share.CLUSFqdnIpStore, hostID)
-	fqdnkeys, _ := cluster.GetStoreKeys(fqdn_store)
+	fqdnkeys, err := cluster.GetStoreKeys(fqdn_store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get FQDN store keys for host cleanup")
+	}
 	for _, fqdnkey := range fqdnkeys {
-		_ = cluster.Delete(fqdnkey)
+		if err := cluster.Delete(fqdnkey); err != nil {
+			log.WithError(err).Warn("failed to delete host FQDN key from cluster")
+		}
 	}
 
 	key := share.CLUSHostKey(hostID, "agent")
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("failed to delete host agent key from cluster")
+	}
 }
 
 func deleteAgentFromCluster(hostID string, agentID string) {
@@ -473,7 +494,10 @@ func syncMemberStateFromCluster() []*share.CLUSController {
 
 	cs := make([]*share.CLUSController, 0)
 	cids := utils.NewSet()
-	controllers, _ := clusHelper.GetAllControllers()
+	controllers, err := clusHelper.GetAllControllers()
+	if err != nil {
+		log.WithError(err).Warn("failed to get controllers for member state sync")
+	}
 	for _, c := range controllers {
 		if n, ok := memberStateMap[c.ClusterIP]; !ok || n.Role != cluster.NodeRoleServer {
 			log.WithFields(log.Fields{"node": c.ClusterIP}).Debug("ctrl is missing")

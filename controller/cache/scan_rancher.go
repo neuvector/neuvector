@@ -110,11 +110,23 @@ var rancherOSCVEs = []rancherOSCVEInfo{
 func locateRancherOSCVE(os, kernel string) []*share.ScanVulnerability {
 	vulns := make([]*share.ScanVulnerability, 0)
 
-	osVer, _ := utils.NewVersion(os)
-	kVer, _ := utils.NewVersion(kernel)
+	osVer, err := utils.NewVersion(os)
+	if err != nil {
+		log.WithError(err).Warn("failed to parse OS version for Rancher CVE check")
+	}
+	kVer, err := utils.NewVersion(kernel)
+	if err != nil {
+		log.WithError(err).Warn("failed to parse kernel version for Rancher CVE check")
+	}
 	for _, cve := range rancherOSCVEs {
-		cveOSVer, _ := utils.NewVersion(cve.os)
-		cveKVer, _ := utils.NewVersion(cve.kernel)
+		cveOSVer, err := utils.NewVersion(cve.os)
+		if err != nil {
+			log.WithError(err).Warn("failed to parse CVE OS version for Rancher CVE check")
+		}
+		cveKVer, err := utils.NewVersion(cve.kernel)
+		if err != nil {
+			log.WithError(err).Warn("failed to parse CVE kernel version for Rancher CVE check")
+		}
 		osCompare := osVer.Compare(cveOSVer)
 		if osCompare < 0 || (osCompare == 0 && (cve.kernel != "" && kVer.Compare(cveKVer) < 0)) {
 			vulns = append(vulns, &share.ScanVulnerability{

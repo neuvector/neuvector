@@ -1512,7 +1512,9 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 					log.WithFields(log.Fields{"group": wlCache.learnedGroupName}).Debug("Fix group fields")
 					gc.group.CapIntcp = wl.CapIntcp
 					gc.group.PlatformRole = wl.PlatformRole
-					_ = clusHelper.PutGroup(gc.group, false)
+					if err := clusHelper.PutGroup(gc.group, false); err != nil {
+						log.WithError(err).Warn("failed to update group in cluster")
+					}
 				}
 			}
 		}
@@ -1651,7 +1653,11 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 	case "uniconf":
 		uniconfUpdate(nType, key, value)
 	case "cert":
-		value, _, _ = kv.UpgradeAndConvert(key, value)
+		var err error
+		value, err, _ = kv.UpgradeAndConvert(key, value)
+		if err != nil {
+			log.WithError(err).Warn("failed to upgrade/convert cert object")
+		}
 		certObjectUpdate(nType, key, value)
 	case "throttled", "telemetry":
 	default:
@@ -1660,7 +1666,11 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 }
 
 func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
-	value, _, _ = kv.UpgradeAndConvert(key, value)
+	var err error
+	value, err, _ = kv.UpgradeAndConvert(key, value)
+	if err != nil {
+		log.WithError(err).Warn("failed to upgrade/convert config object")
+	}
 
 	config := share.CLUSConfigKey2Config(key)
 
@@ -1849,7 +1859,9 @@ func logAgentEvent(ev share.TLogEvent, agent *share.CLUSAgent, msg string) {
 
 	clog.ReportedAt = time.Now().UTC()
 
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("failed to append agent event to queue")
+	}
 }
 
 func logControllerEvent(ev share.TLogEvent, ctrl *share.CLUSController, msg string) {
@@ -1866,7 +1878,9 @@ func logControllerEvent(ev share.TLogEvent, ctrl *share.CLUSController, msg stri
 	}
 	clog.ReportedAt = time.Now().UTC()
 
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("failed to append controller event to queue")
+	}
 }
 
 func markWorkloadState(workloads utils.Set, state string) {

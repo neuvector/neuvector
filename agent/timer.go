@@ -357,7 +357,10 @@ func putAuditLogs() {
 
 	if len(tmp) > 0 {
 		key := share.CLUSAuditLogKey(Host.ID, Agent.ID)
-		value, _ := json.Marshal(tmp)
+		value, err := json.Marshal(tmp)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal audit log")
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key, "len": len(tmp)}).Debug("Put audit log")
 		if err := cluster.PutBinary(key, zb); err != nil {

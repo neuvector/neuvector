@@ -112,7 +112,11 @@ func getUsageReport() *share.CLUSSystemUsageReport {
 	keys, _ := cluster.GetStoreKeys(store)
 	r.SLessProjs = len(keys)
 
-	r.InstallationID, _ = clusHelper.GetInstallationID()
+	var err error
+	r.InstallationID, err = clusHelper.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Warn("failed to get installation ID for usage report")
+	}
 
 	return &r
 }

@@ -596,7 +596,10 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	expAssets := goqu.Ex{"assetid": assets}
 	columns = []interface{}{"idns", "vulsb"}
 
-	statement, args, _ = dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
+	statement, args, sqlErr := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
+	if sqlErr != nil {
+		return nil, nil, sqlErr
+	}
 	rows, err = dbHandle.Query(statement, args...)
 	if err != nil {
 		return nil, nil, err
@@ -648,7 +651,10 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 
 	// get quick filter count for navigation
 	if requesetQuery.Filters.QuickFilter != "" {
-		sql, _, _ := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(quickFilterExp).ToSQL()
+		sql, _, sqlErr2 := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(quickFilterExp).ToSQL()
+		if sqlErr2 != nil {
+			return nil, nil, sqlErr2
+		}
 
 		rows, err := db.Query(sql)
 		if err != nil {
@@ -975,7 +981,10 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	db := dbHandle
 	rows, err := db.Query(statement, args...)

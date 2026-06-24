@@ -1230,7 +1230,11 @@ func syncActivityTx() *syncDataMsg {
 	syncLock(syncCatgEventIdx)
 	if curActivityIndex > 0 {
 		acts := activityCache[0:curActivityIndex]
-		msg.Data, _ = json.Marshal(acts)
+		var err error
+		msg.Data, err = json.Marshal(acts)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal activity log for sync")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgEventIdx)
 	syncUnlock(syncCatgEventIdx)
