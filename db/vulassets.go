@@ -606,7 +606,7 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	expAssets := goqu.Ex{"assetid": assets}
 	columns = []interface{}{"idns", "vulsb"}
 
-	statement, args, sqlErr := dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
+	statement, args, sqlErr = dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
 	if sqlErr != nil {
 		return nil, nil, sqlErr
 	}
