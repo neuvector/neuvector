@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -17,8 +17,42 @@ import (
 
 type CVEDBType map[string]*share.ScanVulnerability
 
-var scanDbMutex sync.RWMutex
-var scannerDB = share.CLUSScannerDB{CVEDB: make(map[string]*share.ScanVulnerability)}
+// CVELookup provides key-based access to CVE metadata.
+// The controller uses a SQLite-backed implementation; tests may use CVEDBMapLookup.
+type CVELookup interface {
+	Get(name string) (*share.ScanVulnerability, bool)
+}
+
+// CVEDBMapLookup adapts a CVEDBType map to the CVELookup interface.
+type CVEDBMapLookup struct{ M CVEDBType }
+
+func (l CVEDBMapLookup) Get(name string) (*share.ScanVulnerability, bool) {
+	v, ok := l.M[name]
+	return v, ok
+}
+
+// cvedbMeta holds both CVEDB fields so they can be stored and loaded as a single atomic unit,
+// preventing a concurrent reader from observing a new version paired with an old createTime.
+type cvedbMeta struct {
+	version    string
+	createTime string
+}
+
+var cvedbMetaPtr atomic.Pointer[cvedbMeta]
+
+// SetCVEDBMeta records the current CVEDB version and create time. Called once per CVEDB
+// update from ScannerUpdateHandler after the data has been written to SQLite.
+func SetCVEDBMeta(version, createTime string) {
+	cvedbMetaPtr.Store(&cvedbMeta{version: version, createTime: createTime})
+}
+
+// GetCVEDBMeta returns the current CVEDB version and create time.
+func GetCVEDBMeta() (version, createTime string) {
+	if m := cvedbMetaPtr.Load(); m != nil {
+		return m.version, m.createTime
+	}
+	return
+}
 
 const (
 	vulnSeverityLow int8 = iota
@@ -67,21 +101,8 @@ func (v VulTrait) GetPubTS() int64 {
 	return v.pubTS
 }
 
-func SetScannerDB(newDB *share.CLUSScannerDB) {
-	scanDbMutex.Lock()
-	scannerDB = *newDB
-	scanDbMutex.Unlock()
-}
-
-func GetScannerDB() *share.CLUSScannerDB {
-	scanDbMutex.RLock()
-	defer scanDbMutex.RUnlock()
-
-	return &scannerDB
-}
-
 // Functions can be used in both controllers and scanner
-func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) *api.RESTVulnerability {
+func ScanVul2REST(cvedb CVELookup, baseOS string, vul *share.ScanVulnerability) *api.RESTVulnerability {
 	v := &api.RESTVulnerability{
 		Name:           vul.Name,
 		Score:          vul.Score,
@@ -101,26 +122,30 @@ func ScanVul2REST(cvedb CVEDBType, baseOS string, vul *share.ScanVulnerability) 
 		InBaseImage:    vul.InBase,
 	}
 
+	if cvedb == nil {
+		return v
+	}
+
 	// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
 	// The guess work based on baseOS is only needed for upgrade from pre-5.0 cases.
 	if vul.DBKey != "" {
-		if vr, ok := cvedb[vul.DBKey]; ok {
+		if vr, ok := cvedb.Get(vul.DBKey); ok {
 			fillVulFields(vr, v)
 		}
 	} else {
 		baseOS = normalizeBaseOS(baseOS)
 
 		key := fmt.Sprintf("%s:%s", baseOS, v.Name)
-		if vr, ok := cvedb[key]; ok {
+		if vr, ok := cvedb.Get(key); ok {
 			fillVulFields(vr, v)
 		} else {
 			// lookup apps
 			key = fmt.Sprintf("apps:%s", v.Name)
-			if vr, ok := cvedb[key]; ok {
+			if vr, ok := cvedb.Get(key); ok {
 				fillVulFields(vr, v)
 			} else {
 				// fix metadata
-				if vr, ok := cvedb[v.Name]; ok {
+				if vr, ok := cvedb.Get(v.Name); ok {
 					fillVulFields(vr, v)
 				}
 			}
@@ -271,27 +296,24 @@ func ImageBench2REST(cmds []string, secrets []*share.ScanSecretLog, setids []*sh
 }
 
 // This is use when grpc structure is returned
-func FillVul(vul *share.ScanVulnerability) {
-	sdb := GetScannerDB()
-
-	if vul.DBKey != "" {
-		if vr, ok := sdb.CVEDB[vul.DBKey]; ok {
-			vul.Score = vr.Score
-			vul.Vectors = vr.Vectors
-			vul.ScoreV3 = vr.ScoreV3
-			vul.VectorsV3 = vr.VectorsV3
-			vul.Description = vr.Description
-			vul.Link = vr.Link
-		}
+func FillVul(cvedb CVELookup, vul *share.ScanVulnerability) {
+	if cvedb == nil || vul.DBKey == "" {
+		return
+	}
+	if vr, ok := cvedb.Get(vul.DBKey); ok {
+		vul.Score = vr.Score
+		vul.Vectors = vr.Vectors
+		vul.ScoreV3 = vr.ScoreV3
+		vul.VectorsV3 = vr.VectorsV3
+		vul.Description = vr.Description
+		vul.Link = vr.Link
 	}
 }
 
-func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *api.RESTScanRepoReport {
-	sdb := GetScannerDB()
-
+func ScanRepoResult2REST(cvedb CVELookup, result *share.ScanResult, tagMap map[string][]string) *api.RESTScanRepoReport {
 	rvuls := make([]*api.RESTVulnerability, len(result.Vuls))
 	for i, vul := range result.Vuls {
-		rvuls[i] = ScanVul2REST(sdb.CVEDB, result.Namespace, vul)
+		rvuls[i] = ScanVul2REST(cvedb, result.Namespace, vul)
 	}
 	rmods := make([]*api.RESTScanModule, len(result.Modules))
 	for i, m := range result.Modules {
@@ -314,7 +336,7 @@ func ScanRepoResult2REST(result *share.ScanResult, tagMap map[string][]string) *
 	for j, layer := range result.Layers {
 		rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 		for i, vul := range layer.Vuls {
-			rvuls[i] = ScanVul2REST(sdb.CVEDB, result.Namespace, vul)
+			rvuls[i] = ScanVul2REST(cvedb, result.Namespace, vul)
 		}
 		/*
 			var rsrts []*api.RESTScanSecret
@@ -423,7 +445,7 @@ func normalizeBaseOS(baseOS string) string {
 	return baseOS
 }
 
-func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag string, includeFiltered bool) []*api.RESTVulnerability {
+func FillVulTraits(cvedb CVELookup, baseOS string, vts []*VulTrait, showTag string, includeFiltered bool) []*api.RESTVulnerability {
 	baseOS = normalizeBaseOS(baseOS)
 
 	vuls := make([]*api.RESTVulnerability, 0, len(vts))
@@ -449,22 +471,24 @@ func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag stri
 
 		// Fill verbose vulnerability info, new scanner should return DBKey for each cve.
 		// The guess work based on baseOS is only needed for upgrade from pre-5.0 cases.
-		if vt.dbKey != "" {
-			if vr, ok := cvedb[vt.dbKey]; ok {
-				fillVulFields(vr, vul)
-			}
-		} else {
-			key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
-			if vr, ok := cvedb[key]; ok {
-				fillVulFields(vr, vul)
+		if cvedb != nil {
+			if vt.dbKey != "" {
+				if vr, ok := cvedb.Get(vt.dbKey); ok {
+					fillVulFields(vr, vul)
+				}
 			} else {
-				// lookup apps
-				key = fmt.Sprintf("apps:%s", vul.Name)
-				if vr, ok := cvedb[key]; ok {
+				key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
+				if vr, ok := cvedb.Get(key); ok {
 					fillVulFields(vr, vul)
 				} else {
-					if vr, ok := cvedb[vul.Name]; ok {
+					// lookup apps
+					key = fmt.Sprintf("apps:%s", vul.Name)
+					if vr, ok := cvedb.Get(key); ok {
 						fillVulFields(vr, vul)
+					} else {
+						if vr, ok := cvedb.Get(vul.Name); ok {
+							fillVulFields(vr, vul)
+						}
 					}
 				}
 			}
@@ -480,8 +504,7 @@ func FillVulTraits(cvedb CVEDBType, baseOS string, vts []*VulTrait, showTag stri
 	return vuls
 }
 
-func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
-	sdb := GetScannerDB()
+func ExtractVulnerability(cvedb CVELookup, vuls []*share.ScanVulnerability) []*VulTrait {
 	traits := make([]*VulTrait, len(vuls))
 	for i, v := range vuls {
 		s, ok := serverityString2ID[v.Severity]
@@ -497,15 +520,13 @@ func ExtractVulnerability(vuls []*share.ScanVulnerability) []*VulTrait {
 			} else {
 				log.WithFields(log.Fields{"publish": v.PublishedDate, "name": v.Name}).Error()
 			}
-		} else {
-			if len(sdb.CVEDB) > 0 {
-				if vr, ok := sdb.CVEDB[v.DBKey]; ok {
-					if t, err := time.Parse(time.RFC3339, vr.PublishedDate); err == nil {
-						publishedTS := t.Unix()
-						if publishedTS != pubTS {
-							// found a same-key entry in scannerDB but with different publishDate value than tne entry in vuls(scanResult).
-							pubTS = publishedTS
-						}
+		} else if cvedb != nil && v.DBKey != "" {
+			if vr, ok := cvedb.Get(v.DBKey); ok {
+				if t, err := time.Parse(time.RFC3339, vr.PublishedDate); err == nil {
+					publishedTS := t.Unix()
+					if publishedTS != pubTS {
+						// found a same-key entry in scannerDB but with different publishDate value than tne entry in vuls(scanResult).
+						pubTS = publishedTS
 					}
 				}
 			}
@@ -939,31 +960,27 @@ func (vpf vpFilter) FilterVuls(vuls []*share.ScanVulnerability, idns []api.RESTI
 	return list
 }
 
-func GetCVERecord(name, dbKey, baseOS string) *api.RESTVulnerability {
-	sdb := GetScannerDB()
+func GetCVERecord(cvedb CVELookup, name, dbKey, baseOS string) *api.RESTVulnerability {
+	vul := &api.RESTVulnerability{Name: name}
+	if cvedb == nil {
+		return vul
+	}
 	baseOS = normalizeBaseOS(baseOS)
 
-	vul := &api.RESTVulnerability{
-		Name: name,
-	}
-
-	cvedb := sdb.CVEDB
-
 	if dbKey != "" {
-		if vr, ok := cvedb[dbKey]; ok {
+		if vr, ok := cvedb.Get(dbKey); ok {
 			fillVulFields(vr, vul)
 		}
 	} else {
 		key := fmt.Sprintf("%s:%s", baseOS, vul.Name)
-		if vr, ok := cvedb[key]; ok {
+		if vr, ok := cvedb.Get(key); ok {
 			fillVulFields(vr, vul)
 		} else {
-			// lookup apps
 			key = fmt.Sprintf("apps:%s", vul.Name)
-			if vr, ok := cvedb[key]; ok {
+			if vr, ok := cvedb.Get(key); ok {
 				fillVulFields(vr, vul)
 			} else {
-				if vr, ok := cvedb[vul.Name]; ok {
+				if vr, ok := cvedb.Get(vul.Name); ok {
 					fillVulFields(vr, vul)
 				}
 			}
@@ -971,9 +988,4 @@ func GetCVERecord(name, dbKey, baseOS string) *api.RESTVulnerability {
 	}
 
 	return vul
-}
-
-func GetCVEDBRecordCount() int {
-	sdb := GetScannerDB()
-	return len(sdb.CVEDB)
 }

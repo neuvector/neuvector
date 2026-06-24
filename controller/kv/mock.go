@@ -117,7 +117,7 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 	m.id = "host-1"
 }
 
-func (m *MockCluster) AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error) {
+func (m *MockCluster) AcquireLock(key string, wait time.Duration, opts ...cluster.LockOptions) (cluster.LockInterface, error) {
 	return &mockLock{}, nil
 }
 
