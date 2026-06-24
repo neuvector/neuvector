@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,22 +24,37 @@ const registryDataDir = NeuvectorDir + "registry/"
 const summarySuffix = ".sum"
 const reportSuffix = ".gz"
 
-func registryImageSummaryFileName(name, id string) string {
-	return fmt.Sprintf("%s%s/%s%s", registryDataDir, name, id, summarySuffix)
+func checkLocalPath(base string, elem ...string) (string, error) {
+	localpath := path.Join(elem...)
+	if !filepath.IsLocal(localpath) {
+		log.WithFields(log.Fields{"localpath": localpath}).Error("invalid file path")
+		return "", fmt.Errorf("Invalid file path")
+	}
+	return path.Join(base, localpath), nil
 }
 
-func registryImageReportFileName(name, id string) string {
-	return fmt.Sprintf("%s%s/%s%s", registryDataDir, name, id, reportSuffix)
+func registryImageSummaryFileName(name, id string) (string, error) {
+	return checkLocalPath(registryDataDir, name, id+summarySuffix)
+}
+
+func registryImageReportFileName(name, id string) (string, error) {
+	return checkLocalPath(registryDataDir, name, id+reportSuffix)
 }
 
 func writeRegistryImageSummary(name, id string, dat []byte) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			log.WithFields(log.Fields{"error": err, "path": path}).Error()
 		}
 	}
-	filename := registryImageSummaryFileName(name, id)
+	filename, err := registryImageSummaryFileName(name, id)
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(filename, dat, 0755); err != nil {
 		log.WithFields(log.Fields{"error": err, "filename": filename}).Error("Unable to write file")
 		return err
@@ -47,13 +63,19 @@ func writeRegistryImageSummary(name, id string, dat []byte) error {
 }
 
 func writeRegistryImageReport(name, id string, dat []byte) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			log.WithFields(log.Fields{"error": err, "path": path}).Error()
 		}
 	}
-	filename := registryImageReportFileName(name, id)
+	filename, err := registryImageReportFileName(name, id)
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(filename, dat, 0755); err != nil {
 		log.WithFields(log.Fields{"error": err, "filename": filename}).Error("Unable to write file")
 		return err
@@ -62,17 +84,26 @@ func writeRegistryImageReport(name, id string, dat []byte) error {
 }
 
 func deleteRegistryImageSummary(name, id string) error {
-	filename := registryImageSummaryFileName(name, id)
+	filename, err := registryImageSummaryFileName(name, id)
+	if err != nil {
+		return err
+	}
 	return os.Remove(filename)
 }
 
 func deleteRegistryImageReport(name, id string) error {
-	filename := registryImageReportFileName(name, id)
+	filename, err := registryImageReportFileName(name, id)
+	if err != nil {
+		return err
+	}
 	return os.Remove(filename)
 }
 
 func createRegistryDir(name string) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return os.MkdirAll(path, 0755)
 	} else {
@@ -81,7 +112,10 @@ func createRegistryDir(name string) error {
 }
 
 func deleteRegistryDir(name string) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	return os.RemoveAll(path)
 }
 
@@ -91,7 +125,11 @@ func restoreToCluster(reg, fedRole string) string {
 	var restored int // # of restored image scan results
 	var scanNotFinished int
 
-	regPath := fmt.Sprintf("%s%s", registryDataDir, reg)
+	regPath, err := checkLocalPath(registryDataDir, reg)
+	if err != nil {
+		log.WithFields(log.Fields{"name": reg, "err": err}).Error("skip")
+		return ""
+	}
 	log.WithFields(log.Fields{"regPath": regPath, "name": reg, "fedRole": fedRole}).Debug("Restore to cluster")
 
 	// 1. Read summary first
@@ -131,15 +169,15 @@ func restoreToCluster(reg, fedRole string) string {
 		sums = sums[:api.ScanPersistImageMax]
 
 		for _, sum := range dels {
-			os.Remove(fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, summarySuffix))
-			os.Remove(fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix))
+			os.Remove(path.Join(regPath, sum.ImageID+summarySuffix))
+			os.Remove(path.Join(regPath, sum.ImageID+reportSuffix))
 		}
 		log.WithFields(log.Fields{"count": len(dels)}).Info("Remove old images")
 	}
 
 	// 3. Read the report and write both into kv
 	for _, sum := range sums {
-		rptFile := fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix)
+		rptFile := path.Join(regPath, sum.ImageID+reportSuffix)
 		vReport, vErr := os.ReadFile(rptFile)
 		if vErr == nil {
 			// 3-1. must restore scan/data/image/{reg}/{id} key first !
