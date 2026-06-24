@@ -31,7 +31,9 @@ var pe policy.Engine
 var learnedProcess []*share.CLUSProcProfileReq
 var learnedProcessMtx sync.Mutex
 
-const maxLearnedProcess int = 2000
+const (
+	maxLearnedProcess = 2000
+)
 
 type domainCache struct {
 	domain *share.CLUSDomain
@@ -256,28 +258,28 @@ func initWorkloadPolicyMap() map[string]*policy.WorkloadIPPolicyInfo {
 	return workloadPolicyMap
 }
 
-func getPolicyConfig(newRuleKey string, slots, ruleslen int) []share.CLUSGroupIPPolicy {
+func getPolicyConfig(newRuleKey string, slots, ruleslen int) ([]share.CLUSGroupIPPolicy, error) {
 	pols := make([]share.CLUSGroupIPPolicy, ruleslen)
 	log.WithFields(log.Fields{"newRuleKey": newRuleKey, "slots": slots, "ruleslen": ruleslen}).Debug("")
 	for i := 0; i < slots; i++ {
 		key := fmt.Sprintf("%s%v", newRuleKey, i)
 		//log.WithFields(log.Fields{"key": key,}).Debug("rule key")
-		value, err := cluster.Get(key)
+		value, err := cluster.GetWithRetry(key)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err, "key": key}).Warn("Failed to get policy config from cluster")
-			continue
+			return nil, fmt.Errorf("failed to get policy config key %s: %w", key, err)
 		}
 		if value != nil {
 			pol := make([]share.CLUSGroupIPPolicy, 0)
 			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
-				log.Error("Failed to unzip data")
-				continue
+				log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
+				return nil, fmt.Errorf("failed to unzip policy config key %s", key)
 			}
 			err := json.Unmarshal(uzb, &pol)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Cannot decode policy")
-				continue
+				log.WithFields(log.Fields{"error": err, "key": key}).Error("Cannot decode policy")
+				return nil, fmt.Errorf("failed to decode policy config key %s: %w", key, err)
 			}
 			//log.WithFields(log.Fields{"value": string(uzb), "policy_len":len(pol),}).Debug("policy per rule key")
 
@@ -288,7 +290,7 @@ func getPolicyConfig(newRuleKey string, slots, ruleslen int) []share.CLUSGroupIP
 			}
 		}
 	}
-	return pols
+	return pols, nil
 }
 
 func mergeWlPolicyConfig(rules []share.CLUSGroupIPPolicy, ruleslen, wlslots, wlens int) []share.CLUSGroupIPPolicy {
@@ -312,58 +314,83 @@ func mergeWlPolicyConfig(rules []share.CLUSGroupIPPolicy, ruleslen, wlslots, wle
 	return newGroupIPPolicy
 }
 
-func systemConfigPolicyVersionNode(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
+func systemConfigPolicyVersionNode(s share.CLUSGroupIPPolicyVer) ([]share.CLUSGroupIPPolicy, error) {
 	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
 
 	//check whether key "recalculate/policy/groupIPRules" exist
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	if !cluster.Exist(rule_key) {
-		return groupIPPolicy
+	exists, err := cluster.Exist(rule_key)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "key": rule_key}).Warn("Failed to check policy config existence")
+		return nil, err
+	}
+	if !exists {
+		return groupIPPolicy, nil
 	}
 	// indicate network policy version change.
 	newCommonRuleKey := fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
 	newNodeRuleKey := fmt.Sprintf("%s%s/%s/", rule_key, Host.ID, s.PolicyIPRulesVersion)
 
 	//combine group ip rules from separate slots
-	groupIPPolicy = getPolicyConfig(newCommonRuleKey, s.CommonSlotNo, s.CommonRulesLen)
-	groupNodeIPPolicy := getPolicyConfig(newNodeRuleKey, s.SlotNo, s.RulesLen)
-	if groupIPPolicy != nil && groupNodeIPPolicy != nil {
+	var groupNodeIPPolicy []share.CLUSGroupIPPolicy
+	groupIPPolicy, err = getPolicyConfig(newCommonRuleKey, s.CommonSlotNo, s.CommonRulesLen)
+	if err != nil {
+		return nil, err
+	}
+	groupNodeIPPolicy, err = getPolicyConfig(newNodeRuleKey, s.SlotNo, s.RulesLen)
+	if err != nil {
+		return nil, err
+	}
+	if len(groupIPPolicy) > 0 || len(groupNodeIPPolicy) > 0 {
 		groupIPPolicy = append(groupIPPolicy, groupNodeIPPolicy...)
 	}
 	if len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
 		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
 	}
 	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
-	return groupIPPolicy
+	return groupIPPolicy, nil
 }
 
-func systemConfigPolicyVersion(s share.CLUSGroupIPPolicyVer) []share.CLUSGroupIPPolicy {
+func systemConfigPolicyVersion(s share.CLUSGroupIPPolicyVer) ([]share.CLUSGroupIPPolicy, error) {
 	groupIPPolicy := make([]share.CLUSGroupIPPolicy, 0)
 
 	//check whether key "recalculate/groupIPRules" exist, if not
 	//use old key "network/groupIPRules" for rolling upgrade case
 	var rule_key, newRuleKey string
 	rule_key = fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	if cluster.Exist(rule_key) {
+	exists, err := cluster.Exist(rule_key)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "key": rule_key}).Warn("Failed to check policy config existence")
+		return nil, err
+	}
+	if exists {
 		// indicate network policy version change.
 		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
 	} else {
 		rule_key = fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-		if !cluster.Exist(rule_key) {
-			return groupIPPolicy
+		exists, err = cluster.Exist(rule_key)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "key": rule_key}).Warn("Failed to check policy config existence")
+			return nil, err
+		}
+		if !exists {
+			return groupIPPolicy, nil
 		}
 		// indicate network policy version change.
 		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.PolicyIPRulesVersion)
 	}
 
 	//combine group ip rules from separate slots
-	groupIPPolicy = getPolicyConfig(newRuleKey, s.SlotNo, s.RulesLen)
+	groupIPPolicy, err = getPolicyConfig(newRuleKey, s.SlotNo, s.RulesLen)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(groupIPPolicy) > 0 && s.WorkloadSlot > 0 && s.WorkloadLen > 0 {
 		groupIPPolicy = mergeWlPolicyConfig(groupIPPolicy, s.RulesLen, s.WorkloadSlot, s.WorkloadLen)
 	}
 	//log.WithFields(log.Fields{"mergelen":len(groupIPPolicy)}).Debug("after merge")
-	return groupIPPolicy
+	return groupIPPolicy, nil
 }
 
 // parent goroutine: containerTaskWorker()
@@ -402,7 +429,11 @@ func printEnIPPolicy(groupIPPolicy []share.CLUSGroupIPPolicy) {
 }
 
 func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
-	groupIPPolicy := systemConfigPolicyVersionNode(s)
+	groupIPPolicy, err := systemConfigPolicyVersionNode(s)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to load policy config from cluster")
+		return false
+	}
 	//printEnIPPolicy(groupIPPolicy)
 	if len(groupIPPolicy) == 0 {
 		if pe.NetworkPolicy == nil {
@@ -1116,7 +1147,7 @@ func dlpConfigRule(dlprules share.CLUSWorkloadDlpRules) {
 	}
 }
 
-func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUSWorkloadDlpRules {
+func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) (share.CLUSWorkloadDlpRules, error) {
 	dlprules := share.CLUSWorkloadDlpRules{
 		DlpRuleList: make([]*share.CLUSDlpRule, ruleslen),
 		DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, wlen),
@@ -1125,10 +1156,10 @@ func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUS
 	for i := 0; i < slots; i++ {
 		key := fmt.Sprintf("%s%v", newRuleKey, i)
 		//log.WithFields(log.Fields{"key": key,}).Debug("rule key")
-		value, err := cluster.Get(key)
+		value, err := cluster.GetWithRetry(key)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err, "key": key}).Warn("Failed to get DLP config from cluster")
-			continue
+			return share.CLUSWorkloadDlpRules{}, fmt.Errorf("failed to get DLP config key %s: %w", key, err)
 		}
 		if value != nil {
 			dlprule := share.CLUSWorkloadDlpRules{
@@ -1137,13 +1168,13 @@ func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUS
 			}
 			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
-				log.Error("Failed to unzip data")
-				continue
+				log.WithFields(log.Fields{"key": key}).Error("Failed to unzip data")
+				return share.CLUSWorkloadDlpRules{}, fmt.Errorf("failed to unzip DLP config key %s", key)
 			}
 			err := json.Unmarshal(uzb, &dlprule)
 			if err != nil {
-				log.WithFields(log.Fields{"error": err}).Error("Cannot decode dlprule")
-				continue
+				log.WithFields(log.Fields{"error": err, "key": key}).Error("Cannot decode dlprule")
+				return share.CLUSWorkloadDlpRules{}, fmt.Errorf("failed to decode DLP config key %s: %w", key, err)
 			}
 			//log.WithFields(log.Fields{"value": string(uzb)}).Debug("dlp per rule key")
 
@@ -1162,10 +1193,10 @@ func getDlpRulesVersion(newRuleKey string, slots, ruleslen, wlen int) share.CLUS
 			}
 		}
 	}
-	return dlprules
+	return dlprules, nil
 }
 
-func dlpUpdateRuleVersion(s share.CLUSDlpRuleVer) share.CLUSWorkloadDlpRules {
+func dlpUpdateRuleVersion(s share.CLUSDlpRuleVer) (share.CLUSWorkloadDlpRules, error) {
 	dlprules := share.CLUSWorkloadDlpRules{
 		DlpRuleList: make([]*share.CLUSDlpRule, 0),
 		DlpWlRules:  make([]*share.CLUSDlpWorkloadRule, 0),
@@ -1174,15 +1205,23 @@ func dlpUpdateRuleVersion(s share.CLUSDlpRuleVer) share.CLUSWorkloadDlpRules {
 	//check whether key "recalculate/DlpWorkloadRules" exist
 	var rule_key, newRuleKey string
 	rule_key = fmt.Sprintf("%s/", share.CLUSRecalDlpWlRulesKey(share.DlpRulesDefaultName))
-	if cluster.Exist(rule_key) {
+	exists, err := cluster.Exist(rule_key)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "key": rule_key}).Warn("Failed to check DLP config existence")
+		return dlprules, err
+	}
+	if exists {
 		// indicate network policy version change.
 		newRuleKey = fmt.Sprintf("%s%s/", rule_key, s.DlpRulesVersion)
 		//log.WithFields(log.Fields{"newRuleKey": newRuleKey}).Debug("")
 
 		//combine dlp rules from separate slots
-		dlprules = getDlpRulesVersion(newRuleKey, s.SlotNo, s.RulesLen, s.WorkloadLen)
+		dlprules, err = getDlpRulesVersion(newRuleKey, s.SlotNo, s.RulesLen, s.WorkloadLen)
+		if err != nil {
+			return dlprules, err
+		}
 	}
-	return dlprules
+	return dlprules, nil
 }
 
 func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -1198,7 +1237,11 @@ func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []b
 		log.WithFields(log.Fields{"error": err}).Error()
 		return
 	}
-	dlprules := dlpUpdateRuleVersion(s)
+	dlprules, err := dlpUpdateRuleVersion(s)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to load DLP rules from cluster")
+		return
+	}
 	dlpConfigRule(dlprules)
 	//when network policy is disabled, change workload's datapath via dlp
 	if gInfo.disableNetPolicy {
