@@ -26,6 +26,7 @@ import (
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
+	nvdb "github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	"github.com/neuvector/neuvector/share/httpclient"
@@ -406,6 +407,7 @@ func acquireCVEDBUploadLock(clusHelper kv.ClusterHelper) (cluster.LockInterface,
 	}
 	return lock, err
 }
+
 
 // ScannerRegisterV3 implements bidirectional streaming scanner registration.
 // The scanner sends version info first; the controller checks if its CVE database is
@@ -801,7 +803,7 @@ func (sas *ScanAdapterService) ScanImage(ctxunused context.Context, req *share.A
 
 	// Fill the detail and filter the result
 	for _, v := range result.Vuls {
-		scanUtils.FillVul(v)
+		scanUtils.FillVul(nvdb.GlobalCVECache(), v)
 	}
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 	result.Vuls = vpf.FilterVuls(result.Vuls, []api.RESTIDName{{DisplayName: fmt.Sprintf("%s:%s", result.Repository, result.Tag)}})

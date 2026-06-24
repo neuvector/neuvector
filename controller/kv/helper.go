@@ -44,7 +44,9 @@ type MockKvConfigUpdateFunc func(nType cluster.ClusterNotifyType, key string, va
 type LogEventFunc func(share.TLogEvent, time.Time, int, string)
 
 type ClusterHelper interface {
-	AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error)
+	// AcquireLock acquires a distributed lock. An optional cluster.LockOptions
+	// overrides defaults; omit entirely to use driver defaults.
+	AcquireLock(key string, wait time.Duration, opts ...cluster.LockOptions) (cluster.LockInterface, error)
 	ReleaseLock(cluster.LockInterface)
 
 	UpgradeClusterKV(version string) (verUpdated bool)
@@ -141,7 +143,9 @@ type ClusterHelper interface {
 	GetScannerStats(id string) (*share.CLUSScannerStats, error)
 	CreateScannerStats(id string) error
 	PutScannerStats(id string, objType share.ScanObjectType, result *share.ScanResult) error
-	GetScannerDB(store string) ([]*share.CLUSScannerDB, error)
+	// IterateScannerDB calls fn for each consul slot under store, one at a time.
+	// Each slot is eligible for GC after fn returns. Returns the total CVE entry count.
+	IterateScannerDB(store string, fn func(*share.CLUSScannerDB) error) (int, error)
 
 	// InitCreditOwners initializes the scan credit owners for the cluster.
 	InitCreditOwners() error
@@ -495,10 +499,19 @@ func getAllSubKeys(scope, store string) utils.Set {
 var enc common.EncryptMarshaller
 var dec common.DecryptUnmarshaller
 
-// This is simplified version of locking, caller not be able to stop wait and not be able to
-// get notified when lock is lock.
-func (m clusterHelper) AcquireLock(key string, wait time.Duration) (cluster.LockInterface, error) {
-	lock, err := cluster.NewLock(key, wait)
+// AcquireLock acquires a distributed lock. This is a simplified version: the caller
+// cannot stop the wait early and will not be notified if the lock is lost.
+// Pass a LockOptions to override consul session defaults (e.g. SessionTTL).
+func (m clusterHelper) AcquireLock(key string, wait time.Duration, opts ...cluster.LockOptions) (cluster.LockInterface, error) {
+	var lock cluster.LockInterface
+	var err error
+
+	// Only one argument is supported.
+	if len(opts) > 0 {
+		lock, err = cluster.NewLock(key, wait, opts[0])
+	} else {
+		lock, err = cluster.NewLock(key, wait)
+	}
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "key": key}).Error("Create lock error")
 		return nil, err
@@ -1824,33 +1837,33 @@ func (m clusterHelper) DeleteScanner(id string) error {
 	return cluster.Delete(key)
 }
 
-func (m clusterHelper) GetScannerDB(store string) ([]*share.CLUSScannerDB, error) {
-	dbs := make([]*share.CLUSScannerDB, 0)
+func (m clusterHelper) IterateScannerDB(store string, fn func(*share.CLUSScannerDB) error) (int, error) {
 	keys, err := cluster.GetStoreKeys(store)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list scanner db keys for %s: %w", store, err)
+		return 0, fmt.Errorf("failed to list scanner db keys for %s: %w", store, err)
 	}
+	total := 0
 	for _, key := range keys {
 		value, _, err := m.get(key)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read scanner db key %s: %w", key, err)
+			return 0, fmt.Errorf("failed to read scanner db key %s: %w", key, err)
 		}
 		if value != nil {
-			var db share.CLUSScannerDB
+			var slot share.CLUSScannerDB
 			uzb := utils.GunzipBytes(value)
 			if uzb == nil {
-				return nil, fmt.Errorf("failed to unzip scanner db key %s: %w", key, err)
+				return 0, fmt.Errorf("failed to unzip scanner db key %s", key)
 			}
-
-			err := json.Unmarshal(uzb, &db)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode scanner db key %s: %w", key, err)
+			if err := json.Unmarshal(uzb, &slot); err != nil {
+				return 0, fmt.Errorf("failed to decode scanner db key %s: %w", key, err)
 			}
-
-			dbs = append(dbs, &db)
+			total += len(slot.CVEDB)
+			if err := fn(&slot); err != nil {
+				return 0, fmt.Errorf("failed to process scanner db slot %s: %w", key, err)
+			}
 		}
 	}
-	return dbs, nil
+	return total, nil
 }
 
 func (m clusterHelper) GetAvailableScanners() []share.CLUSScanner {

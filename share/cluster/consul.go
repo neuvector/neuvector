@@ -583,19 +583,23 @@ func (l *lockMethod) Key() string {
 	return l.key
 }
 
-func (m *consulMethod) NewLock(key string, wait time.Duration) (LockInterface, error) {
+func (m *consulMethod) NewLock(key string, wait time.Duration, opts ...LockOptions) (LockInterface, error) {
 	c, err := m.getClient()
 	if err != nil {
 		return nil, err
 	}
 
-	opts := &api.LockOptions{Key: key}
+	// Only one argument is supported.
+	lockOpts := &api.LockOptions{Key: key}
+	if len(opts) > 0 && opts[0].SessionTTL != "" {
+		lockOpts.SessionTTL = opts[0].SessionTTL
+	}
 	if wait > 0 {
-		opts.LockTryOnce = true
-		opts.LockWaitTime = wait
+		lockOpts.LockTryOnce = true
+		lockOpts.LockWaitTime = wait
 	}
 
-	l, err := c.LockOpts(opts)
+	l, err := c.LockOpts(lockOpts)
 	if err != nil {
 		return nil, err
 	}

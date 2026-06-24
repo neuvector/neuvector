@@ -58,7 +58,7 @@ func refreshScanCache(rs *Registry, id string, sum *share.CLUSRegistryImageSumma
 		key := share.CLUSRegistryImageDataKey(rs.config.Name, id)
 		if report := clusHelper.GetScanReport(key); report != nil {
 			var criticals, highs, meds []string
-			localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
+			localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), report.Vuls)
 			alives := vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 			criticals, highs, meds, _, c.criticalVulsWithFix, c.highVulsWithFix, c.vulScore, c.vulInfo, c.lowVulInfo = countVuln(report.Vuls, nil, alives)
 			c.criticalVuls = len(criticals)
@@ -452,7 +452,6 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 	vmap := make(map[string][]*api.RESTVulnerability)
 	nmap := make(map[string][]api.RESTIDName)
 
-	sdb := scanUtils.GetScannerDB()
 	if acc.HasGlobalPermissions(share.PERM_REG_SCAN, 0) {
 		// To avoid authorize for every image - run faster.
 		for id, c := range rs.cache {
@@ -463,8 +462,8 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 				if err != nil {
 					log.WithFields(log.Fields{"id": id, "error": err}).Warn("Failed to get vulnerability data")
 				}
-				localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
-				vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
+				localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
+				vmap[id] = scanUtils.FillVulTraits(db.GlobalCVECache(), sum.BaseOS, localVulTraits, showTag, false)
 				nmap[id] = images2IDNames(rs, sum)
 			}
 		}
@@ -478,8 +477,8 @@ func (m *scanMethod) GetRegistryVulnerabilities(name string, vpf scanUtils.VPFIn
 					if err != nil {
 						log.WithFields(log.Fields{"id": id, "error": err}).Warn("Failed to get vulnerability data")
 					}
-					localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
-					vmap[id] = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
+					localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
+					vmap[id] = scanUtils.FillVulTraits(db.GlobalCVECache(), sum.BaseOS, localVulTraits, showTag, false)
 					nmap[id] = images2IDNames(rs, sum)
 				}
 			}
@@ -600,8 +599,6 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 
 	if vpf != nil {
 		if c, ok := rs.cache[id]; ok {
-			sdb := scanUtils.GetScannerDB()
-
 			rrpt.Envs = c.envs
 			rrpt.Labels = c.labels
 			rrpt.Cmds = c.cmds
@@ -613,9 +610,9 @@ func (m *scanMethod) GetRegistryImageReport(name, id string, vpf scanUtils.VPFIn
 				return nil, err
 			}
 
-			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+			localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
 			vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
-			rrpt.Vuls = scanUtils.FillVulTraits(sdb.CVEDB, sum.BaseOS, localVulTraits, showTag, false)
+			rrpt.Vuls = scanUtils.FillVulTraits(db.GlobalCVECache(), sum.BaseOS, localVulTraits, showTag, false)
 
 			// The checks are still to be filtered
 			rrpt.Checks = scanUtils.ImageBench2REST(c.cmds, c.secrets, c.setIDPerm, tagMap)
@@ -681,7 +678,6 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 	if report := clusHelper.GetScanReport(key); report == nil {
 		return nil, common.ErrObjectNotFound
 	} else {
-		sdb := scanUtils.GetScannerDB()
 		idns := images2IDNames(rs, sum)
 
 		layers := make([]*api.RESTScanLayer, len(report.Layers))
@@ -689,7 +685,7 @@ func (m *scanMethod) GetRegistryLayersReport(name, id string, vpf scanUtils.VPFI
 			// Because cache doesn't save vul. trait of layers, we have to filtered them every time.
 			rvuls := make([]*api.RESTVulnerability, len(layer.Vuls))
 			for i, vul := range layer.Vuls {
-				rvuls[i] = scanUtils.ScanVul2REST(sdb.CVEDB, sum.BaseOS, vul)
+				rvuls[i] = scanUtils.ScanVul2REST(db.GlobalCVECache(), sum.BaseOS, vul)
 			}
 			rvuls = vpf.FilterVulREST(rvuls, idns, showTag)
 
@@ -1023,7 +1019,7 @@ func fillImageVulModule(rs *Registry, id string, image *imageSummary, vpf scanUt
 	}
 
 	image.modules = modules
-	localVulTraits := scanUtils.ExtractVulnerability(vuls)
+	localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), vuls)
 	if sum, ok := rs.summary[id]; ok && sum.Status == api.ScanStatusFinished {
 		vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 		for _, v := range localVulTraits {

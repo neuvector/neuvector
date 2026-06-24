@@ -423,7 +423,7 @@ func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
 	if err != nil {
 		log.WithError(err).Warn("failed to get vulnerability data for scan cache refresh")
 	}
-	localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+	localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
 
 	vpf.FilterVulTraits(localVulTraits, info.idns)
 	criticals, highs, meds := scanUtils.CountVulTrait(localVulTraits)
@@ -528,7 +528,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 
 		// Filter and count vulnerabilities
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
-		localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
+		localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), report.Vuls)
 		alives = vpf.FilterVulTraits(localVulTraits, info.idns)
 		criticals, highs, meds, lows, fixedCriticalsInfo, fixedHighsInfo = scanUtils.GatherVulTrait(localVulTraits)
 		brief := fillScanBrief(info, len(criticals), len(highs), len(meds))
@@ -590,9 +590,7 @@ func scanDone(id string, objType share.ScanObjectType, report *share.CLUSScanRep
 func (m CacheMethod) GetScannerCount(acc *access.AccessControl) (int, string, string) {
 	cacheMutexRLock()
 	defer cacheMutexRUnlock()
-	sdb := scanUtils.GetScannerDB()
-	dbTime := sdb.CVEDBCreateTime
-	dbVers := sdb.CVEDBVersion
+	dbVers, dbTime := scanUtils.GetCVEDBMeta()
 	if acc.HasGlobalPermissions(share.PERMS_CLUSTER_READ, 0) {
 		return len(scannerCacheMap), dbTime, dbVers
 	} else {
@@ -1253,38 +1251,43 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 			log.WithFields(log.Fields{"scanner": s}).Info("Add or update scanner")
 
 			if s.ID == share.CLUSScannerDBVersionID {
-				// Dummy scanner to indicate db version change. It should not stored in the map.
+				// Dummy scanner to indicate db version change. It should not be stored in the map.
 				newStore := fmt.Sprintf("%s%s/", share.CLUSScannerDBStore, s.CVEDBVersion)
 
-				newDB := &share.CLUSScannerDB{
+				// Write consul slots directly to SQLite one at a time — no full in-memory map is built.
+				// The iterate callback returns an error when no entries are found so that
+				// ReplaceCVEDB rolls back rather than committing an empty table (data-loss guard).
+				var totalEntries int
+				err := db.ReplaceCVEDB(s.CVEDBVersion, s.CVEDBCreateTime,
+					func(writeFn func(*share.CLUSScannerDB) error) error {
+						var iterErr error
+						totalEntries, iterErr = clusHelper.IterateScannerDB(newStore, writeFn)
+						if iterErr != nil {
+							return iterErr
+						}
+						if totalEntries == 0 {
+							return fmt.Errorf("no CVE entries found in store %s", newStore)
+						}
+						return nil
+					},
+				)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "store": newStore, "version": s.CVEDBVersion}).Error("Failed to write scanner DB to SQLite")
+					return
+				}
+
+				// Invalidate the per-prefix cache AFTER the SQLite commit so that
+				// subsequent cache misses load from the newly-committed data.
+				db.GlobalCVECache().Invalidate()
+
+				log.WithFields(log.Fields{"cvedb": s.CVEDBVersion, "entries": totalEntries}).Info()
+
+				scanUtils.SetCVEDBMeta(s.CVEDBVersion, s.CVEDBCreateTime)
+				scan.ScannerDBChange(&share.CLUSScannerDB{
 					CVEDBVersion:    s.CVEDBVersion,
 					CVEDBCreateTime: s.CVEDBCreateTime,
-					CVEDB:           make(map[string]*share.ScanVulnerability),
-				}
-
-				// Reassemble. Keep the current in-memory DB if the new store cannot be read
-				// or contains no usable entries.
-				dbs, err := clusHelper.GetScannerDB(newStore)
-				if err != nil {
-					log.WithFields(log.Fields{"error": err, "store": newStore, "version": s.CVEDBVersion}).Error("Failed to load scanner DB")
-					return
-				}
-				for _, db := range dbs {
-					for _, cve := range db.CVEDB {
-						newDB.CVEDB[cve.Name] = cve
-					}
-				}
-
-				if len(newDB.CVEDB) == 0 {
-					log.WithFields(log.Fields{"store": newStore, "version": s.CVEDBVersion}).Error("Dropping empty scanner DB update")
-					return
-				}
-
-				log.WithFields(log.Fields{"cvedb": newDB.CVEDBVersion, "entries": len(newDB.CVEDB)}).Info()
-
-				scanUtils.SetScannerDB(newDB)
-				scan.ScannerDBChange(newDB)
-				scannerDBChange(newDB.CVEDBVersion)
+				})
+				scannerDBChange(s.CVEDBVersion)
 			} else {
 				// Real Scanner
 				cacheMutexLock()
@@ -1557,9 +1560,7 @@ func (m CacheMethod) GetScanStatus(acc *access.AccessControl) (*api.RESTScanStat
 			status.Scanned++
 		}
 	}
-	sdb := scanUtils.GetScannerDB()
-	status.CVEDBVersion = sdb.CVEDBVersion
-	status.CVEDBCreateTime = sdb.CVEDBCreateTime
+	status.CVEDBVersion, status.CVEDBCreateTime = scanUtils.GetCVEDBMeta()
 	return &status, nil
 }
 
@@ -1623,9 +1624,7 @@ func scanBrief2REST(info *scanInfo) *api.RESTScanBrief {
 		}
 		r.BaseOS = info.baseOS
 	}
-	sdb := scanUtils.GetScannerDB()
-	r.CVEDBVersion = sdb.CVEDBVersion
-	r.CVEDBCreateTime = sdb.CVEDBCreateTime
+	r.CVEDBVersion, r.CVEDBCreateTime = scanUtils.GetCVEDBMeta()
 	return &r
 }
 
@@ -1639,16 +1638,14 @@ func (m CacheMethod) GetVulnerabilityReport(id, showTag string) ([]*api.RESTVuln
 			refreshScanCache(id, info, vpf)
 		}
 
-		sdb := scanUtils.GetScannerDB()
-
 		reportVuls, reportModules, err := db.GetVulnerabilityModule(id)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+		localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
 		vpf.FilterVulTraits(localVulTraits, info.idns)
-		vuls := scanUtils.FillVulTraits(sdb.CVEDB, info.baseOS, localVulTraits, showTag, false)
+		vuls := scanUtils.FillVulTraits(db.GlobalCVECache(), info.baseOS, localVulTraits, showTag, false)
 		modules := make([]*api.RESTScanModule, len(reportModules))
 		for i, m := range reportModules {
 			modules[i] = scanUtils.ScanModule2REST(m)

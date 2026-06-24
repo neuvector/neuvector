@@ -483,7 +483,7 @@ func RegistryImageStateUpdate(name, id string, sum *share.CLUSRegistryImageSumma
 
 			// Filter the vulnerabilities
 			c.filteredTime = time.Now()
-			localVulTraits := scanUtils.ExtractVulnerability(report.Vuls)
+			localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), report.Vuls)
 			if vpf != nil {
 				alives = vpf.FilterVulTraits(localVulTraits, images2IDNames(rs, sum))
 			} else {
