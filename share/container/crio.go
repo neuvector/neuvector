@@ -97,7 +97,11 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 	if err != nil {
 		log.WithError(err).Debug("failed to get self container ID")
 	}
-	id, _ = criGetSelfID(cri, ctx, id)
+	id, err = criGetSelfID(cri, ctx, id)
+	if err != nil {
+		// Suppress error: best-effort ID resolution; sock path discovery proceeds without it
+		log.WithError(err).Debug("failed to get self container ID via CRI")
+	}
 	sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint) // update id
 	if err == nil {
 		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()

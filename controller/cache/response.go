@@ -449,7 +449,10 @@ func responseRuleLookup(desc *eventDesc) {
 
 						var cconf share.CLUSWorkloadConfig
 						key := share.CLUSUniconfWorkloadKey(wlc.workload.HostID, wlc.workload.ID)
-						value, rev, _ := cluster.GetRev(key)
+						value, rev, err := cluster.GetRev(key)
+						if err != nil {
+							log.WithError(err).Warn("failed to get workload config for quarantine")
+						}
 						if value != nil {
 							_ = json.Unmarshal(value, &cconf)
 						} else {

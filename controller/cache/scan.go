@@ -419,7 +419,10 @@ func (m CacheMethod) ScanPlatform(acc *access.AccessControl) error {
 
 // With scan mutex locked
 func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
-	reportVuls, _ := db.GetVulnerability(id)
+	reportVuls, err := db.GetVulnerability(id)
+	if err != nil {
+		log.WithError(err).Warn("failed to get vulnerability data for scan cache refresh")
+	}
 	localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 
 	vpf.FilterVulTraits(localVulTraits, info.idns)
@@ -773,8 +776,12 @@ func scanMapDelete(taskId string) {
 			key = share.CLUSScanDataPlatformKey(taskId)
 			skey = share.CLUSScanStatePlatformKey(taskId)
 		}
-		_ = cluster.DeleteTree(key)
-		_ = cluster.Delete(skey)
+		if err := cluster.DeleteTree(key); err != nil {
+			log.WithError(err).Warn("failed to delete scan data from cluster")
+		}
+		if err := cluster.Delete(skey); err != nil {
+			log.WithError(err).Warn("failed to delete scan state from cluster")
+		}
 	}
 }
 
@@ -1004,8 +1011,13 @@ func updateScanState(id string, nType share.ScanObjectType, status string) {
 	if status == api.ScanStatusFinished {
 		state.ScannedAt = time.Now().UTC()
 	}
-	value, _ := json.Marshal(state)
-	_ = cluster.Put(skey, value)
+	value, err := json.Marshal(state)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal scan state")
+	}
+	if err := cluster.Put(skey, value); err != nil {
+		log.WithError(err).Warn("failed to put scan state to cluster")
+	}
 }
 
 func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -1123,8 +1135,12 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 			if exist := scan.CheckRegistry(name); !exist {
 				if config, _, err := clusHelper.GetRegistry(name, access.NewFedAdminAccessControl()); config != nil {
 					var enc common.EncryptMarshaller
-					value, _ := enc.Marshal(config)
-					scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, share.CLUSRegistryConfigKey(name), value)
+					value, err := enc.Marshal(config)
+					if err != nil {
+						log.WithError(err).Warn("failed to marshal registry config for scan handler")
+					} else {
+						scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, share.CLUSRegistryConfigKey(name), value)
+					}
 				} else {
 					cctx.ScanLog.WithFields(log.Fields{"error": err, "name": name}).Error()
 				}
@@ -1457,7 +1473,9 @@ func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners 
 							ReportedAt: time.Now().UTC(),
 						}
 						clog.Msg = "Scanner autoscale is disabled because someone reverted the scaling for 3 continous times."
-						_ = cctx.EvQueue.Append(&clog)
+						if err := cctx.EvQueue.Append(&clog); err != nil {
+							log.WithError(err).Warn("failed to append autoscale disabled event to queue")
+						}
 						skipScale = true
 						log.Info(clog.Msg)
 					} else {

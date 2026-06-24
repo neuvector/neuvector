@@ -1779,7 +1779,11 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 	rules := make([]share.CLUSGroupIPPolicy, 0)
 	key := share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName)
-	if value, _ := cluster.Get(key); value != nil {
+	value, err := cluster.Get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get policy IP rules from cluster")
+	}
+	if value != nil {
 		uzb := utils.GunzipBytes(value)
 		if uzb == nil {
 			log.Error("Failed to unzip data")
@@ -2049,8 +2053,10 @@ func policyIPRulesCleanup(ruleKeys []string) {
 	for _, key := range ruleKeys {
 		txn.Delete(key)
 	}
-	//Ignore failure, missed keys will be removed the next update.
-	_, _ = txn.Apply()
+	// Suppress error: missed keys will be removed on the next update.
+	if _, err := txn.Apply(); err != nil {
+		log.WithError(err).Debug("failed to apply policy IP rules cleanup transaction")
+	}
 }
 
 func policyIPRulesCleanupNode(rule_key, verstr, newCommonRuleKey string, tmpNid map[string]string) {

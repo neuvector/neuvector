@@ -848,7 +848,9 @@ func deleteDlpRuleNetwork(sensor string) {
 	}
 	log.WithFields(log.Fields{"sensor": sensor}).Debug("")
 	key := share.CLUSDlpRuleKey(sensor)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("failed to delete DLP rule from cluster")
+	}
 }
 
 func getDlpRuleFromDefaultSensor(entry string) *share.CLUSDlpRule {

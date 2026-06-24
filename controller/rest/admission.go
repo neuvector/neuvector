@@ -1127,7 +1127,10 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, err.Error())
 		return
 	}
-	arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
+	arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
+	if err != nil {
+		log.WithError(err).Warn("failed to get admission rule list")
+	}
 	rh := &share.CLUSRuleHead{
 		ID:      ruleCfg.ID,
 		CfgType: cfgType,
@@ -1336,7 +1339,10 @@ func handlerDeleteAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
+	arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleTypeKey)
+	if err != nil {
+		log.WithError(err).Warn("failed to get admission rule list")
+	}
 	var idx = -1
 	for i, arh := range arhs {
 		if arh.ID == id {
@@ -1446,7 +1452,10 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var rconf api.RESTAdmCtrlRulesExport
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read admission rules export request body")
+	}
 	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1659,18 +1668,27 @@ func importAdmCtrl(loginDomainRoles access.DomainRole, importTask share.CLUSImpo
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				// Suppress error: progress update is non-critical.
+				if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+					log.WithError(putErr).Debug("failed to update import task progress")
+				}
 				if err == nil && len(parsedCfg.AdmCtrlRulesCfg) > 0 {
 					var cacheRecord share.CLUSCrdSecurityRule
 					// [4] import all admission control rules defined in the yaml file
 					crdHandler.crdHandleAdmCtrlRules(parsedCfg.CfgType, parsedCfg.AdmCtrlRulesCfg, &cacheRecord, share.ReviewTypeImportAdmCtrl)
 					progress += inc
 					importTask.Percentage = int(progress)
-					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+					// Suppress error: progress update is non-critical.
+					if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+						log.WithError(putErr).Debug("failed to update import task progress")
+					}
 				}
 			}
 			importTask.Percentage = 90
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			// Suppress error: progress update is non-critical.
+			if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+				log.WithError(putErr).Debug("failed to update import task progress")
+			}
 
 			if err == nil && importTask.Scope == share.ScopeFed && len(parsedCfg.AdmCtrlRulesCfg) > 0 {
 				updateFedRulesRevision([]string{share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType}, acc, login)

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
@@ -26,7 +28,11 @@ func getTelemetryData(telemetryFreq uint) (bool, common.TelemetryData) {
 	}
 
 	var lastUploadTime time.Time
-	if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
+	value, err := cluster.Get(share.CLUSTelemetryStore + "controller")
+	if err != nil {
+		log.WithError(err).Warn("failed to get telemetry data from cluster")
+	}
+	if value != nil {
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
 		_ = json.Unmarshal(value, &nvUpgradeInfo)
 		lastUploadTime = nvUpgradeInfo.LastUploadTime

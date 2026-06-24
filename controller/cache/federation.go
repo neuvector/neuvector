@@ -261,7 +261,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			fedJoinedClusterStatusCache[id] = status
 		case share.CLUSFedRulesRevisionSubKey:
 			var revCache share.CLUSFedRulesRevision
-			_ = json.Unmarshal(value, &revCache)
+			if err := json.Unmarshal(value, &revCache); err != nil {
+				log.WithError(err).Warn("failed to unmarshal fed rules revision cache")
+			}
 			// when demote/leave/kicked, in kv the cluster's fedRole is updated first and the CLUSFedRulesRevisionSubKey is updated last(after all fed rules are deleted).
 			// however, it may take a while for all deleted fed rule keys to be updated in cache.
 			if isLeader() && fedMembershipCache.FedRole == api.FedRoleNone {
@@ -291,12 +293,16 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		case share.CLUSFedToPingPollSubKey:
 			if isLeader() {
 				var doPingPoll share.CLUSFedDoPingPoll
-				_ = json.Unmarshal(value, &doPingPoll)
+				if err := json.Unmarshal(value, &doPingPoll); err != nil {
+					log.WithError(err).Warn("failed to unmarshal fed ping-poll config")
+				}
 				go func() { _ = cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil) }()
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
-			_ = json.Unmarshal(value, &cfg)
+			if err := json.Unmarshal(value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal fed system config")
+			}
 			fedWebhookCacheTemp := make(map[string]*webhookCache, 0)
 			for _, h := range cfg.Webhooks {
 				if h.Enable {

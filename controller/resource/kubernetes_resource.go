@@ -2530,7 +2530,10 @@ func RetrieveStorePassphrases() (common.EncKeys, string, string, error) {
 	var currEncKeyIdx uint64
 	var currEncKeyVer string
 
-	_, secretData, rscVersion, foundSecret, _ := retrieveSecretData(nvStoreSecret, "")
+	_, secretData, rscVersion, foundSecret, err := retrieveSecretData(nvStoreSecret, "")
+	if err != nil {
+		log.WithError(err).Warn("failed to retrieve store secret data for passphrases")
+	}
 	encKeys := make(common.EncKeys, len(secretData))
 	for k, v := range secretData {
 		if ui64, err := strconv.ParseUint(k, 10, 64); err == nil {
@@ -2586,7 +2589,10 @@ func AddStorePassphrase() error {
 	var err error
 	var currEncKeyIdx uint64
 
-	_, secretData, rscVersion, foundSecret, _ := retrieveSecretData(nvStoreSecret, "")
+	_, secretData, rscVersion, foundSecret, err := retrieveSecretData(nvStoreSecret, "")
+	if err != nil {
+		log.WithError(err).Warn("failed to retrieve store secret data for adding passphrase")
+	}
 	for k := range secretData {
 		if ui64, err := strconv.ParseUint(k, 10, 64); err == nil {
 			if ui64 > currEncKeyIdx {
