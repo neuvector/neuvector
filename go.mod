@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/beevik/etree v1.6.0
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
-	github.com/containerd/containerd/api v1.10.0
+	github.com/containerd/containerd/api v1.11.1
 	github.com/containerd/containerd/v2 v2.2.5
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/docker/distribution v2.8.3+incompatible
