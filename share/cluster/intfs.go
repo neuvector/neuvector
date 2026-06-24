@@ -35,6 +35,9 @@ var errSizeTooBig error = errors.New("size too big")
 const putRetryTimes int = 2
 const putRetryInterval time.Duration = time.Millisecond * 500
 
+const KVGetRetryTimes int = 3
+const KVGetRetryInterval time.Duration = time.Millisecond * 200
+
 var errorRestart bool
 
 type ClusterConfig struct {
@@ -428,7 +431,7 @@ type ClusterDriver interface {
 	NewSession(name string, ttl time.Duration) (SessionInterface, error)
 
 	// KV
-	Exist(key string) bool
+	Exist(key string) (bool, error)
 	GetKeys(prefix, separater string) ([]string, error)
 	Get(key string) ([]byte, error)
 	GetRev(key string) ([]byte, uint64, error)
@@ -467,7 +470,7 @@ func NewSession(name string, ttl time.Duration) (SessionInterface, error) {
 	return driver.NewSession(name, ttl)
 }
 
-func Exist(key string) bool {
+func Exist(key string) (bool, error) {
 	return driver.Exist(key)
 }
 
@@ -478,6 +481,24 @@ func GetKeys(prefix, separater string) ([]string, error) {
 func Get(key string) ([]byte, error) {
 	// log.WithFields(log.Fields{"key": key}).Debug("")
 	return driver.Get(key)
+}
+
+func GetWithRetry(key string) ([]byte, error) {
+	var lastErr error
+	for attempt := 1; attempt <= KVGetRetryTimes; attempt++ {
+		value, err := Get(key)
+		if err == nil {
+			return value, nil
+		}
+		lastErr = err
+		if attempt < KVGetRetryTimes {
+			log.WithFields(log.Fields{
+				"error": err, "key": key, "attempt": attempt,
+			}).Warn("Failed to get key from cluster, retrying")
+			time.Sleep(KVGetRetryInterval)
+		}
+	}
+	return nil, lastErr
 }
 
 func GetRev(key string) ([]byte, uint64, error) {

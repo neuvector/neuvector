@@ -1038,7 +1038,12 @@ func (m clusterHelper) FixMissingClusterKV() {
 		}},
 	}
 	for _, keyInit := range keyInits {
-		if !cluster.Exist(keyInit.key) {
+		exists, err := cluster.Exist(keyInit.key)
+		if err != nil {
+			log.WithFields(log.Fields{"key": keyInit.key, "error": err}).Warn("Failed to check key existence during upgrade init")
+			continue
+		}
+		if !exists {
 			log.WithFields(log.Fields{"key": keyInit.key}).Info("Re-create because not found")
 			keyInit.init()
 		}

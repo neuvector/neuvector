@@ -469,9 +469,15 @@ func (dpt *kvDispatcher) PutProfile(group, subkey string, value []byte, txn *clu
 		for node := range nodes.Iter() {
 			key := share.CLUSNodeProfileKey(node.(string), subkey)
 			// log.WithFields(log.Fields{"key": key}).Debug("DPT:")
-			if bPutIfNotExist && cluster.Exist(key) {
-				// txn.PutRev(0): not suitable because txn rollbacks if there is any existing key.
-				continue
+			if bPutIfNotExist {
+				exists, existErr := cluster.Exist(key)
+				if existErr != nil {
+					return existErr
+				}
+				if exists {
+					// txn.PutRev(0): not suitable because txn rollbacks if there is any existing key.
+					continue
+				}
 			}
 			txn.PutQuiet(key, value)
 		}

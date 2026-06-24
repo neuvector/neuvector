@@ -677,16 +677,17 @@ func (m *consulMethod) Get(key string) ([]byte, error) {
 	}
 }
 
-func (m *consulMethod) Exist(key string) bool {
+func (m *consulMethod) Exist(key string) (bool, error) {
 	c, err := m.getClient()
-	if err == nil {
-		kv := c.KV()
-		entries, _, err := kv.Keys(key, "", nil)
-		if err == nil && len(entries) > 0 {
-			return true
-		}
+	if err != nil {
+		return false, err
 	}
-	return false
+	kv := c.KV()
+	entries, _, err := kv.Keys(key, "", nil)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) > 0, nil
 }
 
 func (m *consulMethod) GetKeys(prefix, separater string) ([]string, error) {

@@ -3844,7 +3844,11 @@ func (m clusterHelper) DeleteApikey(name string) error {
 func (m clusterHelper) CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact) error {
 	rootKey := share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name)
 
-	if cluster.Exist(rootKey) {
+	exists, err := cluster.Exist(rootKey)
+	if err != nil {
+		return err
+	}
+	if exists {
 		return common.ErrObjectExists
 	}
 
@@ -3865,7 +3869,11 @@ func (m clusterHelper) CreateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstore
 func (m clusterHelper) UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstoreRootOfTrust, txn *cluster.ClusterTransact, rev *uint64) error {
 	rootKey := share.CLUSSigstoreRootOfTrustKey(rootOfTrust.Name)
 
-	if !cluster.Exist(rootKey) {
+	exists, err := cluster.Exist(rootKey)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return common.ErrObjectNotFound
 	}
 
@@ -3894,7 +3902,11 @@ func (m clusterHelper) UpdateSigstoreRootOfTrust(rootOfTrust *share.CLUSSigstore
 func (m clusterHelper) GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigstoreRootOfTrust, *uint64, error) {
 	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
 
-	if !cluster.Exist(rootKey) {
+	exists, err := cluster.Exist(rootKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !exists {
 		return nil, nil, common.ErrObjectNotFound
 	}
 
@@ -3915,7 +3927,11 @@ func (m clusterHelper) GetSigstoreRootOfTrust(rootName string) (*share.CLUSSigst
 func (m clusterHelper) DeleteSigstoreRootOfTrust(rootName string) error {
 	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
 
-	if !cluster.Exist(rootKey) {
+	exists, err := cluster.Exist(rootKey)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return common.ErrObjectNotFound
 	}
 
@@ -3951,11 +3967,19 @@ func (m clusterHelper) CreateSigstoreVerifier(rootName string, verifier *share.C
 	rootKey := share.CLUSSigstoreRootOfTrustKey(rootName)
 	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifier.Name)
 
-	if !cluster.Exist(rootKey) {
+	exists, err := cluster.Exist(rootKey)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return common.ErrObjectNotFound
 	}
 
-	if cluster.Exist(verifierKey) {
+	exists, err = cluster.Exist(verifierKey)
+	if err != nil {
+		return err
+	}
+	if exists {
 		return common.ErrObjectNotFound
 	}
 
@@ -3976,7 +4000,11 @@ func (m clusterHelper) CreateSigstoreVerifier(rootName string, verifier *share.C
 func (m clusterHelper) UpdateSigstoreVerifier(rootName string, verifier *share.CLUSSigstoreVerifier, txn *cluster.ClusterTransact, rev *uint64) error {
 	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifier.Name)
 
-	if !cluster.Exist(verifierKey) {
+	exists, err := cluster.Exist(verifierKey)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return common.ErrObjectNotFound
 	}
 
@@ -4005,7 +4033,11 @@ func (m clusterHelper) UpdateSigstoreVerifier(rootName string, verifier *share.C
 func (m clusterHelper) GetSigstoreVerifier(rootName string, verifierName string) (*share.CLUSSigstoreVerifier, *uint64, error) {
 	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifierName)
 
-	if !cluster.Exist(verifierKey) {
+	exists, err := cluster.Exist(verifierKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !exists {
 		return nil, nil, common.ErrObjectNotFound
 	}
 
@@ -4026,7 +4058,11 @@ func (m clusterHelper) GetSigstoreVerifier(rootName string, verifierName string)
 func (m clusterHelper) DeleteSigstoreVerifier(rootName string, verifierName string) error {
 	verifierKey := share.CLUSSigstoreVerifierKey(rootName, verifierName)
 
-	if !cluster.Exist(verifierKey) {
+	exists, err := cluster.Exist(verifierKey)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return common.ErrObjectNotFound
 	}
 
@@ -4034,7 +4070,11 @@ func (m clusterHelper) DeleteSigstoreVerifier(rootName string, verifierName stri
 }
 
 func (m clusterHelper) GetAllSigstoreVerifiersForRoot(rootName string) ([]*share.CLUSSigstoreVerifier, error) {
-	if !cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName)) {
+	exists, err := cluster.Exist(share.CLUSSigstoreRootOfTrustKey(rootName))
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
 		return nil, fmt.Errorf("root \"%s\" does not exist", rootName)
 	}
 	keys, err := cluster.GetStoreKeys(share.CLUSSigstoreRootOfTrustKey(rootName) + "/")
@@ -4090,7 +4130,11 @@ func (m clusterHelper) PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *u
 func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
 	timestampKey := share.CLUSSigstoreTimestampKey()
 
-	if !cluster.Exist(timestampKey) {
+	exists, err := cluster.Exist(timestampKey)
+	if err != nil {
+		return "", nil, err
+	}
+	if !exists {
 		return "", nil, common.ErrObjectNotFound
 	}
 

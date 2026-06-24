@@ -6,6 +6,7 @@ import "C"
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -130,10 +131,8 @@ func fqdnInfoPostPolicyCalc(hid string) {
 		for _, name := range del {
 			if strings.HasPrefix(name, "*") { //wildcard
 				rule_key := share.CLUSFqdnIpKey(hid, name)
-				if cluster.Exist(rule_key) {
-					if dbgError := cluster.Delete(rule_key); dbgError != nil {
-						log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-					}
+				if dbgError := cluster.Delete(rule_key); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError, "key": rule_key}).Warn("Failed to delete FQDN key from cluster")
 				}
 			}
 			delete(fqdnMap, name)
@@ -1503,23 +1502,32 @@ func (e *Engine) PushFqdnInfoToDP() error {
 	if err != nil {
 		return fmt.Errorf("failed to get FQDN store keys: %w", err)
 	}
+	var errs []error
 	for _, key := range allKeys {
-		value, err := cluster.Get(key)
+		value, err := cluster.GetWithRetry(key)
 		if err != nil {
-			// Continue on individual key failures, don't fail entire operation
 			log.WithError(err).WithField("key", key).Warn("Failed to get FQDN value from cluster")
+			errs = append(errs, fmt.Errorf("key %s: %w", key, err))
 			continue
 		}
 		if value != nil {
 			uzb := utils.GunzipBytes(value)
-			if uzb != nil {
-				var fqdnip share.CLUSFqdnIp
-				if dbgError := json.Unmarshal(uzb, &fqdnip); dbgError != nil {
-					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-				}
-				dp.DPCtrlSetFqdnIp(&fqdnip)
+			if uzb == nil {
+				log.WithField("key", key).Error("Failed to unzip FQDN data")
+				errs = append(errs, fmt.Errorf("key %s: failed to unzip", key))
+				continue
 			}
+			var fqdnip share.CLUSFqdnIp
+			if dbgError := json.Unmarshal(uzb, &fqdnip); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError, "key": key}).Error("Failed to decode FQDN data")
+				errs = append(errs, fmt.Errorf("key %s: %w", key, dbgError))
+				continue
+			}
+			dp.DPCtrlSetFqdnIp(&fqdnip)
 		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to push %d of %d FQDN entries: %w", len(errs), len(allKeys), errors.Join(errs...))
 	}
 	return nil
 }
