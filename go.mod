@@ -105,7 +105,7 @@ require (
 
 require (
 	github.com/alitto/pond v1.9.2
-	github.com/cenkalti/backoff/v5 v5.0.3
+	github.com/cenkalti/backoff/v6 v6.0.1
 	github.com/dmachard/go-clientsyslog v1.0.4
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/go-jose/go-jose/v3 v3.0.5
