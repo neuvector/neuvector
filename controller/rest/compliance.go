@@ -616,7 +616,10 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(err).Debug("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockCompKey, importCallerRest)

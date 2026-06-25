@@ -75,7 +75,10 @@ func handleldapcfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		context.gotAllCustomRoles = true
 	}
 
-	cs, _, _ := clusHelper.GetServerRev(name, accAdmin)
+	cs, _, err := clusHelper.GetServerRev(name, accAdmin)
+	if err != nil {
+		log.WithError(err).Warn("failed to get LDAP server rev")
+	}
 	if cs == nil {
 		cldap := &share.CLUSServerLDAP{
 			Port: DefaultLDAPServerPort,
@@ -135,7 +138,10 @@ func handlesamlcfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		context.gotAllCustomRoles = true
 	}
 
-	cs, _, _ := clusHelper.GetServerRev(name, accAdmin)
+	cs, _, err := clusHelper.GetServerRev(name, accAdmin)
+	if err != nil {
+		log.WithError(err).Warn("failed to get SAML server rev")
+	}
 	if cs == nil {
 		csaml := &share.CLUSServerSAML{
 			CLUSServerAuth: share.CLUSServerAuth{
@@ -198,7 +204,10 @@ func handleoidccfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 		remoteAuther = auth.NewRemoteAuther(nil)
 	}
 
-	cs, _, _ := clusHelper.GetServerRev(name, accAdmin)
+	cs, _, err := clusHelper.GetServerRev(name, accAdmin)
+	if err != nil {
+		log.WithError(err).Warn("failed to get OIDC server rev")
+	}
 	if cs == nil {
 		coidc := &share.CLUSServerOIDC{
 			Scopes: auth.DefaultOIDCScopes,

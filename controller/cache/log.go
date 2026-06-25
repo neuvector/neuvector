@@ -835,7 +835,9 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 		}
 
 		var thrts []share.CLUSThreatLog
-		_ = json.Unmarshal(uzb, &thrts)
+		if err := json.Unmarshal(uzb, &thrts); err != nil {
+			log.WithError(err).Warn("failed to unmarshal threat logs")
+		}
 
 		syncLock(syncCatgThreatIdx)
 		defer syncUnlock(syncCatgThreatIdx)
@@ -1251,7 +1253,10 @@ func syncEventTx() *syncDataMsg {
 	syncLock(syncCatgEventIdx)
 	if curEventIndex > 0 {
 		events := eventCache[0:curEventIndex]
-		msg.Data, _ = json.Marshal(events)
+		var err error
+		if msg.Data, err = json.Marshal(events); err != nil {
+			log.WithError(err).Warn("failed to marshal events")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgEventIdx)
 	syncUnlock(syncCatgEventIdx)
@@ -1263,7 +1268,10 @@ func syncThreatTx() *syncDataMsg {
 	syncLock(syncCatgThreatIdx)
 	if curThrtIndex > 0 {
 		threats := thrtCache[0:curThrtIndex]
-		msg.Data, _ = json.Marshal(threats)
+		var err error
+		if msg.Data, err = json.Marshal(threats); err != nil {
+			log.WithError(err).Warn("failed to marshal threats")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgThreatIdx)
 	syncUnlock(syncCatgThreatIdx)
@@ -1275,7 +1283,10 @@ func syncIncidentTx() *syncDataMsg {
 	syncLock(syncCatgIncidentIdx)
 	if curIncidentIndex > 0 {
 		incidents := incidentCache[0:curIncidentIndex]
-		msg.Data, _ = json.Marshal(incidents)
+		var err error
+		if msg.Data, err = json.Marshal(incidents); err != nil {
+			log.WithError(err).Warn("failed to marshal incidents")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgIncidentIdx)
 	syncUnlock(syncCatgIncidentIdx)

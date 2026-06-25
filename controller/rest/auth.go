@@ -2282,7 +2282,10 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 			if err := cluster.PutIfNotExist(key, value, false); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
 			}
-			user, _, _ = clusHelper.GetUserRev(userName, acc)
+			user, _, err = clusHelper.GetUserRev(userName, acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get user rev")
+			}
 		}
 	}
 	if user == nil || user.Server != "" {
@@ -2409,7 +2412,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			return
 		}
 		if role == api.UserRoleAdmin || role == api.UserRoleFedAdmin {
-			if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll); u != nil {
+			u, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll)
+			if err != nil {
+				log.WithError(err).Warn("failed to get default admin user rev")
+			}
+			if u != nil {
 				if !common.IsSaltedPasswordHash(u.PasswordHash) {
 					if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
 						defaultPW = true
@@ -2426,9 +2433,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		mainSessionUser = user.Fullname
 	} else {
 		// Read body
-		body, _ := io.ReadAll(r.Body)
-
-		err := json.Unmarshal(body, &auth)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.WithError(err).Warn("failed to read request body")
+		}
+		err = json.Unmarshal(body, &auth)
 		if err != nil || auth.Password == nil {
 			log.WithFields(log.Fields{"error": err}).Error("Request error")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2524,7 +2533,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				// user password passes remote auth but not local auth(user found in local). do not increase local user's FailedLoginCount
 				retry := 0
 				for retry < retryClusterMax {
-					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
+					user, rev, err := clusHelper.GetUserRev(auth.Password.Username, accReadAll)
+					if err != nil {
+						log.WithError(err).Warn("failed to get user rev")
+					}
+					if user != nil {
 						if user.FailedLoginCount > 0 {
 							user.FailedLoginCount--
 							if user.FailedLoginCount < uint32(localAuthResult.blockAfterFailedCount) {

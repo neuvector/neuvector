@@ -247,13 +247,18 @@ func automode_decision_func(mover int, group string, err error) error {
 
 	modeType, theGroup := atmoHelper.GetTheGroupType(group)
 	if isLeader() {
-		_ = automode_promote_mode(theGroup, targetMode, modeType)
+		if err := automode_promote_mode(theGroup, targetMode, modeType); err != nil {
+			log.WithError(err).Warn("failed to promote automode")
+		}
 	} else {
 		go func() {
 			r1 := rand.New(rand.NewSource(time.Now().UnixNano()))
 			wait_sec := 3*60 + r1.Intn(100) // separating controller actions. no promoting when it has been already promoted
 			time.Sleep(time.Second * time.Duration(wait_sec))
-			_ = automode_promote_mode(theGroup, targetMode, modeType)
+			// Log error: this is the top of goroutine
+			if err := automode_promote_mode(theGroup, targetMode, modeType); err != nil {
+				log.WithError(err).Warn("failed to promote automode in goroutine")
+			}
 		}()
 	}
 

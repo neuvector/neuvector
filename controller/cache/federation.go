@@ -317,7 +317,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			fedSystemConfigCache = cfg
 		case share.CLUSFedSettingsSubKey:
 			var cfg share.CLUSFedSettings
-			_ = json.Unmarshal(value, &cfg)
+			if err := json.Unmarshal(value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal fed settings")
+			}
 			fedSettingsCache = cfg
 		}
 	case cluster.ClusterNotifyDelete:

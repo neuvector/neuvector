@@ -52,7 +52,9 @@ func writeUsageReport() error {
 
 		for i := usageReportHistory; i < len(all); i++ {
 			key := share.CLUSCtrlUsageReportKey(all[i])
-			_ = cluster.Delete(key)
+			if err := cluster.Delete(key); err != nil {
+				log.WithError(err).Warn("failed to delete usage report")
+			}
 		}
 	}
 

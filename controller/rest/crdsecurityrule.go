@@ -305,7 +305,10 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []v1.GroupConfig, targetGroup s
 		}
 
 		isNvIpGroup := strings.HasPrefix(group.Name, api.LearnedSvcGroupPrefix)
-		cg, _, _ := clusHelper.GetGroup(group.Name, h.acc)
+		cg, _, err := clusHelper.GetGroup(group.Name, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group")
+		}
 		if cg != nil {
 			// group update case
 			updateKV := false
@@ -489,7 +492,9 @@ func (h *nvCrdHandler) crdDeleteNetworkRules(delRules map[string]uint32) {
 		delRuleIDs.Add(id)
 		// This function cannot return an error, as there is no possibility for one to occur.
 		// However, we retain the error return type to accommodate the mock dependency.
-		_ = clusHelper.DeletePolicyRuleTxn(txn, id)
+		if err := clusHelper.DeletePolicyRuleTxn(txn, id); err != nil {
+			log.WithError(err).Warn("failed to delete policy rule in txn")
+		}
 	}
 	for _, crh := range crhs {
 		if crh.CfgType != share.GroundCfg || !delRuleIDs.Contains(crh.ID) {
@@ -613,7 +618,11 @@ func findAbsentGroups(cacheRecord *share.CLUSCrdSecurityRule, groupNew []string)
 func (h *nvCrdHandler) crdDeleteGroup(delGroups []string) {
 	names := make([]string, 0, len(delGroups))
 	for _, name := range delGroups {
-		if cg, _, _ := clusHelper.GetGroup(name, h.acc); cg == nil {
+		cg, _, err := clusHelper.GetGroup(name, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group for deletion")
+		}
+		if cg == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
 			continue
 		}
@@ -650,7 +659,10 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 
 	var lastTxnError error
 	for _, name := range updateGroup {
-		cg, _, _ := clusHelper.GetGroup(name, h.acc)
+		cg, _, err := clusHelper.GetGroup(name, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group for update")
+		}
 		if cg == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
 			continue
@@ -918,7 +930,10 @@ LOOPALLDEL:
 		if kvOnly {
 			groupsToUpdate = append(groupsToUpdate, cur)
 		} else {
-			group, _ := cacher.GetGroup(cur, "", false, h.acc)
+			group, err := cacher.GetGroup(cur, "", false, h.acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get group from cache")
+			}
 			if group != nil {
 				// if group exist before crd apply when delete we should not touch it
 				if group.CfgType != api.CfgTypeGround {
@@ -1430,7 +1445,9 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 		if newId, ok := newRules[cacheName]; ok && newId == cacheId {
 			continue
 		}
-		_ = clusHelper.DeletePolicyRuleTxn(txn, cacheId)
+		if err := clusHelper.DeletePolicyRuleTxn(txn, cacheId); err != nil {
+			log.WithError(err).Warn("failed to delete policy rule in txn")
+		}
 		delete(ruleHead, cacheId)
 	}
 
@@ -1492,7 +1509,10 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(cfgType share.TCfgType, allAdmCtrlR
 		ruleTypeKeys = append(ruleTypeKeys, api.ValidatingExceptRuleType, api.ValidatingDenyRuleType)
 	}
 	for _, ruleType := range ruleTypeKeys {
-		arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+		if err != nil {
+			log.WithError(err).Warn("failed to get admission rule list")
+		}
 		clusArhsNew[ruleType] = arhs
 		for _, arh := range arhs {
 			ids.Add(arh.ID)
@@ -1560,7 +1580,10 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(cfgType share.TCfgType, allAdmCtrlR
 					}
 				} else {
 					// it's non-default rule
-					cr.Criteria, _ = cache.AdmCriteria2CLUS(ruleConf.Criteria)
+					var err error
+					if cr.Criteria, err = cache.AdmCriteria2CLUS(ruleConf.Criteria); err != nil {
+						log.WithError(err).Warn("failed to convert admission criteria")
+					}
 					cr.Comment = ruleConf.Comment
 					cr.Disable = ruleConf.Disabled
 				}
@@ -1999,7 +2022,10 @@ func (h *nvCrdHandler) crdHandleVulnProfile(vulnProfileCfg *resource.NvCrdVulnPr
 
 	var err error
 	if vulnProfileCfg.Profile != nil {
-		cvp, _, _ := clusHelper.GetVulnerabilityProfile(vulnProfileCfg.Profile.Name, h.acc)
+		cvp, _, cvpErr := clusHelper.GetVulnerabilityProfile(vulnProfileCfg.Profile.Name, h.acc)
+		if cvpErr != nil {
+			log.WithError(cvpErr).Warn("failed to get vulnerability profile")
+		}
 		if cvp == nil {
 			cvp = &share.CLUSVulnerabilityProfile{
 				Name:    vulnProfileCfg.Profile.Name,
@@ -2029,7 +2055,10 @@ func (h *nvCrdHandler) crdHandleCompProfile(compProfileCfg *resource.NvCrdCompPr
 
 	var err error
 	if compProfileCfg.Templates != nil {
-		ccp, _, _ := clusHelper.GetComplianceProfile(compProfileCfg.Templates.Name, h.acc)
+		ccp, _, ccpErr := clusHelper.GetComplianceProfile(compProfileCfg.Templates.Name, h.acc)
+		if ccpErr != nil {
+			log.WithError(ccpErr).Warn("failed to get compliance profile")
+		}
 		if ccp != nil && ccp.CfgType != cfgType && ccp.CfgType == share.GroundCfg {
 			log.WithFields(log.Fields{"name": compProfileCfg.Templates.Name}).Error("profile is managed by CRD")
 			return errors.New(restErrMessage[api.RESTErrOpNotAllowed])
@@ -3413,7 +3442,11 @@ func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityR
 			errMsg := fmt.Sprintf("%s:   cannot create sensor with reserved name %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
-		if cs, _ := cacher.GetDlpSensor(sensor.Name, h.acc); cs != nil && cs.Predefine {
+		cs, csErr := cacher.GetDlpSensor(sensor.Name, h.acc)
+		if csErr != nil {
+			log.WithError(csErr).Warn("failed to get DLP sensor")
+		}
+		if cs != nil && cs.Predefine {
 			errMsg := fmt.Sprintf("%s:   cannot modify predefined sensor %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
@@ -3485,7 +3518,11 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 			errMsg := fmt.Sprintf("%s:   cannot create sensor with reserved name %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
-		if cs, _ := cacher.GetWafSensor(sensor.Name, h.acc); cs != nil && cs.Predefine {
+		cs, csErr := cacher.GetWafSensor(sensor.Name, h.acc)
+		if csErr != nil {
+			log.WithError(csErr).Warn("failed to get WAF sensor")
+		}
+		if cs != nil && cs.Predefine {
 			errMsg := fmt.Sprintf("%s:   cannot modify predefined sensor %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
@@ -4045,7 +4082,10 @@ func isExportSkipGroupName(name, owner string, alwaysAllowNsUser bool, acc *acce
 		group, err := cacher.GetGroup(name, "", false, acc)
 		if group == nil {
 			if owner != "target" && err == common.ErrObjectAccessDenied && alwaysAllowNsUser {
-				group, _ = cacher.GetGroup(name, "", false, acc)
+				group, err = cacher.GetGroup(name, "", false, acc)
+				if err != nil {
+					log.WithError(err).Warn("failed to get group with ns user access")
+				}
 			}
 		}
 		if group == nil {
@@ -4345,7 +4385,10 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				continue
 			}
 			policy_ids.Add(idx)
-			rule, _ := cacher.GetPolicyRule(idx, acc)
+			rule, err := cacher.GetPolicyRule(idx, acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get policy rule")
+			}
 			if rule != nil {
 				nvGrpDefItem := resource.NvGroupDefinition{
 					TypeMeta: metav1.TypeMeta{
@@ -4399,11 +4442,23 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	// We don't know the default policy mode in other system so in current system just export
 
 	if rconf.UseNameReferral {
-		json_data1, _ := json.MarshalIndent(respGroupDefs, "", "  ")
-		data, _ := yaml.JSONToYAML(json_data1)
+		json_data1, err := json.MarshalIndent(respGroupDefs, "", "  ")
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal group defs")
+		}
+		data, err := yaml.JSONToYAML(json_data1)
+		if err != nil {
+			log.WithError(err).Warn("failed to convert group defs to YAML")
+		}
 		data = append(data, []byte("\n---\n\n")...)
-		json_data2, _ := json.MarshalIndent(resp, "", "  ")
-		data2, _ := yaml.JSONToYAML(json_data2)
+		json_data2, err := json.MarshalIndent(resp, "", "  ")
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal export response")
+		}
+		data2, err := yaml.JSONToYAML(json_data2)
+		if err != nil {
+			log.WithError(err).Warn("failed to convert export response to YAML")
+		}
 		data = append(data, data2...)
 		doExport(exportFileName, exportType, rconf.RemoteExportOptions, data, w, r, acc, login)
 	} else {

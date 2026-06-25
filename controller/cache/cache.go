@@ -1712,7 +1712,9 @@ func startWorkerThread(ctx *Context) {
 			select {
 			case <-usageReportTicker.C:
 				if isLeader() {
-					_ = writeUsageReport()
+					if err := writeUsageReport(); err != nil {
+						log.WithError(err).Warn("failed to write usage report")
+					}
 				}
 			case <-groupMetricCheckTicker.C:
 				if isLeader() {
