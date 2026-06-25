@@ -89,6 +89,16 @@ func (c *Cmd) Start() error {
 // Wait waits for the command to exit. The command must have been started by
 // Start.
 //
+// If the command fails to run or does not complete successfully, the returned
+// error wraps an error implementing:
+//
+//	interface {
+//		ExitCode() int
+//	}
+//
+// Callers can use errors.As to retrieve the exit code. Other errors may be
+// returned for other problems (e.g. I/O issues).
+//
 // Wait releases any resources associated with the Cmd.
 func (c *Cmd) Wait() error {
 	if c.done == nil {
