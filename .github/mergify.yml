@@ -1,0 +1,241 @@
+pull_request_rules:
+  - name: Automatically open v5.6 backport PR
+    conditions:
+      - base=main
+      - label="pr-backport-to/v5.6"
+    actions:
+      backport:
+        branches:
+          - release/v5.6
+        assignees:
+          - "{{ author }}"
+
+  - name: Automatically open v5.5 backport PR
+    conditions:
+      - base=main
+      - label="pr-backport-to/v5.5"
+    actions:
+      backport:
+        branches:
+          - release/v5.5
+        assignees:
+          - "{{ author }}"
+
+  - name: Automatically open v5.4 backport PR
+    conditions:
+      - base=main
+      - label="pr-backport-to/v5.4"
+    actions:
+      backport:
+        branches:
+          - release/v5.4
+        assignees:
+          - "{{ author }}"
+
+
+  - name: Automatically merge Renovate PRs (main)
+    conditions:
+      - base=main
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Backport PRs (main)
+    conditions:
+      - base=main
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Renovate PRs (v5.6)
+    conditions:
+      - base=release/v5.6
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Backport PRs (v5.6)
+    conditions:
+      - base=release/v5.6
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Renovate PRs (v5.5)
+    conditions:
+      - base=release/v5.5
+      - check-success=unitest
+      - check-success=lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Backport PRs (v5.5)
+    conditions:
+      - base=release/v5.5
+      - check-success=unitest
+      - check-success=lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Renovate PRs (v5.4)
+    conditions:
+      - base=release/v5.4
+      - check-success=unitest
+      - check-success=lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Backport PRs (v5.4)
+    conditions:
+      - base=release/v5.4
+      - check-success=unitest
+      - check-success=lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically approve Renovate PRs (main)
+    conditions:
+      - base=main
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Renovate
+
+  - name: Automatically approve Backport PRs (main)
+    conditions:
+      - base=main
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Backport
+
+  - name: Automatically approve Renovate PRs (v5.6)
+    conditions:
+      - base=release/v5.6
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Renovate
+
+  - name: Automatically approve Backport PRs (v5.6)
+    conditions:
+      - base=release/v5.6
+      - check-success=E2E test
+      - check-success=unitest
+      - check-success=golangci-lint
+      - check-success=openapi-lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Backport
+
+  - name: Automatically approve Renovate PRs (v5.5)
+    conditions:
+      - base=release/v5.5
+      - check-success=unitest
+      - check-success=lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Renovate
+
+  - name: Automatically approve Backport PRs (v5.5)
+    conditions:
+      - base=release/v5.5
+      - check-success=unitest
+      - check-success=lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Backport
+
+  - name: Automatically approve Renovate PRs (v5.4)
+    conditions:
+      - base=release/v5.4
+      - check-success=unitest
+      - check-success=lint
+      - author=renovate-rancher[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Renovate
+
+  - name: Automatically approve Backport PRs (v5.4)
+    conditions:
+      - base=release/v5.4
+      - check-success=unitest
+      - check-success=lint
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving Backport
+
+  - name: Ask to resolve conflict
+    conditions:
+      - conflict
+    actions:
+      comment:
+        message: This pull request is now in conflict. Could you fix it @{{author}}?
