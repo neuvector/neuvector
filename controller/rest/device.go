@@ -409,7 +409,10 @@ func handlerControllerConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	retry := 0
 	for retry < retryClusterMax {
 		// Retrieve from the cluster
-		value, rev, _ := cluster.GetRev(key)
+		value, rev, err := cluster.GetRev(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get controller config from cluster")
+		}
 		if value != nil {
 			if err := json.Unmarshal(value, &cconf); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
@@ -524,7 +527,10 @@ func handlerAgentConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	retry := 0
 	for retry < retryClusterMax {
 		// Retrieve from the cluster
-		value, rev, _ := cluster.GetRev(key)
+		value, rev, err := cluster.GetRev(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get agent config from cluster")
+		}
 		if value != nil {
 			if err := json.Unmarshal(value, &cconf); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")

@@ -1249,7 +1249,11 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	} else {
-		if g, _ := cacher.GetGroupCache(conf.Name, acc); g != nil && g.CfgType == share.GroundCfg {
+		g, getGrpErr := cacher.GetGroupCache(conf.Name, acc)
+		if getGrpErr != nil {
+			log.WithError(getGrpErr).Warn("Failed to get group cache")
+		}
+		if g != nil && g.CfgType == share.GroundCfg {
 			restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 			return
 		}
@@ -1515,7 +1519,11 @@ func parseDerivedDlpRules(dlpRuleMap map[string]*share.CLUSDerivedDlpRuleArray,
 	wlrs := make([]*api.RESTDerivedWorkloadDlpRule, 0)
 	for wlID, arr := range dlpRuleMap {
 		var wl *api.RESTWorkloadBrief
-		if wl, _ = cacher.GetWorkloadBrief(wlID, "", acc); wl == nil {
+		var wlErr error
+		if wl, wlErr = cacher.GetWorkloadBrief(wlID, "", acc); wlErr != nil {
+			log.WithError(wlErr).Warn("Failed to get workload brief")
+		}
+		if wl == nil {
 			continue
 		}
 		wlDlpRule := api.RESTDerivedWorkloadDlpRule{
@@ -1817,12 +1825,14 @@ func importDlp(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, err := os.ReadFile(importTask.TempFilename)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read import DLP temp file")
+	}
 	var secRuleList resource.NvDlpSecurityRuleList
 	var secRule resource.NvDlpSecurityRule
 	var secRules []resource.NvDlpSecurityRule
 	var invalidCrdKind bool
-	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
 			secRules = append(secRules, secRule)
@@ -1852,7 +1862,10 @@ func importDlp(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if putTaskErr := clusHelper.PutImportTask(&importTask); putTaskErr != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(putTaskErr).Debug("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -1877,7 +1890,10 @@ func importDlp(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 			oneSuccess := false
 			progress += inc
 			importTask.Percentage = int(progress)
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			if putTaskErr := clusHelper.PutImportTask(&importTask); putTaskErr != nil {
+				// Suppress error: progress update is non-critical
+				log.WithError(putTaskErr).Debug("failed to update import task progress")
+			}
 
 			// [2]: import a dlp sensor in the yaml file
 			for _, parsedCfg := range parsedDlpCfgs {
@@ -1891,11 +1907,17 @@ func importDlp(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 					oneSuccess = true
 					progress += inc
 					importTask.Percentage = int(progress)
-					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+					if putTaskErr := clusHelper.PutImportTask(&importTask); putTaskErr != nil {
+						// Suppress error: progress update is non-critical
+						log.WithError(putTaskErr).Debug("failed to update import task progress")
+					}
 				}
 			}
 			importTask.Percentage = 90
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			if putTaskErr := clusHelper.PutImportTask(&importTask); putTaskErr != nil {
+				// Suppress error: progress update is non-critical
+				log.WithError(putTaskErr).Debug("failed to update import task progress")
+			}
 
 			if oneSuccess && importTask.Scope == share.ScopeFed {
 				updateFedRulesRevision([]string{share.FedDlpSensorGrpType}, acc, login)
@@ -2066,7 +2088,9 @@ func deleteFedDlpGroupSensors() {
 	existingDlpgrps := clusHelper.GetAllDlpGroups()
 	for _, edlpgrp := range existingDlpgrps {
 		if edlpgrp != nil && edlpgrp.CfgType == share.FederalCfg {
-			_ = clusHelper.DeleteDlpGroup(txn, edlpgrp.Name)
+			if err := clusHelper.DeleteDlpGroup(txn, edlpgrp.Name); err != nil {
+				log.WithError(err).Warn("Failed to delete DLP group")
+			}
 		}
 	}
 	existingSensors := clusHelper.GetAllDlpSensors()
@@ -2302,7 +2326,11 @@ func promoteFedDlpGroup(grpName string, acc *access.AccessControl, login *loginS
 		return
 	}
 	for _, sensor := range cg.Sensors { //local
-		if cs, _ := cacher.GetDlpSensor(sensor.Name, acc); cs != nil {
+		cs, getDlpErr := cacher.GetDlpSensor(sensor.Name, acc)
+		if getDlpErr != nil {
+			log.WithError(getDlpErr).Warn("Failed to get DLP sensor")
+		}
+		if cs != nil {
 			fedDlpSensorPromote(cs, acc, login)
 		}
 	}
@@ -2321,10 +2349,13 @@ func promoteFedDlpGroup(grpName string, acc *access.AccessControl, login *loginS
 			return
 		}
 	}
-	if cached, _ := cacher.GetDlpGroup(grpName, acc); cached == nil {
+	cached, getDlpGrpErr := cacher.GetDlpGroup(grpName, acc)
+	if getDlpGrpErr != nil {
+		log.WithError(getDlpGrpErr).Warn("Failed to get DLP group")
+	}
+	if cached == nil {
 		log.WithFields(log.Fields{"group": grpName}).Debug("Local dlp group does not exist.")
 		return
-	} else {
-		fedDlpGroupConfig(cached, acc, login)
 	}
+	fedDlpGroupConfig(cached, acc, login)
 }

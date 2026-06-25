@@ -2092,7 +2092,10 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 		key := fmt.Sprintf("%s%d", newCommonRuleKey, i)
 		if err = cluster.PutBinary(key, common_zb); err != nil {
 			log.WithFields(log.Fields{"error": err, "commonslot": i, "size": len(common_zbs)}).Error()
-			newCommonKeys, _ := cluster.GetStoreKeys(newCommonRuleKey)
+			newCommonKeys, err := cluster.GetStoreKeys(newCommonRuleKey)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get common rule keys for cleanup")
+			}
 			policyIPRulesCleanup(newCommonKeys)
 			return
 		}
@@ -2182,7 +2185,10 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 	//change key from "network/GroupIPRules/" to "recalculate/policy/GroupIPRules/"
 	//rule_key := fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	oldKeys, _ := cluster.GetStoreKeys(rule_key)
+	oldKeys, err := cluster.GetStoreKeys(rule_key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get old rule keys")
+	}
 
 	verstr := fmt.Sprintf("ver.%d.%d", time.Now().UTC().UnixNano(), time.Now().UTC().UnixNano())
 	newRuleKey := fmt.Sprintf("%s%s/", rule_key, verstr)
@@ -2199,7 +2205,10 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 		key := fmt.Sprintf("%s%d", newRuleKey, i)
 		if err = cluster.PutBinary(key, zb); err != nil {
 			log.WithFields(log.Fields{"error": err, "slot": i, "size": len(zb)}).Error()
-			newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+			newKeys, err := cluster.GetStoreKeys(newRuleKey)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get new rule keys for cleanup")
+			}
 			policyIPRulesCleanup(newKeys)
 			return
 		}

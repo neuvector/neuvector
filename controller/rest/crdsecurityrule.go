@@ -1213,7 +1213,10 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 
 func (h *nvCrdHandler) crdHandlePolicyMode(groupName, policyMode, profileMode, baseline string) {
 	if utils.DoesGroupHavePolicyMode(groupName) {
-		grp, _, _ := clusHelper.GetGroup(groupName, h.acc)
+		grp, _, err := clusHelper.GetGroup(groupName, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get group from cluster")
+		}
 		if grp == nil {
 			log.WithFields(log.Fields{"name": groupName}).Error("Service doesn't exist or access denied")
 			return
@@ -2338,7 +2341,11 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 	// 1. If the learned group already exists, promote it to crd later.
 	// 2. If the crd group already exists, keep the existing crd group unchanged.
 	// 3. If group doesn't exist yet, create a crd nv.ip.xxx group that has "domain" key(if applicable) in criteria (i.e. drop "address" & other criteria).
-	if g, _, _ := clusHelper.GetGroup(groupCfg.Name, h.acc); g != nil {
+	g, _, grpErr := clusHelper.GetGroup(groupCfg.Name, h.acc)
+	if grpErr != nil {
+		log.WithError(grpErr).Warn("Failed to get group from cluster")
+	}
+	if g != nil {
 		if g.Kind != share.GroupKindContainer && hasDlpWafCfg {
 			retMsg = fmt.Sprintf("%s: Group %s cannot have DLP/WAF policy", errMsgSubject, groupStr)
 			return retMsg, api.RESTErrInvalidRequest
@@ -2364,7 +2371,11 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 					newName = fmt.Sprintf("%s-%s-%d", groupCfg.Name, fmt.Sprint(hashval), reviewType)
 				}
 				// Make sure alternative group name is avialiable for non-nv.ip.xxx group
-				if variation_g, _, _ := clusHelper.GetGroup(newName, h.acc); variation_g != nil {
+				variation_g, _, varGrpErr := clusHelper.GetGroup(newName, h.acc)
+				if varGrpErr != nil {
+					log.WithError(varGrpErr).Warn("Failed to get variation group from cluster")
+				}
+				if variation_g != nil {
 					vrg_criteria := criteria2REST(variation_g.Criteria)
 					if !common.SameGroupCriteria(*groupCfg.Criteria, vrg_criteria, false) {
 						retMsg = fmt.Sprintf("%s: Group %s and alternative name %s both taken", errMsgSubject, groupStr, newName)
@@ -2434,7 +2445,11 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 				// the group based on variation
 				// 1. if already created then it is duplicated create, so keep the variation
 				// 2. if not exist, then use the original name to create the group
-				if variation_g, _, _ := clusHelper.GetGroup(newName, h.acc); variation_g != nil {
+				variation_g2, _, varGrp2Err := clusHelper.GetGroup(newName, h.acc)
+				if varGrp2Err != nil {
+					log.WithError(varGrp2Err).Warn("Failed to get variation group from cluster")
+				}
+				if variation_g2 != nil {
 					crdgroupCfg.Name = newName
 				}
 			}
@@ -4865,7 +4880,11 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
 		}
-		if crdHash, skip, _ = crdHandler.getCrInfo(obj); skip {
+		var getCrErr error
+		if crdHash, skip, getCrErr = crdHandler.getCrInfo(obj); getCrErr != nil {
+			log.WithError(getCrErr).Warn("Failed to get CRD info")
+		}
+		if skip {
 			continue
 		}
 		if !crdHandler.AcquireLock(clusterLockWait) {

@@ -736,7 +736,10 @@ func handleusercfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 
 		var newuser bool
 		username := ruser.Fullname
-		user, rev, _ := clusHelper.GetUserRev(username, accAdmin)
+		user, rev, err := clusHelper.GetUserRev(username, accAdmin)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get user rev from cluster")
+		}
 		if user == nil {
 			userdata := share.CLUSUser{
 				Fullname:    utils.MakeUserFullname("", username),

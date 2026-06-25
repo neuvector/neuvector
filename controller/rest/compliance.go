@@ -632,13 +632,19 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 				cmpProfilesCfg = append(cmpProfilesCfg, cpCfgRet)
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 			}
 		}
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 
 		if err == nil {
 			// [2]: import compliance profile defined in the yaml file
@@ -649,11 +655,17 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 			}
 		}
 		importTask.Percentage = 90
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 	}
 
 	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)

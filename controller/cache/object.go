@@ -615,7 +615,9 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		var newHost, ok bool
 		var cache *hostCache
 		var host share.CLUSHost
-		_ = json.Unmarshal(value, &host)
+		if err := json.Unmarshal(value, &host); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal host")
+		}
 
 		if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher && host.Flavor == "" {
 			host.Flavor = share.FlavorRancher
@@ -736,7 +738,9 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var agent share.CLUSAgent
 		var newAgent bool
-		_ = json.Unmarshal(value, &agent)
+		if err := json.Unmarshal(value, &agent); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal agent")
+		}
 
 		log.WithFields(log.Fields{"agent": agent}).Info("Add or update enforcer")
 
@@ -1937,7 +1941,10 @@ func putSpecialIPNetToCluseter(checkDiff bool) {
 	}
 
 	key := share.CLUSInternalIPNetsKey(share.SpecialIPNetDefaultName)
-	value, _ := json.Marshal(subnets)
+	value, err := json.Marshal(subnets)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal subnets")
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")

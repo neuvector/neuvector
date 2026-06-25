@@ -664,7 +664,9 @@ func deleteWafRuleNetwork(sensor string) {
 	}
 	log.WithFields(log.Fields{"sensor": sensor}).Debug("")
 	key := share.CLUSWafRuleKey(sensor)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete WAF rule key")
+	}
 }
 
 func getWafRuleFromDefaultSensor(entry string) *share.CLUSWafRule {

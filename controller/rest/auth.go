@@ -2614,7 +2614,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 					}
 				}
 				if acceptedAlerts.Cardinality() != len(user.AcceptedAlerts) {
-					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
+					user, rev, err := clusHelper.GetUserRev(auth.Password.Username, accReadAll)
+					if err != nil {
+						log.WithError(err).Warn("Failed to get user rev for accepted alerts update")
+					}
+					if user != nil {
 						user.AcceptedAlerts = acceptedAlerts.ToStringSlice()
 						if err := clusHelper.PutUserRev(user, rev); err != nil {
 							log.WithFields(log.Fields{"error": err}).Error("PutUserRev")
@@ -2679,7 +2683,10 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Read body
 	var auth api.RESTFedAuthData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read request body")
+	}
 	err = json.Unmarshal(body, &auth)
 	if err != nil || auth.MasterToken == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -2740,10 +2747,13 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	defer r.Body.Close()
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read request body")
+	}
 
 	var data api.RESTAuthData
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || (data.Password == nil && data.Token == nil) {
 		e := "Request error"
 		log.WithFields(log.Fields{"error": err}).Error(e)

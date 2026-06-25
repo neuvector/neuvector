@@ -398,7 +398,10 @@ func upgradeAdmissionCert(value []byte) (*share.CLUSAdmissionCertCloaked, bool, 
 			CertNew:   string(certOld.Cert),
 			Cloaked:   true,
 		}
-		valueNew, _ := enc.Marshal(&certNew) // valueNew is byte slice of cloaked object
+		valueNew, err := enc.Marshal(&certNew) // valueNew is byte slice of cloaked object
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal cloaked admission cert")
+		}
 		// we need to do json.Unmarshal here so the return of doUpgrade() can be json.Marshal and wtitten to kv later
 		var cert share.CLUSAdmissionCertCloaked
 		if err := json.Unmarshal(valueNew, &cert); err != nil {
