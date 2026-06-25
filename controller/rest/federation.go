@@ -1050,7 +1050,10 @@ func revertFedRoles(acc *access.AccessControl) {
 		}
 		retry := 0
 		for retry < retryClusterMax {
-			cs, rev, _ := clusHelper.GetServerRev(server.Name, acc)
+			cs, rev, err := clusHelper.GetServerRev(server.Name, acc)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get server rev for fed role revert")
+			}
 			if cs != nil {
 				if cs.LDAP != nil {
 					revertMappedFedRoles(cs.LDAP.GroupMappedRoles)
@@ -1484,7 +1487,10 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	fedRole, _ := cacher.GetFedMembershipRole(acc)
+	fedRole, err := cacher.GetFedMembershipRole(acc)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get federation membership role")
+	}
 	if fedRole == api.FedRoleMaster && !acc.IsFedAdmin() {
 		restRespAccessDenied(w, login)
 		return
@@ -1500,7 +1506,6 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	var err error
 	var lock cluster.LockInterface
 	if lock, err = lockClusKey(w, share.CLUSLockFedKey); err != nil {
 		return
@@ -1662,7 +1667,10 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 	if reqData.PollInterval > 0 {
 		atomic.StoreUint32(&_fedPollInterval, reqData.PollInterval)
 	}
-	secret, _ := utils.GetGuid()
+	secret, err := utils.GetGuid()
+	if err != nil {
+		log.WithError(err).Warn("Failed to generate GUID for federation secret")
+	}
 	membership = share.CLUSFedMembership{
 		FedRole:       api.FedRoleMaster,
 		PingInterval:  reqData.PingInterval,
@@ -1894,7 +1902,11 @@ func handlerGetFedJoinToken(w http.ResponseWriter, r *http.Request, ps httproute
 
 	query := restParseQuery(r)
 	str := query.pairs[api.QueryDuration] // in minutes.
-	duration, _ := strconv.Atoi(str)
+	duration, err := strconv.Atoi(str)
+	if err != nil {
+		// Suppress error: invalid duration query param falls back to default
+		log.WithError(err).Debug("Invalid duration query param, using default")
+	}
 	if duration <= 0 { // in minute
 		duration = 60
 	}
@@ -2539,7 +2551,11 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 			accReadAll := access.NewReaderAccessControl()
 			if jointCluster := cacher.GetFedLocalJointCluster(accReadAll); jointCluster.ID != "" {
 				if _, err := jwtValidateToken(req.Token, jointCluster.Secret, nil); err == nil {
-					if met, result, _ := kv.CheckFedKvVersion("joint", req.FedKvVersion); !met {
+					met, result, kvErr := kv.CheckFedKvVersion("joint", req.FedKvVersion)
+					if kvErr != nil {
+						log.WithError(kvErr).Warn("Failed to check fed kv version")
+					}
+					if !met {
 						resp.Result = result
 					}
 					restRespSuccess(w, r, &resp, nil, nil, nil, "")

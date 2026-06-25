@@ -1328,7 +1328,11 @@ func (m clusterHelper) GetAllServers(acc *access.AccessControl) map[string]*shar
 		log.WithError(err).Warn("Failed to get server store keys")
 	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get server from cluster")
+		}
+		if value != nil {
 			var cs share.CLUSServer
 			_ = nvJsonUnmarshal(key, value, &cs)
 
@@ -1345,7 +1349,11 @@ func (m clusterHelper) GetAllServers(acc *access.AccessControl) map[string]*shar
 
 func (m clusterHelper) GetServerRev(name string, acc *access.AccessControl) (*share.CLUSServer, uint64, error) {
 	key := share.CLUSServerKey(name)
-	if value, rev, _ := m.get(key); value != nil {
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get server rev from cluster")
+	}
+	if value != nil {
 		var server share.CLUSServer
 		_ = nvJsonUnmarshal(key, value, &server)
 
@@ -1391,7 +1399,11 @@ func (m clusterHelper) GetAllUsers(acc *access.AccessControl) map[string]*share.
 		log.WithError(err).Warn("Failed to get user store keys")
 	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get user from cluster")
+		}
+		if value != nil {
 			var user share.CLUSUser
 			_ = nvJsonUnmarshal(key, value, &user)
 
@@ -3444,7 +3456,9 @@ func (m clusterHelper) DeleteCustomCheckConfig(txn *cluster.ClusterTransact, gro
 	key1 := share.CLUSCustomCheckConfigKey(group)
 	key2 := share.CLUSCustomCheckNetworkKey(group)
 	if txn == nil {
-		_ = cluster.Delete(key1)
+		if err := cluster.Delete(key1); err != nil {
+			log.WithError(err).Warn("Failed to delete custom check config key")
+		}
 		return cluster.Delete(key2)
 	} else {
 		txn.Delete(key1)
@@ -4149,5 +4163,7 @@ func (m clusterHelper) CreateQuerySessionRequest(qsr *api.QuerySessionRequest) e
 
 func (m clusterHelper) DeleteQuerySessionRequest(queryToken string) {
 	key := share.CLUSQuerySessionKey(queryToken)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete query session request")
+	}
 }

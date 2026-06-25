@@ -1725,7 +1725,9 @@ func startWorkerThread(ctx *Context) {
 					if !noTelemetry {
 						if sendTelemetry, teleData := getTelemetryData(telemetryFreq); sendTelemetry {
 							var param interface{} = &teleData
-							_ = cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param)
+							if err := cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param); err != nil {
+								log.WithError(err).Warn("Failed to start/stop fed ping poll")
+							}
 						}
 					}
 					if ctx.CheckDefAdminFreq != 0 { // 0 means do not check default admin's password
@@ -1733,7 +1735,9 @@ func startWorkerThread(ctx *Context) {
 					}
 
 					masterCluster := cacher.GetFedMasterCluster(access.NewReaderAccessControl())
-					_ = ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID)
+					if err := ConfigCspUsages(false, false, cacher.GetFedMembershipRoleNoAuth(), masterCluster.ID); err != nil {
+						log.WithError(err).Warn("Failed to config CSP usages")
+					}
 				}
 			case <-pruneTicker.C:
 				pruneGroupsByNamespace()

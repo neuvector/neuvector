@@ -1287,7 +1287,10 @@ func syncAuditTx() *syncDataMsg {
 	syncLock(syncCatgAuditIdx)
 	if curAuditIndex > 0 {
 		audits := auditCache[0:curAuditIndex]
-		msg.Data, _ = json.Marshal(audits)
+		var err error
+		if msg.Data, err = json.Marshal(audits); err != nil {
+			log.WithError(err).Warn("Failed to marshal audit cache")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgAuditIdx)
 	syncUnlock(syncCatgAuditIdx)
@@ -2171,7 +2174,9 @@ func checkDefAdminPwd(throttleMinutes uint) {
 			log.WithError(err).Warn("Failed to get throttled events from cluster")
 		}
 		if value != nil {
-			_ = json.Unmarshal(value, &evtsTime)
+			if err := json.Unmarshal(value, &evtsTime); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal throttled events")
+			}
 		}
 		if evtsTime.LastReportTime == nil {
 			evtsTime.LastReportTime = make(map[share.TLogEvent]int64)
@@ -2187,7 +2192,10 @@ func checkDefAdminPwd(throttleMinutes uint) {
 		if update {
 			_ = CacheEvent(id, "Default admin user's default password is not changed yet.")
 			evtsTime.LastReportTime[id] = now.Unix()
-			value, _ := json.Marshal(&evtsTime)
+			value, err := json.Marshal(&evtsTime)
+			if err != nil {
+				log.WithError(err).Warn("Failed to marshal throttled events")
+			}
 			if rev == 0 {
 				if err := cluster.Put(key, value); err != nil {
 					log.WithError(err).Warn("Failed to put throttled events to cluster")

@@ -31,7 +31,10 @@ func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 
 	resp.EULA = &api.RESTEULA{}
 	key := share.CLUSConfigEULAKey
-	value, _ := cluster.Get(key)
+	value, err := cluster.Get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get EULA from cluster")
+	}
 	if value != nil {
 		if err := json.Unmarshal(value, &eula); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
@@ -47,9 +50,16 @@ func handlerEULAShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		if len(errs) > 0 {
 			resp.K8sRbacAlertMsg = strings.Join(errs, "<p>")
 		}
-		user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, access.NewReaderAccessControl())
+		user, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("Failed to get default admin user rev")
+		}
 		if user != nil && user.ResetPwdInNextLogin && user.UseBootstrapPwd {
-			if bootstrapPwd, _ := resource.RetrieveBootstrapPassword(); bootstrapPwd != "" {
+			bootstrapPwd, bpErr := resource.RetrieveBootstrapPassword()
+			if bpErr != nil {
+				log.WithError(bpErr).Warn("Failed to retrieve bootstrap password")
+			}
+			if bootstrapPwd != "" {
 				strK8sCmdFormat := `kubectl get secret --namespace %s neuvector-bootstrap-secret -o go-template='{{ .data.bootstrapPassword|base64decode}}{{ "\n" }}'`
 				resp.BootstrapPwdCmd = fmt.Sprintf(strK8sCmdFormat, resource.NvAdmSvcNamespace)
 			}

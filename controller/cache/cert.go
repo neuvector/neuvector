@@ -46,7 +46,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	if pathInfo, ok := pathInfoMap[cn]; !ok {
 		if _, ok := certmanagerCerts[cn]; ok {
 			if cctx.NotifyCertChange != nil {
-				_ = cctx.NotifyCertChange(cn)
+				if err := cctx.NotifyCertChange(cn); err != nil {
+					log.WithError(err).Warn("Failed to notify cert change")
+				}
 			}
 		} else {
 			log.WithFields(log.Fields{"cn": cn}).Debug("unsupported")

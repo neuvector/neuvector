@@ -159,7 +159,11 @@ func handlerRoleShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		return
 	}
 
-	name, _ := url.PathUnescape(ps.ByName("name"))
+	name, err := url.PathUnescape(ps.ByName("name"))
+	if err != nil {
+		log.WithError(err).Warn("Failed to unescape role name")
+		name = ps.ByName("name")
+	}
 	if role := access.GetRoleDetails(name); role != nil {
 		resp := api.RESTUserRoleData{Role: role}
 		restRespSuccess(w, r, &resp, acc, login, nil, "Get role details")
@@ -237,17 +241,24 @@ func handlerRoleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	name, _ := url.PathUnescape(ps.ByName("name")) // role name
+	name, err := url.PathUnescape(ps.ByName("name")) // role name
+	if err != nil {
+		log.WithError(err).Warn("Failed to unescape role name")
+		name = ps.ByName("name")
+	}
 	if reserved := access.GetReservedRoleNames(); reserved.Contains(name) {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "reserved role")
 		return
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read request body")
+	}
 
 	var rconf api.RESTUserRoleConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -316,7 +327,11 @@ func handlerRoleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	name, _ := url.PathUnescape(ps.ByName("name")) // role name
+	name, err := url.PathUnescape(ps.ByName("name")) // role name
+	if err != nil {
+		log.WithError(err).Warn("Failed to unescape role name")
+		name = ps.ByName("name")
+	}
 	if reserved := access.GetReservedRoleNames(); reserved.Contains(name) {
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "reserved role")
 		return
@@ -424,7 +439,6 @@ func handlerRoleDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	var err error
 	var lock cluster.LockInterface
 	if lock, err = lockClusKey(w, share.CLUSLockUserKey); err != nil {
 		return
