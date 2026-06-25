@@ -1163,7 +1163,11 @@ func (m clusterHelper) PutPolicyRuleListZip(key string, array []byte) error {
 
 func (m clusterHelper) GetPolicyRule(id uint32) (*share.CLUSPolicyRule, uint64) {
 	key := share.CLUSPolicyRuleKey(share.DefaultPolicyName, id)
-	if value, rev, _ := m.get(key); value != nil {
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get policy rule")
+	}
+	if value != nil {
 		var rule share.CLUSPolicyRule
 		_ = nvJsonUnmarshal(key, value, &rule)
 		return &rule, rev
@@ -1242,7 +1246,11 @@ func (m clusterHelper) PutDlpVer(s *share.CLUSDlpRuleVer) error {
 func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleHead {
 	crhs := make([]*share.CLUSRuleHead, 0)
 	key := share.CLUSResponseRuleListKey(policyName)
-	if value, _, _ := m.get(key); value != nil {
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get response rule list")
+	}
+	if value != nil {
 		_ = nvJsonUnmarshal(key, value, &crhs)
 		return crhs
 	}
@@ -1252,7 +1260,11 @@ func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleH
 
 func (m clusterHelper) GetResponseRule(policyName string, id uint32) (*share.CLUSResponseRule, uint64) {
 	key := share.CLUSResponseRuleKey(policyName, id)
-	if value, rev, _ := m.get(key); value != nil {
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get response rule")
+	}
+	if value != nil {
 		var rule share.CLUSResponseRule
 		_ = nvJsonUnmarshal(key, value, &rule)
 		return &rule, rev
@@ -3041,7 +3053,10 @@ func (m clusterHelper) GetFedJointCluster(id string) *share.CLUSFedJointClusterI
 }
 
 func (m clusterHelper) PutFedJointCluster(jointCluster *share.CLUSFedJointClusterInfo) error {
-	value, _ := enc.Marshal(jointCluster)
+	value, err := enc.Marshal(jointCluster)
+	if err != nil {
+		return fmt.Errorf("failed to marshal joint cluster: %w", err)
+	}
 	key := share.CLUSFedJointClusterKey(jointCluster.ID)
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
@@ -3549,7 +3564,10 @@ func (m clusterHelper) GetAwsProjectCfg(projectName string, acc *access.AccessCo
 
 func (m clusterHelper) PutAwsProjectCfg(projectName string, record *share.CLUSAwsProjectCfg) error {
 	key := share.CLUSCloudCfgKey(share.CloudAws, projectName)
-	value, _ := enc.Marshal(record)
+	value, err := enc.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("failed to marshal project config: %w", err)
+	}
 	return cluster.Put(key, value)
 }
 
@@ -3566,7 +3584,10 @@ func (m clusterHelper) GetAwsCloudResource(projectName string) (*share.CLUSAwsRe
 
 func (m clusterHelper) PutAwsCloudResource(project *share.CLUSAwsResource) error {
 	key := share.CLUSCloudKey(share.CloudAws, project.ProjectName)
-	value, _ := enc.Marshal(project)
+	value, err := enc.Marshal(project)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cloud resource: %w", err)
+	}
 	return cluster.Put(key, value)
 }
 

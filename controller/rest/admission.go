@@ -1711,8 +1711,13 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	var promoteData api.RESTAdmCtrlPromoteRequestData
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &promoteData)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+	err = json.Unmarshal(body, &promoteData)
 	if err != nil || promoteData.Request == nil || len(promoteData.Request.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1733,7 +1738,10 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	defer clusHelper.ReleaseLock(lock)
 
 	for _, ruleType := range []string{api.ValidatingExceptRuleType, api.ValidatingDenyRuleType, share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType} {
-		arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+		if err != nil {
+			log.WithError(err).Warn("failed to get admission rule list")
+		}
 		for _, arh := range arhs {
 			switch ruleType {
 			case share.FedAdmCtrlExceptRulesType, share.FedAdmCtrlDenyRulesType:

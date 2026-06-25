@@ -408,7 +408,9 @@ func deleteAgentFromCluster(hostID string, agentID string) {
 	log.WithFields(log.Fields{"hostID": hostID, "enforcer": agentID}).Info()
 
 	key := share.CLUSAgentKey(hostID, agentID)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("failed to delete agent from cluster")
+	}
 }
 
 func deleteControllerFromCluster(hostID string, ctrlID string, clusterIP string) {

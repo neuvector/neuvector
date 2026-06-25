@@ -379,7 +379,9 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var group share.CLUSGroup
-		_ = json.Unmarshal(value, &group)
+		if err := json.Unmarshal(value, &group); err != nil {
+			log.WithError(err).Warn("failed to unmarshal group")
+		}
 
 		// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 		// for example, in upgrade case, the group will be created. This is to remove the group as we see it.

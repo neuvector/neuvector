@@ -856,7 +856,9 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 			for _, cc = range ctrlCacheMap {
 				if cc.ctrl.ID != ctrl.ID && cc.ctrl.ClusterIP == ctrl.ClusterIP {
 					log.WithFields(log.Fields{"controller": cc.ctrl}).Info("duplicated controller")
-					_ = cluster.Delete(cc.clusKey)
+					if err := cluster.Delete(cc.clusKey); err != nil {
+						log.WithError(err).Warn("failed to delete duplicated controller")
+					}
 				}
 			}
 
