@@ -335,7 +335,10 @@ func handlerViolationWorkloads(w http.ResponseWriter, r *http.Request, ps httpro
 			wlName = v.ServerName
 			wlDomain = v.ServerDomain
 		}
-		workload, _ := cacher.GetWorkloadBrief(wlID, "", acc)
+		workload, err := cacher.GetWorkloadBrief(wlID, "", acc)
+		if err != nil {
+			log.WithError(err).Debug("failed to get workload brief for violation log")
+		}
 		if workload == nil { // possible cases: access denied or the workload info is not found
 			workload = &api.RESTWorkloadBrief{
 				ID: wlID, Name: wlName, DisplayName: wlName, Domain: wlDomain, State: api.StateOffline,

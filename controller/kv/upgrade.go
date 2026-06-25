@@ -2,6 +2,7 @@ package kv
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -1444,11 +1445,17 @@ func ValidateWebhookCert() {
 						admission.SetCABundle(certInfo.svcName, certData)
 					}
 					// cert migration in kv is done. delete old kv key
-					_ = cluster.Delete(share.CLUSAdmissionCertKey(certInfo.store, share.DefaultPolicyName))
+					if err := cluster.Delete(share.CLUSAdmissionCertKey(certInfo.store, share.DefaultPolicyName)); err != nil {
+						log.WithError(err).Warn("failed to delete old admission cert key")
+					}
 				} else if orchPlatform != share.PlatformKubernetes {
 					// if it's non-k8s env, delete the old cert keys
-					_ = cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigAdmissionControlStore, share.DefaultPolicyName))
-					_ = cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName))
+					if err := cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigAdmissionControlStore, share.DefaultPolicyName)); err != nil {
+						log.WithError(err).Warn("failed to delete old admission control cert key")
+					}
+					if err := cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName)); err != nil {
+						log.WithError(err).Warn("failed to delete old CRD cert key")
+					}
 				}
 			} else {
 				log.WithFields(log.Fields{"err1": err1, "err2": err2, "svcName": certInfo.svcName}).Error("failed to restore files")
@@ -1839,10 +1846,14 @@ func upgradeDefSecRisksProfiles() {
 	acc := access.NewAdminAccessControl()
 	// vulnerability profile
 	if _, _, err := clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc); err != nil {
-		log.WithError(err).Warn("Failed to get vulnerability profile during upgrade")
+		if !errors.Is(err, common.ErrObjectNotFound) {
+			log.WithError(err).Warn("Failed to get vulnerability profile during upgrade")
+		}
 	}
 	// compliance profile
 	if _, _, err := clusHelper.GetComplianceProfile(share.DefaultComplianceProfileName, acc); err != nil {
-		log.WithError(err).Warn("Failed to get compliance profile during upgrade")
+		if !errors.Is(err, common.ErrObjectNotFound) {
+			log.WithError(err).Warn("Failed to get compliance profile during upgrade")
+		}
 	}
 }

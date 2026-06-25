@@ -140,7 +140,11 @@ func handlerDomainEntryConfig(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	name := ps.ByName("name")
-	name, _ = url.PathUnescape(name)
+	if unescaped, err := url.PathUnescape(name); err != nil {
+		log.WithError(err).Warn("failed to unescape domain name")
+	} else {
+		name = unescaped
+	}
 
 	// Read body
 	body, _ := io.ReadAll(r.Body)

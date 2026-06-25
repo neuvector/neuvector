@@ -960,7 +960,10 @@ func getJointClusterToken(rc *share.CLUSFedJointClusterInfo, clusterID string, u
 func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, tag string, body []byte, ch chan<- cmdResponse,
 	acc *access.AccessControl, login *loginSession, talkRounds []bool) int {
 	log.WithFields(log.Fields{"method": method, "id": id}).Debug()
-	user, _, _ := clusHelper.GetUserRev(login.fullname, acc)
+	user, _, err := clusHelper.GetUserRev(login.fullname, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user rev for fed cluster talk")
+	}
 	cmdResp := cmdResponse{id: id, result: _fedClusterDisconnected}
 	var status int
 
@@ -1710,14 +1713,21 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 
 	accFedAdmin := access.NewFedAdminAccessControl()
 	_ = cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles) // The error is handled within the function.
-	user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accFedAdmin)
+	user, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, accFedAdmin)
+	if err != nil {
+		log.WithError(err).Warn("failed to get default admin user rev")
+	}
 	if user != nil {
 		kickLoginSessions(user)
 	}
 	// if current user is local non-default admin user or rancher user, kick all related sessions
 	if w != nil && (login.fullname != common.DefaultAdminUser || login.server != "") {
-		if user, _, _ := clusHelper.GetUserRev(login.fullname, accFedAdmin); user != nil {
-			kickLoginSessions(user)
+		loginUser, _, err := clusHelper.GetUserRev(login.fullname, accFedAdmin)
+		if err != nil {
+			log.WithError(err).Warn("failed to get login user rev")
+		}
+		if loginUser != nil {
+			kickLoginSessions(loginUser)
 		}
 	}
 
@@ -3320,13 +3330,20 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 		}
 
 		var status int
-		if met, result, _ := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
+		met, result, err := kv.CheckFedKvVersion("master", req.FedKvVersion)
+		if err != nil {
+			log.WithError(err).Warn("failed to check fed kv version")
+		}
+		if !met {
 			resp.Result = result
 			status = result
 		} else {
 			// return fed registry/repo scan data revisions to managed clusters
 			resp.ScanDataRevs, _ = cacher.GetFedScanDataRevisions(true, fedCfg.DeployRepoScanData)
-			resp.Settings, resp.Revisions, _ = cacher.GetFedRules(req.Revisions, accReadAll)
+			resp.Settings, resp.Revisions, err = cacher.GetFedRules(req.Revisions, accReadAll)
+			if err != nil {
+				log.WithError(err).Warn("failed to get fed rules")
+			}
 			if len(resp.Revisions) > 0 {
 				status = _fedClusterOutOfSync
 			} else {
@@ -3407,7 +3424,11 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 		// do not give out master's fed registry/repo scan data when master cluster is importing config
 		resp.Result = _fedClusterImporting
 	} else {
-		if met, result, _ := kv.CheckFedKvVersion("master", req.FedKvVersion); !met {
+		met, result, err := kv.CheckFedKvVersion("master", req.FedKvVersion)
+		if err != nil {
+			log.WithError(err).Warn("failed to check fed kv version for scan data poll")
+		}
+		if !met {
 			resp.Result = result
 		} else {
 			var getFedRegCfg bool
@@ -3460,7 +3481,11 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	// command request contains fed kv version for the joining cluster. if it's different from this cluster's fed kv version, it means they are not compatible
-	if met, result, _ := kv.CheckFedKvVersion("joint", req.FedKvVersion); !met {
+	met, result, err := kv.CheckFedKvVersion("joint", req.FedKvVersion)
+	if err != nil {
+		log.WithError(err).Warn("failed to check fed kv version for joint cluster command")
+	}
+	if !met {
 		resp.Result = result
 	} else {
 		switch req.Command {
@@ -3639,7 +3664,11 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				for _, urlInfo := range forbiddenFwUrlRegex {
 					if strings.HasPrefix(request, urlInfo.urlPrefix) {
 						if urlInfo.urlRegex == nil {
-							urlInfo.urlRegex, _ = regexp.Compile(urlInfo.url)
+							var err error
+							urlInfo.urlRegex, err = regexp.Compile(urlInfo.url)
+							if err != nil {
+								log.WithError(err).Warn("failed to compile forbidden URL regex")
+							}
 						}
 						if urlInfo.urlRegex != nil && urlInfo.urlRegex.MatchString(request) {
 							for _, verb := range urlInfo.verbs {
@@ -3707,7 +3736,11 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		}
 		user = wrapUser
 	} else {
-		user, _, _ = clusHelper.GetUserRev(login.fullname, acc)
+		var err error
+		user, _, err = clusHelper.GetUserRev(login.fullname, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get user rev for cluster forward")
+		}
 	}
 
 	remoteExport := false

@@ -37,7 +37,10 @@ func writeUsageReport() error {
 	}
 
 	// clean up
-	keys, _ := cluster.GetStoreKeys(share.CLUSCtrlUsageReportStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSCtrlUsageReportStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get store keys for usage cleanup")
+	}
 	if len(keys) > usageReportHistory {
 		all := make([]int64, 0, len(keys))
 		for _, key := range keys {
@@ -111,10 +114,12 @@ func getUsageReport() *share.CLUSSystemUsageReport {
 	fedCacheMutexRUnlock()
 
 	store := share.CLUSConfigCloudStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get cloud store keys")
+	}
 	r.SLessProjs = len(keys)
 
-	var err error
 	r.InstallationID, err = clusHelper.GetInstallationID()
 	if err != nil {
 		log.WithError(err).Warn("failed to get installation ID for usage report")
