@@ -224,10 +224,23 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 			continue
 		}
 
-		vulasset.Workloads, _ = convertToJSON(vulasset.WorkloadItems)
-		vulasset.Nodes, _ = convertToJSON(vulasset.NodeItems)
-		vulasset.Images, _ = convertToJSON(vulasset.ImageItems)
-		vulasset.Platforms, _ = convertToJSON(vulasset.PlatformItems)
+		var jsonErr error
+		vulasset.Workloads, jsonErr = convertToJSON(vulasset.WorkloadItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert workload items to JSON")
+		}
+		vulasset.Nodes, jsonErr = convertToJSON(vulasset.NodeItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert node items to JSON")
+		}
+		vulasset.Images, jsonErr = convertToJSON(vulasset.ImageItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert image items to JSON")
+		}
+		vulasset.Platforms, jsonErr = convertToJSON(vulasset.PlatformItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert platform items to JSON")
+		}
 
 		vulasset.MeetSearch = true
 		vulasset.ImpactWeight = len(vulasset.WorkloadItems) + len(vulasset.NodeItems) + len(vulasset.ImageItems) + len(vulasset.PlatformItems)

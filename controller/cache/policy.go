@@ -149,7 +149,9 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		if share.CLUSIsPolicyRuleKey(key) {
 			var rule share.CLUSPolicyRule
-			_ = json.Unmarshal(value, &rule)
+			if err := json.Unmarshal(value, &rule); err != nil {
+				log.WithError(err).Warn("failed to unmarshal policy rule")
+			}
 
 			// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 			// for example, in upgrade case, the group will be created.
@@ -205,7 +207,9 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			}
 		} else if share.CLUSIsPolicyZipRuleListKey(key) {
 			var heads []*share.CLUSRuleHead
-			_ = json.Unmarshal(value, &heads)
+			if err := json.Unmarshal(value, &heads); err != nil {
+				log.WithError(err).Warn("failed to unmarshal policy rule heads")
+			}
 
 			cacheMutexLock()
 			policyCache.ruleHeads = nil
@@ -1788,7 +1792,9 @@ func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 		if uzb == nil {
 			log.Error("Failed to unzip data")
 		} else {
-			_ = json.Unmarshal(uzb, &rules)
+			if err := json.Unmarshal(uzb, &rules); err != nil {
+				log.WithError(err).Warn("failed to unmarshal IP policy rules")
+			}
 		}
 		return rules
 	}
@@ -1876,7 +1882,10 @@ func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, i
 		//zip each slots
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal policy IP rules slot")
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -1936,7 +1945,10 @@ func preparePolicySlotsNode(rules []share.CLUSGroupIPPolicy, wlen int) ([][]byte
 		//zip each slots
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal policy IP rules slot")
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -2025,7 +2037,10 @@ func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, er
 		//zip each slots
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal policy IP rules slot")
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -2237,7 +2252,10 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 	clusHelper := kv.GetClusterHelper()
 	if err = clusHelper.PutPolicyVer(&polVer); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to write network policy to the cluster")
-		newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+		newKeys, err := cluster.GetStoreKeys(newRuleKey)
+		if err != nil {
+			log.WithError(err).Warn("failed to get store keys for policy cleanup")
+		}
 		policyIPRulesCleanup(newKeys)
 		return
 	}
@@ -2246,7 +2264,11 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 
 func putPolicyIPRulesToCluster(rules []share.CLUSGroupIPPolicy) {
 	key := share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName)
-	value, _ := json.Marshal(rules)
+	value, err := json.Marshal(rules)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal policy IP rules")
+		return
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")

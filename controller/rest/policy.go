@@ -508,7 +508,9 @@ func deletePolicyRules(txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {
 		// This function cannot return an error, as there is no possibility for one to occur.
 		// However, we retain the error return type to accommodate the mock dependency.
-		_ = clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+		if err := clusHelper.DeletePolicyRuleTxn(txn, id.(uint32)); err != nil {
+			log.WithError(err).Warn("failed to delete policy rule from transaction")
+		}
 	}
 }
 
@@ -2008,7 +2010,11 @@ func parseDerivedPolicyRules(ruleMap map[string]*share.CLUSDerivedPolicyRuleArra
 	wlrs := make([]*api.RESTDerivedWorkloadPolicyRule, 0)
 	for wlID, arr := range ruleMap {
 		var wl *api.RESTWorkloadBrief
-		if wl, _ = cacher.GetWorkloadBrief(wlID, "", acc); wl == nil {
+		wl, err := cacher.GetWorkloadBrief(wlID, "", acc)
+		if err != nil {
+			log.WithError(err).Debug("failed to get workload brief for derived policy")
+		}
+		if wl == nil {
 			continue
 		}
 		wlPolicy := api.RESTDerivedWorkloadPolicyRule{
@@ -2095,7 +2101,9 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 	for _, rhExisting := range rhsExisting {
 		if rhExisting.CfgType == share.FederalCfg {
 			if _, ok := rulesMap[rhExisting.ID]; !ok { // in existing but not in new. so delete it
-				_ = clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID)
+				if err := clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID); err != nil {
+					log.WithError(err).Warn("failed to delete policy rule from federation transaction")
+				}
 			}
 		} else {
 			nonFedPolicies++

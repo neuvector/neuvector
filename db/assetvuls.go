@@ -905,11 +905,19 @@ func encodeAndCompress(data interface{}) ([]byte, error) {
 func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
 	var vulsBytes, modulesBytes []byte
 	if len(assetVul.Vuls) > 0 {
-		vulsBytes, _ = encodeAndCompress(assetVul.Vuls)
+		var err error
+		vulsBytes, err = encodeAndCompress(assetVul.Vuls)
+		if err != nil {
+			log.WithError(err).Warn("failed to encode/compress vulnerability data")
+		}
 	}
 
 	if len(assetVul.Modules) > 0 {
-		modulesBytes, _ = encodeAndCompress(assetVul.Modules)
+		var err error
+		modulesBytes, err = encodeAndCompress(assetVul.Modules)
+		if err != nil {
+			log.WithError(err).Warn("failed to encode/compress module data")
+		}
 	}
 
 	record := &goqu.Record{

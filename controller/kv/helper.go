@@ -1438,7 +1438,11 @@ func (m clusterHelper) GetAllUsersNoAuth() map[string]*share.CLUSUser {
 		log.WithError(err).Warn("Failed to get user store keys")
 	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get user key")
+		}
+		if value != nil {
 			var user share.CLUSUser
 			_ = nvJsonUnmarshal(key, value, &user)
 			users[user.Fullname] = &user
@@ -1450,7 +1454,11 @@ func (m clusterHelper) GetAllUsersNoAuth() map[string]*share.CLUSUser {
 
 func (m clusterHelper) GetUserRev(fullname string, acc *access.AccessControl) (*share.CLUSUser, uint64, error) {
 	key := share.CLUSUserKey(url.QueryEscape(fullname))
-	if value, rev, _ := m.get(key); value != nil {
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user rev")
+	}
+	if value != nil {
 		var user share.CLUSUser
 		_ = nvJsonUnmarshal(key, value, &user)
 
@@ -1498,7 +1506,11 @@ func (m clusterHelper) DeleteUser(fullname string) error {
 
 func (m clusterHelper) GetProcessProfile(group string) *share.CLUSProcessProfile {
 	key := share.CLUSProfileConfigKey(group)
-	if value, _, _ := m.get(key); value != nil {
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get process profile")
+	}
+	if value != nil {
 		var pp share.CLUSProcessProfile
 		_ = nvJsonUnmarshal(key, value, &pp)
 		return &pp
@@ -1596,7 +1608,10 @@ func (m clusterHelper) GetAllScanner(acc *access.AccessControl) []*share.CLUSSca
 	if keys, err := cluster.GetStoreKeys(share.CLUSScannerStore); err == nil {
 		for _, key := range keys {
 			var s share.CLUSScanner
-			value, _, _ := m.get(key)
+			value, _, err := m.get(key)
+			if err != nil {
+				log.WithError(err).Debug("failed to get scanner data")
+			}
 			if value != nil {
 				_ = nvJsonUnmarshal(key, value, &s)
 
@@ -1612,7 +1627,10 @@ func (m clusterHelper) GetAllScanner(acc *access.AccessControl) []*share.CLUSSca
 func (m clusterHelper) GetScannerStats(id string) (*share.CLUSScannerStats, error) {
 	var s share.CLUSScannerStats
 	key := share.CLUSScannerStatsKey(id)
-	value, _, _ := m.get(key)
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scanner stats")
+	}
 	if value == nil {
 		return nil, cluster.ErrKeyNotFound
 	}
@@ -1643,9 +1661,14 @@ func (m clusterHelper) PutScannerStats(id string, objType share.ScanObjectType, 
 	key := share.CLUSScannerStatsKey(id)
 
 	var err error
+	var value []byte
+	var rev uint64
 	retry := 0
 	for retry < 3 {
-		value, rev, _ := m.get(key)
+		value, rev, err = m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get scanner stats")
+		}
 		if value == nil {
 			return common.ErrObjectNotFound
 		}
@@ -2066,7 +2089,10 @@ func (m clusterHelper) PutComplianceProfileIfNotExist(cp *share.CLUSCompliancePr
 func (m clusterHelper) GetAllVulnerabilityProfiles(acc *access.AccessControl) []*share.CLUSVulnerabilityProfile {
 	cps := make([]*share.CLUSVulnerabilityProfile, 0)
 
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigVulnerabilityProfileStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigVulnerabilityProfileStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get vulnerability profile store keys")
+	}
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {
 			var cp share.CLUSVulnerabilityProfile
@@ -2490,7 +2516,10 @@ func (m clusterHelper) GetAllFileMonitorProfile() map[string]*share.CLUSFileMoni
 	confs := make(map[string]*share.CLUSFileMonitorProfile, 0)
 
 	store := share.CLUSConfigFileMonitorStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get file monitor profile store keys")
+	}
 	for _, key := range keys {
 		name := share.CLUSFileMonitorKey2Group(key)
 		if value, _, _ := m.get(key); value != nil {
@@ -3216,7 +3245,10 @@ func (m clusterHelper) GetDlpSensor(sensor string) *share.CLUSDlpSensor {
 }
 
 func (m clusterHelper) GetAllDlpSensors() []*share.CLUSDlpSensor {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigDlpRuleStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigDlpRuleStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get DLP sensor store keys")
+	}
 	sensors := make([]*share.CLUSDlpSensor, 0, len(keys))
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {

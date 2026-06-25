@@ -843,7 +843,9 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var ctrl share.CLUSController
 		var newCtrl bool
-		_ = json.Unmarshal(value, &ctrl)
+		if err := json.Unmarshal(value, &ctrl); err != nil {
+			log.WithError(err).Warn("failed to unmarshal controller")
+		}
 
 		log.WithFields(log.Fields{"controller": ctrl}).Info("Add or update controller")
 
@@ -1371,7 +1373,9 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var wl share.CLUSWorkload
-		_ = json.Unmarshal(value, &wl)
+		if err := json.Unmarshal(value, &wl); err != nil {
+			log.WithError(err).Warn("failed to unmarshal workload")
+		}
 
 		// Check if it's NeuVector containers first
 		if wl.PlatformRole == container.PlatformContainerNeuVector {
@@ -1612,7 +1616,9 @@ func networkEPUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var nep share.CLUSNetworkEP
-		_ = json.Unmarshal(value, &nep)
+		if err := json.Unmarshal(value, &nep); err != nil {
+			log.WithError(err).Warn("failed to unmarshal network endpoint")
+		}
 		addToNetworkEPGroup(&nep)
 	case cluster.ClusterNotifyDelete:
 		id := share.CLUSNetworkEPKey2ID(key)
@@ -1988,7 +1994,11 @@ func putInternalIPNetToCluseter(checkDiff bool) {
 	}
 
 	key := share.CLUSInternalIPNetsKey(share.InternalIPNetDefaultName)
-	value, _ := json.Marshal(subnets)
+	value, err := json.Marshal(subnets)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal internal IP subnets")
+		return
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")
@@ -2301,7 +2311,9 @@ func querySessionRequest(nType cluster.ClusterNotifyType, key string, value []by
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var qsr api.QuerySessionRequest
-		_ = json.Unmarshal(value, &qsr)
+		if err := json.Unmarshal(value, &qsr); err != nil {
+			log.WithError(err).Warn("failed to unmarshal query session request")
+		}
 
 		log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr}).Debug("[multi-cluster] consul kv watcher added event. Will call rest.CreateQuerySession()")
 
