@@ -105,7 +105,7 @@ func TestCASignTLSCert(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Generate TLS key/cert using CA.
-	err = GenTlsCertWithCaAndStoreInFiles("www.google.com", certfile, keyfile, cacertfile, cakeyfile, ValidityPeriod{Year: 1}, x509.ExtKeyUsageServerAuth)
+	err = GenTlsCertWithCaAndStoreInFiles("www.google.com", dir, certfile, keyfile, cacertfile, cakeyfile, ValidityPeriod{Year: 1}, x509.ExtKeyUsageServerAuth)
 	assert.Nil(t, err)
 
 	_, err = tls.LoadX509KeyPair(certfile, keyfile)
@@ -130,7 +130,7 @@ func TestGenTlsCertWithCaAndStoreInKv_SelfSign(t *testing.T) {
 	//
 	// Self-sign
 	//
-	err = GenTlsCertWithCaAndStoreInKv("CN", certfile, keyfile, "", "", ValidityPeriod{Year: 1})
+	err = GenTlsCertWithCaAndStoreInKv("CN", dir, certfile, keyfile, "", "", ValidityPeriod{Year: 1})
 	assert.Nil(t, err)
 
 	_, err = tls.LoadX509KeyPair(certfile, keyfile)
@@ -144,7 +144,7 @@ func TestGenTlsCertWithCaAndStoreInKv_SelfSign(t *testing.T) {
 	certdata, err := os.ReadFile(certfile)
 	assert.Nil(t, err)
 
-	err = GenTlsCertWithCaAndStoreInKv("CN", certfile, keyfile, "", "", ValidityPeriod{Year: 1})
+	err = GenTlsCertWithCaAndStoreInKv("CN", dir, certfile, keyfile, "", "", ValidityPeriod{Year: 1})
 	assert.Nil(t, err)
 
 	keydata2, err := os.ReadFile(keyfile)
@@ -176,7 +176,7 @@ func TestGenTlsCertWithCaAndStoreInKv_WithCA(t *testing.T) {
 	err = CreateCAFilesAndStoreInKv(cacertfile, cakeyfile)
 	assert.Nil(t, err)
 
-	err = GenTlsCertWithCaAndStoreInKv("CN", certfile, keyfile, cacertfile, cakeyfile, ValidityPeriod{Year: 1})
+	err = GenTlsCertWithCaAndStoreInKv("CN", dir, certfile, keyfile, cacertfile, cakeyfile, ValidityPeriod{Year: 1})
 	assert.Nil(t, err)
 
 	_, err = tls.LoadX509KeyPair(certfile, keyfile)
