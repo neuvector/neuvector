@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"errors"
@@ -24,8 +26,10 @@ import (
 )
 
 const (
-	AdmCAKeyPath  = "/etc/neuvector/certs/internal/adm_ca.key"
-	AdmCACertPath = "/etc/neuvector/certs/internal/adm_ca.cert"
+	certsDir = "/etc/neuvector/certs/"
+
+	AdmCAKeyPath  = certsDir + "internal/adm_ca.key"
+	AdmCACertPath = certsDir + "internal/adm_ca.cert"
 
 	CertTypeAdmCtrl   = "adm_ctrl"
 	CertTypeFed       = "federation"
@@ -330,8 +334,8 @@ func generateCertWithRSAKeyInternal(template *x509.Certificate, keysize int, par
 }
 
 // Generate a TLS cert and store it in kv.
-func GenTlsCertWithCaAndStoreInKv(cn string, certPath string, keyPath string, caCertPath string, caKeyPath string, validityPeriod ValidityPeriod) error {
-	if err := GenTlsCertWithCaAndStoreInFiles(cn, certPath, keyPath, caCertPath, caKeyPath, validityPeriod, x509.ExtKeyUsageServerAuth); err != nil {
+func GenTlsCertWithCaAndStoreInKv(cn, certsDir, certPath, keyPath, caCertPath, caKeyPath string, validityPeriod ValidityPeriod) error {
+	if err := GenTlsCertWithCaAndStoreInFiles(cn, certsDir, certPath, keyPath, caCertPath, caKeyPath, validityPeriod, x509.ExtKeyUsageServerAuth); err != nil {
 		log.WithError(err).WithFields(log.Fields{"certPath": certPath, "keyPath": keyPath}).Error("wrong cert/key")
 		return err
 	}
@@ -400,8 +404,22 @@ func verifyWebServerCert(cn string, certData []byte) bool {
 // Generate TLS key/cert pair using ca specified and store them in specified files.
 // Return true if it succeeds to create key pair or the file already exists.
 // If caCertPath and caKeyPath are both empty, this will create a self-signed certificate.
-func GenTlsCertWithCaAndStoreInFiles(cn string, certPath string, privKeyPath string, caCertPath string, caKeyPath string, validityPeriod ValidityPeriod, usage x509.ExtKeyUsage) error {
+func GenTlsCertWithCaAndStoreInFiles(cn, certsDir, certPath, privKeyPath, caCertPath, caKeyPath string, validityPeriod ValidityPeriod, usage x509.ExtKeyUsage) error {
 	notfound := false
+	base := certsDir
+	if base[len(base)-1] != '/' {
+		base += "/"
+	}
+	for idx, path := range []string{privKeyPath, certPath} {
+		if !strings.HasPrefix(path, base) {
+			err := fmt.Errorf("Invalid file path")
+			log.WithFields(log.Fields{"i": idx, "path": path}).Error(err.Error())
+			return err
+		}
+		if _, err := checkLocalPath(base, path[len(base):]); err != nil {
+			return err
+		}
+	}
 	if _, err := os.Stat(privKeyPath); err != nil && os.IsNotExist(err) {
 		notfound = true
 	}
@@ -477,22 +495,44 @@ func GenTlsKeyCert(cn string, caCertPath string, caKeyPath string, validityPerio
 	return cert, key, nil
 }
 
-func GetFedTlsKeyCertPath(masterID, jointID string) (string, string, string) { // returns (caCertPath, privKeyPath, certPath)
+func GetTlsKeyCertPath(svcName, ns string) (string, string, string) { // returns (keyPath, certPath, certsDir)
+	keyPath, err := checkLocalPath(certsDir, fmt.Sprintf("%s.%s.svc.key.pem", svcName, ns))
+	if err != nil {
+		return "", "", ""
+	}
+	certPath, err := checkLocalPath(certsDir, fmt.Sprintf("%s.%s.svc.cert.pem", svcName, ns))
+	if err != nil {
+		return "", "", ""
+	}
+	return keyPath, certPath, certsDir
+}
+
+func GetFedTlsKeyCertPath(masterID, jointID string) (string, string, string, string, error) { // returns (caCertPath, privKeyPath, certPath, certsDir, error)
+	var err error
 	var caCertPath, privKeyPath, certPath string
 	if masterID != "" {
-		caCertPath = fmt.Sprintf("/etc/neuvector/certs/fed.master.%s.cert.pem", masterID)
+		caCertPath, err = checkLocalPath(certsDir, fmt.Sprintf("fed.master.%s.cert.pem", masterID))
+		if err != nil {
+			return "", "", "", "", err
+		}
 	}
 	if jointID != "" {
-		privKeyPath = fmt.Sprintf("/etc/neuvector/certs/fed.client.%s.key.pem", jointID)
-		certPath = fmt.Sprintf("/etc/neuvector/certs/fed.client.%s.cert.pem", jointID)
+		privKeyPath, err = checkLocalPath(certsDir, fmt.Sprintf("fed.client.%s.key.pem", jointID))
+		if err != nil {
+			return "", "", "", "", err
+		}
+		certPath, err = checkLocalPath(certsDir, fmt.Sprintf("fed.client.%s.cert.pem", jointID))
+		if err != nil {
+			return "", "", "", "", err
+		}
 	}
-	return caCertPath, privKeyPath, certPath
+	return caCertPath, privKeyPath, certPath, certsDir, nil
 }
 
 func GetFedCaCertPath(masterID string) (string, error) { // returns caCertPath
 	var caCertData []byte
 	var err error
-	caCertPath := fmt.Sprintf("/etc/neuvector/certs/fed.master.%s.cert.pem", masterID)
+	caCertPath := path.Join(certsDir, fmt.Sprintf("fed.master.%s.cert.pem", masterID))
 	if caCertData, err = os.ReadFile(AdmCACertPath); err == nil {
 		if err = os.WriteFile(caCertPath, caCertData, 0600); err == nil {
 			return caCertPath, nil

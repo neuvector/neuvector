@@ -30,8 +30,16 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 
 	cnAdm := fmt.Sprintf("%s.%s.svc", resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
 	cnCrd := fmt.Sprintf("%s.%s.svc", resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
-	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
-	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	admKeyPath, admCertPath, _ := kv.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
+	if admKeyPath == "" || admCertPath == "" {
+		log.WithFields(log.Fields{"svc": resource.NvAdmSvcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+		return
+	}
+	crdKeyPath, crdCertPath, _ := kv.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	if crdKeyPath == "" || crdCertPath == "" {
+		log.WithFields(log.Fields{"svc": resource.NvCrdSvcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+		return
+	}
 	pathInfoMap := map[string]*keyCertFileInfo{
 		share.CLUSRootCAKey: {share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
 		cnAdm:               {resource.NvAdmSvcName, admKeyPath, admCertPath, true},
