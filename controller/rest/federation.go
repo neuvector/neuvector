@@ -1009,9 +1009,11 @@ func talkToJointCluster(rc *share.CLUSFedJointClusterInfo, method, request, id, 
 // share.CLUSLockFedKey lock is owned by caller
 func informFedDismissed(joinedCluster share.CLUSFedJointClusterInfo, bodyTo []byte, ch chan<- bool, acc *access.AccessControl, login *loginSession) {
 	talkToJointCluster(&joinedCluster, http.MethodPost, "v1/fed/remove_internal", joinedCluster.ID, _tagDismissFed, bodyTo, nil, acc, login, nil)
-	_, jointKeyPath, jointCertPath := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
-	os.Remove(jointKeyPath)
-	os.Remove(jointCertPath)
+	_, jointKeyPath, jointCertPath, _, err := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
+	if err == nil {
+		os.Remove(jointKeyPath)
+		os.Remove(jointCertPath)
+	}
 	_setFedJointPrivateKey(joinedCluster.ID, nil)
 	if err := clusHelper.DeleteFedJointCluster(joinedCluster.ID); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("DeleteFedJointCluster")
@@ -1137,10 +1139,12 @@ func leaveFedCleanup(masterID, jointID string, lockAcquired bool) {
 		defer clusHelper.ReleaseLock(lock)
 	}
 
-	masterCaCertPath, jointKeyPath, jointCertPath := kv.GetFedTlsKeyCertPath(masterID, jointID)
+	masterCaCertPath, jointKeyPath, jointCertPath, _, err := kv.GetFedTlsKeyCertPath(masterID, jointID)
 	os.Remove(masterCaCertPath)
-	os.Remove(jointKeyPath)
-	os.Remove(jointCertPath)
+	if err == nil {
+		os.Remove(jointKeyPath)
+		os.Remove(jointCertPath)
+	}
 	if err := clusHelper.DeleteFedJointClusterStatus(masterID); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("DeleteFedJointClusterStatus")
 	}
@@ -1837,7 +1841,7 @@ func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *l
 	}
 
 	masterCluster := cacher.GetFedMasterCluster(acc)
-	if masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, ""); masterCaCertPath != "" {
+	if masterCaCertPath, _, _, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, ""); masterCaCertPath != "" {
 		os.Remove(masterCaCertPath)
 	}
 	membership = share.CLUSFedMembership{
@@ -2048,7 +2052,7 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 		respTo := api.RESTFedJoinRespInternal{}
 		if err = json.Unmarshal(data, &respTo); err == nil {
 			mtlsAvailable := false
-			caCertPath, _, _ := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
+			caCertPath, _, _, _, _ := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
 			if respTo.CACert != "" && respTo.ClientCert != "" && respTo.ClientKey != "" {
 				if caCert, err := base64.StdEncoding.DecodeString(respTo.CACert); err == nil {
 					if err = os.WriteFile(caCertPath, caCert, 0600); err == nil {
@@ -2416,9 +2420,15 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 
 	// update kv
 	var caCertData, privKeyData, certData []byte
-	_, privKeyPath, certPath := kv.GetFedTlsKeyCertPath("", reqData.JointCluster.ID)
-	if err := kv.GenTlsCertWithCaAndStoreInFiles(reqData.JointCluster.ID, certPath, privKeyPath, kv.AdmCACertPath, kv.AdmCAKeyPath, kv.ValidityPeriod{Year: 10}, x509.ExtKeyUsageClientAuth); err == nil {
-		masterCaCertPath, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
+	_, privKeyPath, certPath, certsDir, err := kv.GetFedTlsKeyCertPath("", reqData.JointCluster.ID)
+	if err != nil {
+		log.WithFields(log.Fields{"id": reqData.JointCluster.ID, "error": err}).Error()
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+	if err := kv.GenTlsCertWithCaAndStoreInFiles(reqData.JointCluster.ID, certsDir, certPath, privKeyPath, kv.AdmCACertPath, kv.AdmCAKeyPath,
+		kv.ValidityPeriod{Year: 10}, x509.ExtKeyUsageClientAuth); err == nil {
+		masterCaCertPath, _, _, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
 		caCertData, err = os.ReadFile(masterCaCertPath)
 		if err == nil {
 			privKeyData, err = os.ReadFile(privKeyPath)
@@ -2665,9 +2675,11 @@ func removeFromFederation(joinedCluster *share.CLUSFedJointClusterInfo, acc *acc
 		if err := clusHelper.DeleteFedJointCluster(joinedCluster.ID); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
 		}
-		_, clientKeyPath, clientCertPath := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
-		os.Remove(clientKeyPath)
-		os.Remove(clientCertPath)
+		_, clientKeyPath, clientCertPath, _, err := kv.GetFedTlsKeyCertPath("", joinedCluster.ID)
+		if err == nil {
+			os.Remove(clientKeyPath)
+			os.Remove(clientCertPath)
+		}
 		_setFedJointPrivateKey(joinedCluster.ID, nil)
 		for j := 0; j < 3; j++ {
 			if c := cacher.GetFedJoinedCluster(joinedCluster.ID, acc); c.ID == joinedCluster.ID {

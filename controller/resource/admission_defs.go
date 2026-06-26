@@ -1,9 +1,5 @@
 package resource
 
-import (
-	"fmt"
-)
-
 // for OperationType
 const (
 	OperationAll string = "*"
@@ -40,9 +36,3 @@ const (
 	SideEffectSome         string = "Some"
 	SideEffectNoneOnDryRun string = "NoneOnDryRun"
 )
-
-func GetTlsKeyCertPath(svcName, ns string) (string, string) {
-	keyPath := fmt.Sprintf("/etc/neuvector/certs/%s.%s.svc.key.pem", svcName, ns)
-	certPath := fmt.Sprintf("/etc/neuvector/certs/%s.%s.svc.cert.pem", svcName, ns)
-	return keyPath, certPath
-}
