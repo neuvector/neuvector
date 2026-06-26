@@ -901,7 +901,6 @@ func workloadRisk2IDName(wl *common.WorkloadRisk) api.RESTIDName {
 }
 
 func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *api.RESTVulnerabilityAssetData) {
-	sdb := scanUtils.GetScannerDB()
 	vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)
 
 	resp := api.RESTVulnerabilityAssetData{
@@ -924,9 +923,9 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
 			reportVuls, _ := db.GetVulnerability(wl.ID)
-			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+			localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
 
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, localVulTraits, "", false)
+			vuls := scanUtils.FillVulTraits(db.GlobalCVECache(), wl.BaseOS, localVulTraits, "", false)
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)
@@ -942,9 +941,9 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		for _, n := range nodes {
 
 			reportVuls, _ := db.GetVulnerability(n.ID)
-			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
+			localVulTraits := scanUtils.ExtractVulnerability(db.GlobalCVECache(), reportVuls)
 
-			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, localVulTraits, "", false)
+			vuls := scanUtils.FillVulTraits(db.GlobalCVECache(), n.BaseOS, localVulTraits, "", false)
 			if vuls != nil {
 				for _, vul := range vuls {
 					va := addVulAsset(all, vul)

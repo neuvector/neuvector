@@ -415,6 +415,14 @@ type SessionInterface interface {
 	Disassociate(key string) error
 }
 
+// LockOptions holds optional parameters for NewLock / AcquireLock.
+// The zero value selects the consul driver defaults for every field.
+type LockOptions struct {
+	// SessionTTL overrides the consul session TTL (e.g. "300s").
+	// Empty string uses the driver default.
+	SessionTTL string
+}
+
 type ClusterDriver interface {
 	Start(cc *ClusterConfig, eCh chan error, recover bool)
 	Join(cc *ClusterConfig) error
@@ -427,7 +435,7 @@ type ClusterDriver interface {
 	ServerAlive() (bool, error)
 	GetAllMembers() []ClusterMemberInfo
 
-	NewLock(key string, wait time.Duration) (LockInterface, error)
+	NewLock(key string, wait time.Duration, opts ...LockOptions) (LockInterface, error)
 	NewSession(name string, ttl time.Duration) (SessionInterface, error)
 
 	// KV
@@ -462,8 +470,8 @@ type ClusterDriver interface {
 
 var driver ClusterDriver = &consul
 
-func NewLock(key string, wait time.Duration) (LockInterface, error) {
-	return driver.NewLock(key, wait)
+func NewLock(key string, wait time.Duration, opts ...LockOptions) (LockInterface, error) {
+	return driver.NewLock(key, wait, opts...)
 }
 
 func NewSession(name string, ttl time.Duration) (SessionInterface, error) {

@@ -128,7 +128,11 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 
 	// check if CVEDB is ready
 	CVEDBReady := true
-	cveDBCount := funcGetCveDbRecordCount()
+	cveDBCount, err := GetCVECount()
+	if err != nil {
+		log.WithError(err).Warn("failed to get cvedb count")
+	}
+
 	if cveDBCount == 0 {
 		CVEDBReady = false
 	}
