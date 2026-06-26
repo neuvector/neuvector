@@ -30,8 +30,8 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 
 	cnAdm := fmt.Sprintf("%s.%s.svc", resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
 	cnCrd := fmt.Sprintf("%s.%s.svc", resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
-	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
-	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	admKeyPath, admCertPath, _ := kv.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
+	crdKeyPath, crdCertPath, _ := kv.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
 	pathInfoMap := map[string]*keyCertFileInfo{
 		share.CLUSRootCAKey: {share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
 		cnAdm:               {resource.NvAdmSvcName, admKeyPath, admCertPath, true},

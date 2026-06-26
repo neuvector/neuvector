@@ -1315,8 +1315,8 @@ func ValidateWebhookCert() {
 	// for a fresh deployment + pv(from 4.2+), after restoring pv there will be no cert in kv anymore.
 	// in this case, we need to explicitly generate those key/cert if they are not found in kv(object/cert/)
 	// i.e. we do not do this in upgrade phases anymore!
-	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
-	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	admKeyPath, admCertPath, _ := GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
+	crdKeyPath, crdCertPath, _ := GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
 	certsInfo := []*keyCertInfo{
 		{
 			cn:           share.CLUSRootCAKey,
@@ -1375,10 +1375,10 @@ func ValidateWebhookCert() {
 
 						case resource.NvAdmSvcName, resource.NvCrdSvcName:
 							if orchPlatform == share.PlatformKubernetes {
-								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+								tlsKeyPath, tlsCertPath, certsDir := GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
 
 								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn,
-									tlsCertPath, tlsKeyPath,
+									certsDir, tlsCertPath, tlsKeyPath,
 									AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10}); err != nil {
 									// Make it retry.
 									log.WithError(err).Error("failed to generate Webhook certs")
@@ -1397,9 +1397,9 @@ func ValidateWebhookCert() {
 								os.Remove(certInfo.keyPath)
 								os.Remove(certInfo.certPath)
 								log.WithFields(log.Fields{"cn": certInfo.cn}).Info("invalid cert")
-								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+								tlsKeyPath, tlsCertPath, certsDir := GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
 
-								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
+								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, certsDir, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
 									log.WithError(err).Error("failed to generate Webhook certs in ValidateWebhookCert()")
 								}
 								cert, _, err = clusHelper.GetObjectCertRev(certInfo.cn)
