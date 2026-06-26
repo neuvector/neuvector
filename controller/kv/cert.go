@@ -496,8 +496,14 @@ func GenTlsKeyCert(cn string, caCertPath string, caKeyPath string, validityPerio
 }
 
 func GetTlsKeyCertPath(svcName, ns string) (string, string, string) { // returns (keyPath, certPath, certsDir)
-	keyPath := path.Join(certsDir, fmt.Sprintf("%s.%s.svc.key.pem", svcName, ns))
-	certPath := path.Join(certsDir, fmt.Sprintf("%s.%s.svc.cert.pem", svcName, ns))
+	keyPath, err := checkLocalPath(certsDir, fmt.Sprintf("%s.%s.svc.key.pem", svcName, ns))
+	if err != nil {
+		return "", "", ""
+	}
+	certPath, err := checkLocalPath(certsDir, fmt.Sprintf("%s.%s.svc.cert.pem", svcName, ns))
+	if err != nil {
+		return "", "", ""
+	}
 	return keyPath, certPath, certsDir
 }
 
@@ -505,7 +511,10 @@ func GetFedTlsKeyCertPath(masterID, jointID string) (string, string, string, str
 	var err error
 	var caCertPath, privKeyPath, certPath string
 	if masterID != "" {
-		caCertPath = path.Join(certsDir, fmt.Sprintf("fed.master.%s.cert.pem", masterID))
+		caCertPath, err = checkLocalPath(certsDir, fmt.Sprintf("fed.master.%s.cert.pem", masterID))
+		if err != nil {
+			return "", "", "", "", err
+		}
 	}
 	if jointID != "" {
 		privKeyPath, err = checkLocalPath(certsDir, fmt.Sprintf("fed.client.%s.key.pem", jointID))
