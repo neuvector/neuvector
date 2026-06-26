@@ -1,0 +1,74 @@
+pull_request_rules:
+  - name: Automatically open v5.5 backport PR
+    conditions:
+      - base=main
+      - label="pr-backport-to/v5.5"
+    actions:
+      backport:
+        branches:
+          - release/v5.5
+        assignees:
+          - "{{ author }}"
+
+  - name: Automatically open v5.4 backport PR
+    conditions:
+      - base=main
+      - label="pr-backport-to/v5.4"
+    actions:
+      backport:
+        branches:
+          - release/v5.4
+        assignees:
+          - "{{ author }}"
+
+  - name: Automatically merge Renovate PRs
+    conditions:
+      - check-success="CI / unitest"
+      - check-success="CI / golangci-lint"
+      - check-success="CI / openapi-lint"
+      - author=renovate[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically merge Backport PRs
+    conditions:
+      - check-success="CI / unitest"
+      - check-success="CI / golangci-lint"
+      - check-success="CI / openapi-lint"
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Automatically approve Renovate PRs
+    conditions:
+      - check-success="CI / unitest"
+      - check-success="CI / golangci-lint"
+      - check-success="CI / openapi-lint"
+      - author=renovate[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+
+  - name: Automatically approve Backport PRs
+    conditions:
+      - check-success="CI / unitest"
+      - check-success="CI / golangci-lint"
+      - check-success="CI / openapi-lint"
+      - author=mergify[bot]
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        bot_account: harvesterhci-io-github-bot
+
+  - name: Ask to resolve conflict
+    conditions:
+      - conflict
+    actions:
+      comment:
+        message: This pull request is now in conflict. Could you fix it @{{author}}?
