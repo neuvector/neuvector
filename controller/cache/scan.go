@@ -1223,7 +1223,9 @@ func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var scanDataRevs share.CLUSFedScanRevisions
-		_ = json.Unmarshal(value, &scanDataRevs)
+		if err := json.Unmarshal(value, &scanDataRevs); err != nil {
+			log.WithError(err).Warn("failed to unmarshal fed scan data revisions")
+		}
 		fedScanDataRevsCache = scanDataRevs
 
 	case cluster.ClusterNotifyDelete:

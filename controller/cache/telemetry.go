@@ -34,7 +34,9 @@ func getTelemetryData(telemetryFreq uint) (bool, common.TelemetryData) {
 	}
 	if value != nil {
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
-		_ = json.Unmarshal(value, &nvUpgradeInfo)
+		if err := json.Unmarshal(value, &nvUpgradeInfo); err != nil {
+			log.WithError(err).Warn("failed to unmarshal upgrade info")
+		}
 		lastUploadTime = nvUpgradeInfo.LastUploadTime
 	}
 	var past = time.Minute * time.Duration(telemetryFreq)

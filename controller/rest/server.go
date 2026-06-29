@@ -1887,7 +1887,10 @@ func handlerServerDelete(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	cs, _, _ := clusHelper.GetServerRev(name, acc)
+	cs, _, err := clusHelper.GetServerRev(name, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"server": name, "error": err}).Warn("failed to get server")
+	}
 	if cs == nil {
 		e := "Server not found"
 		log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1956,8 +1959,13 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	if rs.LDAP != nil {
-		cs, _, _ = clusHelper.GetServerRev(rs.Name, acc)
+		var getErr error
+		cs, _, getErr = clusHelper.GetServerRev(rs.Name, acc)
 		if cs == nil {
+			if getErr != nil {
+				// Suppress: expected when testing a new server not yet saved
+				log.WithError(getErr).Debug("GetServerRev: server not yet saved")
+			}
 			// This happens when creating a new server that has never been saved.
 			cldap := &share.CLUSServerLDAP{Port: DefaultLDAPServerPort}
 			cs = &share.CLUSServer{Name: rs.Name, LDAP: cldap}
@@ -1988,10 +1996,11 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 			return
 		}
 	} else if rs.Name != "" {
-		cs, _, _ = clusHelper.GetServerRev(rs.Name, acc)
+		var getErr error
+		cs, _, getErr = clusHelper.GetServerRev(rs.Name, acc)
 		if cs == nil {
 			e := "Server not found"
-			log.WithFields(log.Fields{"server": rs.Name}).Error(e)
+			log.WithFields(log.Fields{"server": rs.Name, "err": getErr}).Error(e)
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
 			return
 		}

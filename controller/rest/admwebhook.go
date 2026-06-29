@@ -694,12 +694,20 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	if podSpec != nil {
 		switch ps := podSpec.(type) {
 		case *corev1.PodTemplateSpec:
-			allContainers, _ = parsePodSpec(objectMeta, &ps.Spec)
+			var err error
+			allContainers, err = parsePodSpec(objectMeta, &ps.Spec)
+			if err != nil {
+				log.WithError(err).Warn("failed to parse pod spec")
+			}
 			specLabels = ps.Labels
 			specAnnotations = ps.Annotations
 			saName = ps.Spec.ServiceAccountName
 		case *corev1.PodSpec:
-			allContainers, _ = parsePodSpec(objectMeta, ps)
+			var err error
+			allContainers, err = parsePodSpec(objectMeta, ps)
+			if err != nil {
+				log.WithError(err).Warn("failed to parse pod spec")
+			}
 			saName = ps.ServiceAccountName
 		default:
 			return nil, errors.New("unsupported podSpec type")
@@ -1114,7 +1122,11 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 		if len(pod.OwnerReferences) != 0 && pod.Status.Phase == "Running" {
 			return composeResponse(nil), nil, reqIgnored
 		}
-		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
+		var err error
+		admResObject, err = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
+		if err != nil {
+			log.WithError(err).Warn("failed to parse admission request for pod")
+		}
 	case k8sKindPersistentVolumeClaim:
 		var pvc corev1.PersistentVolumeClaim
 		if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {

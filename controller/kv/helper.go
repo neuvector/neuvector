@@ -2455,7 +2455,11 @@ func (m clusterHelper) PutRegistryState(name string, state *share.CLUSRegistrySt
 
 func (m clusterHelper) GetRegistryState(name string) *share.CLUSRegistryState {
 	key := share.CLUSRegistryStateKey(name)
-	if value, _, _ := m.get(key); len(value) > 0 {
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get registry state")
+	}
+	if len(value) > 0 {
 		var state share.CLUSRegistryState
 		_ = nvJsonUnmarshal(key, value, &state)
 		return &state
@@ -2493,7 +2497,11 @@ func (m clusterHelper) DeleteRegistryKeys(name string) error {
 }
 
 func (m clusterHelper) GetScanState(key string) *share.CLUSScanState {
-	if value, _, _ := m.get(key); len(value) > 0 {
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scan state")
+	}
+	if len(value) > 0 {
 		var state share.CLUSScanState
 		_ = nvJsonUnmarshal(key, value, &state)
 		return &state
@@ -2502,7 +2510,11 @@ func (m clusterHelper) GetScanState(key string) *share.CLUSScanState {
 }
 
 func (m clusterHelper) GetScanReport(key string) *share.CLUSScanReport {
-	if value, _, _ := m.get(key); len(value) > 0 {
+	value, _, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scan report")
+	}
+	if len(value) > 0 {
 		if uzb := utils.GunzipBytes(value); uzb != nil {
 			var report share.CLUSScanReport
 

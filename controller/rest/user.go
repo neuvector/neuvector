@@ -1323,7 +1323,11 @@ func handlerApikeyShow(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	name := ps.ByName("name")
-	name, _ = url.PathUnescape(name)
+	var err error
+	name, err = url.PathUnescape(name)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape name")
+	}
 
 	// Retrieve apikey from the cluster
 	apikey, _, err := clusHelper.GetApikeyRev(name, acc)
@@ -1509,7 +1513,11 @@ func handlerApikeyDelete(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	name := ps.ByName("name")
-	name, _ = url.PathUnescape(name)
+	var err error
+	name, err = url.PathUnescape(name)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape name")
+	}
 
 	// Retrieve user from the cluster
 	apikey, _, err := clusHelper.GetApikeyRev(name, acc)
