@@ -407,7 +407,7 @@ func verifyWebServerCert(cn string, certData []byte) bool {
 func GenTlsCertWithCaAndStoreInFiles(cn, certsDir, certPath, privKeyPath, caCertPath, caKeyPath string, validityPeriod ValidityPeriod, usage x509.ExtKeyUsage) error {
 	notfound := false
 	base := certsDir
-	if base[len(base)-1] != '/' {
+	if !strings.HasSuffix(base, "/") {
 		base += "/"
 	}
 	for idx, path := range []string{privKeyPath, certPath} {
