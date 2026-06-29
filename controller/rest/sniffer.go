@@ -184,10 +184,13 @@ func handlerSnifferStart(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var proc api.RESTSnifferArgsData
-	err := json.Unmarshal(body, &proc)
+	err = json.Unmarshal(body, &proc)
 	if err != nil || proc.Sniffer == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

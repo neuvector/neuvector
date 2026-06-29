@@ -77,10 +77,13 @@ func handlerEULAConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTEULAData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.EULA == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -95,7 +98,12 @@ func handlerEULAConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	key := share.CLUSConfigEULAKey
-	value, _ := json.Marshal(&cconf)
+	value, err := json.Marshal(&cconf)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal EULA config")
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return
+	}
 	if err := cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 		// cache.AuthLog(cache.LOGEV_USER_CONFIG_FAILED,

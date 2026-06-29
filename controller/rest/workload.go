@@ -275,8 +275,11 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	idlist := utils.NewSet()
 	if r.Method == http.MethodPost {
 		var idListData api.RESTAssetIDList
-		body, _ := io.ReadAll(r.Body)
-		err := json.Unmarshal(body, &idListData)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.WithError(err).Warn("failed to read request body")
+		}
+		err = json.Unmarshal(body, &idListData)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Request error")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -499,7 +502,10 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTWorkloadConfigCfgData
 	err = json.Unmarshal(body, &rconf)
@@ -511,7 +517,7 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	if rconf.Config.Quarantine != nil && *rconf.Config.Quarantine {
 		if wl.ShareNSWith != "" {
-			err := errors.New("Only the pod container can be quarantined")
+			err = errors.New("Only the pod container can be quarantined")
 			log.WithFields(log.Fields{"id": id}).Error(err.Error())
 			restRespNotFoundLogAccessDenied(w, login, err)
 			return
@@ -737,7 +743,10 @@ func handlerWorkloadRequest(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var req api.RESTWorkloadRequestData
 	err = json.Unmarshal(body, &req)

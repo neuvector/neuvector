@@ -239,11 +239,14 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var data api.RESTRegistryConfigData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryConfigDataV2
-		err := json.Unmarshal(body, &v2data)
+		err = json.Unmarshal(body, &v2data)
 		if err != nil || v2data.Config == nil {
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 			return
@@ -585,11 +588,14 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var data api.RESTRegistryConfigData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryConfigDataV2
-		err := json.Unmarshal(body, &v2data)
+		err = json.Unmarshal(body, &v2data)
 		if err != nil || v2data.Config == nil {
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 			return
@@ -1267,7 +1273,11 @@ func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
 			delete(oldRegs, n.Name)
 		}
 		if !foundSameReg {
-			value, _ := json.Marshal(*n)
+			value, err := json.Marshal(*n)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal registry config")
+				continue
+			}
 			txn.Put(share.CLUSRegistryConfigKey(n.Name), value)
 		}
 	}

@@ -945,8 +945,9 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 						if ep.name == share.CFGEndpointAdmissionControl && key == "object/config/admission_control/default/state" {
 							//time.Sleep(time.Second) // so that controllers have chance to update cache
 							var state share.CLUSAdmissionState
-							if err := nvJsonUnmarshal(key, []byte(value), &state); err == nil {
-								if ctrlState := state.CtrlStates[admission.NvAdmValidateType]; ctrlState != nil {
+							if err := nvJsonUnmarshal(key, []byte(value), &state); err != nil {
+								log.WithError(err).Warn("failed to unmarshal admission control state")
+							} else if ctrlState := state.CtrlStates[admission.NvAdmValidateType]; ctrlState != nil {
 									var failurePolicy string
 									if state.FailurePolicy == resource.FailLower {
 										failurePolicy = resource.Fail
@@ -981,7 +982,6 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 									if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState); err != nil {
 										log.WithError(err).Warn("Failed to configure k8s admission control")
 									}
-								}
 							}
 						}
 					}

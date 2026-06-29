@@ -150,8 +150,9 @@ func (m *MockCluster) GetCustomRoleRev(name string, acc *access.AccessControl) (
 func (m *MockCluster) PutCustomRoleRev(role *share.CLUSUserRole, rev uint64, acc *access.AccessControl) error {
 	m.customrolesCluster[role.Name] = role
 	if m.mockKvRoleConfigUpdateFunc != nil {
-		value, _ := json.Marshal(*role)
-		m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSUserRoleKey(role.Name), value)
+		if value, err := json.Marshal(*role); err == nil {
+			m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSUserRoleKey(role.Name), value)
+		}
 	}
 
 	return nil
@@ -160,8 +161,9 @@ func (m *MockCluster) PutCustomRoleRev(role *share.CLUSUserRole, rev uint64, acc
 func (m *MockCluster) CreateCustomRole(role *share.CLUSUserRole, acc *access.AccessControl) error {
 	m.customrolesCluster[role.Name] = role
 	if m.mockKvRoleConfigUpdateFunc != nil {
-		value, _ := json.Marshal(*role)
-		m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyAdd, share.CLUSUserRoleKey(role.Name), value)
+		if value, err := json.Marshal(*role); err == nil {
+			m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyAdd, share.CLUSUserRoleKey(role.Name), value)
+		}
 	}
 
 	return nil
@@ -277,8 +279,9 @@ func (m *MockCluster) GetSystemConfigRev(acc *access.AccessControl) (*share.CLUS
 func (m *MockCluster) PutSystemConfigRev(conf *share.CLUSSystemConfig, rev uint64) error {
 	m.sysconfig = *conf
 	if m.mockKvSystemConfigUpdateFunc != nil {
-		value, _ := json.Marshal(*conf)
-		m.mockKvSystemConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSConfigSystemKey, value)
+		if value, err := json.Marshal(*conf); err == nil {
+			m.mockKvSystemConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSConfigSystemKey, value)
+		}
 	}
 	return nil
 }
@@ -700,7 +703,10 @@ func (m *MockCluster) DeleteApikey(name string) error {
 }
 
 func (m *MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
-	value, _ := json.Marshal(cert)
+	value, err := json.Marshal(cert)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cert: %w", err)
+	}
 	m.kv[cn] = string(value)
 	return nil
 }

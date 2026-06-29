@@ -669,9 +669,12 @@ func handlerDlpRuleCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTDlpRuleConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1000,9 +1003,12 @@ func handlerDlpSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTDlpSensorConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1095,9 +1101,12 @@ func handlerDlpRuleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTDlpRuleConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1231,9 +1240,12 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTDlpGroupConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1702,7 +1714,10 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTDlpSensorExport
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")

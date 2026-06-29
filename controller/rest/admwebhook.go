@@ -1150,10 +1150,14 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 
 	// parse request meta object
 	if objectMeta != nil {
+		var parseErr error
 		if req.Kind.Kind == k8sKindPersistentVolumeClaim {
-			admResObject, _ = parseAdmRequest(req, objectMeta, nil)
+			admResObject, parseErr = parseAdmRequest(req, objectMeta, nil)
 		} else if podTemplateSpec != nil {
-			admResObject, _ = parseAdmRequest(req, objectMeta, podTemplateSpec)
+			admResObject, parseErr = parseAdmRequest(req, objectMeta, podTemplateSpec)
+		}
+		if parseErr != nil {
+			log.WithError(parseErr).Warn("failed to parse admission request")
 		}
 	}
 	stamps.Parsed = time.Now()
@@ -1582,7 +1586,11 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 
 	listenPortTLS := fmt.Sprintf(":%d", port)
 
-	pair, _ := loadX509KeyPair(svcName)
+	pair, err := loadX509KeyPair(svcName)
+	if err != nil {
+		log.WithFields(log.Fields{"svcName": svcName, "error": err}).Error("Failed to load X509 key pair")
+		return
+	}
 
 	whsvr := &WebhookServer{
 		dumpRequestObj: debug,

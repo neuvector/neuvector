@@ -268,11 +268,9 @@ func cacheFedEvent(ev share.TLogEvent, msg, fullname, remote, session string, ro
 			Msg:            msg,
 		}
 		if err := evqueue.Append(&alog); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error("evqueue.Append")
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -1504,7 +1502,10 @@ func handlerConfigLocalCluster(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var reqData api.RESTFedConfigData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &reqData); err != nil || (reqData.Name != nil && *reqData.Name == "") ||
 		(reqData.RestInfo != nil && !reqData.RestInfo.IsValid()) ||
 		(reqData.UseProxy != nil && (*reqData.UseProxy != "" && *reqData.UseProxy != "https")) {
@@ -1716,7 +1717,9 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 	}
 
 	accFedAdmin := access.NewFedAdminAccessControl()
-	_ = cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles) // The error is handled within the function.
+	if err := cacheFedEvent(share.CLUSEvFedPromote, msg, login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+		log.WithError(err).Warn("failed to cache fed promote event")
+	}
 	user, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, accFedAdmin)
 	if err != nil {
 		log.WithError(err).Warn("failed to get default admin user rev")
@@ -1769,7 +1772,10 @@ func handlerPromoteToMaster(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var reqData api.RESTFedPromoteReqData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err = json.Unmarshal(body, &reqData); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1855,7 +1861,9 @@ func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *l
 		return membership, http.StatusInternalServerError, api.RESTErrFedOperationFailed, err
 	}
 
-	_ = cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles) // The error is handled within the function.
+	if err := cacheFedEvent(share.CLUSEvFedDemote, "Demote from primary cluster", login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+		log.WithError(err).Warn("failed to cache fed demote event")
+	}
 	evqueue.Flush()
 	revertFedRoles(acc)
 	cleanFedRules()
@@ -2099,7 +2107,9 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 				updateClusterState(respTo.MasterCluster.ID, respTo.MasterCluster.ID, _fedClusterConnected, nil, acc)
 				updateClusterState(jointID, "", _fedClusterJoined, nil, acc)
 				msg := fmt.Sprintf("Join federation%s and the primary cluster is %s(%s)", msgProxy, respTo.MasterCluster.Name, masterRestInfo.Server)
-				_ = cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles) // The error is handled within the function.
+				if err := cacheFedEvent(share.CLUSEvFedJoin, msg, login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+					log.WithError(err).Warn("failed to cache fed join event")
+				}
 				atomic.StoreUint32(&_fedFullPolling, 1)
 				if err := cache.ConfigCspUsages(false, true, api.FedRoleJoint, respTo.MasterCluster.ID); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("ConfigCspUsages")
@@ -2155,7 +2165,10 @@ func handlerJoinFed(w http.ResponseWriter, r *http.Request, ps httprouter.Params
 	}
 
 	var reqData api.RESTFedJoinReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &reqData); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2212,7 +2225,9 @@ func leaveFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSess
 			}
 
 			if err := clusHelper.PutFedMembership(&membership); err == nil {
-				_ = cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles) // The error is handled within the function.
+				if err := cacheFedEvent(share.CLUSEvFedLeave, "Leave federation", login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+					log.WithError(err).Warn("failed to cache fed leave event")
+				}
 				evqueue.Flush()
 				if w == nil {
 					// called by configmap
@@ -2257,7 +2272,10 @@ func handlerLeaveFed(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	}
 
 	var reqData api.RESTFedLeaveReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &reqData); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -2315,7 +2333,9 @@ func handlerRemoveJointCluster(w http.ResponseWriter, r *http.Request, ps httpro
 		restRespErrorMessage(w, status, code, "Fail to dismiss managed cluster")
 	} else {
 		msg := fmt.Sprintf("Dismiss cluster %s(%s) from federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-		_ = cacheFedEvent(share.CLUSEvFedKick, msg, login.fullname, login.remote, login.id, login.domainRoles) // The error is handled within the function.
+		if err := cacheFedEvent(share.CLUSEvFedKick, msg, login.fullname, login.remote, login.id, login.domainRoles); err != nil {
+			log.WithError(err).Warn("failed to cache fed kick event")
+		}
 		restRespSuccess(w, r, nil, acc, login, nil, "Dismiss managed cluster")
 	}
 }
@@ -2337,7 +2357,10 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var reqData api.RESTFedJoinReqInternal
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &reqData); err == nil {
 		masterName := cacher.GetSystemConfigClusterName(accReadAll)
 		if masterName == reqData.JointCluster.Name {
@@ -2357,7 +2380,9 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 						log.WithFields(log.Fields{"ID": joinedCluster.ID, "Name": joinedCluster.Name, "status": status, "code": code}).Info("re-join")
 						if status == http.StatusOK {
 							msg := fmt.Sprintf("Dismiss cluster %s(%s) from federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-							_ = cacheFedEvent(share.CLUSEvFedKick, msg, reqData.User, reqData.Remote, "", reqData.UserRoles)
+							if err := cacheFedEvent(share.CLUSEvFedKick, msg, reqData.User, reqData.Remote, "", reqData.UserRoles); err != nil {
+								log.WithError(err).Warn("failed to cache fed kick event")
+							}
 						}
 						break
 					}
@@ -2497,7 +2522,9 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 		}
 		_, resp.CspType = common.GetMappedCspType(nil, &cctx.CspType) // master cluster's billing csp type
 		msg := fmt.Sprintf("Cluster %s(%s) joins federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-		_ = cacheFedEvent(share.CLUSEvFedJoin, msg, reqData.User, reqData.Remote, "", reqData.UserRoles) // The error is handled within the function.
+		if err := cacheFedEvent(share.CLUSEvFedJoin, msg, reqData.User, reqData.Remote, "", reqData.UserRoles); err != nil {
+			log.WithError(err).Warn("failed to cache fed join event")
+		}
 		jointCluster.ID = reqData.JointCluster.ID
 		go func() {
 			if _, _, err := pingJointCluster(_tagJoinPending, "v1/fed/ping_internal", jointCluster, nil, access.NewAdminAccessControl()); err != nil {
@@ -2529,7 +2556,10 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var req api.RESTFedLeaveReqInternal
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &req); err != nil || req.ID == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2544,7 +2574,9 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 		if err := jwtValidateFedJoinTicket(req.JointTicket, joinedCluster.Secret); err == nil {
 			if status, code = removeFromFederation(&joinedCluster, accReadAll); status == http.StatusOK {
 				msg := fmt.Sprintf("Cluster %s(%s) leaves federation", joinedCluster.Name, joinedCluster.RestInfo.Server)
-				_ = cacheFedEvent(share.CLUSEvFedLeave, msg, req.User, req.Remote, "", req.UserRoles) // The error is handled within the function.
+				if err := cacheFedEvent(share.CLUSEvFedLeave, msg, req.User, req.Remote, "", req.UserRoles); err != nil {
+					log.WithError(err).Warn("failed to cache fed leave event")
+				}
 				restRespSuccess(w, r, nil, nil, nil, nil, "Leave federation by managed cluster's request")
 				return
 			} else {
@@ -2566,7 +2598,10 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
 		var req api.RESTFedPingReq
 		var resp api.RESTFedPingResp
-		body, _ := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.WithError(err).Warn("failed to read request body")
+		}
 		if err := json.Unmarshal(body, &req); err == nil {
 			accReadAll := access.NewReaderAccessControl()
 			if jointCluster := cacher.GetFedLocalJointCluster(accReadAll); jointCluster.ID != "" {
@@ -2637,7 +2672,9 @@ func handlerJointKickedInternal(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 	userName := fmt.Sprintf("%s (primary cluster)", login.mainSessionUser)
-	_ = cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles) // The error is handled within the function.
+	if err := cacheFedEvent(share.CLUSEvFedKick, "Dimissed from federation", userName, login.remote, login.id, login.domainRoles); err != nil {
+		log.WithError(err).Warn("failed to cache fed kick event")
+	}
 	evqueue.Flush()
 	go leaveFedCleanup(masterCluster.ID, jointCluster.ID, false)
 
@@ -2702,7 +2739,10 @@ func handlerDeployFedRules(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	var req api.RESTDeployFedRulesReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2828,7 +2868,9 @@ func workFedRules(fedSettings *api.RESTFedRulesSettings, fedRevs map[string]uint
 		}
 	}
 	if updated {
-		_ = cacheFedEvent(share.CLUSEvFedPolicySync, "Sync up policy with primary cluster", "", "", "", nil) // The error is handled within the function.
+		if err := cacheFedEvent(share.CLUSEvFedPolicySync, "Sync up policy with primary cluster", "", "", "", nil); err != nil {
+			log.WithError(err).Warn("failed to cache fed policy sync event")
+		}
 		data := share.CLUSFedRulesRevision{Revisions: localRevs, LastUpdateTime: time.Now().UTC()}
 		if err := clusHelper.PutFedRulesRevision(nil, &data); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("PutFedRulesRevision")
@@ -3291,7 +3333,10 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 
 	var err error
 	var req api.RESTPollFedRulesReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err = json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -3414,7 +3459,10 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 	ce := r.Header.Get("Content-Encoding")
 
 	var req api.RESTPollFedScanDataReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if ce == "gzip" {
 		body = utils.GunzipBytes(body)
 	}
@@ -3468,7 +3516,10 @@ func handlerFedCommandInternal(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var req api.RESTFedInternalCommandReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -3544,7 +3595,10 @@ func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var err error
 	var req api.RESTFedCspSupportReq
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	if err = json.Unmarshal(body, &req); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 		return
@@ -3708,7 +3762,11 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 				})
 				if importURIs.Contains(reqPath) {
 					query := restParseQuery(r)
-					if scope, _ := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal); scope != share.ScopeLocal {
+					scope, checkErr := checkScopeParameter(w, query, share.ScopeLocal, enumScopeLocal)
+					if checkErr != nil {
+						return
+					}
+					if scope != share.ScopeLocal {
 						log.WithFields(log.Fields{"scope": scope}).Error()
 						restRespError(w, http.StatusForbidden, api.RESTErrOpNotAllowed)
 						return
@@ -3737,7 +3795,10 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteUnauthorized, "Unable to authenticate with the cluster")
 		return
 	}
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var user *share.CLUSUser
 	if login.loginType == loginTypeApikey {

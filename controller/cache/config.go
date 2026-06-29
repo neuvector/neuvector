@@ -551,11 +551,15 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 			if isLeader() {
 				var param interface{} = &cfg.IBMSAConfig
-				_ = cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
+				if err := cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param); err != nil {
+					log.WithError(err).Warn("failed to start/stop fed ping poll")
+				}
 			}
 		} else {
 			// customer explicitly disables IBM SA endpoint
-			_ = cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil)
+			if err := cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil); err != nil {
+				log.WithError(err).Warn("failed to start/stop fed ping poll")
+			}
 		}
 		//if global network policy mode enabled/disabled or mode changes
 		//shedule policy calculation
@@ -670,7 +674,9 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	httpProxy := cfg.RegistryHttpProxy
 	var param1 interface{} = &httpsProxy
 	var param2 interface{} = &httpProxy
-	_ = cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
+	if err := cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2); err != nil {
+		log.WithError(err).Warn("failed to update proxy info")
+	}
 
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {
@@ -767,7 +773,9 @@ func configInit() {
 	}
 	if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 		var param interface{} = &cfg.IBMSAConfig
-		_ = cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
+		if err := cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param); err != nil {
+			log.WithError(err).Warn("failed to start/stop fed ping poll")
+		}
 	}
 	if !utils.CompareSliceWithoutOrder(systemConfigCache.ControllerDebug, cctx.Debug) {
 		systemConfigCache.ControllerDebug = cctx.Debug

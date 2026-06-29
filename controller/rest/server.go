@@ -1028,10 +1028,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1319,10 +1322,13 @@ func handlerServerConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1437,10 +1443,13 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 	role := ps.ByName("role")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerRoleGroupsConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1582,10 +1591,13 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 	group := ps.ByName("group")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerGroupRoleDomainsConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || rconf.Config.GroupRoleMapping == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1787,10 +1799,13 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerGroupsOrderConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1949,10 +1964,13 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerTestData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Test == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

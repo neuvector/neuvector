@@ -140,11 +140,14 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var errMsg string
 	var rconf api.RESTPwdProfileConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || rconf.Config.Name == share.CLUSSysPwdProfileName {
 		errMsg = "Request error"
 	} else if name != rconf.Config.Name {

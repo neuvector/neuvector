@@ -216,7 +216,11 @@ func group2REST(cache *groupCache, view string, withCap bool) *api.RESTGroup {
 	}
 
 	for m := range cache.members.Iter() {
-		if wl, _ := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl()); wl != nil {
+		wl, err := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload brief")
+		}
+		if wl != nil {
 			if (view == api.QueryValueViewPod || view == api.QueryValueViewPodOnly) && wl.ShareNSWith != "" {
 				continue
 			}
@@ -285,7 +289,11 @@ func groupDetail2REST(cache *groupCache, view string, withCap bool) *api.RESTGro
 	}
 
 	for m := range cache.members.Iter() {
-		if wl, _ := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl()); wl != nil {
+		wl, err := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload brief")
+		}
+		if wl != nil {
 			if (view == api.QueryValueViewPod || view == api.QueryValueViewPodOnly) && wl.ShareNSWith != "" {
 				continue
 			}
@@ -1447,7 +1455,9 @@ func groupWorkloadJoin(id string, param interface{}) {
 			if bHasGroupProfile {
 				policyMode, profileMode := getNewServicePolicyMode()
 				cacheMutexUnlock()
-				_ = createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
+				if err := createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl()); err != nil {
+					log.WithError(err).Warn("failed to create learned group")
+				}
 				cacheMutexLock()
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
@@ -2149,7 +2159,11 @@ func group2Service(gc *groupCache, view string, withCap bool) *api.RESTService {
 
 	sv.Members = make([]*api.RESTWorkloadBrief, 0, gc.members.Cardinality())
 	for m := range gc.members.Iter() {
-		if wl, _ := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl()); wl != nil {
+		wl, err := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload brief")
+		}
+		if wl != nil {
 			if (view == api.QueryValueViewPod || view == api.QueryValueViewPodOnly) && wl.ShareNSWith != "" {
 				continue
 			}

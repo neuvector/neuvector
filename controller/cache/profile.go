@@ -405,7 +405,9 @@ func ProcReportBkgSvc() {
 					processEntryMux.Unlock()
 
 					for _, gproc := range gprocs {
-						_ = handleProfileReport(gproc)
+						if err := handleProfileReport(gproc); err != nil {
+							log.WithError(err).Warn("failed to handle profile report")
+						}
 					}
 					clusHelper.ReleaseLock(lock)
 				}
@@ -442,7 +444,9 @@ func addK8sProbeApps(group string, probeCmds []k8sProbeCmd) {
 	if len(procs) > 0 {
 		gproc[group] = procs
 		if isLeader() {
-			_ = handleProfileReport(gproc)
+			if err := handleProfileReport(gproc); err != nil {
+				log.WithError(err).Warn("failed to handle profile report")
+			}
 		} else {
 			AddProcessReport(gproc) // put into a queue
 		}

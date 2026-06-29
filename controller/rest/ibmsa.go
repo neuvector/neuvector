@@ -525,7 +525,10 @@ func handlerPostIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httprout
 	var err error
 
 	action := ps.ByName("action")
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	switch action {
 	case "configuration":
 		err = json.Unmarshal(body, &cfg)
@@ -983,7 +986,10 @@ func handlerTestOccurrences(w http.ResponseWriter, r *http.Request, ps httproute
 
 	//accountID := ps.ByName("accountID")
 	//providerID := ps.ByName("providerID")
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	err = json.Unmarshal(body, &occur)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")

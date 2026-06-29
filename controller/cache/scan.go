@@ -1193,7 +1193,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 						report.SignatureInfo.VerificationTimestamp = ""
 						report.SignatureInfo.VerificationError = 0
 					}
-					res, _ := json.Marshal(&scanResult)
+					res, err := json.Marshal(&scanResult)
+					if err != nil {
+						log.WithError(err).Warn("failed to marshal scan result for hash")
+					}
 					sha256Sum := sha256.Sum256(res)
 					currImagesHash[id] = hex.EncodeToString(sha256Sum[:])
 					fedScanResultHash[fedRegName] = currImagesHash

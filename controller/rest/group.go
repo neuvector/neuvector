@@ -595,10 +595,13 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTGroupConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -719,10 +722,13 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTGroupConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1030,10 +1036,13 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1121,10 +1130,13 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceBatchConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || len(rconf.Config.Services) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1585,10 +1597,13 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceBatchConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || len(rconf.Config.Services) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1683,10 +1698,13 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceBatchConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || len(rconf.Config.Services) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
