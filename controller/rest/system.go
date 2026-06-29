@@ -128,7 +128,11 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		}
 
 		var nvUpgradeInfo share.CLUSCheckUpgradeInfo
-		if value, _ := cluster.Get(share.CLUSTelemetryStore + "controller"); value != nil {
+		value, err := cluster.Get(share.CLUSTelemetryStore + "controller")
+		if err != nil {
+			log.WithError(err).Warn("failed to get telemetry data from cluster")
+		}
+		if value != nil {
 			if err := json.Unmarshal(value, &nvUpgradeInfo); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
 				restRespError(w, http.StatusInternalServerError, api.RESTErrFailReadCluster)
@@ -2098,7 +2102,10 @@ func handlerSessionList(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	for _, f := range query.filters {
 		if f.tag == api.FilterByID && f.op == api.OPeq {
-			id, _ := strconv.ParseUint(f.value, 10, 64)
+			id, err := strconv.ParseUint(f.value, 10, 64)
+			if err != nil {
+				log.WithError(err).Warn("failed to parse filter ID value")
+			}
 			csf.ID = uint32(id)
 		}
 	}
@@ -2200,7 +2207,10 @@ func handlerSessionDelete(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	for _, f := range query.filters {
 		if f.tag == api.FilterByID && f.op == api.OPeq {
-			id, _ := strconv.ParseUint(f.value, 10, 64)
+			id, err := strconv.ParseUint(f.value, 10, 64)
+			if err != nil {
+				log.WithError(err).Warn("failed to parse filter ID value")
+			}
 			csf.ID = uint32(id)
 		}
 	}
@@ -2304,10 +2314,18 @@ func getAcceptableAlerts(acc *access.AccessControl, login *loginSession) ([]stri
 	}
 
 	var accepted []string
-	if user, _, _ := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl()); user != nil {
+	user, _, err := clusHelper.GetUserRev(common.ReservedNvSystemUser, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithError(err).Warn("failed to get system user")
+	}
+	if user != nil {
 		accepted = user.AcceptedAlerts
 	}
-	if user, _, _ := clusHelper.GetUserRev(login.fullname, acc); user != nil {
+	user, _, err = clusHelper.GetUserRev(login.fullname, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user")
+	}
+	if user != nil {
 		accepted = append(accepted, user.AcceptedAlerts...)
 	}
 	acceptedAlerts := utils.NewSetFromStringSlice(accepted)
@@ -2552,7 +2570,11 @@ func multipartExport(w http.ResponseWriter, sections utils.Set) error {
 	h := make(textproto.MIMEHeader)
 	h.Set("Content-Disposition", fmt.Sprintf("form-data; name=\"%s\"; filename=\"%s\"", multipartConfigName, filename))
 	h.Set("Content-Type", "application/x-gzip")
-	cfgw, _ := mpw.CreatePart(h)
+	cfgw, err := mpw.CreatePart(h)
+	if err != nil {
+		log.WithError(err).Warn("failed to create multipart form section")
+		return err
+	}
 
 	gzw := gzip.NewWriter(cfgw)
 	defer gzw.Close()
@@ -2754,7 +2776,10 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 
 	importRunning := false
 	importNoResponse := false
-	importTask, _ := clusHelper.GetImportTask()
+	importTask, err := clusHelper.GetImportTask()
+	if err != nil {
+		log.WithError(err).Warn("failed to get import task status")
+	}
 	if importTask.TID != "" && (importTask.Status == share.IMPORT_PREPARE || importTask.Status == share.IMPORT_RUNNING) {
 		importRunning = true
 		if !importTask.LastUpdateTime.IsZero() && time.Now().UTC().Sub(importTask.LastUpdateTime).Seconds() > share.IMPORT_QUERY_INTERVAL {

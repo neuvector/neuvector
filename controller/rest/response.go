@@ -394,7 +394,10 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 
 	grpCfgType := utils.ApiCfgTypeToTCfgType[r.CfgType]
 	if r.Group != "" {
-		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
+		grp, _, err := clusHelper.GetGroup(r.Group, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group")
+		}
 		if grpMustExist && grp == nil {
 			return fmt.Errorf("Group %s is not found", r.Group)
 		} else if grp != nil {
@@ -1362,7 +1365,9 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+		log.WithError(putErr).Warn("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -1395,7 +1400,9 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 		oneSuccess := false
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+			log.WithError(putErr).Warn("failed to update import task progress")
+		}
 
 		for _, parsedCfg := range parsedResponseCfgs {
 			cacheRecord := share.CLUSCrdSecurityRule{
@@ -1409,10 +1416,14 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 			oneSuccess = true
 			progress += inc
 			importTask.Percentage = int(progress)
-			_ = clusHelper.PutImportTask(&importTask)
+			if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+				log.WithError(putErr).Warn("failed to update import task progress")
+			}
 		}
 		importTask.Percentage = 90
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+			log.WithError(putErr).Warn("failed to update import task progress")
+		}
 
 		if oneSuccess && importTask.Scope == share.ScopeFed {
 			updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)

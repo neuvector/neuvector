@@ -155,7 +155,10 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 		switch cfgType {
 		case share.CLUSResCfgRule:
 			var rule share.CLUSResponseRule
-			_ = json.Unmarshal(value, &rule)
+			if err := json.Unmarshal(value, &rule); err != nil {
+				log.WithError(err).Warn("failed to unmarshal response rule")
+				return
+			}
 			if exist, ok := resPolicyCache.ruleMap[rule.ID]; ok {
 				if gc, ok := groupCacheMap[exist.Group]; ok {
 					gc.usedByResponseRules.Remove(exist.ID)
@@ -175,7 +178,10 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 			}
 		case share.CLUSResCfgRuleList:
 			var heads []*share.CLUSRuleHead
-			_ = json.Unmarshal(value, &heads)
+			if err := json.Unmarshal(value, &heads); err != nil {
+				log.WithError(err).Warn("failed to unmarshal response rule heads")
+				return
+			}
 			resPolicyCache.ruleHeads = heads
 			resPolicyCache.ruleOrderMap = ruleHeads2OrderMap(heads)
 		}

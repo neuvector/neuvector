@@ -817,7 +817,9 @@ func (m clusterHelper) GetSystemConfigRev(acc *access.AccessControl) (*share.CLU
 		log.WithError(err).Warn("Failed to get system config")
 	}
 	if value != nil {
-		_ = nvJsonUnmarshal(key, value, &conf)
+		if err = nvJsonUnmarshal(key, value, &conf); err != nil {
+			return nil, 0
+		}
 
 		if !acc.Authorize(&conf, nil) {
 			return nil, 0
@@ -857,7 +859,9 @@ func (m clusterHelper) GetScanConfigRev(acc *access.AccessControl) (*share.CLUSS
 		log.WithError(err).Warn("Failed to get scan config")
 	}
 	if value != nil {
-		_ = nvJsonUnmarshal(key, value, &conf)
+		if err = nvJsonUnmarshal(key, value, &conf); err != nil {
+			return nil, 0
+		}
 
 		if !acc.Authorize(&conf, nil) {
 			return nil, 0
@@ -886,7 +890,9 @@ func (m clusterHelper) GetFedSystemConfigRev(acc *access.AccessControl) (*share.
 		log.WithError(err).Warn("Failed to get fed system config")
 	}
 	if value != nil {
-		_ = nvJsonUnmarshal(key, value, &conf)
+		if err = nvJsonUnmarshal(key, value, &conf); err != nil {
+			return &conf, 0
+		}
 		return &conf, rev
 	} else {
 		return &conf, 0
@@ -2032,9 +2038,15 @@ func (m clusterHelper) GetAllComplianceProfiles(acc *access.AccessControl) []*sh
 		log.WithError(err).Warn("Failed to get compliance profile store keys")
 	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get compliance profile")
+		}
+		if value != nil {
 			var cp share.CLUSComplianceProfile
-			_ = nvJsonUnmarshal(key, value, &cp)
+			if err := nvJsonUnmarshal(key, value, &cp); err != nil {
+				continue // error already logged by nvJsonUnmarshal
+			}
 
 			if !acc.Authorize(&cp, nil) {
 				continue
@@ -2049,7 +2061,10 @@ func (m clusterHelper) GetAllComplianceProfiles(acc *access.AccessControl) []*sh
 
 func (m clusterHelper) GetComplianceProfile(name string, acc *access.AccessControl) (*share.CLUSComplianceProfile, uint64, error) {
 	key := share.CLUSComplianceProfileKey(name)
-	value, rev, _ := m.get(key)
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get compliance profile")
+	}
 	if value != nil {
 		var cp share.CLUSComplianceProfile
 		_ = nvJsonUnmarshal(key, value, &cp)
@@ -2094,9 +2109,15 @@ func (m clusterHelper) GetAllVulnerabilityProfiles(acc *access.AccessControl) []
 		log.WithError(err).Warn("failed to get vulnerability profile store keys")
 	}
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get vulnerability profile")
+		}
+		if value != nil {
 			var cp share.CLUSVulnerabilityProfile
-			_ = nvJsonUnmarshal(key, value, &cp)
+			if err := nvJsonUnmarshal(key, value, &cp); err != nil {
+				continue // error already logged by nvJsonUnmarshal
+			}
 
 			if !acc.Authorize(&cp, nil) {
 				continue
@@ -3302,12 +3323,21 @@ func (m clusterHelper) GetDlpGroup(group string) *share.CLUSDlpGroup {
 }
 
 func (m clusterHelper) GetAllDlpGroups() []*share.CLUSDlpGroup {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigDlpGroupStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigDlpGroupStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get DLP group store keys")
+	}
 	dlpgrps := make([]*share.CLUSDlpGroup, 0, len(keys))
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get DLP group")
+		}
+		if value != nil {
 			var dlpgrp share.CLUSDlpGroup
-			_ = nvJsonUnmarshal(key, value, &dlpgrp)
+			if err := nvJsonUnmarshal(key, value, &dlpgrp); err != nil {
+				continue // error already logged by nvJsonUnmarshal
+			}
 			dlpgrps = append(dlpgrps, &dlpgrp)
 		}
 	}
@@ -3361,12 +3391,21 @@ func (m clusterHelper) GetWafSensor(sensor string) *share.CLUSWafSensor {
 }
 
 func (m clusterHelper) GetAllWafSensors() []*share.CLUSWafSensor {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigWafRuleStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigWafRuleStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get WAF sensor store keys")
+	}
 	sensors := make([]*share.CLUSWafSensor, 0, len(keys))
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get WAF sensor")
+		}
+		if value != nil {
 			var sensor share.CLUSWafSensor
-			_ = nvJsonUnmarshal(key, value, &sensor)
+			if err := nvJsonUnmarshal(key, value, &sensor); err != nil {
+				continue // error already logged by nvJsonUnmarshal
+			}
 			sensors = append(sensors, &sensor)
 		}
 	}
@@ -3418,12 +3457,21 @@ func (m clusterHelper) GetWafGroup(group string) *share.CLUSWafGroup {
 }
 
 func (m clusterHelper) GetAllWafGroups() []*share.CLUSWafGroup {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigWafGroupStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigWafGroupStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get WAF group store keys")
+	}
 	wafgrps := make([]*share.CLUSWafGroup, 0, len(keys))
 	for _, key := range keys {
-		if value, _, _ := m.get(key); value != nil {
+		value, _, err := m.get(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get WAF group")
+		}
+		if value != nil {
 			var wafgrp share.CLUSWafGroup
-			_ = nvJsonUnmarshal(key, value, &wafgrp)
+			if err := nvJsonUnmarshal(key, value, &wafgrp); err != nil {
+				continue // error already logged by nvJsonUnmarshal
+			}
 			wafgrps = append(wafgrps, &wafgrp)
 		}
 	}

@@ -39,7 +39,10 @@ func handlerPwdProfileShow(w http.ResponseWriter, r *http.Request, ps httprouter
 	} else {
 		getFullInfo = false
 	}
-	profile, _ := cacher.GetPwdProfile(name)
+	profile, err := cacher.GetPwdProfile(name)
+	if err != nil {
+		log.WithError(err).Warn("failed to get password profile")
+	}
 	if profile.Name == "" {
 		log.WithFields(log.Fields{"name": name}).Error("Request error")
 		restRespNotFoundLogAccessDenied(w, login, common.ErrObjectNotFound)

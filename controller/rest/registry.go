@@ -280,7 +280,11 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if cc, _, _ := clusHelper.GetRegistry(rconf.Name, acc); cc != nil {
+	cc, _, err := clusHelper.GetRegistry(rconf.Name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get registry")
+	}
+	if cc != nil {
 		log.WithFields(log.Fields{"Name": cc.Name}).Error("Duplicate registry name")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, "Duplicate registry name found")
 		return
