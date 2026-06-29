@@ -263,7 +263,10 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 						}
 					}
 					if firstNonFedIdx > 0 {
-						newValue, _ := json.Marshal(rhs[firstNonFedIdx:])
+						newValue, err := json.Marshal(rhs[firstNonFedIdx:])
+						if err != nil {
+							log.WithError(err).Warn("failed to marshal rule heads")
+						}
 						return false, newValue
 					} else {
 						//in case there are no fed policies
@@ -483,10 +486,14 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 				u.FailedLoginCount = 0
 				u.BlockLoginSince = time.Time{}
 				u.PwdResetTime = time.Now().UTC()
-				data, _ := json.Marshal(&u)
-				value = string(data)
-				if u.Fullname == common.DefaultAdminUser && u.Server == "" {
-					importInfo.defAdminRestored = true
+				data, err := json.Marshal(&u)
+				if err != nil {
+					log.WithError(err).Warn("failed to marshal user for import")
+				} else {
+					value = string(data)
+					if u.Fullname == common.DefaultAdminUser && u.Server == "" {
+						importInfo.defAdminRestored = true
+					}
 				}
 			}
 		} else if ep.name == share.CFGEndpointGroup && orchPlatform == share.PlatformKubernetes {

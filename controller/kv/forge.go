@@ -94,7 +94,10 @@ var FAKEWLID string = "9321f8a6951c550e2d1634b32b859ed6ed167752b8a8552f95dad7eb3
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func printOneGroupIPPolicyFake(p *share.CLUSGroupIPPolicy) {
-	value, _ := json.Marshal(p)
+	value, err := json.Marshal(p)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal group IP policy")
+	}
 	log.WithFields(log.Fields{"value": string(value)}).Debug("")
 }
 

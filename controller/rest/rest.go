@@ -204,7 +204,11 @@ func restRespPartial(w http.ResponseWriter, r *http.Request, resp interface{}) {
 	var data []byte
 	if resp != nil {
 		var e common.EmptyMarshaller
-		data, _ = e.Marshal(resp)
+		var marshalErr error
+		data, marshalErr = e.Marshal(resp)
+		if marshalErr != nil {
+			log.WithError(marshalErr).Warn("failed to marshal partial response")
+		}
 
 		if hdrs, ok := r.Header["Accept-Encoding"]; ok {
 		loop:
@@ -238,7 +242,11 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 	if resp != nil {
 		if restIsSupportReq(r) {
 			var m common.MaskMarshaller
-			data, _ = m.Marshal(resp)
+			var marshalErr error
+			data, marshalErr = m.Marshal(resp)
+			if marshalErr != nil {
+				log.WithError(marshalErr).Warn("failed to marshal response")
+			}
 		} else {
 			accept := r.Header.Get("Accept")
 			if accept == "application/gob" {
@@ -251,7 +259,11 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 				ct = accept
 			} else {
 				var e common.EmptyMarshaller
-				data, _ = e.Marshal(resp)
+				var marshalErr error
+				data, marshalErr = e.Marshal(resp)
+				if marshalErr != nil {
+					log.WithError(marshalErr).Warn("failed to marshal response")
+				}
 			}
 		}
 
@@ -288,7 +300,11 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 			var masked []byte
 			if req != nil {
 				var m common.MaskMarshaller
-				masked, _ = m.Marshal(req)
+				var marshalErr error
+				masked, marshalErr = m.Marshal(req)
+				if marshalErr != nil {
+					log.WithError(marshalErr).Warn("failed to marshal request for audit log")
+				}
 			}
 			restEventLog(r, masked, login, restLogFields{restLogFieldMsg: msg})
 		}
@@ -1067,13 +1083,19 @@ func getNewestVersion(vers utils.Set) string {
 
 func isObjectNameValid(name string) bool {
 	// Object name must starts with letters or digits
-	valid, _ := regexp.MatchString("^[a-zA-Z0-9]+[.:a-zA-Z0-9_-]*$", name)
+	valid, err := regexp.MatchString("^[a-zA-Z0-9]+[.:a-zA-Z0-9_-]*$", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match object name pattern")
+	}
 	return valid
 }
 
 func isObjectNameWithSpaceValid(name string) bool {
 	// Object name must starts with letters or digits
-	valid, _ := regexp.MatchString("(^[a-zA-Z0-9]$)|(^[a-zA-Z0-9]+[ .:a-zA-Z0-9_-]*[.:a-zA-Z0-9_-]+$)", name)
+	valid, err := regexp.MatchString("(^[a-zA-Z0-9]$)|(^[a-zA-Z0-9]+[ .:a-zA-Z0-9_-]*[.:a-zA-Z0-9_-]+$)", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match object name pattern")
+	}
 	return valid
 }
 
@@ -1093,7 +1115,10 @@ func isUserNameValid(name string) bool {
 
 func isNamePathValid(name string) bool {
 	// Accept name or path, such as "https://mydomain.com/groups" or "/groups"
-	valid, _ := regexp.MatchString("^[/a-zA-Z0-9]+[/.:a-zA-Z0-9_-]*$", name)
+	valid, err := regexp.MatchString("^[/a-zA-Z0-9]+[/.:a-zA-Z0-9_-]*$", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match name path pattern")
+	}
 	return valid
 }
 
@@ -2298,8 +2323,16 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 
 	data, isRespByteSlice = resp.([]byte)
 	if !isRespByteSlice {
-		json_data, _ := json.MarshalIndent(resp, "", "  ")
-		data, _ = yaml.JSONToYAML(json_data)
+		json_data, err := json.MarshalIndent(resp, "", "  ")
+		if err != nil {
+			log.WithError(err).Error("failed to marshal export data as JSON")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailExport)
+			return
+		}
+		data, err = yaml.JSONToYAML(json_data)
+		if err != nil {
+			log.WithError(err).Warn("failed to convert export data to YAML")
+		}
 	}
 
 	if remoteExportOptions != nil {

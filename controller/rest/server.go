@@ -377,7 +377,10 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 
 	name := ps.ByName("server")
 
-	cs, _, _ := clusHelper.GetServerRev(name, access.NewReaderAccessControl())
+	cs, _, err := clusHelper.GetServerRev(name, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithFields(log.Fields{"server": name, "error": err}).Warn("failed to get server")
+	}
 	if cs == nil {
 		// Only return basic error, no more information
 		log.WithFields(log.Fields{"server": name}).Error("Server not found")
@@ -386,10 +389,13 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var data api.RESTTokenRedirect
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || data.Redirect == "" {
 		e := "Get redirect URL request error"
 		log.WithFields(log.Fields{"error": err, "redirect": data.Redirect}).Error(e)
@@ -1167,9 +1173,12 @@ func configLDAPServer(name string, ldap *api.RESTServerLDAPConfig, acc *access.A
 	var err error
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithFields(log.Fields{"server": name, "error": getErr}).Warn("failed to get server")
+		}
 		if cs == nil {
-			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("Server not found")
+			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("server not found")
 		}
 
 		if cs.LDAP == nil {
@@ -1210,9 +1219,12 @@ func configSAMLServer(name string, saml *api.RESTServerSAMLConfig, acc *access.A
 	var err error
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithFields(log.Fields{"server": name, "error": getErr}).Warn("failed to get server")
+		}
 		if cs == nil {
-			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("Server not found")
+			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("server not found")
 		}
 
 		if cs.SAML == nil {

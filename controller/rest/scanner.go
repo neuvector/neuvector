@@ -53,7 +53,10 @@ func applyScanConfigUpdates(sconf *api.RESTScanConfigConfig) (*share.CLUSScanCon
 	// For example, if only some auto-scan flags are being updated, we want to keep the
 	// previous values for any flags that aren't being modified in this request.
 	var cconf *share.CLUSScanConfig
-	oldCfg, _ := cluster.Get(share.CLUSConfigScanKey)
+	oldCfg, err := cluster.Get(share.CLUSConfigScanKey)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scan config from cluster")
+	}
 	if oldCfg != nil {
 		var oldCLUSScanConfig share.CLUSScanConfig
 		err := json.Unmarshal(oldCfg, &oldCLUSScanConfig)
@@ -245,7 +248,10 @@ func handlerScanWorkloadReport(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var resp *api.RESTScanReportData
 
-	vuls, modules, _ := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, modules, err := cacher.GetVulnerabilityReport(id, showTag)
+	if err != nil && err != common.ErrObjectNotFound {
+		log.WithError(err).Warn("failed to get vulnerability report")
+	}
 	if vuls == nil {
 		// Return an empty list if workload has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
@@ -433,7 +439,10 @@ func handlerAssetsScanReportInternal(
 	maxReached := false
 outer:
 	for _, asset = range cachedAssets {
-		vuls, _, _ := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
+		vuls, _, vulErr := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
+		if vulErr != nil && vulErr != common.ErrObjectNotFound {
+			log.WithError(vulErr).Warn("failed to get vulnerability report")
+		}
 
 		vuls, err = filterAndSortCVE(rconf.VulScoreFilter, rconf.SeverityFilter, vuls)
 		if err != nil {
@@ -723,7 +732,10 @@ func handlerScanHostReport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	var resp *api.RESTScanReportData
 
-	vuls, _, _ := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, _, err := cacher.GetVulnerabilityReport(id, showTag)
+	if err != nil && err != common.ErrObjectNotFound {
+		log.WithError(err).Warn("failed to get vulnerability report")
+	}
 	if vuls == nil {
 		// Return an empty list if node has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
@@ -923,7 +935,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		for _, wl := range pod.Children {
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
-			reportVuls, _ := db.GetVulnerability(wl.ID)
+			reportVuls, err := db.GetVulnerability(wl.ID)
+			if err != nil {
+				log.WithError(err).Warn("failed to get workload vulnerability report")
+			}
 			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, localVulTraits, "", false)
@@ -941,7 +956,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
 
-			reportVuls, _ := db.GetVulnerability(n.ID)
+			reportVuls, err := db.GetVulnerability(n.ID)
+			if err != nil {
+				log.WithError(err).Warn("failed to get node vulnerability report")
+			}
 			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, localVulTraits, "", false)
@@ -957,7 +975,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		platform, _, _ := cacher.GetPlatform()
-		vuls, _, _ := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
+		vuls, _, err := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
+		if err != nil && err != common.ErrObjectNotFound {
+			log.WithError(err).Warn("failed to get platform vulnerability report")
+		}
 		if vuls != nil {
 			for _, vul := range vuls {
 				va := addVulAsset(all, vul)
