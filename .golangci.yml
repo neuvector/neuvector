@@ -8,6 +8,7 @@ linters:
     - staticcheck
     - unused
     - nolintlint # reports ill-formed or insufficient nolint directives
+    - bodyclose
   exclusions:
     generated: lax
     presets:

@@ -39,9 +39,12 @@ func (s *Snapshot) Restore(q *WriteOptions, in io.Reader) error {
 	r := s.c.newRequest("PUT", "/v1/snapshot")
 	r.body = in
 	r.setWriteOptions(q)
-	_, _, err := requireOK(s.c.doRequest(r))
+	_, resp, err := requireOK(s.c.doRequest(r))
 	if err != nil {
 		return err
+	}
+	if resp != nil {
+		resp.Body.Close()
 	}
 	return nil
 }
