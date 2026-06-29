@@ -129,6 +129,8 @@ func TestDockerHubAuth(t *testing.T) {
 
 		if tc.responseMsg != "" {
 			respMsg, readErr := io.ReadAll(resp.Body)
+			assert.Nil(t, resp.Body.Close())
+
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
@@ -262,6 +264,7 @@ func TestDockerHubReauth(t *testing.T) {
 		if tc.responseMsg != "" {
 			respMsg, readErr := io.ReadAll(resp.Body)
 			assert.Nil(t, readErr)
+			assert.Nil(t, resp.Body.Close())
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
 			assert.Nil(t, resp)
@@ -442,6 +445,7 @@ func TestDockerHubRoundTrip(t *testing.T) {
 
 		if tc.responseMsg != "" {
 			respMsg, readErr := io.ReadAll(resp.Body)
+			assert.Nil(t, resp.Body.Close())
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
