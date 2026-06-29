@@ -2097,7 +2097,7 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 	//rule_key := fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
 	oldKeys, err := cluster.GetStoreKeys(rule_key)
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		log.WithError(err).Warn("failed to get old policy IP rule store keys")
 	}
 

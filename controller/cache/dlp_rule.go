@@ -755,7 +755,7 @@ func putDlpWorkloadRulesToClusterScale(rules share.CLUSWorkloadDlpRules) {
 	//change key from "network/DlpWorkloadRules/" to "recalculate/dlp/DlpWorkloadRules/"
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalDlpWlRulesKey(share.DlpRulesDefaultName))
 	oldKeys, err := cluster.GetStoreKeys(rule_key)
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		log.WithError(err).Warn("Failed to get old DLP rule keys")
 	}
 
