@@ -948,40 +948,40 @@ func (c *configHelper) importInternal(rpcEps []*common.RPCEndpoint, localCtrlerI
 							if err := nvJsonUnmarshal(key, []byte(value), &state); err != nil {
 								log.WithError(err).Warn("failed to unmarshal admission control state")
 							} else if ctrlState := state.CtrlStates[admission.NvAdmValidateType]; ctrlState != nil {
-									var failurePolicy string
-									if state.FailurePolicy == resource.FailLower {
-										failurePolicy = resource.Fail
-									} else {
-										failurePolicy = resource.Ignore
-									}
-									k8sResInfo := admission.ValidatingWebhookConfigInfo{
-										Name: resource.NvAdmValidatingName,
-										WebhooksInfo: []*admission.WebhookInfo{
-											{
-												Name: resource.NvAdmValidatingWebhookName,
-												ClientConfig: admission.ClientConfig{
-													ClientMode:  state.AdmClientMode,
-													ServiceName: resource.NvAdmSvcName,
-													Path:        ctrlState.Uri,
-												},
-												FailurePolicy:  failurePolicy,
-												TimeoutSeconds: state.TimeoutSeconds,
+								var failurePolicy string
+								if state.FailurePolicy == resource.FailLower {
+									failurePolicy = resource.Fail
+								} else {
+									failurePolicy = resource.Ignore
+								}
+								k8sResInfo := admission.ValidatingWebhookConfigInfo{
+									Name: resource.NvAdmValidatingName,
+									WebhooksInfo: []*admission.WebhookInfo{
+										{
+											Name: resource.NvAdmValidatingWebhookName,
+											ClientConfig: admission.ClientConfig{
+												ClientMode:  state.AdmClientMode,
+												ServiceName: resource.NvAdmSvcName,
+												Path:        ctrlState.Uri,
 											},
-											{
-												Name: resource.NvStatusValidatingWebhookName,
-												ClientConfig: admission.ClientConfig{
-													ClientMode:  state.AdmClientMode,
-													ServiceName: resource.NvAdmSvcName,
-													Path:        ctrlState.NvStatusUri,
-												},
-												FailurePolicy:  resource.Ignore,
-												TimeoutSeconds: state.TimeoutSeconds,
-											},
+											FailurePolicy:  failurePolicy,
+											TimeoutSeconds: state.TimeoutSeconds,
 										},
-									}
-									if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState); err != nil {
-										log.WithError(err).Warn("Failed to configure k8s admission control")
-									}
+										{
+											Name: resource.NvStatusValidatingWebhookName,
+											ClientConfig: admission.ClientConfig{
+												ClientMode:  state.AdmClientMode,
+												ServiceName: resource.NvAdmSvcName,
+												Path:        ctrlState.NvStatusUri,
+											},
+											FailurePolicy:  resource.Ignore,
+											TimeoutSeconds: state.TimeoutSeconds,
+										},
+									},
+								}
+								if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState); err != nil {
+									log.WithError(err).Warn("Failed to configure k8s admission control")
+								}
 							}
 						}
 					}
