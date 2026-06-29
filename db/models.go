@@ -354,8 +354,11 @@ func getAssetvulSchema(uniqueAssetId bool) []string {
 	return schema
 }
 
-func formatSessionTempTableName(queryToken string) string {
-	return fmt.Sprintf("tmp_session_%s", queryToken)
+func formatSessionTempTableName(queryToken string) (string, error) {
+	if err := vaildateQueryToken(queryToken); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("tmp_session_%s", queryToken), nil
 }
 
 func getQueryParamInteger(r *http.Request, name string, defaultValue int) int {

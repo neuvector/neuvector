@@ -3,7 +3,6 @@ package db
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -237,26 +236,19 @@ func deleteSessionTempTableInMemDb(queryToken string) error {
 	db := memoryDbHandle
 
 	// SQLite does not support parameterized substitution for table and column names, only for values.
-	if len(queryToken) == 12 && isValidSessionTableName(queryToken) {
-		for i := 0; i < 10; i++ {
-			sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", formatSessionTempTableName(queryToken))
-			_, err := db.Exec(sql)
-			if err != nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			break
+	tableName, err := formatSessionTempTableName(queryToken)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < 10; i++ {
+		sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", tableName)
+		_, err := db.Exec(sql)
+		if err != nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
 		}
+		break
 	}
 
 	return nil
-}
-
-func isValidSessionTableName(name string) bool {
-	match, err := regexp.MatchString("^[a-f0-9]+$", name)
-	if err != nil {
-		// Error: impossible since pattern is a literal valid regex
-		return false
-	}
-	return match
 }
