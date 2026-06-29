@@ -793,7 +793,8 @@ func marshalValue(cloak string, v reflect.Value, marshalResult tMarshallResult) 
 			return dest, nil
 		}
 		if mapKeys[0].Kind() != reflect.String {
-			return nil, MarshalInvalidTypeError{t: mapKeys[0].Kind(), data: val}
+			// Do not include val as it could be sensitive.
+			return nil, MarshalInvalidTypeError{t: mapKeys[0].Kind()}
 		}
 		for _, key := range mapKeys {
 			d, err := marshalValue(cloak, v.MapIndex(key), marshalResult)
