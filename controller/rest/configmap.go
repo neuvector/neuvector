@@ -334,7 +334,10 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 			log.WithFields(log.Fields{"err": err2}).Error("applyScanConfigUpdates error")
 			return err2
 		}
-		value, _ := json.Marshal(cconf)
+		value, err2 := json.Marshal(cconf)
+		if err2 != nil {
+			log.WithError(err2).Warn("failed to marshal scan config")
+		}
 		err = cluster.Put(share.CLUSConfigScanKey, value)
 	}
 

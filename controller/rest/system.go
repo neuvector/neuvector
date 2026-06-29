@@ -104,7 +104,10 @@ func handlerSystemUsage(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		return
 	}
 
-	keys, _ := cluster.GetStoreKeys(share.CLUSCtrlUsageReportStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSCtrlUsageReportStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get usage report store keys")
+	}
 	all := make([]*api.RESTSystemUsageReport, 0, len(keys))
 	for _, key := range keys {
 		if v, err := cluster.Get(key); err == nil {
@@ -161,9 +164,15 @@ func handlerDebugSystemStats(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	store := share.CLUSExpiredTokenStore
-	expiredTokenKeys, _ := cluster.GetStoreKeys(store)
+	expiredTokenKeys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get expired token keys")
+	}
 	store = share.CLUSScanStateStore
-	scanStateKeys, _ := cluster.GetStoreKeys(store)
+	scanStateKeys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scan state keys")
+	}
 	store = share.CLUSScanDataStore
 	scanDataKeys, _ := cluster.GetStoreKeys(store)
 
@@ -2928,7 +2937,11 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				_, tempToken, _, err = jwtGenerateToken(user, domainRoles, nil, login.remote, login.mainSessionID, "", nil)
 				if err == nil {
 					value := r.Header.Get("X-As-Standalone")
-					ignoreFed, _ := strconv.ParseBool(value)
+					ignoreFed, err := strconv.ParseBool(value)
+					if err != nil && value != "" {
+						// Suppress error: absent header is expected; only log when value is malformed
+						log.WithError(err).Warn("failed to parse X-As-Standalone header, defaulting to false")
+					}
 					go func() {
 						if err := cfgHelper.Import(eps, localDev.Ctrler.ID, localDev.Ctrler.ClusterIP, login.domainRoles, importTask,
 							tempToken, revertFedRoles, postImportOp, rpc.PauseResumeStoreWatcher, ignoreFed); err != nil {
@@ -3380,7 +3393,10 @@ func importFedConfig(loginDomainRoles access.DomainRole, importTask share.CLUSIm
 		}
 
 		importTask.Percentage = 90
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 
 		if err == nil && importTask.Scope == share.ScopeFed {
 			updateFedRulesRevision([]string{share.FedSystemConfigType}, acc, login)

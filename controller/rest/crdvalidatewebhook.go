@@ -471,7 +471,10 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		var sizeErrMsg string
 		if len(body) > cluster.KVValueSizeMax {
 			crdRecord := share.CLUSCrdRecord{CrdRecord: &ar}
-			value, _ := json.Marshal(crdRecord)
+			value, err := json.Marshal(crdRecord)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal CRD record")
+			}
 			if len(value) >= cluster.KVValueSizeMax {
 				zb := utils.GzipBytes(value)
 				if len(zb) >= cluster.KVValueSizeMax {
