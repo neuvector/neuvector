@@ -3578,7 +3578,7 @@ func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error 
 func (m clusterHelper) GetCrdEventQueueCount() int {
 	key := share.CLUSCrdContentCountKey()
 	value, err := cluster.Get(key)
-	if err != nil {
+	if err != nil && err != cluster.ErrKeyNotFound {
 		log.WithError(err).Warn("Failed to get CRD event queue count")
 	}
 	if value != nil {
