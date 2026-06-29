@@ -188,7 +188,11 @@ func restoreToCluster(reg, fedRole string) string {
 				// 3-2. then restore scan/state/image/{reg}/{id} key
 				var sErr error
 				sKey := share.CLUSRegistryImageStateKey(reg, sum.ImageID)
-				vSummary, _ := json.Marshal(&sum)
+				vSummary, err := json.Marshal(&sum)
+				if err != nil {
+					log.WithError(err).Warn("failed to marshal registry image summary during restore")
+					continue
+				}
 				if sErr = cluster.Put(sKey, vSummary); sErr != nil {
 					if err := cluster.Delete(vKey); err != nil {
 						log.WithError(err).Warn("failed to delete registry image data key during restore")

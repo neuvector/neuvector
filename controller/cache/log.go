@@ -815,7 +815,9 @@ func violationUpdate(conn *share.CLUSConnection, server uint32) {
 			f.Direction = "egress"
 		}
 		var param interface{} = &f
-		_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+		if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
+			log.WithError(err).Warn("failed to start/stop fed ping poll")
+		}
 	}
 }
 
@@ -890,7 +892,9 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 						f.Direction = "egress"
 					}
 					var param interface{} = &f
-					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+					if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
+						log.WithError(err).Warn("failed to start/stop fed ping poll")
+					}
 				}
 			}
 		}
@@ -986,7 +990,9 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 						}
 					}
 					var param interface{} = &f
-					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+					if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
+						log.WithError(err).Warn("failed to start/stop fed ping poll")
+					}
 				}
 
 				if isLeader() {
@@ -2201,7 +2207,9 @@ func checkDefAdminPwd(throttleMinutes uint) {
 			}
 		}
 		if update {
-			_ = CacheEvent(id, "Default admin user's default password is not changed yet.")
+			if err := CacheEvent(id, "Default admin user's default password is not changed yet."); err != nil {
+				log.WithError(err).Warn("failed to cache default password event")
+			}
 			evtsTime.LastReportTime[id] = now.Unix()
 			value, err := json.Marshal(&evtsTime)
 			if err != nil {

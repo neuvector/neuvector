@@ -469,8 +469,11 @@ func responseRuleLookup(desc *eventDesc) {
 						if !cconf.Quarantine {
 							cconf.Quarantine = true
 							cconf.QuarReason = share.QuarantineReasonEvent(desc.event, id)
-							value, _ = json.Marshal(&cconf)
-							if err := cluster.PutRev(key, value, rev); err != nil {
+							var marshalErr error
+							value, marshalErr = json.Marshal(&cconf)
+							if marshalErr != nil {
+								log.WithError(marshalErr).Warn("failed to marshal container config")
+							} else if err := cluster.PutRev(key, value, rev); err != nil {
 								log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
 							}
 						}

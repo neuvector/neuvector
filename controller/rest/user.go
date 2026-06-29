@@ -99,10 +99,13 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTUserData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.User == nil {
 		e := "Request error"
 		log.WithFields(log.Fields{"error": err}).Error(e)
@@ -601,7 +604,10 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTUserConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -879,7 +885,10 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var errMsg string
 	var rconf api.RESTUserPwdConfigData
@@ -1039,7 +1048,10 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTUserRoleDomainsConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -1382,10 +1394,13 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTApikeyCreationData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Apikey == nil {
 		e := "Request error"
 		log.WithFields(log.Fields{"error": err}).Error(e)

@@ -253,7 +253,12 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 					tmpvalue = uzb
 				}
 
-				if nvJsonUnmarshal(key, tmpvalue, &rhs) == nil {
+				if err := nvJsonUnmarshal(key, tmpvalue, &rhs); err != nil {
+					log.WithError(err).Warn("failed to unmarshal rule heads")
+					if !restore {
+						return false, uzb
+					}
+				} else {
 					// because fed policies are always in top, we can simply iterate thru rhs
 					firstNonFedIdx := len(rhs)
 					for idx, rh := range rhs {
@@ -273,10 +278,6 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 						if !restore {
 							return false, uzb
 						}
-					}
-				} else {
-					if !restore {
-						return false, uzb
 					}
 				}
 			}
@@ -423,7 +424,9 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 			subKey := share.CLUSKeyNthToken(key, 3)
 			if subKey == share.CLUSFedMembershipSubKey {
 				var m share.CLUSFedMembership
-				if nvJsonUnmarshal(key, []byte(value), &m) == nil {
+				if err := nvJsonUnmarshal(key, []byte(value), &m); err != nil {
+					log.WithError(err).Warn("failed to unmarshal federation membership")
+				} else {
 					importInfo.fedRole = m.FedRole
 					log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Info()
 				}
@@ -482,7 +485,9 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 
 		if ep.name == share.CFGEndpointUser {
 			var u share.CLUSUser
-			if nvJsonUnmarshal(key, []byte(value), &u) == nil {
+			if err := nvJsonUnmarshal(key, []byte(value), &u); err != nil {
+				log.WithError(err).Warn("failed to unmarshal user for import")
+			} else {
 				u.FailedLoginCount = 0
 				u.BlockLoginSince = time.Time{}
 				u.PwdResetTime = time.Now().UTC()
@@ -498,18 +503,18 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 			}
 		} else if ep.name == share.CFGEndpointGroup && orchPlatform == share.PlatformKubernetes {
 			var g share.CLUSGroup
-			if nvJsonUnmarshal(key, []byte(value), &g) == nil {
-				if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, g.Name); err == nil {
-					// check whether there is an nvgroupdefinitions CR with different criteria/comment in k8s
-					if o, ok := obj.(*resource.NvGroupDefinition); ok {
-						rc := make([]v1.CriteriaEntry, 0, len(g.Criteria))
-						for _, c := range g.Criteria {
-							rc = append(rc, v1.CriteriaEntry{Key: c.Key, Value: c.Value, Op: c.Op})
-						}
-						if !common.SameGroupCriteria(o.Spec.Selector.Criteria, rc, false) || o.Spec.Selector.Comment != g.Comment {
-							msg := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", g.Name)
-							log.WithFields(log.Fields{"restored": rc, "cr": o.Spec.Selector.Criteria}).Warn(msg)
-						}
+			if err := nvJsonUnmarshal(key, []byte(value), &g); err != nil {
+				log.WithError(err).Warn("failed to unmarshal group for import")
+			} else if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, g.Name); err == nil {
+				// check whether there is an nvgroupdefinitions CR with different criteria/comment in k8s
+				if o, ok := obj.(*resource.NvGroupDefinition); ok {
+					rc := make([]v1.CriteriaEntry, 0, len(g.Criteria))
+					for _, c := range g.Criteria {
+						rc = append(rc, v1.CriteriaEntry{Key: c.Key, Value: c.Value, Op: c.Op})
+					}
+					if !common.SameGroupCriteria(o.Spec.Selector.Criteria, rc, false) || o.Spec.Selector.Comment != g.Comment {
+						msg := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", g.Name)
+						log.WithFields(log.Fields{"restored": rc, "cr": o.Spec.Selector.Criteria}).Warn(msg)
 					}
 				}
 			}

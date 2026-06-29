@@ -83,7 +83,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 							if admission.ResetCABundle(pathInfo.svcName, certData) {
 								// remembered cert is updated with new cert. in rest.restartWebhookServer() it will re-register the webhook resource to k8s
 								var param interface{} = &pathInfo.svcName
-								_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+								if err := cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param); err != nil {
+									log.WithError(err).Warn("failed to start/stop fed ping poll")
+								}
 							}
 						}
 					}

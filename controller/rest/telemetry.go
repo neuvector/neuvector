@@ -44,7 +44,11 @@ func reportTelemetryData(rawData common.TelemetryData) {
 
 	logError := lastTeleErrorDay != today
 
-	bodyTo, _ := json.Marshal(&reqPayload)
+	bodyTo, err := json.Marshal(&reqPayload)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal telemetry payload")
+		return
+	}
 	if _, _, _, err := sendRestRequest("telemetry", http.MethodPost, _teleNeuvectorURL, "", "", "", "", nil, bodyTo, logError, nil, nil); err == nil {
 		lastTeleErrorDay = -1
 		upgradeInfo := share.CLUSCheckUpgradeInfo{

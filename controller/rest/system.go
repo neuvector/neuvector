@@ -174,7 +174,10 @@ func handlerDebugSystemStats(w http.ResponseWriter, r *http.Request, ps httprout
 		log.WithError(err).Warn("failed to get scan state keys")
 	}
 	store = share.CLUSScanDataStore
-	scanDataKeys, _ := cluster.GetStoreKeys(store)
+	scanDataKeys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scan data keys")
+	}
 
 	resp := api.RESTSystemStatsData{
 		Stats: &api.RESTSystemStats{
@@ -415,10 +418,13 @@ func handlerPredictSystemScore(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var data api.RESTPredictScoreData
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || data.Metrics == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -642,10 +648,13 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	// Authz is done when action is taken, setting service policies.
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var req api.RESTSystemRequestData
-	err := json.Unmarshal(body, &req)
+	err = json.Unmarshal(body, &req)
 	if err != nil || req.Request == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -896,10 +905,13 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTSystemWebhookConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1025,7 +1037,10 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 
 	name := ps.ByName("name")
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTSystemWebhookConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -1563,7 +1578,11 @@ func configSystemConfig(w http.ResponseWriter, acc *access.AccessControl, login 
 				order := make([]string, 0)
 				for _, name := range *rc.AuthOrder {
 					if name != api.AuthServerLocal {
-						if cs, _, _ := clusHelper.GetServerRev(name, acc); cs == nil {
+						cs, _, err := clusHelper.GetServerRev(name, acc)
+						if err != nil {
+							log.WithError(err).Warn("failed to get server rev for auth order")
+						}
+						if cs == nil {
 							e := "Authentication server not found"
 							log.WithFields(log.Fields{"name": name}).Error(e)
 							restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrObjectNotFound, e)
@@ -1930,8 +1949,11 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	scope := share.ScopeFed
 	dummy := share.CLUSSystemConfig{CfgType: share.FederalCfg}
 	var rconf api.RESTSystemConfigConfigData
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &rconf)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
+	err = json.Unmarshal(body, &rconf)
 	if err == nil && apiVer == "v2" {
 		if rconf.ConfigV2 != nil {
 			config := &api.RESTSystemConfigConfig{}
@@ -3301,7 +3323,10 @@ func handlerFedConfigExport(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var rconf api.RESTFedConfigExport
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")

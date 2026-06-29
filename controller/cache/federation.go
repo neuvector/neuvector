@@ -198,17 +198,31 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				if _, err := kv.GetFedCaCertPath(m.MasterCluster.ID); err != nil {
 					log.WithError(err).Warn("Failed to get fed CA cert path")
 				}
-				go func() { _ = cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil) }()
+				go func() {
+					if err := cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil); err != nil {
+						log.WithError(err).Warn("failed to start/stop fed ping poll")
+					}
+				}()
 			case api.FedRoleJoint:
 				var param interface{} = &m.JointCluster
 				if err := cctx.StartStopFedPingPollFunc(share.JointLoadOwnKeys, 0, param); err == nil {
 					//serializeFile(masterCaCertPath, m.MasterCluster.CACert)
-					go func() { _ = cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil) }()
+					go func() {
+						if err := cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil); err != nil {
+							log.WithError(err).Warn("failed to start/stop fed ping poll")
+						}
+					}()
 				}
 			case api.FedRoleNone:
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleNone)
-				_ = cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil)
-				go func() { _ = cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil) }()
+				if err := cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil); err != nil {
+					log.WithError(err).Warn("failed to start/stop fed ping poll")
+				}
+				go func() {
+					if err := cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil); err != nil {
+						log.WithError(err).Warn("failed to start/stop fed ping poll")
+					}
+				}()
 				purgeFiles("fed.master.")
 				purgeFiles("fed.client.")
 				fedSystemConfigCache = share.CLUSSystemConfig{CfgType: share.FederalCfg}
@@ -237,7 +251,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 						tokenCache: make(map[string]string),
 					}
 					var param interface{} = &cluster
-					_ = cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param)
+					if err := cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param); err != nil {
+						log.WithError(err).Warn("failed to start/stop fed ping poll")
+					}
 					fedJoinedClustersCache[id] = cache
 				} else {
 					if cache.cluster.Name != cluster.Name {
@@ -296,7 +312,11 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				if err := json.Unmarshal(value, &doPingPoll); err != nil {
 					log.WithError(err).Warn("failed to unmarshal fed ping-poll config")
 				}
-				go func() { _ = cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil) }()
+				go func() {
+					if err := cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil); err != nil {
+						log.WithError(err).Warn("failed to start/stop fed ping poll")
+					}
+				}()
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
@@ -334,7 +354,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				delete(fedJoinedClustersCache, id)
 				purgeFiles(fmt.Sprintf("fed.client.%s.", id))
 				var param interface{} = &id
-				_ = cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param)
+				if err := cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param); err != nil {
+					log.WithError(err).Warn("failed to start/stop fed ping poll")
+				}
 			}
 		case share.CLUSFedClustersStatusSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)

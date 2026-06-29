@@ -46,8 +46,11 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	var rconf api.RESTAcceptedAlerts
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &rconf)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -108,7 +111,10 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 					Locale:       common.OEMDefaultUserLocale,
 					PwdResetTime: time.Now().UTC(),
 				}
-				value, _ := json.Marshal(u)
+				value, err := json.Marshal(u)
+				if err != nil {
+					log.WithError(err).Warn("failed to marshal system user")
+				}
 				key := share.CLUSUserKey(common.ReservedNvSystemUser)
 				if err := cluster.PutIfNotExist(key, value, false); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")

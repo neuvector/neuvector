@@ -161,7 +161,10 @@ func (t *regTracer) SendRequest(method, url string) {
 }
 
 func (t *regTracer) GotResponse(statusCode int, status string, header http.Header, body io.ReadCloser) io.Reader {
-	c, _ := io.ReadAll(body)
+	c, err := io.ReadAll(body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read response body")
+	}
 	body.Close()
 
 	t.steps = append(t.steps, &api.RESTRegistryTestStep{
@@ -228,12 +231,14 @@ func handlerRegistryTest(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	var data api.RESTRegistryTestData
-	body, _ := io.ReadAll(r.Body)
-	var err error
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryTestDataV2
-		err := json.Unmarshal(body, &v2data)
+		err = json.Unmarshal(body, &v2data)
 		if err != nil || v2data.Config == nil {
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 			return

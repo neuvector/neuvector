@@ -2,6 +2,7 @@ package cache
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -19,10 +20,11 @@ const usageReportHistory = 180
 
 func writeUsageReport() error {
 	r := getUsageReport()
-	value, _ := json.Marshal(*r)
+	value, err := json.Marshal(*r)
+	if err != nil {
+		return fmt.Errorf("failed to marshal usage report: %w", err)
+	}
 	key := share.CLUSCtrlUsageReportKey(r.ReportedAt.Unix())
-
-	var err error
 	for i := 0; i < 3; i++ {
 		if err = cluster.Put(key, value); err != nil {
 			time.Sleep(usageReportRetryWait)

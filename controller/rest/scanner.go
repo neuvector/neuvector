@@ -93,10 +93,13 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var sconf api.RESTScanConfigData
-	err := json.Unmarshal(body, &sconf)
+	err = json.Unmarshal(body, &sconf)
 	if err != nil || sconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -115,7 +118,11 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	value, _ := json.Marshal(cconf)
+	value, err := json.Marshal(cconf)
+	if err != nil {
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return
+	}
 	if err := cluster.Put(share.CLUSConfigScanKey, value); err != nil {
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 	} else {
@@ -485,11 +492,14 @@ func handlerWorkloadsScanReport(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	// validation
 	var rconf api.RESTAssetsScanReportQuery
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -757,11 +767,14 @@ func handlerHostsScanReport(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	body, _ := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	// validation
 	var rconf api.RESTAssetsScanReportQuery
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

@@ -337,6 +337,7 @@ func handlesystemcfg(yaml_data []byte, load bool, skip *bool, context *configMap
 		value, err2 := json.Marshal(cconf)
 		if err2 != nil {
 			log.WithError(err2).Warn("failed to marshal scan config")
+			return err2
 		}
 		err = cluster.Put(share.CLUSConfigScanKey, value)
 	}

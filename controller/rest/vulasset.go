@@ -430,7 +430,10 @@ func _createAssetQuerySession(qsr *api.QuerySessionRequest) error {
 		return err
 	}
 
-	queryFilterb, _ := json.Marshal(queryFilter)
+	queryFilterb, err := json.Marshal(queryFilter)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal query filter")
+	}
 	qs := &db.QueryStat{
 		Token:        queryFilter.QueryToken,
 		CreationTime: qsr.CreationTime,
@@ -633,7 +636,10 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queryFilterb, _ := json.Marshal(queryFilter)
+	queryFilterb, err := json.Marshal(queryFilter)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal query filter")
+	}
 	err = createQueryStat(login, db.QueryStateType_Asset, queryFilter.QueryToken, string(queryFilterb))
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("createQueryStat error")
