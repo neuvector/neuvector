@@ -379,7 +379,10 @@ func GetRpmPackages(fullpath, kernel string) ([]byte, error) {
 		}
 	}
 
-	value, _ := json.Marshal(&list)
+	value, err := json.Marshal(&list)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal RPM package list")
+	}
 	return value, nil
 }
 

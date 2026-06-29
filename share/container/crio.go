@@ -107,7 +107,10 @@ func crioConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 		log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
 	}
 
-	storageDev, _ := criGetStorageDevice(cri, ctx)
+	storageDev, err := criGetStorageDevice(cri, ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to get storage device info")
+	}
 	log.WithFields(log.Fields{"endpoint": endpoint, "sockPath": sockPath, "version": ver, "storageDriver": storageDev}).Info("cri connected")
 	driver := crioDriver{
 		sys: sys, version: ver, criClient: cri, podImgRepoDigest: "pod", endpoint: endpoint, endpointHost: sockPath,
@@ -160,7 +163,10 @@ func (d *crioDriver) reConnect() error {
 		return err
 	}
 
-	d.storageDriver, _ = criGetStorageDevice(cri, ctx)
+	d.storageDriver, err = criGetStorageDevice(cri, ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to get storage device info on reconnect")
+	}
 
 	log.WithFields(log.Fields{"endpoint": endpoint, "version": ver}).Info("cri-o connected")
 

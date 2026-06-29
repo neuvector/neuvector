@@ -1265,7 +1265,10 @@ func configOIDCServer(name string, oidc *api.RESTServerOIDCConfig, acc *access.A
 	var err error
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("Server not found")
 		}
@@ -1481,7 +1484,10 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			e := "Server not found"
 			log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1609,7 +1615,10 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			e := "Server not found"
 			log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1805,7 +1814,10 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			e := "Server not found"
 			log.WithFields(log.Fields{"server": name}).Error(e)

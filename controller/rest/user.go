@@ -161,7 +161,11 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	defer clusHelper.ReleaseLock(lock)
 
 	// Check if user already exists
-	if userExisting, _, _ := clusHelper.GetUserRev(ruser.Fullname, acc); userExisting != nil {
+	userExisting, _, err := clusHelper.GetUserRev(ruser.Fullname, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to check if user exists")
+	}
+	if userExisting != nil {
 		e := "User already exists"
 		log.WithFields(log.Fields{"login": login.fullname, "create": ruser.Fullname}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
@@ -322,7 +326,10 @@ func handlerUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	}
 
 	fullname := ps.ByName("fullname")
-	fullname, _ = url.PathUnescape(fullname)
+	fullname, err := url.PathUnescape(fullname)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape fullname path")
+	}
 	if len(fullname) == 0 || fullname[0] == '~' {
 		handlerNotFound(w, r)
 		return
@@ -392,7 +399,10 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		resp.PwdDaysUntilExpire = -1
 		resp.PwdHoursUntilExpire = 0
 	}
-	resp.GlobalPermits, resp.DomainPermits, _ = access.GetUserPermissions(user.Role, user.RoleDomains, user.ExtraPermits, user.ExtraPermitsDomains)
+	resp.GlobalPermits, resp.DomainPermits, err = access.GetUserPermissions(user.Role, user.RoleDomains, user.ExtraPermits, user.ExtraPermitsDomains)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user permissions")
+	}
 
 	// collect all top-level permissions from role/extraPermits for global domain on remote managed clsuters
 	if user.RemoteRolePermits != nil {
@@ -404,7 +414,10 @@ func handlerSelfUserShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		if user.RemoteRolePermits.ExtraPermits != nil {
 			extraPermits = user.RemoteRolePermits.ExtraPermits[access.AccessDomainGlobal]
 		}
-		resp.RemoteGlobalPermits, _, _ = access.GetUserPermissions(role, nil, extraPermits, nil)
+		resp.RemoteGlobalPermits, _, err = access.GetUserPermissions(role, nil, extraPermits, nil)
+		if err != nil {
+			log.WithError(err).Warn("failed to get remote global user permissions")
+		}
 	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self user detail")
@@ -459,7 +472,10 @@ func handlerUserList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	resp.Users = make([]*api.RESTUser, 0)
 
 	now := time.Now().UTC()
-	pwdProfile, _ := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+	pwdProfile, err := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+	if err != nil {
+		log.WithError(err).Warn("failed to get password profile")
+	}
 	users := clusHelper.GetAllUsersNoAuth()
 	for _, user := range users {
 		if login.fullname != user.Fullname || login.loginType == loginTypeApikey { // a user can always see himself/herself
@@ -579,13 +595,16 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	fullname := ps.ByName("fullname")
-	fullname, _ = url.PathUnescape(fullname)
+	fullname, err := url.PathUnescape(fullname)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape fullname path")
+	}
 
 	// Read request
 	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		e := "Request error"
 		log.WithFields(log.Fields{"error": err}).Error(e)
@@ -850,7 +869,10 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	fullname := ps.ByName("fullname")
-	fullname, _ = url.PathUnescape(fullname)
+	fullname, err := url.PathUnescape(fullname)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape fullname path")
+	}
 	if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
@@ -861,7 +883,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	var errMsg string
 	var rconf api.RESTUserPwdConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		errMsg = "Request error"
 	} else if fullname != rconf.Config.Fullname {
@@ -891,7 +913,10 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	var unblockUser, resetPassword bool
 	retry := 0
 	for retry < retryClusterMax {
-		pwdProfile, _ := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+		pwdProfile, pwdErr := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+		if pwdErr != nil {
+			log.WithError(pwdErr).Warn("failed to get password profile")
+		}
 		// Retrieve user from the cluster
 		user, rev, err := clusHelper.GetUserRev(fullname, acc)
 		if user == nil {
@@ -1003,7 +1028,10 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	fullname := ps.ByName("fullname")
-	fullname, _ = url.PathUnescape(fullname)
+	fullname, err := url.PathUnescape(fullname)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape fullname path")
+	}
 	role := ps.ByName("role")
 	if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
@@ -1014,7 +1042,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	body, _ := io.ReadAll(r.Body)
 
 	var rconf api.RESTUserRoleDomainsConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1132,7 +1160,10 @@ func handlerUserDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	fullname := ps.ByName("fullname")
-	fullname, _ = url.PathUnescape(fullname)
+	fullname, err := url.PathUnescape(fullname)
+	if err != nil {
+		log.WithError(err).Warn("failed to unescape fullname path")
+	}
 	if len(fullname) == 0 || fullname[0] == '~' {
 		restRespAccessDenied(w, login)
 		return
@@ -1475,7 +1506,11 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	defer clusHelper.ReleaseLock(lock)
 
 	// Check if apikey already exists
-	if apikeyExisting, _, _ := clusHelper.GetApikeyRev(rapikey.Name, acc); apikeyExisting != nil {
+	apikeyExisting, _, err := clusHelper.GetApikeyRev(rapikey.Name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to check if apikey exists")
+	}
+	if apikeyExisting != nil {
 		e := "apikey name already exists"
 		log.WithFields(log.Fields{"Name": login.fullname, "create": rapikey.Name}).Error(e)
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, e)
@@ -1566,7 +1601,10 @@ func handlerSelfApikeyShow(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	resp := api.RESTSelfApikeyData{Apikey: apikey2REST(apikey)}
 
-	resp.GlobalPermits, resp.DomainPermits, _ = access.GetUserPermissions(apikey.Role, apikey.RoleDomains, share.NvPermissions{}, nil)
+	resp.GlobalPermits, resp.DomainPermits, err = access.GetUserPermissions(apikey.Role, apikey.RoleDomains, share.NvPermissions{}, nil)
+	if err != nil {
+		log.WithError(err).Warn("failed to get apikey permissions")
+	}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get self apikey detail")
 }
@@ -1590,6 +1628,9 @@ func isApiAccessKeyFormatValid(name string) bool {
 		return false
 	}
 
-	valid, _ := regexp.MatchString("^[a-zA-Z0-9_-]+$", name)
+	valid, err := regexp.MatchString("^[a-zA-Z0-9_-]+$", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match apikey name pattern")
+	}
 	return valid
 }
