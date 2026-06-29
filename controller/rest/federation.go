@@ -1847,7 +1847,11 @@ func demoteFromMaster(w http.ResponseWriter, acc *access.AccessControl, login *l
 	}
 
 	masterCluster := cacher.GetFedMasterCluster(acc)
-	if masterCaCertPath, _, _, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, ""); masterCaCertPath != "" {
+	masterCaCertPath, _, _, _, err := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
+	if err != nil {
+		log.WithError(err).Warn("failed to get fed tls key cert path")
+	}
+	if masterCaCertPath != "" {
 		os.Remove(masterCaCertPath)
 	}
 	membership = share.CLUSFedMembership{
@@ -2060,7 +2064,10 @@ func joinFed(w http.ResponseWriter, acc *access.AccessControl, login *loginSessi
 		respTo := api.RESTFedJoinRespInternal{}
 		if err = json.Unmarshal(data, &respTo); err == nil {
 			mtlsAvailable := false
-			caCertPath, _, _, _, _ := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
+			caCertPath, _, _, _, err := kv.GetFedTlsKeyCertPath(respTo.MasterCluster.ID, jointID)
+			if err != nil {
+				log.WithError(err).Warn("failed to get fed tls key cert path")
+			}
 			if respTo.CACert != "" && respTo.ClientCert != "" && respTo.ClientKey != "" {
 				if caCert, err := base64.StdEncoding.DecodeString(respTo.CACert); err == nil {
 					if err = os.WriteFile(caCertPath, caCert, 0600); err == nil {
@@ -2453,7 +2460,10 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	if err := kv.GenTlsCertWithCaAndStoreInFiles(reqData.JointCluster.ID, certsDir, certPath, privKeyPath, kv.AdmCACertPath, kv.AdmCAKeyPath,
 		kv.ValidityPeriod{Year: 10}, x509.ExtKeyUsageClientAuth); err == nil {
-		masterCaCertPath, _, _, _, _ := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
+		masterCaCertPath, _, _, _, err := kv.GetFedTlsKeyCertPath(masterCluster.ID, "")
+		if err != nil {
+			log.WithError(err).Warn("failed to get fed tls key cert path")
+		}
 		caCertData, err = os.ReadFile(masterCaCertPath)
 		if err == nil {
 			privKeyData, err = os.ReadFile(privKeyPath)
