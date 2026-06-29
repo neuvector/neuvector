@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -2427,7 +2428,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 
 	// (1) bench reports: bench/<id>/report/<BenchType>
 	keys, err := cluster.GetKeys(share.CLUSBenchStore, "/") // middle element
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		log.WithFields(log.Fields{"err": err}).Warn("failed to get bench store keys")
 	}
 	removed := lookupPurgeWorkloadEntries(keys, 1, ids, suspected, confirmed, updated)
@@ -2435,7 +2436,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 
 	// (2) bench scan state: scan/state/bench/workload/<id>
 	keys, err = cluster.GetKeys(share.CLUSScanStateKey("bench/workload"), " ") // last element
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		log.WithFields(log.Fields{"err": err}).Warn("failed to get bench workload scan state keys")
 	}
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
@@ -2443,7 +2444,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 
 	// (3) auto scan reports: scan/data/report/workload/<id>
 	keys, err = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanDataStore), " ") // last element
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		log.WithFields(log.Fields{"err": err}).Warn("failed to get scan data report keys")
 	}
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
@@ -2451,7 +2452,7 @@ func pruneWorkloadKV(suspected utils.Set) {
 
 	// (4) scan state records: scan/state/report/workload/<id>
 	keys, err = cluster.GetKeys(fmt.Sprintf("%sreport/workload", share.CLUSScanStateStore), " ") // last element
-	if err != nil {
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
 		log.WithFields(log.Fields{"err": err}).Warn("failed to get scan state report keys")
 	}
 	removed = append(removed, lookupPurgeWorkloadEntries(keys, 4, ids, suspected, confirmed, updated)...)
