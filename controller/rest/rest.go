@@ -1125,7 +1125,10 @@ func isNamePathValid(name string) bool {
 func isDomainNameValid(name string) bool {
 	// k8s namesapce naming rule: a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc')
 	// plus, we support * at the end of namespace configuration for regex matching
-	valid, _ := regexp.MatchString(`^[a-z0-9]+[-a-z0-9\*]*[\*a-z0-9]$`, name)
+	valid, err := regexp.MatchString(`^[a-z0-9]+[-a-z0-9\*]*[\*a-z0-9]$`, name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match domain name pattern")
+	}
 	return valid
 }
 
@@ -2331,7 +2334,9 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 		}
 		data, err = yaml.JSONToYAML(json_data)
 		if err != nil {
-			log.WithError(err).Warn("failed to convert export data to YAML")
+			log.WithError(err).Error("failed to convert export data to YAML")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailExport)
+			return
 		}
 	}
 

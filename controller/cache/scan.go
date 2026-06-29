@@ -1098,7 +1098,10 @@ func registryStateHandler(nType cluster.ClusterNotifyType, key string, value []b
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var state share.CLUSRegistryState
-		_ = json.Unmarshal(value, &state)
+		if err := json.Unmarshal(value, &state); err != nil {
+			log.WithError(err).Warn("failed to unmarshal registry state")
+			return
+		}
 		scan.RegistryStateUpdate(name, &state)
 	case cluster.ClusterNotifyDelete:
 		// State is deleted when registry deleted. No handling here.
@@ -1126,7 +1129,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var sum share.CLUSRegistryImageSummary
-		_ = json.Unmarshal(value, &sum)
+		if err := json.Unmarshal(value, &sum); err != nil {
+			log.WithError(err).Warn("failed to unmarshal registry image summary")
+			return
+		}
 
 		if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) && (name != common.RegistryFedRepoScanName) {
 			// when a new fed registry with its image scan result are deployed to a worker cluster, it's possible that

@@ -530,7 +530,10 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	retry := 0
 	for retry < retryClusterMax {
 		// Retrieve from the cluster
-		value, rev, _ := cluster.GetRev(key)
+		value, rev, err := cluster.GetRev(key)
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload config from cluster")
+		}
 		if value != nil {
 			if err := json.Unmarshal(value, &cconf); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("Unmarshal")

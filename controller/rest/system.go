@@ -2923,7 +2923,10 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 			importTask.TotalLines = lines
 			importTask.Percentage = 3
 			importTask.LastUpdateTime = time.Now().UTC()
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+				// Ignore error: progress update is non-critical
+				log.WithError(putErr).Debug("failed to update import task progress")
+			}
 			kv.SetImporting(1)
 			eps := cacher.GetAllControllerRPCEndpoints(access.NewReaderAccessControl())
 			switch importType {
@@ -3065,7 +3068,10 @@ func handlerConfigImport(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		restRespAccessDenied(w, login)
 		return
 	} else if tid == "" && acc.HasGlobalPermissions(share.PERM_SYSTEM_CONFIG, share.PERM_SYSTEM_CONFIG) {
-		fedRole, _ := cacher.GetFedMembershipRole(acc)
+		fedRole, err := cacher.GetFedMembershipRole(acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get federation membership role")
+		}
 		if fedRole == api.FedRoleMaster && !acc.IsFedAdmin() {
 			restRespAccessDenied(w, login)
 			return
@@ -3342,7 +3348,10 @@ func importFedConfig(loginDomainRoles access.DomainRole, importTask share.CLUSIm
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, readErr := os.ReadFile(importTask.TempFilename)
+	if readErr != nil {
+		log.WithError(readErr).Warn("failed to read import file")
+	}
 	var secRule resource.NvCrdFedConfigSecurityRule
 	if err := json.Unmarshal(json_data, &secRule); err != nil || secRule.APIVersion != "neuvector.com/v1" || secRule.Kind != resource.NvConfigSecurityRuleKind {
 		msg := "Invalid security rule(s)"
@@ -3353,15 +3362,18 @@ func importFedConfig(loginDomainRoles access.DomainRole, importTask share.CLUSIm
 
 	var inc float32
 	var progress float32 // progress percentage
+	var err error
 
 	inc = 90.0 / float32(3)
 	progress = 6
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+		// Ignore error: progress update is non-critical
+		log.WithError(putErr).Debug("failed to update import task progress")
+	}
 
-	var err error
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockServerKey, importCallerRest)
 	if crdHandler.AcquireLock(clusterLockWait) {
@@ -3381,7 +3393,10 @@ func importFedConfig(loginDomainRoles access.DomainRole, importTask share.CLUSIm
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+			// Ignore error: progress update is non-critical
+			log.WithError(putErr).Debug("failed to update import task progress")
+		}
 
 		cacheRecord := share.CLUSCrdSecurityRule{
 			ResponseRules: &share.CLUSCrdResponseRules{},

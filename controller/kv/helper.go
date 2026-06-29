@@ -548,9 +548,13 @@ func (m clusterHelper) AcquireLock(key string, wait time.Duration) (cluster.Lock
 	// 0: callers(), 1: GetCaller(), 2: AcquireLock(), 3: lockClusKey()
 	fn := utils.GetCaller(2, []string{"AcquireLock", "lockClusKey"})
 	locker := &share.CLUSDistLocker{LockedBy: m.id, Caller: fn, LockedAt: time.Now()}
-	value, _ := json.Marshal(locker)
-	// Suppress error: storing lock holder info is best-effort debug metadata
+	value, err := json.Marshal(locker)
+	if err != nil {
+		// Suppress error: storing lock holder info is best-effort debug metadata
+		log.WithError(err).Debug("Failed to marshal lock holder info")
+	}
 	if err := cluster.Put(lKey, value); err != nil {
+		// Suppress error: storing lock holder info is best-effort debug metadata
 		log.WithError(err).Debug("Failed to store lock holder info")
 	}
 
@@ -891,7 +895,7 @@ func (m clusterHelper) GetFedSystemConfigRev(acc *access.AccessControl) (*share.
 	}
 	if value != nil {
 		if err = nvJsonUnmarshal(key, value, &conf); err != nil {
-			return &conf, 0
+			return nil, 0
 		}
 		return &conf, rev
 	} else {
@@ -934,7 +938,10 @@ func (m clusterHelper) GetDomain(name string, acc *access.AccessControl) (*share
 
 func (m clusterHelper) PutDomainIfNotExist(domain *share.CLUSDomain) error {
 	key := share.CLUSDomainKey(domain.Name)
-	value, _ := json.Marshal(domain)
+	value, err := json.Marshal(domain)
+	if err != nil {
+		return fmt.Errorf("failed to marshal domain: %w", err)
+	}
 	return cluster.PutIfNotExist(key, value, true)
 }
 
@@ -2132,7 +2139,10 @@ func (m clusterHelper) GetAllVulnerabilityProfiles(acc *access.AccessControl) []
 
 func (m clusterHelper) GetVulnerabilityProfile(name string, acc *access.AccessControl) (*share.CLUSVulnerabilityProfile, uint64, error) {
 	key := share.CLUSVulnerabilityProfileKey(name)
-	value, rev, _ := m.get(key)
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get vulnerability profile from cluster")
+	}
 	if value != nil {
 		var cp share.CLUSVulnerabilityProfile
 		_ = nvJsonUnmarshal(key, value, &cp)
@@ -2351,7 +2361,10 @@ func (m clusterHelper) PutFedScanRevisions(scanRevs *share.CLUSFedScanRevisions,
 
 func (m clusterHelper) GetRegistry(name string, acc *access.AccessControl) (*share.CLUSRegistryConfig, uint64, error) {
 	key := share.CLUSRegistryConfigKey(name)
-	value, rev, _ := m.get(key)
+	value, rev, err := m.get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get registry config from cluster")
+	}
 	if value != nil {
 		var cfg share.CLUSRegistryConfig
 		_ = nvJsonUnmarshal(key, value, &cfg)
@@ -2393,7 +2406,10 @@ func (m clusterHelper) GetAllRegistry(scope string) []*share.CLUSRegistryConfig 
 				}
 			}
 			var config share.CLUSRegistryConfig
-			value, _, _ := m.get(key)
+			value, _, err := m.get(key)
+			if err != nil {
+				log.WithError(err).Warn("failed to get registry config from cluster")
+			}
 			if value != nil {
 				_ = nvJsonUnmarshal(key, value, &config)
 				configs = append(configs, &config)
@@ -3535,7 +3551,10 @@ func (m clusterHelper) GetCustomCheckConfig(group string) (*share.CLUSCustomChec
 func (m clusterHelper) GetAllCustomCheckConfig() map[string]*share.CLUSCustomCheckGroup {
 	scripts := make(map[string]*share.CLUSCustomCheckGroup)
 	store := share.CLUSConfigScriptStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get custom check config keys from cluster")
+	}
 	for _, key := range keys {
 		group := share.CLUSKeyNthToken(key, 3)
 		if value, _, _ := m.get(key); value != nil {
@@ -3725,7 +3744,10 @@ func (m clusterHelper) DeleteAwsLambda(project, region, funcName string) error {
 
 // custom roles
 func (m clusterHelper) GetAllCustomRoles(acc *access.AccessControl) map[string]*share.CLUSUserRole {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigUserRoleStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigUserRoleStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get custom role keys from cluster")
+	}
 	roles := make(map[string]*share.CLUSUserRole, len(keys))
 	for _, key := range keys {
 		if value, _, _ := m.get(key); value != nil {
@@ -3836,7 +3858,10 @@ func (m clusterHelper) DuplicateNetworkKeyTxn(txn *cluster.ClusterTransact, key 
 
 // only restore the common profiles
 func (m clusterHelper) RestoreNetworkKeys() {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get network config keys from cluster")
+	}
 	for _, key := range keys {
 		if profileKey := objCfgStore2networkStore(key); profileKey != "" {
 			if utils.IsGroupNodes(share.CLUSKeyLastToken(profileKey)) {

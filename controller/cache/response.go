@@ -460,7 +460,9 @@ func responseRuleLookup(desc *eventDesc) {
 							log.WithError(err).Warn("failed to get workload config for quarantine")
 						}
 						if value != nil {
-							_ = json.Unmarshal(value, &cconf)
+							if err := json.Unmarshal(value, &cconf); err != nil {
+								log.WithError(err).Warn("failed to unmarshal workload config for quarantine")
+							}
 						} else {
 							cconf.Wire = share.WireDefault
 						}

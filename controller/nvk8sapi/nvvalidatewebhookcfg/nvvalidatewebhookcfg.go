@@ -709,7 +709,10 @@ func ConfigK8sAdmissionControl(k8sResInfo *ValidatingWebhookConfigInfo, ctrlStat
 	retry := 0
 	for _, whInfo := range k8sResInfo.WebhooksInfo {
 		if whInfo.ClientConfig.ClientMode == share.AdmClientModeUrl {
-			svcInfo, _ := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
+			svcInfo, svcErr := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
+			if svcErr != nil {
+				log.WithError(svcErr).Warn("failed to get validate webhook service info")
+			}
 			whInfo.ClientConfig.Port = svcInfo.SvcNodePort
 		}
 	}

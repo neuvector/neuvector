@@ -923,7 +923,11 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	}
-	if g, _ := cacher.GetGroupCache(conf.Name, acc); g != nil && g.CfgType == share.GroundCfg {
+	g, err := cacher.GetGroupCache(conf.Name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get group cache")
+	}
+	if g != nil && g.CfgType == share.GroundCfg {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 		return
 	}
@@ -1238,7 +1242,10 @@ func importWaf(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, readErr := os.ReadFile(importTask.TempFilename)
+	if readErr != nil {
+		log.WithError(readErr).Warn("failed to read import file")
+	}
 	var secRuleList resource.NvWafSecurityRuleList
 	var secRule resource.NvWafSecurityRule
 	var secRules []resource.NvWafSecurityRule
@@ -1719,7 +1726,11 @@ func promoteFedWafGroup(grpName string, acc *access.AccessControl, login *loginS
 		return
 	}
 	for _, sensor := range cg.Sensors { //local
-		if cs, _ := cacher.GetWafSensor(sensor.Name, acc); cs != nil {
+		cs, sensorErr := cacher.GetWafSensor(sensor.Name, acc)
+		if sensorErr != nil {
+			log.WithError(sensorErr).Warn("failed to get WAF sensor")
+		}
+		if cs != nil {
 			fedWafSensorPromote(cs, acc, login)
 		}
 	}
@@ -1738,10 +1749,13 @@ func promoteFedWafGroup(grpName string, acc *access.AccessControl, login *loginS
 			return
 		}
 	}
-	if cached, _ := cacher.GetWafGroup(grpName, acc); cached == nil {
+	cached, grpErr := cacher.GetWafGroup(grpName, acc)
+	if grpErr != nil {
+		log.WithError(grpErr).Warn("failed to get WAF group")
+	}
+	if cached == nil {
 		log.WithFields(log.Fields{"group": grpName}).Debug("Local waf group does not exist.")
 		return
-	} else {
-		fedWafGroupConfig(cached, acc, login)
 	}
+	fedWafGroupConfig(cached, acc, login)
 }
