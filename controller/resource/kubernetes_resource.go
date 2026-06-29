@@ -1504,7 +1504,11 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		}
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"resource": rt, "error": err}).Error("fail to register")
+		if rt == RscTypeImage {
+			log.WithFields(log.Fields{"resource": rt, "error": err}).Info("OpenShift image resource not available, skipping")
+		} else {
+			log.WithFields(log.Fields{"resource": rt, "error": err}).Error("fail to register")
+		}
 	}
 
 	return err
@@ -2141,7 +2145,7 @@ func GetK8sVersion() (int, int) {
 				var err error
 				ocVersionMajor, err = strconv.Atoi(ss[0])
 				if err != nil {
-					log.WithError(err).Warn("Failed to parse OC version major")
+					log.WithError(err).Info("OC version not available, skipping")
 				}
 			}
 		}
