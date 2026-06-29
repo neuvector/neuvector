@@ -1141,7 +1141,10 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	}
 
 	// do summary - top5 and others
-	sessionTable := formatSessionTempTableName(queryToken)
+	sessionTable, err := formatSessionTempTableName(queryToken)
+	if err != nil {
+		return 0, nil, err
+	}
 	statement, args, err = dialect.From(sessionTable).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(goqu.Ex{"type": "image"}).Order(goqu.C("cve_count").Desc()).Prepared(true).ToSQL()
 	if err != nil {
 		return 0, nil, err
@@ -1181,7 +1184,10 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 }
 
 func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul) (int, error) {
-	tableName := formatSessionTempTableName(sessionToken)
+	tableName, err := formatSessionTempTableName(sessionToken)
+	if err != nil {
+		return 0, err
+	}
 
 	record := getCompiledAssetVulRecord(assetVul)
 
@@ -1226,7 +1232,10 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
-	tableName := formatSessionTempTableName(sessionToken)
+	tableName, err := formatSessionTempTableName(sessionToken)
+	if err != nil {
+		return err
+	}
 	statement, args, err := dialect.From(tableName).Select(columns...).Prepared(true).ToSQL()
 	if err != nil {
 		return err
@@ -1333,12 +1342,14 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 	start := queryFilter.QueryStart
 	row := queryFilter.QueryCount
 
-	sessionTemp := formatSessionTempTableName(sessionToken)
+	sessionTemp, err := formatSessionTempTableName(sessionToken)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
 	var args []interface{}
-	var err error
 	if row == -1 {
 		statement, args, err = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Prepared(true).ToSQL() // select all
 	} else {
