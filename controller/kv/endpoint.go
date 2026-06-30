@@ -3,6 +3,7 @@ package kv
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -613,7 +614,7 @@ func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 	}
 
 	if ep.isStore {
-		if kvPairs, err := cluster.List(ep.key); err == nil || err == cluster.ErrEmptyStore {
+		if kvPairs, err := cluster.List(ep.key); err == nil || errors.Is(err, cluster.ErrEmptyStore) {
 			for _, kvPair := range kvPairs {
 				key := kvPair.Key
 				skip := false
@@ -671,7 +672,7 @@ func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 			return err
 		}
 	} else {
-		if value, err := cluster.Get(ep.key); err == nil || err == cluster.ErrKeyNotFound {
+		if value, err := cluster.Get(ep.key); err == nil || errors.Is(err, cluster.ErrKeyNotFound) {
 			line := fmt.Sprintf("%s\n%s\n", ep.key, value)
 			if _, err = writer.WriteString(line); err != nil {
 				return err

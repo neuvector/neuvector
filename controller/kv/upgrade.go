@@ -1894,7 +1894,7 @@ func resetRegistryCfgType() {
 
 func initFedScanRevKey() {
 	if m := clusHelper.GetFedMembership(); m != nil && (m.FedRole == api.FedRoleMaster || m.FedRole == api.FedRoleJoint) {
-		if _, _, err := clusHelper.GetFedScanRevisions(); err == cluster.ErrKeyNotFound {
+		if _, _, err := clusHelper.GetFedScanRevisions(); errors.Is(err, common.ErrObjectNotFound) {
 			var currName string
 			var currRev uint64
 			var regConfigRev uint64

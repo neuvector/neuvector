@@ -11,6 +11,7 @@ import (
 
 	"errors"
 
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	log "github.com/sirupsen/logrus"
@@ -125,7 +126,7 @@ func (c *CertManager) checkAndRotateCert(cn string, callback *CertManagerCallbac
 		var x509Cert *x509.Certificate
 		shouldrenew := false
 		data, index, err := clusHelper.GetObjectCertRev(cn)
-		if err != nil && err != cluster.ErrKeyNotFound {
+		if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 			// This function assumes the previous certificate should be there.  If not, return an error.
 			return fmt.Errorf("failed to get certificate: %w", err)
 		}
@@ -291,7 +292,7 @@ func (c *CertManager) UpdateCerts(cn string) error {
 
 	return RetryOnCASError(DefaultRetryNumber, func() error {
 		data, index, err := clusHelper.GetObjectCertRev(cn)
-		if err != nil && err != cluster.ErrKeyNotFound {
+		if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 			// This function assumes the previous certificate should be there.  If not, return an error.
 			return fmt.Errorf("failed to get certificate: %w", err)
 		}

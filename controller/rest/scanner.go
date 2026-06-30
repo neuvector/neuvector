@@ -256,7 +256,7 @@ func handlerScanWorkloadReport(w http.ResponseWriter, r *http.Request, ps httpro
 	var resp *api.RESTScanReportData
 
 	vuls, modules, err := cacher.GetVulnerabilityReport(id, showTag)
-	if err != nil && err != common.ErrObjectNotFound {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("failed to get vulnerability report")
 	}
 	if vuls == nil {
@@ -447,7 +447,7 @@ func handlerAssetsScanReportInternal(
 outer:
 	for _, asset = range cachedAssets {
 		vuls, _, vulErr := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
-		if vulErr != nil && vulErr != common.ErrObjectNotFound {
+		if vulErr != nil && !errors.Is(vulErr, common.ErrObjectNotFound) {
 			log.WithError(vulErr).Warn("failed to get vulnerability report")
 		}
 
@@ -743,7 +743,7 @@ func handlerScanHostReport(w http.ResponseWriter, r *http.Request, ps httprouter
 	var resp *api.RESTScanReportData
 
 	vuls, _, err := cacher.GetVulnerabilityReport(id, showTag)
-	if err != nil && err != common.ErrObjectNotFound {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("failed to get vulnerability report")
 	}
 	if vuls == nil {
@@ -989,7 +989,7 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		platform, _, _ := cacher.GetPlatform()
 		vuls, _, err := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
-		if err != nil && err != common.ErrObjectNotFound {
+		if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 			log.WithError(err).Warn("failed to get platform vulnerability report")
 		}
 		if vuls != nil {

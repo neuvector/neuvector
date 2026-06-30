@@ -179,9 +179,14 @@ func initCache() {
 	ruleCaches := [4]*share.CLUSAdmissionRules{&admValidateExceptCache, &admValidateDenyCache, &admFedValidateExceptionCache, &admFedValidateDenyCache}
 	for idx, ruleType := range ruleTypes {
 		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
-		if err != nil && err.Error() == cluster.ErrKeyNotFound.Error() {
-			if putErr := clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleType, arhs); putErr != nil {
-				log.WithFields(log.Fields{"ruleType": ruleType, "err": putErr}).Warn("failed to init admission rule list")
+		if err != nil {
+			if errors.Is(err, common.ErrObjectNotFound) {
+				if putErr := clusHelper.PutAdmissionRuleList(admission.NvAdmValidateType, ruleType, arhs); putErr != nil {
+					log.WithFields(log.Fields{"ruleType": ruleType, "err": putErr}).Warn("failed to init admission rule list")
+				}
+			} else {
+				log.WithFields(log.Fields{"ruleType": ruleType, "err": err}).Error("failed to get admission rule list")
+				continue
 			}
 		}
 		ruleCaches[idx].RuleMap = make(map[uint32]*share.CLUSAdmissionRule, len(arhs)) // key is ruleID
