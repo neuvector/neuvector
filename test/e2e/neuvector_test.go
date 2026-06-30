@@ -21,3 +21,7 @@ func TestNeuVectorScannerCVEDB(t *testing.T) {
 func TestNeuVectorWorkloadScan(t *testing.T) {
 	testEnv.Test(t, getScannerWorkloadScanFeature())
 }
+
+func TestNeuVectorAdmissionRuleLifecycle(t *testing.T) {
+	testEnv.Test(t, getAdmissionRuleLifecycleFeature())
+}
