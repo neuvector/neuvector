@@ -200,7 +200,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				}
 				go func() {
 					if err := cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						log.WithError(err).Warn("failed to start fed rest server")
 					}
 				}()
 			case api.FedRoleJoint:
@@ -209,18 +209,18 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					//serializeFile(masterCaCertPath, m.MasterCluster.CACert)
 					go func() {
 						if err := cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil); err != nil {
-							log.WithError(err).Warn("failed to start/stop fed ping poll")
+							log.WithError(err).Warn("failed to start fed poll")
 						}
 					}()
 				}
 			case api.FedRoleNone:
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleNone)
 				if err := cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil); err != nil {
-					log.WithError(err).Warn("failed to start/stop fed ping poll")
+					log.WithError(err).Warn("failed to purge joint cluster keys")
 				}
 				go func() {
 					if err := cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						log.WithError(err).Warn("failed to stop fed rest server")
 					}
 				}()
 				purgeFiles("fed.master.")
@@ -252,7 +252,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					}
 					var param interface{} = &cluster
 					if err := cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						log.WithError(err).Warn("failed to load joint cluster key")
 					}
 					fedJoinedClustersCache[id] = cache
 				} else {
@@ -314,7 +314,8 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				}
 				go func() {
 					if err := cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						// This will run once per minute per cluster in federation.
+						log.WithError(err).Debug("failed to ping poll")
 					}
 				}()
 			}
@@ -355,7 +356,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				purgeFiles(fmt.Sprintf("fed.client.%s.", id))
 				var param interface{} = &id
 				if err := cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param); err != nil {
-					log.WithError(err).Warn("failed to start/stop fed ping poll")
+					log.WithError(err).Warn("failed to unload joint cluster key")
 				}
 			}
 		case share.CLUSFedClustersStatusSubKey:

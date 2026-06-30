@@ -1729,7 +1729,7 @@ func startWorkerThread(ctx *Context) {
 						if sendTelemetry, teleData := getTelemetryData(telemetryFreq); sendTelemetry {
 							var param interface{} = &teleData
 							if err := cctx.StartStopFedPingPollFunc(share.ReportTelemetryData, 0, param); err != nil {
-								log.WithError(err).Warn("Failed to start/stop fed ping poll")
+								log.WithError(err).Warn("Failed to report telemetry data")
 							}
 						}
 					}

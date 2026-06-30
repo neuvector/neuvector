@@ -816,7 +816,7 @@ func violationUpdate(conn *share.CLUSConnection, server uint32) {
 		}
 		var param interface{} = &f
 		if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
-			log.WithError(err).Warn("failed to start/stop fed ping poll")
+			log.WithError(err).Warn("failed to post to ibmsa")
 		}
 	}
 }
@@ -893,7 +893,7 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 					}
 					var param interface{} = &f
 					if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						log.WithError(err).Warn("failed to post to ibmsa")
 					}
 				}
 			}
@@ -991,7 +991,7 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 					}
 					var param interface{} = &f
 					if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						log.WithError(err).Warn("failed to post to ibmsa")
 					}
 				}
 
