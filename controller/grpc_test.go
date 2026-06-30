@@ -164,7 +164,8 @@ func TestIncrementalDBWriter(t *testing.T) {
 				batches = append(batches, data)
 				return nil
 			}
-			w := newIncrementalDBWriter(testVersion, testCreateTime, "scan/database/test/", writeFunc)
+			w, err := newIncrementalDBWriter(testVersion, testCreateTime, "scan/database/test/", writeFunc)
+			require.NoError(t, err)
 
 			var addErr error
 			for name, cve := range c.entries {

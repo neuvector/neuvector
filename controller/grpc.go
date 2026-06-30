@@ -61,13 +61,16 @@ type incrementalDBWriter struct {
 	writeFunc   func(int, []byte) error // abstracted slot write; injected for testability
 }
 
-func newIncrementalDBWriter(version, createTime, store string, writeFunc func(int, []byte) error) *incrementalDBWriter {
+func newIncrementalDBWriter(version, createTime, store string, writeFunc func(int, []byte) error) (*incrementalDBWriter, error) {
 	db := share.CLUSScannerDB{
 		CVEDBVersion:    version,
 		CVEDBCreateTime: createTime,
 		CVEDB:           make(map[string]*share.ScanVulnerability),
 	}
-	base, _ := json.Marshal(db)
+	base, err := json.Marshal(db)
+	if err != nil {
+		return nil, err
+	}
 	return &incrementalDBWriter{
 		store:       store,
 		baseSize:    len(base),
@@ -75,7 +78,7 @@ func newIncrementalDBWriter(version, createTime, store string, writeFunc func(in
 		writeFunc:   writeFunc,
 		db:          db,
 		handled:     make(map[string]bool),
-	}
+	}, nil
 }
 
 // expandCVEEntry inserts cve into dest under key name.  When name contains a colon (e.g.
@@ -465,13 +468,24 @@ func (ss *ScanService) ScannerRegisterV3(stream share.ControllerScanService_Scan
 		})
 	}
 
+	sendError := func(err error) error {
+		log.WithError(err).Error("failed to handle scanner registration request")
+		return stream.Send(&share.ScannerRegisterV3Response{
+			Action:  share.ScannerRegisterV3Response_ERROR,
+			Message: err.Error(),
+		})
+	}
+
 	pageSize := getCVEDBPageSize()
 
 	newStore := fmt.Sprintf("%s%s/", share.CLUSScannerDBStore, req.CVEDBVersion)
 	writeFunc := func(i int, zb []byte) error {
 		return cluster.PutBinary(fmt.Sprintf("%s%d", newStore, i), zb)
 	}
-	writer := newIncrementalDBWriter(req.CVEDBVersion, req.CVEDBCreateTime, newStore, writeFunc)
+	writer, err := newIncrementalDBWriter(req.CVEDBVersion, req.CVEDBCreateTime, newStore, writeFunc)
+	if err != nil {
+		return sendError(err)
+	}
 	needCleanup := true
 	defer func() {
 		if needCleanup {
@@ -480,14 +494,6 @@ func (ss *ScanService) ScannerRegisterV3(stream share.ControllerScanService_Scan
 	}()
 
 	log.WithFields(log.Fields{"scanner": req.ID, "version": req.CVEDBVersion, "pageSize": pageSize}).Info("Requesting CVEDB from scanner")
-
-	sendError := func(err error) error {
-		log.WithError(err).Error("failed to handle scanner registration request")
-		return stream.Send(&share.ScannerRegisterV3Response{
-			Action:  share.ScannerRegisterV3Response_ERROR,
-			Message: err.Error(),
-		})
-	}
 
 	// Request the first page.
 	if err := stream.Send(&share.ScannerRegisterV3Response{
