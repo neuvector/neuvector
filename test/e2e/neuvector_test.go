@@ -25,3 +25,7 @@ func TestNeuVectorWorkloadScan(t *testing.T) {
 func TestNeuVectorAdmissionRuleLifecycle(t *testing.T) {
 	testEnv.Test(t, getAdmissionRuleLifecycleFeature())
 }
+
+func TestNeuVectorAdmissionAssessment(t *testing.T) {
+	testEnv.Test(t, getAdmissionAssessmentFeature())
+}
