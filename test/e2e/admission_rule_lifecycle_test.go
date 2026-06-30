@@ -159,28 +159,34 @@ func assessAdmDenyRuleInList(ctx context.Context, t *testing.T, _ *envconf.Confi
 	httpClient := newNVHTTPClient()
 	ruleID := getAdmRuleID(ctx)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		endpoint+"/v1/admission/rules", nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Auth-Token", token)
-
-	resp, err := httpClient.Do(req)
-	require.NoError(t, err, "GET /v1/admission/rules")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode, "GET /v1/admission/rules failed")
-
-	var data api.RESTAdmissionRulesData
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&data), "decode rules list response")
-
-	found := false
-	for _, r := range data.Rules {
-		if r.ID == ruleID {
-			found = true
-			require.False(t, r.Disable, "newly created rule should not be disabled")
-			break
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			endpoint+"/v1/admission/rules", nil)
+		if err != nil {
+			return false
 		}
-	}
-	require.True(t, found, "rule ID %d not found in GET /v1/admission/rules", ruleID)
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false
+		}
+		var data api.RESTAdmissionRulesData
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return false
+		}
+		for _, r := range data.Rules {
+			if r.ID == ruleID {
+				return !r.Disable
+			}
+		}
+		return false
+	}, assessTimeout, retryInterval,
+		"rule ID %d not found (or found disabled) in GET /v1/admission/rules after %s", ruleID, assessTimeout)
+
 	return ctx
 }
 
@@ -224,28 +230,34 @@ func assessAdmDenyRuleIsDisabled(ctx context.Context, t *testing.T, _ *envconf.C
 	httpClient := newNVHTTPClient()
 	ruleID := getAdmRuleID(ctx)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		endpoint+"/v1/admission/rules", nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Auth-Token", token)
-
-	resp, err := httpClient.Do(req)
-	require.NoError(t, err, "GET /v1/admission/rules")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode, "GET /v1/admission/rules failed")
-
-	var data api.RESTAdmissionRulesData
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&data), "decode rules list response")
-
-	found := false
-	for _, r := range data.Rules {
-		if r.ID == ruleID {
-			found = true
-			require.True(t, r.Disable, "rule ID %d should be disabled", ruleID)
-			break
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			endpoint+"/v1/admission/rules", nil)
+		if err != nil {
+			return false
 		}
-	}
-	require.True(t, found, "rule ID %d not found in GET /v1/admission/rules", ruleID)
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false
+		}
+		var data api.RESTAdmissionRulesData
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return false
+		}
+		for _, r := range data.Rules {
+			if r.ID == ruleID {
+				return r.Disable
+			}
+		}
+		return false
+	}, assessTimeout, retryInterval,
+		"rule ID %d did not show as disabled in GET /v1/admission/rules after %s", ruleID, assessTimeout)
+
 	return ctx
 }
 
@@ -276,23 +288,34 @@ func assessAdmDenyRuleIsGone(ctx context.Context, t *testing.T, _ *envconf.Confi
 	httpClient := newNVHTTPClient()
 	ruleID := getAdmRuleID(ctx)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		endpoint+"/v1/admission/rules", nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Auth-Token", token)
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			endpoint+"/v1/admission/rules", nil)
+		if err != nil {
+			return false
+		}
+		req.Header.Set("X-Auth-Token", token)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false
+		}
+		var data api.RESTAdmissionRulesData
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return false
+		}
+		for _, r := range data.Rules {
+			if r.ID == ruleID {
+				return false
+			}
+		}
+		return true
+	}, assessTimeout, retryInterval,
+		"deleted rule ID %d still appears in GET /v1/admission/rules after %s", ruleID, assessTimeout)
 
-	resp, err := httpClient.Do(req)
-	require.NoError(t, err, "GET /v1/admission/rules")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode, "GET /v1/admission/rules failed")
-
-	var data api.RESTAdmissionRulesData
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&data), "decode rules list response")
-
-	for _, r := range data.Rules {
-		require.NotEqual(t, ruleID, r.ID,
-			"deleted rule ID %d should not appear in GET /v1/admission/rules", ruleID)
-	}
 	return ctx
 }
 

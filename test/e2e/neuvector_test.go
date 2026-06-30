@@ -29,3 +29,7 @@ func TestNeuVectorAdmissionRuleLifecycle(t *testing.T) {
 func TestNeuVectorAdmissionAssessment(t *testing.T) {
 	testEnv.Test(t, getAdmissionAssessmentFeature())
 }
+
+func TestNeuVectorAdmissionEnforcement(t *testing.T) {
+	testEnv.Test(t, getAdmissionEnforcementFeature())
+}
