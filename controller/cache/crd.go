@@ -48,7 +48,7 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 							cacheCtrlState.Uri = ctrlState.Uri
 							var param interface{} = &resource.NvCrdSvcName
 							if err := cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param); err != nil {
-								log.WithError(err).Warn("failed to start/stop fed ping poll")
+								log.WithError(err).Warn("failed to restart crd webhook server")
 							}
 						}
 					}
@@ -89,7 +89,7 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				}
 				if queueInfo.Count > 0 {
 					if err := cctx.StartStopFedPingPollFunc(share.ProcessCrdQueue, 0, nil); err != nil {
-						log.WithError(err).Warn("failed to start/stop fed ping poll")
+						log.WithError(err).Warn("failed to process crd request queue")
 					}
 				}
 			}

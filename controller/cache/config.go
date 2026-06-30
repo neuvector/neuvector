@@ -552,13 +552,13 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			if isLeader() {
 				var param interface{} = &cfg.IBMSAConfig
 				if err := cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param); err != nil {
-					log.WithError(err).Warn("failed to start/stop fed ping poll")
+					log.WithError(err).Warn("failed to start posting to ibmsa")
 				}
 			}
 		} else {
 			// customer explicitly disables IBM SA endpoint
 			if err := cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil); err != nil {
-				log.WithError(err).Warn("failed to start/stop fed ping poll")
+				log.WithError(err).Warn("failed to stop posting to ibmsa")
 			}
 		}
 		//if global network policy mode enabled/disabled or mode changes
@@ -774,7 +774,7 @@ func configInit() {
 	if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 		var param interface{} = &cfg.IBMSAConfig
 		if err := cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param); err != nil {
-			log.WithError(err).Warn("failed to start/stop fed ping poll")
+			log.WithError(err).Warn("failed to start posting to ibmsa")
 		}
 	}
 	if !utils.CompareSliceWithoutOrder(systemConfigCache.ControllerDebug, cctx.Debug) {
