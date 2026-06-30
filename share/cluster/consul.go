@@ -1087,7 +1087,7 @@ func addNodeWatcher(watcher NodeWatcher) bool {
 	v := reflect.ValueOf(nodeWatchers)
 	f := reflect.ValueOf(watcher)
 	for i := 0; i < v.Len(); i++ {
-		if v.Index(i).Interface() == f {
+		if v.Index(i).Pointer() == f.Pointer() {
 			log.Debug("Node watcher has been registered.")
 			return false
 		}
@@ -1163,7 +1163,7 @@ func addKeyWatcher(key string, watcher KeyWatcher) bool {
 		v := reflect.ValueOf(keyWatchers[key])
 		f := reflect.ValueOf(watcher)
 		for i := 0; i < v.Len(); i++ {
-			if v.Index(i).Interface() == f {
+			if v.Index(i).Pointer() == f.Pointer() {
 				log.Debug("Key watcher has been registered.")
 				return false
 			}
@@ -1245,7 +1245,7 @@ func addStateWatcher(watcher StateWatcher) bool {
 	v := reflect.ValueOf(stateWatchers)
 	f := reflect.ValueOf(watcher)
 	for i := 0; i < v.Len(); i++ {
-		if v.Index(i).Interface() == f {
+		if v.Index(i).Pointer() == f.Pointer() {
 			log.Debug("State watcher has been registered.")
 			return false
 		}
@@ -1372,7 +1372,7 @@ func addStoreWatcher(store string, watcher StoreWatcher, bCongestCtl bool) bool 
 		v := reflect.ValueOf(storeWatchers[store])
 		f := reflect.ValueOf(watcher)
 		for i := 0; i < v.Len(); i++ {
-			if v.Index(i).Interface() == f {
+			if v.Index(i).Pointer() == f.Pointer() {
 				log.Debug("Store watcher has been registered")
 				return false
 			}
