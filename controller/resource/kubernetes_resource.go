@@ -1346,7 +1346,7 @@ exit_watcher:
 					d.lock.Lock()
 					for rt, rtWatcher := range d.watchers {
 						if rtWatcher != nil && rtWatcher.cancel != nil {
-							log.WithFields(log.Fields{"resource": rt}).Info("Cancel context")
+							log.WithFields(log.Fields{"resource": rt}).Debug("Canceling context")
 							rtWatcher.tokenRenewed = true
 							rtWatcher.cancel()
 							// 1. watchResource() is notified. It sends an error(ex: context.Canceled) to errCh channel and returns
@@ -1699,7 +1699,7 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 					tokenRenewed = rtWatcher.tokenRenewed
 				}
 				d.lock.RUnlock()
-				log.WithFields(log.Fields{"resource": rt, "tokenRenewed": tokenRenewed}).Info("Context cancelled")
+				log.WithFields(log.Fields{"resource": rt, "tokenRenewed": tokenRenewed}).Debug("Context cancelled")
 				if !tokenRenewed {
 					// The context is cancelled not because of k8s token renewal
 					// It means this go routine should be exiting now.
