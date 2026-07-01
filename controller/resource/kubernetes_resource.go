@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -2474,6 +2475,25 @@ func GenRandomString(length int) (string, error) {
 	}
 	for i := range length {
 		bytes[i] = charset[int(bytes[i])%len(charset)]
+	}
+	return string(bytes), nil
+}
+
+func GenShellSafeRandomString(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	if length <= 0 {
+		return "", nil
+	}
+
+	bytes := make([]byte, length)
+	max := big.NewInt(int64(len(charset)))
+	for i := range bytes {
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error()
+			return "", err
+		}
+		bytes[i] = charset[n.Int64()]
 	}
 	return string(bytes), nil
 }

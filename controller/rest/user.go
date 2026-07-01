@@ -1449,7 +1449,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Generate secret key
 	var apikey share.CLUSApikey
-	secretKey, err := resource.GenRandomString(64)
+	secretKey, err := resource.GenShellSafeRandomString(64)
 	if err == nil {
 		apikey = share.CLUSApikey{
 			ExpirationType:   rapikey.ExpirationType,
