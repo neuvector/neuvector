@@ -71,7 +71,7 @@ func getUsageReport() *share.CLUSSystemUsageReport {
 
 	r.ReportedAt = time.Now().UTC()
 	r.Platform = getHostPlatform(localDev.Host.Platform, localDev.Host.Flavor)
-	r.CVEDBVersion = scanUtils.GetScannerDB().CVEDBVersion
+	r.CVEDBVersion, _ = scanUtils.GetCVEDBMeta()
 	r.Registries = scan.GetRegistryCount()
 
 	cacheMutexRLock()

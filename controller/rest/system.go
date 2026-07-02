@@ -216,9 +216,7 @@ func handlerSystemSummary(w http.ResponseWriter, r *http.Request, ps httprouter.
 		summary.CompoVersions = cacher.GetComponentVersions(acc)
 	}
 	summary.Workloads, summary.RunningWorkloads, summary.RunningPods = cacher.GetWorkloadCount(accSysConfig)
-	sdb := scanUtils.GetScannerDB()
-	summary.CVEDBVersion = sdb.CVEDBVersion
-	summary.CVEDBCreateTime = sdb.CVEDBCreateTime
+	summary.CVEDBVersion, summary.CVEDBCreateTime = scanUtils.GetCVEDBMeta()
 	resp := api.RESTSystemSummaryData{Summary: summary}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get system summary")

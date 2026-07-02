@@ -45,8 +45,32 @@ message ScannerDeregisterData {
 }
 
 message ControllerCaps {
-    bool CriticalVul = 1;
-    bool ScannerSettings = 2;
+    bool CriticalVul              = 1;
+    bool ScannerSettings          = 2;
+    bool SupportScannerRegisterV3 = 3;
+}
+
+message ScannerRegisterV3Request {
+    string CVEDBVersion    = 1;
+    string CVEDBCreateTime = 2;
+    string RPCServer       = 3;
+    uint32 RPCServerPort   = 4;
+    string ID              = 5;
+    map<string, ScanVulnerability> CVEDB = 6;
+    bool   CVEDBLast       = 7;  // true on the last message of the entire DB upload
+    bool   CVEDBPageDone   = 8;  // true on the last message of the current page; controller should send next SEND_CVEDB
+    uint32 CVEDBTotal      = 9;  // total CVE entries in scanner's DB; sent in the initial metadata message so controller can size Consul slots
+}
+
+message ScannerRegisterV3Response {
+    enum Action {
+        REGISTERED = 0;
+        SEND_CVEDB = 1;
+        ERROR      = 2;
+    }
+    Action action        = 1;
+    string message       = 2;
+    uint32 CVEDBPageSize = 3;  // entries per page;  must be non-zero.
 }
 
 message ScannerAvailable {
@@ -54,8 +78,8 @@ message ScannerAvailable {
 }
 
 service ControllerScanService {
-  rpc ScannerRegister(ScannerRegisterData) returns (RPCVoid);
   rpc ScannerRegisterStream(stream ScannerRegisterData) returns (RPCVoid);
+  rpc ScannerRegisterV3(stream ScannerRegisterV3Request) returns (stream ScannerRegisterV3Response);
   rpc ScannerDeregister(ScannerDeregisterData) returns (RPCVoid);
   rpc SubmitScanResult(ScanResult) returns (RPCVoid);
   rpc GetCaps(RPCVoid) returns (ControllerCaps);

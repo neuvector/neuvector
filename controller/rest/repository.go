@@ -17,6 +17,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/controller/scan"
+	nvdb "github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 )
@@ -169,7 +170,7 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 			}
 		}
 
-		rpt := scanUtils.ScanRepoResult2REST(result, cpf.filter)
+		rpt := scanUtils.ScanRepoResult2REST(nvdb.GlobalCVECache(), result, cpf.filter)
 		rpt.Checks = filterComplianceChecks(rpt.Checks, cpf)
 
 		vpf := cacher.GetVulnerabilityProfileInterface(share.DefaultVulnerabilityProfileName)

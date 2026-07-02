@@ -628,6 +628,11 @@ func main() {
 
 	if err := db.CreateVulAssetDb(false); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("CreateVulAssetDb")
+		os.Exit(-2)
+	}
+	if err := db.CreateCVEDb(); err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("CreateCVEDb")
+		os.Exit(-2)
 	}
 
 	keyRotationDuration := time.Duration(time.Hour * 24 * 30 * 3)

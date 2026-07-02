@@ -20,6 +20,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
+	nvdb "github.com/neuvector/neuvector/db"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -2042,7 +2043,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 		// if only reporting one cve per event, we will add the vulnerabile info.
 		// the vul. list will not be included in the log
 		for _, v := range reportedVuls {
-			scanUtils.FillVul(v)
+			scanUtils.FillVul(nvdb.GlobalCVECache(), v)
 		}
 		clog.Vuls = make(map[string]*share.ScanVulnerability)
 		for _, v := range reportedVuls {
@@ -2069,11 +2070,7 @@ func scanReport2ScanLog(id string, objType share.ScanObjectType, report *share.C
 			}
 			if systemConfigCache.SingleCVEPerSyslog {
 				for _, v := range lc.Vuls {
-					scanUtils.FillVul(v)
-				}
-				lc.Vuls = make(map[string]*share.ScanVulnerability)
-				for _, v := range lc.Vuls {
-					lc.Vuls[v.Name] = v
+					scanUtils.FillVul(nvdb.GlobalCVECache(), v)
 				}
 			}
 			clog.Layers[i] = lc

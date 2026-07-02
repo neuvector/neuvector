@@ -24,6 +24,8 @@ It has these top-level messages:
 	ScannerRegisterData
 	ScannerDeregisterData
 	ControllerCaps
+	ScannerRegisterV3Request
+	ScannerRegisterV3Response
 	ScannerAvailable
 	CLUSFilePacket
 	CLUSAdmissionRequest
