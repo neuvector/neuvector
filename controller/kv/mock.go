@@ -546,7 +546,7 @@ func (m *MockCluster) GetScanner(id string, acc *access.AccessControl) (*share.C
 		}
 		return &clone, nil
 	}
-	return nil, cluster.ErrKeyNotFound
+	return nil, common.ErrObjectNotFound
 }
 
 func (m *MockCluster) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
@@ -739,7 +739,7 @@ func (m *MockCluster) GetObjectCertRev(cn string) (*share.CLUSX509Cert, uint64, 
 	out := share.CLUSX509Cert{}
 	v, ok := m.kv[cn]
 	if !ok {
-		return nil, 0, cluster.ErrKeyNotFound
+		return nil, 0, common.ErrObjectNotFound
 	}
 	err := json.Unmarshal([]byte(v), &out)
 	if err != nil {

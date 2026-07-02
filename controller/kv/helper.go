@@ -569,10 +569,17 @@ func (m clusterHelper) ReleaseLock(lock cluster.LockInterface) {
 	}
 }
 
+func translateErr(err error) error {
+	if errors.Is(err, cluster.ErrKeyNotFound) || errors.Is(err, cluster.ErrEmptyStore) {
+		return common.ErrObjectNotFound
+	}
+	return err
+}
+
 func (m clusterHelper) get(key string) ([]byte, uint64, error) {
 	value, rev, err := cluster.GetRev(key)
 	if err != nil || value == nil {
-		return nil, rev, err
+		return nil, rev, translateErr(err)
 	} else {
 		var wrt bool
 		if value, err, wrt = UpgradeAndConvert(key, value); wrt {
@@ -681,7 +688,7 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 
 		key := share.CLUSCtrlInstallationKey
 		value, index, err = m.get(key)
-		if err != nil && err != cluster.ErrKeyNotFound {
+		if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 			return err
 		}
 		id = string(value)
@@ -698,7 +705,7 @@ func (m clusterHelper) GetOrCreateInstallationID() (string, error) {
 		}
 
 		value, err = cluster.Get(share.CLUSNextKeyRotationTSKey)
-		if err != nil {
+		if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
 			log.WithError(err).Warn("Failed to get key rotation timestamp")
 		}
 		if len(value) == 0 {
@@ -775,7 +782,7 @@ func (m clusterHelper) GetAllControllers() ([]*share.CLUSController, error) {
 	all := make([]*share.CLUSController, 0)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error()
-		return all, err
+		return all, translateErr(err)
 	}
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
@@ -816,7 +823,7 @@ func (m clusterHelper) GetSystemConfigRev(acc *access.AccessControl) (*share.CLU
 
 	key := share.CLUSConfigSystemKey
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("Failed to get system config")
 	}
 	if value != nil {
@@ -859,7 +866,7 @@ func (m clusterHelper) GetScanConfigRev(acc *access.AccessControl) (*share.CLUSS
 
 	key := share.CLUSConfigScanKey
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("Failed to get scan config")
 	}
 	if value != nil {
@@ -891,7 +898,7 @@ func (m clusterHelper) GetFedSystemConfigRev(acc *access.AccessControl) (*share.
 
 	key := share.CLUSFedKey(share.CFGEndpointSystem)
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("Failed to get fed system config")
 	}
 	if value != nil {
@@ -922,7 +929,7 @@ func (m clusterHelper) PutFedSystemConfigRev(conf *share.CLUSSystemConfig, rev u
 func (m clusterHelper) GetDomain(name string, acc *access.AccessControl) (*share.CLUSDomain, uint64, error) {
 	key := share.CLUSDomainKey(name)
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("Failed to get domain")
 	}
 	if value != nil {
@@ -1195,7 +1202,7 @@ func (m clusterHelper) PutPolicyRuleListZip(key string, array []byte) error {
 func (m clusterHelper) GetPolicyRule(id uint32) (*share.CLUSPolicyRule, uint64) {
 	key := share.CLUSPolicyRuleKey(share.DefaultPolicyName, id)
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("failed to get policy rule")
 	}
 	if value != nil {
@@ -1289,7 +1296,7 @@ func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleH
 	crhs := make([]*share.CLUSRuleHead, 0)
 	key := share.CLUSResponseRuleListKey(policyName)
 	value, _, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("failed to get response rule list")
 	}
 	if value != nil {
@@ -1305,7 +1312,7 @@ func (m clusterHelper) GetResponseRuleList(policyName string) []*share.CLUSRuleH
 func (m clusterHelper) GetResponseRule(policyName string, id uint32) (*share.CLUSResponseRule, uint64) {
 	key := share.CLUSResponseRuleKey(policyName, id)
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("failed to get response rule")
 	}
 	if value != nil {
@@ -1410,7 +1417,7 @@ func (m clusterHelper) GetAllServers(acc *access.AccessControl) map[string]*shar
 func (m clusterHelper) GetServerRev(name string, acc *access.AccessControl) (*share.CLUSServer, uint64, error) {
 	key := share.CLUSServerKey(name)
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("Failed to get server rev from cluster")
 	}
 	if value != nil {
@@ -1509,7 +1516,7 @@ func (m clusterHelper) GetAllUsersNoAuth() map[string]*share.CLUSUser {
 func (m clusterHelper) GetUserRev(fullname string, acc *access.AccessControl) (*share.CLUSUser, uint64, error) {
 	key := share.CLUSUserKey(url.QueryEscape(fullname))
 	value, rev, err := m.get(key)
-	if err != nil {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithError(err).Warn("failed to get user rev")
 	}
 	if value != nil {
@@ -1692,7 +1699,7 @@ func (m clusterHelper) GetScannerStats(id string) (*share.CLUSScannerStats, erro
 		log.WithError(err).Warn("failed to get scanner stats")
 	}
 	if value == nil {
-		return nil, cluster.ErrKeyNotFound
+		return nil, common.ErrObjectNotFound
 	}
 
 	if err := nvJsonUnmarshal(key, value, &s); err != nil {
@@ -1795,16 +1802,18 @@ func (m clusterHelper) GetScanner(id string, acc *access.AccessControl) (*share.
 
 		return &s, nil
 	}
-	return nil, cluster.ErrKeyNotFound
+	return nil, common.ErrObjectNotFound
 }
 
 // GetScannerRev gets scanner with revision for internal operations (no auth check)
 func (m clusterHelper) GetScannerRev(id string) (*share.CLUSScanner, uint64, error) {
 	key := share.CLUSScannerKey(id)
 	value, rev, err := m.get(key)
-	if err != nil || value == nil {
-		// Use cluster.ErrKeyNotFound to stay consistent with the KV store layer abstraction.
-		return nil, 0, cluster.ErrKeyNotFound
+	if err != nil {
+		return nil, 0, err
+	}
+	if value == nil {
+		return nil, 0, common.ErrObjectNotFound
 	}
 
 	var s share.CLUSScanner
@@ -1941,7 +1950,7 @@ func (m clusterHelper) ReleaseScanCredit(scannerId string, releaseCredit int) er
 		scanner, rev, err := m.GetScannerRev(scannerId)
 		if err != nil {
 			// Check if scanner was deleted (object not found)
-			if errors.Is(err, cluster.ErrKeyNotFound) {
+			if errors.Is(err, common.ErrObjectNotFound) {
 				// Scanner has been deleted - credit is implicitly released with the scanner
 				log.WithFields(log.Fields{"scanner": scannerId}).Debug("Scanner not found during credit release, likely deleted")
 				return nil
@@ -1996,7 +2005,7 @@ func (m clusterHelper) TrackCreditAcquisition(controllerID, scannerID string, ma
 	for i := 0; i < m.maxScanCreditRetries; i++ {
 		scanners := make(map[string]int)
 		value, rev, err := m.get(key)
-		if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+		if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 			return err
 		}
 
@@ -3885,7 +3894,7 @@ func (m clusterHelper) PutCrdEventQueue(record *share.CLUSCrdEventRecord) error 
 func (m clusterHelper) GetCrdEventQueueCount() int {
 	key := share.CLUSCrdContentCountKey()
 	value, err := cluster.Get(key)
-	if err != nil && err != cluster.ErrKeyNotFound {
+	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
 		log.WithError(err).Warn("Failed to get CRD event queue count")
 	}
 	if value != nil {

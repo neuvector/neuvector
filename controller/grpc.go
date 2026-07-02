@@ -21,6 +21,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
+	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/rest"
 	"github.com/neuvector/neuvector/controller/rpc"
@@ -186,7 +187,7 @@ func (ss *ScanService) HealthCheck(ctx context.Context, data *share.ScannerRegis
 
 	clusHelper := kv.GetClusterHelper()
 	s, err := clusHelper.GetScanner(scannerID, access.NewReaderAccessControl())
-	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithFields(log.Fields{"error": err, "scanner": scannerID}).Warn("Failed to get scanner during health check")
 		return nil, fmt.Errorf("failed to get scanner %s: %w", scannerID, err)
 	}
@@ -242,7 +243,7 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 
 	// Check if the database is newer.
 	s, err := clusHelper.GetScanner(share.CLUSScannerDBVersionID, access.NewReaderAccessControl())
-	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, common.ErrObjectNotFound) {
 		log.WithFields(log.Fields{"error": err, "version": data.CVEDBVersion}).Warn("Failed to get scanner DB version record")
 		return fmt.Errorf("failed to get scanner DB version record: %w", err)
 	}

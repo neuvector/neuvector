@@ -107,7 +107,7 @@ func handlerSigstoreRootOfTrustGetByName(w http.ResponseWriter, r *http.Request,
 
 	rootName := ps.ByName("root_name")
 	rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
-	if err == common.ErrObjectNotFound || rootOfTrust == nil {
+	if errors.Is(err, common.ErrObjectNotFound) || rootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		return
 	} else if err != nil {
@@ -143,7 +143,7 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 
 	rootName := ps.ByName("root_name")
 	clusRootOfTrust, rev, err := clusHelper.GetSigstoreRootOfTrust(rootName)
-	if err == common.ErrObjectNotFound || clusRootOfTrust == nil {
+	if errors.Is(err, common.ErrObjectNotFound) || clusRootOfTrust == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		return
 	} else if err != nil {
@@ -203,7 +203,7 @@ func handlerSigstoreRootOfTrustDeleteByName(w http.ResponseWriter, r *http.Reque
 	rootName := ps.ByName("root_name")
 	err := clusHelper.DeleteSigstoreRootOfTrust(rootName)
 	if err != nil {
-		if err == common.ErrObjectNotFound {
+		if errors.Is(err, common.ErrObjectNotFound) {
 			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		} else {
 			msg := fmt.Sprintf("Could not delete root of trust \"%s\" from kv store: %s", rootName, err.Error())
@@ -296,7 +296,7 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		// check if root of trust type allows keyless verifiers
 		rootName := ps.ByName("root_name")
 		rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
-		if err == common.ErrObjectNotFound || rootOfTrust == nil {
+		if errors.Is(err, common.ErrObjectNotFound) || rootOfTrust == nil {
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, fmt.Sprintf("could not find root of trust %s", rootName))
 			return
 		} else if err != nil {
@@ -370,7 +370,7 @@ func handlerSigstoreVerifierGetByName(w http.ResponseWriter, r *http.Request, ps
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	verifier, _, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
-	if err == common.ErrObjectNotFound || verifier == nil {
+	if errors.Is(err, common.ErrObjectNotFound) || verifier == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		return
 	} else if err != nil {
@@ -396,7 +396,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 	rootName := ps.ByName("root_name")
 	verifierName := ps.ByName("verifier_name")
 	clusVerifier, rev, err := clusHelper.GetSigstoreVerifier(rootName, verifierName)
-	if err == common.ErrObjectNotFound || clusVerifier == nil {
+	if errors.Is(err, common.ErrObjectNotFound) || clusVerifier == nil {
 		restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		return
 	} else if err != nil {
@@ -422,7 +422,7 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 		// check if root of trust type allows keyless verifiers
 		rootName := ps.ByName("root_name")
 		rootOfTrust, _, err := clusHelper.GetSigstoreRootOfTrust(rootName)
-		if err == common.ErrObjectNotFound || rootOfTrust == nil {
+		if errors.Is(err, common.ErrObjectNotFound) || rootOfTrust == nil {
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, fmt.Sprintf("could not find root of trust %s", rootName))
 			return
 		} else if err != nil {
@@ -476,7 +476,7 @@ func handlerSigstoreVerifierDeleteByName(w http.ResponseWriter, r *http.Request,
 	verifierName := ps.ByName("verifier_name")
 	err := clusHelper.DeleteSigstoreVerifier(rootName, verifierName)
 	if err != nil {
-		if err == common.ErrObjectNotFound {
+		if errors.Is(err, common.ErrObjectNotFound) {
 			restRespError(w, http.StatusNotFound, api.RESTErrObjectNotFound)
 		} else {
 			msg := fmt.Sprintf("Could not delete verifier \"%s/%s\" from kv store: %s", rootName, verifierName, err.Error())
