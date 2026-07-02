@@ -354,8 +354,8 @@ func getAssetvulSchema(uniqueAssetId bool) []string {
 	return schema
 }
 
-func formatSessionTempTableName(queryToken string) (string, error) {
-	if err := vaildateQueryToken(queryToken); err != nil {
+func formatSessionTempTableName(queryToken, loginID string) (string, error) {
+	if err := vaildateQueryToken(queryToken, loginID); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("tmp_session_%s", queryToken), nil
