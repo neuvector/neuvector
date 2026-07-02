@@ -112,8 +112,8 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/knqyf263/go-rpmdb v0.1.1
 	github.com/mitchellh/pointerstructure v1.2.1
-	github.com/moby/moby/api v1.54.2
-	github.com/moby/moby/client v0.4.1
+	github.com/moby/moby/api v1.55.0
+	github.com/moby/moby/client v0.5.0
 	github.com/neuvector/neuvector/controller/k8sapi v0.0.0-00010101000000-000000000000
 	github.com/openvex/go-vex v0.2.8
 	github.com/quay/clair/v2 v2.1.8
