@@ -684,7 +684,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 				}
 
 				s := &loginSession{
-					id:          "apikey_" + apikeyAccount.Name,
+					id:          "apikey_" + hex.EncodeToString([]byte(apikeyAccount.Name)),
 					fullname:    apikeyAccount.Name,
 					remote:      r.RemoteAddr,
 					domainRoles: roles,

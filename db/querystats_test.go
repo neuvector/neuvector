@@ -3,6 +3,8 @@ package db
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPopulateQueryStat(t *testing.T) {
@@ -11,7 +13,9 @@ func TestPopulateQueryStat(t *testing.T) {
 		t.Errorf("CreateDatabase() returns %v", err)
 	}
 
-	queryToken := "0123456789ab"
+	loginID := "0123456789ab"
+	queryToken, err := GenQueryToken(loginID)
+	assert.NoError(t, err)
 	qs := &QueryStat{
 		Token:        queryToken,
 		CreationTime: time.Now().UTC().Unix(),
@@ -27,7 +31,7 @@ func TestPopulateQueryStat(t *testing.T) {
 	}
 
 	// read it back
-	readbackQs, err := GetQueryStat(queryToken)
+	readbackQs, err := GetQueryStat(queryToken, loginID)
 	if err != nil {
 		t.Errorf("GetQueryStat() returns %v", err)
 	}
@@ -45,12 +49,14 @@ func TestDeleteQuerySession(t *testing.T) {
 		t.Errorf("CreateDatabase() returns %v", err)
 	}
 
-	queryToken := "0123456789ab"
+	loginID := "0123456789ab"
+	queryToken, err := GenQueryToken(loginID)
+	assert.NoError(t, err)
 	qs := &QueryStat{
 		Token:        queryToken,
 		CreationTime: time.Now().UTC().Unix(),
 		LoginType:    1,
-		LoginID:      "111",
+		LoginID:      loginID,
 		LoginName:    "admin",
 		Data1:        "",
 	}
@@ -61,7 +67,7 @@ func TestDeleteQuerySession(t *testing.T) {
 	}
 
 	// read it back
-	readbackQs, err := GetQueryStat(queryToken)
+	readbackQs, err := GetQueryStat(queryToken, loginID)
 	if err != nil {
 		t.Errorf("GetQueryStat() returns %v", err)
 	}
@@ -76,7 +82,7 @@ func TestDeleteQuerySession(t *testing.T) {
 	_ = DeleteQuerySessionByToken(queryToken)
 
 	// we should not get any records back
-	readbackQs, err = GetQueryStat(queryToken)
+	readbackQs, err = GetQueryStat(queryToken, loginID)
 	if err == nil {
 		t.Error("Read deleted query status, got success return code. Expected error returned.")
 	}

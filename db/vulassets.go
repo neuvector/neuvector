@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -324,11 +325,11 @@ func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {
 	vulAsset.Skip = !keep
 }
 
-func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
-	if err := vaildateQueryToken(sessionToken); err != nil {
+func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64, loginID string) (map[string]*DbVulAsset, map[string][]string, error) {
+	sessionTemp, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
 		return nil, nil, err
 	}
-	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
 	columns := []interface{}{"name", "severity", "description", "packages", "link", "score",
@@ -340,14 +341,14 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 		return nil, nil, fmt.Errorf("failed to build session vul query: %w", err)
 	}
 
-	queryStat, err := GetQueryStat(sessionToken)
+	queryStat, err := GetQueryStat(sessionToken, loginID)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	db := memoryDbHandle
 	if queryStat.FileDBReady == 1 {
-		db, err = openSessionFileDb(sessionToken)
+		db, err = openSessionFileDb(sessionToken, loginID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -406,23 +407,20 @@ func addAssetsToSet(assetsIDStr string, assetSet utils.Set) {
 	}
 }
 
-func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
-	if err := vaildateQueryToken(sessionToken); err != nil {
-		return err
-	}
+func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset, loginID string) error {
 	// create a new db file using the sessionToken as filename
-	db, err := createSessionFileDb(sessionToken)
+	db, err := createSessionFileDb(sessionToken, loginID)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	err = createSessionVulAssetTable(db, sessionToken)
+	err = createSessionVulAssetTable(db, sessionToken, loginID)
 	if err != nil {
 		return err
 	}
 
-	err = populateSession(db, sessionToken, vulAssets)
+	err = populateSession(db, sessionToken, vulAssets, loginID)
 	if err != nil {
 		return err
 	}
@@ -435,15 +433,15 @@ func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
 
 	// delete session table in memory, allow some time for the ongoing read operation to complete before proceeding
 	time.Sleep(30 * time.Second)
-	if err := deleteSessionTempTableInMemDb(sessionToken); err != nil {
+	if err := deleteSessionTempTableInMemDb(sessionToken, loginID); err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("deleteSessionTempTableInMemDb")
 	}
 
 	return nil
 }
 
-func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memoryDb bool) error {
-	if err := vaildateQueryToken(sessionToken); err != nil {
+func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memoryDb bool, loginID string) error {
+	if err := vaildateQueryToken(sessionToken, loginID); err != nil {
 		return err
 	}
 	db := dbHandle
@@ -451,12 +449,12 @@ func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memo
 		db = memoryDbHandle
 	}
 
-	return populateSession(db, sessionToken, vulAssets)
+	return populateSession(db, sessionToken, vulAssets, loginID)
 }
 
-func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
+func GetVulAssetSessionV2(requesetQuery *VulQueryFilter, loginID string) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
 	if requesetQuery != nil {
-		if err := vaildateQueryToken(requesetQuery.QueryToken); err != nil {
+		if err := vaildateQueryToken(requesetQuery.QueryToken, loginID); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -499,13 +497,16 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	row := requesetQuery.QueryCount
 	threadCount := requesetQuery.ThreadCount
 
-	sessionTemp := formatSessionTempTableName(sessionToken)
+	sessionTemp, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	columns := []interface{}{"name", "severity", "description", "link", "score",
 		"vectors", "score_v3", "vectors_v3", "published_timestamp", "last_modified_timestamp",
 		"workloads", "nodes", "images", "platforms", "feed_rating"}
 
-	queryStat, err := GetQueryStat(sessionToken)
+	queryStat, err := GetQueryStat(sessionToken, loginID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -542,7 +543,7 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	// db := memoryDbHandle
 	var db *sql.DB
 	if queryStat.FileDBReady == 1 {
-		db, err = openSessionFileDb(sessionToken)
+		db, err = openSessionFileDb(sessionToken, loginID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -698,8 +699,8 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	return resp, allAssets, nil
 }
 
-func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
-	if err := vaildateQueryToken(sessionToken); err != nil {
+func CeateSessionVulAssetTable(sessionToken string, memoryDb bool, loginID string) error {
+	if err := vaildateQueryToken(sessionToken, loginID); err != nil {
 		return err
 	}
 
@@ -708,7 +709,7 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 		db = memoryDbHandle
 	}
 
-	err := createSessionVulAssetTable(db, sessionToken)
+	err := createSessionVulAssetTable(db, sessionToken, loginID)
 	if err != nil {
 		return err
 	}
@@ -724,7 +725,7 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 			}
 
 			log.WithFields(log.Fields{"sessionToken": sessionToken}).Error("CeateSessionVulAssetTable error, missing session table in memdb. Recreate it.")
-			err := createSessionVulAssetTable(memoryDbHandle, sessionToken)
+			err := createSessionVulAssetTable(memoryDbHandle, sessionToken, loginID)
 			if err != nil {
 				return err
 			}
@@ -734,8 +735,8 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 	return nil
 }
 
-func CreateSessionAssetTable(sessionToken string, memoryDb bool) error {
-	if err := vaildateQueryToken(sessionToken); err != nil {
+func CreateSessionAssetTable(sessionToken string, memoryDb bool, loginID string) error {
+	if err := vaildateQueryToken(sessionToken, loginID); err != nil {
 		return err
 	}
 	db := dbHandle
@@ -743,7 +744,7 @@ func CreateSessionAssetTable(sessionToken string, memoryDb bool) error {
 		db = memoryDbHandle
 	}
 
-	err := createSessionAssetTable(db, sessionToken)
+	err := createSessionAssetTable(db, sessionToken, loginID)
 	if err != nil {
 		return err
 	}
@@ -843,9 +844,12 @@ func meetCVEBasedFilter(vulasset *DbVulAsset, qf *VulQueryFilter) bool {
 	return expectedMeetCount == meetCount
 }
 
-func createSessionFileDb(sessionToken string) (*sql.DB, error) {
-	tableName := formatSessionTempTableName(sessionToken)
-	dbfile := fmt.Sprintf("%s/%s", dbFile_Folder, tableName)
+func createSessionFileDb(sessionToken, loginID string) (*sql.DB, error) {
+	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return nil, err
+	}
+	dbfile := path.Join(dbFile_Folder, tableName)
 
 	os.Remove(dbfile)
 
@@ -856,9 +860,12 @@ func createSessionFileDb(sessionToken string) (*sql.DB, error) {
 	return db, nil
 }
 
-func openSessionFileDb(sessionToken string) (*sql.DB, error) {
-	tableName := formatSessionTempTableName(sessionToken)
-	dbfile := fmt.Sprintf("%s/%s", dbFile_Folder, tableName)
+func openSessionFileDb(sessionToken, loginID string) (*sql.DB, error) {
+	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return nil, err
+	}
+	dbfile := path.Join(dbFile_Folder, tableName)
 
 	if _, err := os.Stat(dbfile); err == nil {
 		db, err := sql.Open("sqlite3", dbfile)
@@ -870,24 +877,30 @@ func openSessionFileDb(sessionToken string) (*sql.DB, error) {
 	return nil, errors.New("db file doesn't exist")
 }
 
-func deleteSessionFileDb(sessionToken string) error {
-	tableName := formatSessionTempTableName(sessionToken)
-	dbfile := fmt.Sprintf("%s/%s", dbFile_Folder, tableName)
+func deleteSessionFileDb(sessionToken, loginID string) error {
+	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return err
+	}
+	dbfile := path.Join(dbFile_Folder, tableName)
 
-	err := os.Remove(dbfile)
+	err = os.Remove(dbfile)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func createSessionVulAssetTable(db *sql.DB, sessionToken string) error {
-	tableName := formatSessionTempTableName(sessionToken)
+func createSessionVulAssetTable(db *sql.DB, sessionToken, loginID string) error {
+	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return err
+	}
 
 	columns := getVulassetSchema()
 	sql := fmt.Sprintf("CREATE TABLE %s (%s);", tableName, strings.Join(columns, ","))
 
-	_, err := db.Exec(sql)
+	_, err = db.Exec(sql)
 	if err != nil {
 		return err
 	}
@@ -895,13 +908,16 @@ func createSessionVulAssetTable(db *sql.DB, sessionToken string) error {
 	return nil
 }
 
-func createSessionAssetTable(db *sql.DB, sessionToken string) error {
-	tableName := formatSessionTempTableName(sessionToken)
+func createSessionAssetTable(db *sql.DB, sessionToken, loginID string) error {
+	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return err
+	}
 
 	columns := getAssetvulSchema(false)
 	sql := fmt.Sprintf("CREATE TABLE %s (%s);", tableName, strings.Join(columns, ","))
 
-	_, err := db.Exec(sql)
+	_, err = db.Exec(sql)
 	if err != nil {
 		return err
 	}
@@ -909,8 +925,11 @@ func createSessionAssetTable(db *sql.DB, sessionToken string) error {
 	return nil
 }
 
-func populateSession(db *sql.DB, sessionToken string, vulAssets []*DbVulAsset) error {
-	tableName := formatSessionTempTableName(sessionToken)
+func populateSession(db *sql.DB, sessionToken string, vulAssets []*DbVulAsset, loginID string) error {
+	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+	if err != nil {
+		return err
+	}
 
 	columns := []string{"name", "severity", "description", "packages", "link", "score", "vectors", "score_v3", "vectors_v3",
 		"published_timestamp", "last_modified_timestamp", "workloads", "nodes", "images", "platforms", "cve_sources", "f_withFix", "f_profile", "debuglog", "score_str", "scorev3_str", "impact_weight",

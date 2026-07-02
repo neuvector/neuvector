@@ -96,7 +96,9 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	err = PopulateAssetVul(generateImageDbAssetVul(imageID))
 	assert.NoError(t, err)
 
-	queryToken := "abc123def456"
+	loginID := "0123456789ab"
+	queryToken, err := GenQueryToken(loginID)
+	assert.NoError(t, err)
 	queryFilter := &AssetQueryFilter{
 		QueryToken: queryToken,
 		QueryStart: 0,
@@ -111,7 +113,7 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	allowed := map[string]utils.Set{
 		AssetImage: utils.NewSet(imageID),
 	}
-	_, _, err = CreateImageAssetSession(allowed, queryFilter)
+	_, _, err = CreateImageAssetSession(allowed, queryFilter, loginID)
 	assert.NoError(t, err)
 
 	filterBytes, err := json.Marshal(queryFilter)
@@ -122,6 +124,7 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 		CreationTime: 1,
 		LoginType:    0,
 		LoginName:    "test",
+		LoginID:      loginID,
 		Data1:        string(filterBytes),
 		FileDBReady:  0,
 		Type:         QueryStateType_Asset,
@@ -133,7 +136,7 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 		}
 	}()
 
-	assets, quickFilterMatched, err := GetImageAssetSession(queryFilter)
+	assets, quickFilterMatched, err := GetImageAssetSession(queryFilter, loginID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, quickFilterMatched)

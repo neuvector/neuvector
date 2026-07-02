@@ -3,7 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -75,8 +75,8 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 	return 0, errors.New("populate query stat failed")
 }
 
-func GetQueryStat(token string) (*QueryStat, error) {
-	if err := vaildateQueryToken(token); err != nil {
+func GetQueryStat(token, loginID string) (*QueryStat, error) {
+	if err := vaildateQueryToken(token, loginID); err != nil {
 		return nil, err
 	}
 	dialect := goqu.Dialect("sqlite3")
@@ -200,7 +200,11 @@ func setFileDbState(queryToken string, newValue int) error {
 }
 
 func DeleteQuerySessionByToken(queryToken string) error {
-	qs, err := GetQueryStat(queryToken)
+	_, loginID, found := strings.Cut(queryToken, "_")
+	if !found {
+		return errors.New("invalid query token")
+	}
+	qs, err := GetQueryStat(queryToken, loginID)
 	if err != nil {
 		return err
 	}
@@ -217,46 +221,40 @@ func DeleteQuerySessionByToken(queryToken string) error {
 	}
 
 	// delete session table in memory
-	err = deleteSessionTempTableInMemDb(queryToken)
+	err = deleteSessionTempTableInMemDb(queryToken, loginID)
 	if err != nil {
 		return err
 	}
 
 	// delete the session table in file-based db, ignore the error
-	if err := deleteSessionFileDb(queryToken); err != nil {
+	if err := deleteSessionFileDb(queryToken, loginID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func deleteSessionTempTableInMemDb(queryToken string) error {
+func deleteSessionTempTableInMemDb(queryToken, loginID string) error {
+	tableName, err := formatSessionTempTableName(queryToken, loginID)
+	if err != nil {
+		return err
+	}
+
 	memdbMutex.Lock()
 	defer memdbMutex.Unlock()
 
 	db := memoryDbHandle
 
 	// SQLite does not support parameterized substitution for table and column names, only for values.
-	if len(queryToken) == 12 && isValidSessionTableName(queryToken) {
-		for i := 0; i < 10; i++ {
-			sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", formatSessionTempTableName(queryToken))
-			_, err := db.Exec(sql)
-			if err != nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			break
+	for i := 0; i < 10; i++ {
+		sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", tableName)
+		_, err := db.Exec(sql)
+		if err != nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
 		}
+		break
 	}
 
 	return nil
-}
-
-func isValidSessionTableName(name string) bool {
-	match, err := regexp.MatchString("^[a-f0-9]+$", name)
-	if err != nil {
-		// Error: impossible since pattern is a literal valid regex
-		return false
-	}
-	return match
 }
