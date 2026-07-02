@@ -94,8 +94,8 @@ func TestUserConfig(t *testing.T) {
 	clusHelper = &mockCluster
 	cacher = &mockCache{}
 
-	user1 := makeLocalUser("user1", "111111", api.UserRoleAdmin)
-	user2 := makeLocalUser("user2", "222222", api.UserRoleReader)
+	user1 := makeLocalUser(t, "user1", "111111", api.UserRoleAdmin)
+	user2 := makeLocalUser(t, "user2", "222222", api.UserRoleReader)
 	if err := clusHelper.CreateUser(user1); err != nil {
 		t.Errorf("CreateUser error=%v", err)
 	}
@@ -150,8 +150,8 @@ func TestUserConfigKick(t *testing.T) {
 
 	cacher = &mockCache{}
 
-	user1 := makeLocalUser("user1", "111111", api.UserRoleAdmin)
-	user2 := makeLocalUser("user2", "222222", api.UserRoleReader)
+	user1 := makeLocalUser(t, "user1", "111111", api.UserRoleAdmin)
+	user2 := makeLocalUser(t, "user2", "222222", api.UserRoleReader)
 	if err := clusHelper.CreateUser(user1); err != nil {
 		t.Errorf("CreateUser error=%v", err)
 	}
@@ -301,8 +301,8 @@ func TestUserConfigNegative(t *testing.T) {
 	mockCluster.Init(nil, nil)
 	clusHelper = &mockCluster
 
-	user1 := makeLocalUser("user1", "111111", api.UserRoleAdmin)
-	user2 := makeLocalUser("user2", "222222", api.UserRoleReader)
+	user1 := makeLocalUser(t, "user1", "111111", api.UserRoleAdmin)
+	user2 := makeLocalUser(t, "user2", "222222", api.UserRoleReader)
 	if err := clusHelper.CreateUser(user1); err != nil {
 		t.Errorf("CreateUser error=%v", err)
 	}
@@ -485,7 +485,7 @@ func TestUserRoleSelf(t *testing.T) {
 	clusHelper = &mockCluster
 
 	// -- make user as global reader & ns1, ns2 admin
-	user1 := makeLocalUserWithRole("user1", "111111", api.UserRoleReader,
+	user1 := makeLocalUserWithRole(t, "user1", "111111", api.UserRoleReader,
 		map[string][]string{api.UserRoleAdmin: {"ns1", "ns2"}},
 	)
 	if err := clusHelper.CreateUser(user1); err != nil {

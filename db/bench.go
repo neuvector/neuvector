@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -38,7 +39,10 @@ func GetBenchData(assetID string) (*DbBench, error) {
 		"WorkerBenchValue", "SecretBenchValue", "SetidBenchValue"}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_bench).Select(columns...).Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_bench).Select(columns...).Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build bench query: %w", err)
+	}
 
 	rows, err := dbHandle.Query(statement, args...)
 	if err != nil {
@@ -85,7 +89,10 @@ func UpdateBenchData(bench *DbBench) (int, error) {
 	// Insert case
 	if bench.Db_ID == 0 {
 		ds := dialect.Insert(Table_bench).Rows(getCompiledBenchRecord(bench))
-		sql, args, _ := ds.Prepared(true).ToSQL()
+		sql, args, err := ds.Prepared(true).ToSQL()
+		if err != nil {
+			return 0, fmt.Errorf("failed to build bench insert query: %w", err)
+		}
 
 		result, err := db.Exec(sql, args...)
 		if err != nil {
@@ -101,8 +108,11 @@ func UpdateBenchData(bench *DbBench) (int, error) {
 	}
 
 	// Update case
-	sql, args, _ := dialect.Update(Table_bench).Where(goqu.C("id").Eq(bench.Db_ID)).Set(getCompiledBenchRecord(bench)).Prepared(true).ToSQL()
-	_, err := db.Exec(sql, args...)
+	sql, args, err := dialect.Update(Table_bench).Where(goqu.C("id").Eq(bench.Db_ID)).Set(getCompiledBenchRecord(bench)).Prepared(true).ToSQL()
+	if err != nil {
+		return 0, fmt.Errorf("failed to build bench update query: %w", err)
+	}
+	_, err = db.Exec(sql, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -112,7 +122,10 @@ func UpdateBenchData(bench *DbBench) (int, error) {
 
 func getBenchID(assetID string) (int, error) {
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_bench).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_bench).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	if err != nil {
+		return 0, fmt.Errorf("failed to build bench ID query: %w", err)
+	}
 
 	rows, err := dbHandle.Query(statement, args...)
 	if err != nil {
@@ -151,8 +164,11 @@ func DeleteBenchByID(assetID string) error {
 	dialect := goqu.Dialect("sqlite3")
 	db := dbHandle
 
-	sql, args, _ := dialect.Delete(Table_bench).Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
-	_, err := db.Exec(sql, args...)
+	sql, args, err := dialect.Delete(Table_bench).Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
+	if err != nil {
+		return fmt.Errorf("failed to build bench delete query: %w", err)
+	}
+	_, err = db.Exec(sql, args...)
 	if err != nil {
 		return err
 	}

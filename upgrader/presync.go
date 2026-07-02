@@ -275,7 +275,10 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 		Path:  fmt.Sprintf("/metadata/annotations/%s", UPGRADER_UID_ANNOTATION),
 		Value: certUpgraderUID,
 	}}
-	patchBytes, _ := json.Marshal(payload)
+	patchBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal patch payload: %w", err)
+	}
 
 	if useBetav1 {
 		_, err = client.Resource(

@@ -54,8 +54,13 @@ func (b *nvCrdSchmaBuilder) Init() {
 		share.DefaultPolicyName,
 	}
 	b.enumMap = make(map[string][]byte, len(enums))
+	var err error
 	for _, k := range enums {
-		b.enumMap[k], _ = json.Marshal(k)
+		b.enumMap[k], err = json.Marshal(k)
+		if err != nil {
+			// Suppress error: json.Marshal of string never fails in practice
+			log.WithError(err).Debug("Failed to marshal enum key")
+		}
 	}
 }
 

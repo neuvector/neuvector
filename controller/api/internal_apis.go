@@ -139,26 +139,6 @@ type RESTProfilingData struct {
 	Profiling *RESTProfiling `json:"profiling"`
 }
 
-type RESTK8sNvRbacStatus struct {
-	ClusterRoleErrors        []string                   `json:"clusterrole_errors,omitempty"`        // obsolete
-	ClusterRoleBindingErrors []string                   `json:"clusterrolebinding_errors,omitempty"` // obsolete
-	RoleErrors               []string                   `json:"role_errors,omitempty"`               // obsolete
-	RoleBindingErrors        []string                   `json:"rolebinding_errors,omitempty"`        // obsolete
-	NvCrdSchemaErrors        []string                   `json:"neuvector_crd_errors,omitempty"`      // obsolete
-	NvUpgradeInfo            *RESTCheckUpgradeInfo      `json:"neuvector_upgrade_info"`
-	AcceptableAlerts         *RESTK8sNvAcceptableAlerts `json:"acceptable_alerts,omitempty"` // acceptable controller-generated alerts
-	AcceptedAlerts           []string                   `json:"accepted_alerts,omitempty"`   // keys of accepted manager-generated/user alerts
-}
-
-type RESTK8sNvAcceptableAlerts struct {
-	ClusterRoleErrors        map[string]string `json:"clusterrole_errors"`        // key is hex(sha256) of the English message
-	ClusterRoleBindingErrors map[string]string `json:"clusterrolebinding_errors"` // key is hex(sha256) of the English message
-	RoleErrors               map[string]string `json:"role_errors"`               // key is hex(sha256) of the English message
-	RoleBindingErrors        map[string]string `json:"rolebinding_errors"`        // key is hex(sha256) of the English message
-	NvCrdSchemaErrors        map[string]string `json:"neuvector_crd_errors"`      // key is hex(sha256) of the English message
-	OtherAlerts              map[string]string `json:"other_alerts"`              // key is hex(sha256) of the English message
-}
-
 type RESTNvAlerts struct {
 	NvUpgradeInfo    *RESTCheckUpgradeInfo   `json:"neuvector_upgrade_info"`
 	AcceptableAlerts *RESTNvAcceptableAlerts `json:"acceptable_alerts,omitempty"` // acceptable controller-generated alerts

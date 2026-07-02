@@ -27,9 +27,12 @@ func handlerSigstoreRootOfTrustPost(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rootOfTrust api.REST_SigstoreRootOfTrust_POST
-	err := json.Unmarshal(body, &rootOfTrust)
+	err = json.Unmarshal(body, &rootOfTrust)
 	if err != nil {
 		msg := fmt.Sprintf("Could not unmarshal request body: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -148,7 +151,10 @@ func handlerSigstoreRootOfTrustPatchByName(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var restRootOfTrust api.REST_SigstoreRootOfTrust_PATCH
 	err = json.Unmarshal(body, &restRootOfTrust)
 	if err != nil {
@@ -269,9 +275,12 @@ func handlerSigstoreVerifierPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var verifier api.REST_SigstoreVerifier
-	err := json.Unmarshal(body, &verifier)
+	err = json.Unmarshal(body, &verifier)
 	if err != nil {
 		msg := fmt.Sprintf("Could not unmarshal request body: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -395,7 +404,10 @@ func handlerSigstoreVerifierPatchByName(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var restVerifier api.REST_SigstoreVerifier_PATCH
 	err = json.Unmarshal(body, &restVerifier)
 	if err != nil {

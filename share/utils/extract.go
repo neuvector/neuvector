@@ -36,7 +36,10 @@ func ExtractAllArchiveData(r io.Reader, maxFileSize int64) (map[string][]byte, e
 			log.WithFields(log.Fields{"size": size, "filename": filename}).Error("file too big")
 			return tarutil.ErrExtractedFileTooBig
 		}
-		d, _ := io.ReadAll(reader)
+		d, err := io.ReadAll(reader)
+		if err != nil {
+			return fmt.Errorf("failed to read file %q: %w", filename, err)
+		}
 		data[filename] = d
 		return nil
 	}
@@ -86,10 +89,16 @@ func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encry
 
 		// Extract the element
 		if hdr.Typeflag == tar.TypeReg {
-			data, _ := io.ReadAll(tr)
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return fmt.Errorf("failed to read archive entry %q: %w", filename, err)
+			}
 
 			if encryptKey != nil {
-				data, _ = Encrypt(encryptKey, data)
+				data, err = Encrypt(encryptKey, data)
+				if err != nil {
+					return fmt.Errorf("failed to encrypt file %q: %w", filename, err)
+				}
 			}
 
 			err = os.WriteFile(path+filename, data, 0400)

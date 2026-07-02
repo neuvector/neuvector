@@ -129,13 +129,6 @@ func NewVersion(str string) (Version, error) {
 	return version, nil
 }
 
-// NewVersionUnsafe is just a wrapper around NewVersion that ignore potentiel
-// parsing error. Useful for test purposes
-func NewVersionUnsafe(str string) Version {
-	v, _ := NewVersion(str)
-	return v
-}
-
 // Compare function compares two Debian-like package version
 //
 // The implementation is based on http://man.he.net/man5/deb-version
@@ -233,7 +226,10 @@ func (v Version) MarshalJSON() ([]byte, error) {
 func (v *Version) UnmarshalJSON(b []byte) (err error) {
 	var str string
 	if err = json.Unmarshal(b, &str); err == nil {
-		vp := NewVersionUnsafe(str)
+		vp, parseErr := NewVersion(str)
+		if parseErr != nil {
+			return parseErr
+		}
 		*v = vp
 	}
 	return

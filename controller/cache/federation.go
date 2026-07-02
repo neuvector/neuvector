@@ -56,12 +56,16 @@ func fedInit(restoredFedRole string) {
 	m := clusHelper.GetFedMembership()
 	if m == nil {
 		m = &share.CLUSFedMembership{}
-		_ = clusHelper.PutFedMembership(m)
+		if err := clusHelper.PutFedMembership(m); err != nil {
+			log.WithError(err).Warn("Failed to initialize fed membership")
+		}
 	}
 	l := clusHelper.GetFedJointClusterList()
 	if l == nil {
 		l = &share.CLUSFedJoinedClusterList{IDs: make([]string, 0)}
-		_ = clusHelper.PutFedJointClusterList(l)
+		if err := clusHelper.PutFedJointClusterList(l); err != nil {
+			log.WithError(err).Warn("Failed to initialize fed joint cluster list")
+		}
 	}
 
 	revCache, _ := clusHelper.GetFedRulesRevisionRev()
@@ -86,7 +90,9 @@ func fedInit(restoredFedRole string) {
 				}
 			}
 			if wrt {
-				_ = clusHelper.PutFedRulesRevision(nil, revCache)
+				if err := clusHelper.PutFedRulesRevision(nil, revCache); err != nil {
+					log.WithError(err).Warn("Failed to update fed rules revision")
+				}
 			}
 			fedRulesRevisionCache.Revisions = revCache.Revisions
 		}
@@ -159,12 +165,14 @@ func serializeFile(fileName string, dataBase64 string) {
 func purgeFiles(fileNamePrefix string) {
 	dir := "/etc/neuvector/certs"
 	pathPrefix := fmt.Sprintf("%s/%s", dir, fileNamePrefix)
-	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if info != nil && strings.Index(path, pathPrefix) == 0 {
 			os.Remove(path)
 		}
 		return nil
-	})
+	}); err != nil {
+		log.WithError(err).Warn("Failed to walk certs directory for purge")
+	}
 }
 
 func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -179,23 +187,42 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		case share.CLUSFedMembershipSubKey:
 			var m share.CLUSFedMembership
 			var dec common.DecryptUnmarshaller
-			_ = dec.Unmarshal(value, &m)
+			if err := dec.Unmarshal(value, &m); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal fed membership")
+				return
+			}
 			log.WithFields(log.Fields{"role": m.FedRole}).Info()
 			switch m.FedRole {
 			case api.FedRoleMaster:
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleMaster)
-				_, _ = kv.GetFedCaCertPath(m.MasterCluster.ID)
-				go func() { _ = cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil) }()
+				if _, err := kv.GetFedCaCertPath(m.MasterCluster.ID); err != nil {
+					log.WithError(err).Warn("Failed to get fed CA cert path")
+				}
+				go func() {
+					if err := cctx.StartStopFedPingPollFunc(share.StartFedRestServer, m.PingInterval, nil); err != nil {
+						log.WithError(err).Warn("failed to start fed rest server")
+					}
+				}()
 			case api.FedRoleJoint:
 				var param interface{} = &m.JointCluster
 				if err := cctx.StartStopFedPingPollFunc(share.JointLoadOwnKeys, 0, param); err == nil {
 					//serializeFile(masterCaCertPath, m.MasterCluster.CACert)
-					go func() { _ = cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil) }()
+					go func() {
+						if err := cctx.StartStopFedPingPollFunc(share.StartPollFedMaster, m.PollInterval, nil); err != nil {
+							log.WithError(err).Warn("failed to start fed poll")
+						}
+					}()
 				}
 			case api.FedRoleNone:
 				access.UpdateUserRoleForFedRoleChange(api.FedRoleNone)
-				_ = cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil)
-				go func() { _ = cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil) }()
+				if err := cctx.StartStopFedPingPollFunc(share.PurgeJointKeys, 0, nil); err != nil {
+					log.WithError(err).Warn("failed to purge joint cluster keys")
+				}
+				go func() {
+					if err := cctx.StartStopFedPingPollFunc(share.StopFedRestServer, 0, nil); err != nil {
+						log.WithError(err).Warn("failed to stop fed rest server")
+					}
+				}()
 				purgeFiles("fed.master.")
 				purgeFiles("fed.client.")
 				fedSystemConfigCache = share.CLUSSystemConfig{CfgType: share.FederalCfg}
@@ -213,7 +240,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			if id != "" {
 				var cluster share.CLUSFedJointClusterInfo
 				var dec common.DecryptUnmarshaller
-				_ = dec.Unmarshal(value, &cluster)
+				if err := dec.Unmarshal(value, &cluster); err != nil {
+					log.WithError(err).Warn("Failed to unmarshal fed cluster info")
+				}
 				cache, ok := fedJoinedClustersCache[id]
 				if cache == nil || !ok {
 					log.WithFields(log.Fields{"id": id}).Info("add")
@@ -222,7 +251,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 						tokenCache: make(map[string]string),
 					}
 					var param interface{} = &cluster
-					_ = cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param)
+					if err := cctx.StartStopFedPingPollFunc(share.MasterLoadJointKeys, 0, param); err != nil {
+						log.WithError(err).Warn("failed to load joint cluster key")
+					}
 					fedJoinedClustersCache[id] = cache
 				} else {
 					if cache.cluster.Name != cluster.Name {
@@ -232,22 +263,23 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					cache.cluster.ProxyRequired = cluster.ProxyRequired
 					cache.cluster.RestVersion = cluster.RestVersion
 				}
-				if isLeader() && cluster.Disabled {
-					data := share.CLUSFedClusterStatus{Status: 207} // _fedLicenseDisallowed
-					_ = clusHelper.PutFedJointClusterStatus(id, &data)
-				}
 			}
 		case share.CLUSFedClustersStatusSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
 			var status share.CLUSFedClusterStatus
-			_ = json.Unmarshal(value, &status)
+			if err := json.Unmarshal(value, &status); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal federation cluster status")
+				return
+			}
 			if status.Nodes == 0 {
 				status.Nodes = 1
 			}
 			fedJoinedClusterStatusCache[id] = status
 		case share.CLUSFedRulesRevisionSubKey:
 			var revCache share.CLUSFedRulesRevision
-			_ = json.Unmarshal(value, &revCache)
+			if err := json.Unmarshal(value, &revCache); err != nil {
+				log.WithError(err).Warn("failed to unmarshal fed rules revision cache")
+			}
 			// when demote/leave/kicked, in kv the cluster's fedRole is updated first and the CLUSFedRulesRevisionSubKey is updated last(after all fed rules are deleted).
 			// however, it may take a while for all deleted fed rule keys to be updated in cache.
 			if isLeader() && fedMembershipCache.FedRole == api.FedRoleNone {
@@ -263,7 +295,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 					if m := clusHelper.GetFedMembership(); m != nil {
 						if m.PendingDismiss {
 							m.PendingDismiss = false
-							_ = clusHelper.PutFedMembership(m)
+							if err := clusHelper.PutFedMembership(m); err != nil {
+								log.WithError(err).Warn("Failed to update fed membership pending dismiss")
+							}
 						}
 					}
 				}
@@ -275,12 +309,21 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		case share.CLUSFedToPingPollSubKey:
 			if isLeader() {
 				var doPingPoll share.CLUSFedDoPingPoll
-				_ = json.Unmarshal(value, &doPingPoll)
-				go func() { _ = cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil) }()
+				if err := json.Unmarshal(value, &doPingPoll); err != nil {
+					log.WithError(err).Warn("failed to unmarshal fed ping-poll config")
+				}
+				go func() {
+					if err := cctx.StartStopFedPingPollFunc(doPingPoll.Cmd, doPingPoll.FullPolling, nil); err != nil {
+						// This will run once per minute per cluster in federation.
+						log.WithError(err).Debug("failed to ping poll")
+					}
+				}()
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
-			_ = json.Unmarshal(value, &cfg)
+			if err := json.Unmarshal(value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal fed system config")
+			}
 			fedWebhookCacheTemp := make(map[string]*webhookCache, 0)
 			for _, h := range cfg.Webhooks {
 				if h.Enable {
@@ -295,7 +338,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			fedSystemConfigCache = cfg
 		case share.CLUSFedSettingsSubKey:
 			var cfg share.CLUSFedSettings
-			_ = json.Unmarshal(value, &cfg)
+			if err := json.Unmarshal(value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal fed settings")
+			}
 			fedSettingsCache = cfg
 		}
 	case cluster.ClusterNotifyDelete:
@@ -310,7 +355,9 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 				delete(fedJoinedClustersCache, id)
 				purgeFiles(fmt.Sprintf("fed.client.%s.", id))
 				var param interface{} = &id
-				_ = cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param)
+				if err := cctx.StartStopFedPingPollFunc(share.MasterUnloadJointKeys, 0, param); err != nil {
+					log.WithError(err).Warn("failed to unload joint cluster key")
+				}
 			}
 		case share.CLUSFedClustersStatusSubKey:
 			id := share.CLUSFedKey2ClusterIdKey(key)
@@ -577,7 +624,11 @@ func (m CacheMethod) GetFedRules(reqRevs map[string]uint64, acc *access.AccessCo
 					if current.AdmCtrlRulesData == nil {
 						current.AdmCtrlRulesData = &share.CLUSFedAdmCtrlRulesData{Revision: fedRev, Rules: make(map[string]*share.CLUSAdmissionRules)}
 					}
-					current.AdmCtrlRulesData.Rules[ruleType], _ = m.GetFedAdmissionRulesCache(admission.NvAdmValidateType, ruleType)
+					var err error
+					current.AdmCtrlRulesData.Rules[ruleType], err = m.GetFedAdmissionRulesCache(admission.NvAdmValidateType, ruleType)
+					if err != nil {
+						log.WithError(err).Warn("Failed to get fed admission rules cache")
+					}
 				case share.FedNetworkRulesType:
 					current.NetworkRulesData = &share.CLUSFedNetworkRulesData{Revision: fedRev}
 					current.NetworkRulesData.Rules, current.NetworkRulesData.RuleHeads = m.GetFedNetworkRulesCache()
@@ -602,7 +653,12 @@ func (m CacheMethod) GetFedRules(reqRevs map[string]uint64, acc *access.AccessCo
 				}
 			}
 			cacheMutexRUnlock()
-			settings, _ = json.Marshal(current)
+			var err error
+			settings, err = json.Marshal(current)
+			if err != nil {
+				log.WithError(err).Warn("Failed to marshal fed rules settings")
+				return nil, nil, err
+			}
 
 			tempSettings := make([]byte, len(settings))
 			copy(tempSettings, settings)
@@ -888,8 +944,12 @@ func (m CacheMethod) GetFedScanResultHash(cachedScanDataRevs, masterScanDataRevs
 				if masterRegRev, ok2 := masterScanDataRevs.ScannedRegRevs[regName]; !ok2 {
 					// the fed registry is deleted on master cluster
 					delete(cachedScanDataRevs.ScannedRegRevs, regName)
-					_ = clusHelper.DeleteRegistryKeys(regName)
-					_ = clusHelper.DeleteRegistry(nil, regName)
+					if err := clusHelper.DeleteRegistryKeys(regName); err != nil {
+						log.WithError(err).Warn("Failed to delete registry keys")
+					}
+					if err := clusHelper.DeleteRegistry(nil, regName); err != nil {
+						log.WithError(err).Warn("Failed to delete registry")
+					}
 				} else if cachedRegRev != masterRegRev {
 					// the fed registry on managed cluster has different scan data revision from what master cluster has. collect scan result hash of images in the fed registry
 					imagesHash := make(map[string]string, len(cachedImagesHash)) // image id : scan result hash

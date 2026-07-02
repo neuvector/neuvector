@@ -419,7 +419,10 @@ func (m CacheMethod) ScanPlatform(acc *access.AccessControl) error {
 
 // With scan mutex locked
 func refreshScanCache(id string, info *scanInfo, vpf scanUtils.VPFInterface) {
-	reportVuls, _ := db.GetVulnerability(id)
+	reportVuls, err := db.GetVulnerability(id)
+	if err != nil {
+		log.WithError(err).Warn("failed to get vulnerability data for scan cache refresh")
+	}
 	localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 
 	vpf.FilterVulTraits(localVulTraits, info.idns)
@@ -773,8 +776,12 @@ func scanMapDelete(taskId string) {
 			key = share.CLUSScanDataPlatformKey(taskId)
 			skey = share.CLUSScanStatePlatformKey(taskId)
 		}
-		_ = cluster.DeleteTree(key)
-		_ = cluster.Delete(skey)
+		if err := cluster.DeleteTree(key); err != nil {
+			log.WithError(err).Warn("failed to delete scan data from cluster")
+		}
+		if err := cluster.Delete(skey); err != nil {
+			log.WithError(err).Warn("failed to delete scan state from cluster")
+		}
 	}
 }
 
@@ -1004,8 +1011,13 @@ func updateScanState(id string, nType share.ScanObjectType, status string) {
 	if status == api.ScanStatusFinished {
 		state.ScannedAt = time.Now().UTC()
 	}
-	value, _ := json.Marshal(state)
-	_ = cluster.Put(skey, value)
+	value, err := json.Marshal(state)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal scan state")
+	}
+	if err := cluster.Put(skey, value); err != nil {
+		log.WithError(err).Warn("failed to put scan state to cluster")
+	}
 }
 
 func scanStateHandler(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -1086,7 +1098,10 @@ func registryStateHandler(nType cluster.ClusterNotifyType, key string, value []b
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var state share.CLUSRegistryState
-		_ = json.Unmarshal(value, &state)
+		if err := json.Unmarshal(value, &state); err != nil {
+			log.WithError(err).Warn("failed to unmarshal registry state")
+			return
+		}
 		scan.RegistryStateUpdate(name, &state)
 	case cluster.ClusterNotifyDelete:
 		// State is deleted when registry deleted. No handling here.
@@ -1114,7 +1129,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var sum share.CLUSRegistryImageSummary
-		_ = json.Unmarshal(value, &sum)
+		if err := json.Unmarshal(value, &sum); err != nil {
+			log.WithError(err).Warn("failed to unmarshal registry image summary")
+			return
+		}
 
 		if fedRole == api.FedRoleJoint && strings.HasPrefix(name, api.FederalGroupPrefix) && (name != common.RegistryFedRepoScanName) {
 			// when a new fed registry with its image scan result are deployed to a worker cluster, it's possible that
@@ -1123,8 +1141,12 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 			if exist := scan.CheckRegistry(name); !exist {
 				if config, _, err := clusHelper.GetRegistry(name, access.NewFedAdminAccessControl()); config != nil {
 					var enc common.EncryptMarshaller
-					value, _ := enc.Marshal(config)
-					scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, share.CLUSRegistryConfigKey(name), value)
+					value, err := enc.Marshal(config)
+					if err != nil {
+						log.WithError(err).Warn("failed to marshal registry config for scan handler")
+					} else {
+						scan.RegistryConfigHandler(cluster.ClusterNotifyAdd, share.CLUSRegistryConfigKey(name), value)
+					}
 				} else {
 					cctx.ScanLog.WithFields(log.Fields{"error": err, "name": name}).Error()
 				}
@@ -1171,7 +1193,10 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 						report.SignatureInfo.VerificationTimestamp = ""
 						report.SignatureInfo.VerificationError = 0
 					}
-					res, _ := json.Marshal(&scanResult)
+					res, err := json.Marshal(&scanResult)
+					if err != nil {
+						log.WithError(err).Warn("failed to marshal scan result for hash")
+					}
 					sha256Sum := sha256.Sum256(res)
 					currImagesHash[id] = hex.EncodeToString(sha256Sum[:])
 					fedScanResultHash[fedRegName] = currImagesHash
@@ -1207,7 +1232,9 @@ func fedScanRevsHandler(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var scanDataRevs share.CLUSFedScanRevisions
-		_ = json.Unmarshal(value, &scanDataRevs)
+		if err := json.Unmarshal(value, &scanDataRevs); err != nil {
+			log.WithError(err).Warn("failed to unmarshal fed scan data revisions")
+		}
 		fedScanDataRevsCache = scanDataRevs
 
 	case cluster.ClusterNotifyDelete:
@@ -1235,12 +1262,22 @@ func ScannerUpdateHandler(nType cluster.ClusterNotifyType, key string, value []b
 					CVEDB:           make(map[string]*share.ScanVulnerability),
 				}
 
-				// Reassemble
-				dbs := clusHelper.GetScannerDB(newStore)
+				// Reassemble. Keep the current in-memory DB if the new store cannot be read
+				// or contains no usable entries.
+				dbs, err := clusHelper.GetScannerDB(newStore)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "store": newStore, "version": s.CVEDBVersion}).Error("Failed to load scanner DB")
+					return
+				}
 				for _, db := range dbs {
 					for _, cve := range db.CVEDB {
 						newDB.CVEDB[cve.Name] = cve
 					}
+				}
+
+				if len(newDB.CVEDB) == 0 {
+					log.WithFields(log.Fields{"store": newStore, "version": s.CVEDBVersion}).Error("Dropping empty scanner DB update")
+					return
 				}
 
 				log.WithFields(log.Fields{"cvedb": newDB.CVEDBVersion, "entries": len(newDB.CVEDB)}).Info()
@@ -1320,7 +1357,7 @@ func ScanUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte
 	}
 }
 
-func scanLicenseUpdate(id string, param interface{}) {
+func initScanMap() {
 
 	// Cache lock must be within scan lock, so get the map first
 	wls := make(map[string]struct{ a, d string }, len(wlCacheMap))
@@ -1447,7 +1484,9 @@ func rescaleScanner(autoscaleCfg share.CLUSSystemConfigAutoscale, totalScanners 
 							ReportedAt: time.Now().UTC(),
 						}
 						clog.Msg = "Scanner autoscale is disabled because someone reverted the scaling for 3 continous times."
-						_ = cctx.EvQueue.Append(&clog)
+						if err := cctx.EvQueue.Append(&clog); err != nil {
+							log.WithError(err).Warn("failed to append autoscale disabled event to queue")
+						}
 						skipScale = true
 						log.Info(clog.Msg)
 					} else {

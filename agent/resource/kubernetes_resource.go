@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/neuvector/k8s"
+	log "github.com/sirupsen/logrus"
 	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -118,7 +119,11 @@ func (d *kubernetes) newClient() error {
 		d.client = client
 		d.discovery = k8s.NewDiscoveryClient(client)
 
-		d.version, _ = d.discovery.Version(context.Background())
+		var err error
+		d.version, err = d.discovery.Version(context.Background())
+		if err != nil {
+			log.WithError(err).Warn("failed to discover k8s version")
+		}
 	}
 	return nil
 }

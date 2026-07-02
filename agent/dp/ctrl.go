@@ -130,7 +130,11 @@ func DPCtrlAddTapPort(netns, iface string, epmac net.HardwareAddr) {
 			EPMAC: epmac.String(),
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddTapPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -143,7 +147,11 @@ func DPCtrlDelTapPort(netns, iface string) {
 			Iface: iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDelTapPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -161,7 +169,11 @@ func DPCtrlAddNfqPort(netns, iface string, qno int, epmac net.HardwareAddr, jumb
 	if jumboframe != nil {
 		data.AddNfqPort.JumboFrame = jumboframe
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddNfqPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -174,7 +186,11 @@ func DPCtrlDelNfqPort(netns, iface string) {
 			Iface: iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDelNfqPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -189,7 +205,11 @@ func DPCtrlAddSrvcPort(iface string, jumboframe *bool) {
 	if jumboframe != nil {
 		data.AddPort.JumboFrame = jumboframe
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddSrvcPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -201,7 +221,11 @@ func DPCtrlDelSrvcPort(iface string) {
 			Iface: iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDelSrvcPortReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -213,7 +237,11 @@ func DPCtrlSetSysConf(xffenabled *bool) {
 			XffEnabled: xffenabled,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPSysConfReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -225,7 +253,11 @@ func DPCtrlSetDisableNetPolicy(disableNetPolicy *bool) {
 			DisableNetPolicy: disableNetPolicy,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDisableNetPolicyReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -236,7 +268,11 @@ func DPCtrlSetDetectUnmanagedWl(detectUnmanagedWl *bool) {
 			DetectUnmanagedWl: detectUnmanagedWl,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPDetectUnmanagedWlReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -247,7 +283,11 @@ func DPCtrlSetEnableIcmpPolicy(enableIcmpPolicy *bool) {
 			EnableIcmpPolicy: enableIcmpPolicy,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPEnableIcmpPolicyReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -258,7 +298,11 @@ func DPCtrlSetStrictGroupMode(strictGroupMode *bool) {
 			StrictGroupMode: strictGroupMode,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPStrictGroupModeReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -287,7 +331,11 @@ func DPCtrlAddMAC(iface string, mac, ucmac, bcmac, oldmac, pmac net.HardwareAddr
 	if len(pips) <= 0 {
 		data.AddMAC.PIPS = nil
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal DPAddMACReq")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -300,7 +348,11 @@ func DPCtrlDelMAC(iface string, mac net.HardwareAddr) {
 			MAC:   mac.String(),
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DP delete MAC message")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -310,7 +362,11 @@ func DPCtrlRefreshApp() {
 	data := DPRefreshAppReq{
 		RefreshApp: &DPRefreshApp{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DP refresh app message")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -336,7 +392,11 @@ func DPCtrlConfigMAC(MACs []string, tap *bool, appMap map[share.CLUSProtoPort]*s
 		}
 		data.Cfg.Apps = &apps
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPConfigPort data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -349,7 +409,11 @@ func DPCtrlConfigNBE(MACs []string, nbe *bool) {
 	if nbe != nil {
 		data.Cfg.Nbe = nbe
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPConfigNBE data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -364,7 +428,11 @@ func DPCtrlAddPortPair(vex_iface, vin_iface string, epmac net.HardwareAddr, quar
 	if quar != nil {
 		data.AddPortPair.Quar = quar
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPAddPortPair data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -375,7 +443,11 @@ func DPCtrlDelPortPair(vex_iface, vin_iface string) {
 			IfaceVin: vin_iface,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPDelPortPair data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -390,7 +462,11 @@ func DPCtrlStatsMAC(macs []*net.HardwareAddr, cb DPCallback, param interface{}) 
 	data := DPStatsMACReq{
 		Stats: &DPMACArray{MACs: dp_macs},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPStatsMACReq data")
+		return
+	}
 	dpSendMsgEx(msg, 5, cb, param)
 }
 
@@ -400,7 +476,11 @@ func DPCtrlStatsAgent(cb DPCallback, param interface{}) {
 	data := DPStatsAgentReq{
 		Stats: &DPEmpty{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPStatsAgentReq data")
+		return
+	}
 	dpSendMsgEx(msg, 5, cb, param)
 }
 
@@ -410,7 +490,11 @@ func DPCtrlCounterAgent(cb DPCallback, param interface{}) {
 	data := DPCounterAgentReq{
 		Counter: &DPEmpty{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPCounterAgentReq data")
+		return
+	}
 	dpSendMsgEx(msg, 5, cb, param)
 }
 
@@ -420,7 +504,11 @@ func DPCtrlConfigAgent(debug *DPDebug) {
 	data := DPSetDebugReq{
 		Debug: debug,
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPSetDebugReq data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -430,7 +518,11 @@ func DPCtrlCountSession(cb DPCallback, param interface{}) {
 	data := DPCountSessionReq{
 		CountSession: &DPEmpty{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPCountSessionReq data")
+		return
+	}
 	dpSendMsgEx(msg, 5, cb, param)
 }
 
@@ -440,7 +532,11 @@ func DPCtrlListSession(cb DPCallback, param interface{}) {
 	data := DPListSessionReq{
 		ListSession: &DPEmpty{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPListSessionReq data")
+		return
+	}
 	dpSendMsgEx(msg, 5, cb, param)
 }
 
@@ -452,7 +548,11 @@ func DPCtrlClearSession(id uint32) {
 			ID: id,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPClearSessionReq data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -462,7 +562,11 @@ func DPCtrlListMeter(cb DPCallback, param interface{}) {
 	data := DPListMeterReq{
 		ListMeter: &DPEmpty{},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPListMeterReq data")
+		return
+	}
 	dpSendMsgEx(msg, 5, cb, param)
 }
 
@@ -506,7 +610,11 @@ func DPCtrlConfigPolicy(policy *DPWorkloadIPPolicy, cmd uint) int {
 				IPRules:     policy.IPRules[start:end],
 			},
 		}
-		msg, _ := json.Marshal(data)
+		msg, err := json.Marshal(data)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPPolicyCfgReq data")
+			return -1
+		}
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -546,7 +654,11 @@ func DPCtrlDeleteFqdn(names []string) int {
 			req = &DPFqdnDeleteReq{Delete: &DPFqdnList{Names: names[start:end]}}
 		}
 		start = start + namesPerMsg
-		msg, _ := json.Marshal(req)
+		msg, err := json.Marshal(req)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPFqdnDeleteReq data")
+			return -1
+		}
 		if dpSendMsg(msg) < 0 {
 			return -1
 		}
@@ -570,7 +682,11 @@ func DPCtrlSetFqdnIp(fqdnip *share.CLUSFqdnIp) int {
 			Vhost:    &Vhost,
 		},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPFqdnIpSetReq data")
+		return -1
+	}
 	if dpSendMsg(msg) < 0 {
 		return -1
 	}
@@ -619,7 +735,12 @@ func DPCtrlConfigPolicyAddr(subnets map[string]share.CLUSSubnet) {
 			},
 		}
 
-		msg, _ = json.Marshal(data)
+		var err error
+		msg, err = json.Marshal(data)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPPolicyAddressCfgReq data")
+			return
+		}
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -687,7 +808,12 @@ func DPCtrlConfigInternalSubnet(subnets map[string]share.CLUSSubnet) {
 			},
 		}
 
-		msg, _ = json.Marshal(data)
+		var err error
+		msg, err = json.Marshal(data)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPInternalSubnetCfgReq data")
+			return
+		}
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -755,7 +881,11 @@ func DPCtrlConfigSpecialIPSubnet(subnets map[string]share.CLUSSpecSubnet) {
 			},
 		}
 
-		msg, _ := json.Marshal(data)
+		msg, err := json.Marshal(data)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPSpecialIPSubnetCfgReq data")
+			return
+		}
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -855,7 +985,11 @@ func DPCtrlConfigDlp(wldlprule *DPWorkloadDlpRule) int {
 			}
 			data.DPWlDlpCfg.WafRuleNames = append(data.DPWlDlpCfg.WafRuleNames, wrids)
 		}
-		msg, _ := json.Marshal(data)
+		msg, err := json.Marshal(data)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPWlDlpCfgReq data")
+			return -1
+		}
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -934,7 +1068,11 @@ func DPCtrlBldDlp(dlpRulesInfo []*DPDlpRuleEntry, dlpDpMacs utils.Set, delmacs u
 				data.DPDlpBld.DelMac = append(data.DPDlpBld.DelMac, dmc.(string))
 			}
 		}
-		msg, _ := json.Marshal(data)
+		msg, err := json.Marshal(data)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal DPDlpBldReq data")
+			return -1
+		}
 		sz := len(msg)
 		if sz > maxMsgSize {
 			// a very rough way to calculate rulesPerMsg
@@ -980,7 +1118,11 @@ func DPCtrlBldDlpChgMac(oldmacs, addmacs, delmacs utils.Set) {
 	for dmac := range delmacs.Iter() {
 		data.DPDlpChgBldMac.DelMac = append(data.DPDlpChgBldMac.DelMac, dmac.(string))
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPDlpBldMACReq data")
+		return
+	}
 	dpSendMsg(msg)
 }
 
@@ -994,7 +1136,11 @@ func DPCtrlDlpCfgChgMac(delmacs utils.Set) {
 	for dmac := range delmacs.Iter() {
 		data.DPDlpChgCfgMac.DelMac = append(data.DPDlpChgCfgMac.DelMac, dmac.(string))
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPDlpCfgMACReq data")
+		return
+	}
 	if dpSendMsg(msg) == -1 {
 		log.Debug("dpSendMsg send error")
 	}
@@ -1043,7 +1189,11 @@ func dpKeepAlive() {
 	data := DPKeepAliveReq{
 		Alive: &DPKeepAlive{SeqNum: seq},
 	}
-	msg, _ := json.Marshal(data)
+	msg, err := json.Marshal(data)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal DPKeepAliveReq data")
+		return
+	}
 	dpSendMsgExSilent(msg, 3, cbKeepAlive, &seq)
 }
 

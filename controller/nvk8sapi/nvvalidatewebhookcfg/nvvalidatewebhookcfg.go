@@ -1,8 +1,6 @@
 package admission
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -182,8 +180,7 @@ func SetCABundle(svcName string, caBundle []byte) {
 		TagKey:  fmt.Sprintf("tag-%s", svcName),
 		EchoKey: fmt.Sprintf("echo-%s", svcName),
 	}
-	b := sha256.Sum256(caBundle)
-	log.WithFields(log.Fields{"svcName": svcName, "cert": hex.EncodeToString(b[:])}).Info("sha256")
+	log.WithFields(log.Fields{"svcName": svcName}).Info()
 
 	resource.GetK8sVersion()
 }
@@ -192,8 +189,7 @@ func ResetCABundle(svcName string, caBundle []byte) bool { // return true if res
 	newCert := string(caBundle)
 	oldCert := admCaBundle[svcName]
 	if len(newCert) > 0 && oldCert != newCert {
-		b := sha256.Sum256([]byte(oldCert))
-		log.WithFields(log.Fields{"svcName": svcName, "old": hex.EncodeToString(b[:])}).Info("sha256")
+		log.WithFields(log.Fields{"svcName": svcName}).Info()
 		admCaBundle[svcName] = newCert
 		return true
 	}
@@ -246,14 +242,22 @@ func collectK8sObjectForDebug(k8sResInfo *ValidatingWebhookConfigInfo) {
 					k8sConfig.Webhooks[i].ClientConfig = admregv1.WebhookClientConfig{}
 					k8sConfig.ManagedFields = nil
 				}
-				value, _ := json.Marshal(k8sConfig)
+				value, err := json.Marshal(k8sConfig)
+				if err != nil {
+					log.WithError(err).Warn("Failed to marshal ValidatingWebhookConfiguration")
+					return
+				}
 				k8sResInfo.K8sManifest = string(value)
 			} else {
 				k8sConfig := obj.(*admregv1b1.ValidatingWebhookConfiguration)
 				for i := range k8sConfig.Webhooks {
 					k8sConfig.Webhooks[i].ClientConfig = admregv1b1.WebhookClientConfig{}
 				}
-				value, _ := json.Marshal(k8sConfig)
+				value, err := json.Marshal(k8sConfig)
+				if err != nil {
+					log.WithError(err).Warn("Failed to marshal ValidatingWebhookConfiguration")
+					return
+				}
 				k8sResInfo.K8sManifest = string(value)
 			}
 		}
@@ -705,7 +709,10 @@ func ConfigK8sAdmissionControl(k8sResInfo *ValidatingWebhookConfigInfo, ctrlStat
 	retry := 0
 	for _, whInfo := range k8sResInfo.WebhooksInfo {
 		if whInfo.ClientConfig.ClientMode == share.AdmClientModeUrl {
-			svcInfo, _ := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
+			svcInfo, svcErr := GetValidateWebhookSvcInfo(whInfo.ClientConfig.ServiceName)
+			if svcErr != nil {
+				log.WithError(svcErr).Warn("failed to get validate webhook service info")
+			}
 			whInfo.ClientConfig.Port = svcInfo.SvcNodePort
 		}
 	}

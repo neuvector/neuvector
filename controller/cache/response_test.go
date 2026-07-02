@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neuvector/neuvector/controller/api"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
@@ -32,7 +33,7 @@ func cleanupTestPolicyGroupCache() {
 	}
 }
 
-func newEventRule(id uint32, evType, group string, conditions []share.CLUSEventCondition, actions []string) *share.CLUSResponseRule {
+func newEventRule(id uint32, evType, group string, conditions []v1.EventCondition, actions []string) *share.CLUSResponseRule {
 	rule := &share.CLUSResponseRule{
 		ID:         id,
 		Event:      evType,
@@ -97,13 +98,13 @@ func TestResponseRuleLookup(t *testing.T) {
 		// Rule 9:  matches Container.Start but is disabled (won't match)
 		// Rule 8:  matches Container.Start and is enabled (should match)
 		actions := []string{share.EventActionSuppressLog}
-		disabledRule := newEventRule(9, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions)
+		disabledRule := newEventRule(9, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions)
 		disabledRule.Disable = true
 
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
-			newEventRule(10, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameControllerStart}}, actions),
+			newEventRule(10, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameControllerStart}}, actions),
 			disabledRule,
-			newEventRule(8, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
+			newEventRule(8, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
 		})
 
 		desc := newActivityDesc(api.EventNameContainerStart, api.LogLevelINFO, testWorkloadDomain, testWorkloadID)
@@ -122,15 +123,15 @@ func TestResponseRuleLookup(t *testing.T) {
 		// Rule 11: matches Info and is enabled (should match)
 		// Rule 12: matches Container.Start and is enabled (should match)
 		actions := []string{share.EventActionSuppressLog}
-		disabledRule := newEventRule(9, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions)
+		disabledRule := newEventRule(9, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions)
 		disabledRule.Disable = true
 
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
-			newEventRule(10, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameControllerStart}}, actions),
+			newEventRule(10, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameControllerStart}}, actions),
 			disabledRule,
-			newEventRule(8, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
-			newEventRule(11, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeLevel, CondValue: api.LogLevelINFO}}, actions),
-			newEventRule(12, share.EventEvent, "", []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
+			newEventRule(8, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
+			newEventRule(11, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeLevel, CondValue: api.LogLevelINFO}}, actions),
+			newEventRule(12, share.EventEvent, "", []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
 		})
 
 		desc := newActivityDesc(api.EventNameContainerStart, api.LogLevelINFO, testWorkloadDomain, testWorkloadID)
@@ -153,15 +154,15 @@ func TestResponseRuleLookup(t *testing.T) {
 		// Rule 8:  matches Container.Start and is enabled (won't match)
 		// Rule 11: matches Info and is enabled (won't match)
 		actions := []string{share.EventActionSuppressLog}
-		disabledRule := newEventRule(9, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions)
+		disabledRule := newEventRule(9, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions)
 		disabledRule.Disable = true
 
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
-			newEventRule(12, share.EventIncident, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameHostSuspiciousProcess}}, actions),
-			newEventRule(10, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameControllerStart}}, actions),
+			newEventRule(12, share.EventIncident, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameHostSuspiciousProcess}}, actions),
+			newEventRule(10, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameControllerStart}}, actions),
 			disabledRule,
-			newEventRule(8, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
-			newEventRule(11, share.EventEvent, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeLevel, CondValue: api.LogLevelDEBUG}}, actions),
+			newEventRule(8, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeName, CondValue: api.EventNameContainerStart}}, actions),
+			newEventRule(11, share.EventEvent, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeLevel, CondValue: api.LogLevelDEBUG}}, actions),
 		})
 
 		desc := newActivityDesc(api.EventNameContainerSecured, api.LogLevelINFO, testWorkloadDomain, testWorkloadID)
@@ -185,7 +186,7 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 			{PubTS: now.AddDate(0, 0, -21).Unix()},
 		}
 
-		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "3"}}, actions)
+		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "3"}}, actions)
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
 			rule,
 		})
@@ -204,7 +205,7 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 			{PubTS: now.AddDate(0, 0, -21).Unix()},
 		}
 
-		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "2/15"}}, actions)
+		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "2/15"}}, actions)
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
 			rule,
 		})
@@ -223,7 +224,7 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 			{PubTS: now.AddDate(0, 0, -21).Unix()},
 		}
 
-		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "2/10"}}, actions)
+		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "2/10"}}, actions)
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
 			rule,
 		})
@@ -242,7 +243,7 @@ func TestResponseRuleCVEWithFixMatch(t *testing.T) {
 			{PubTS: now.AddDate(0, 0, -21).Unix()},
 		}
 
-		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []share.CLUSEventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "1/30"}}, actions)
+		rule := newEventRule(9, share.EventCVEReport, api.AllContainerGroup, []v1.EventCondition{{CondType: share.EventCondTypeCVEHighWithFix, CondValue: "1/30"}}, actions)
 		localResPolicyCache = buildResPolicyCache([]*share.CLUSResponseRule{
 			rule,
 		})

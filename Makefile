@@ -238,5 +238,15 @@ push-enforcer-image: buildx-machine
 		--builder $(MACHINE) $(IMAGE_ARGS) $(IID_FILE_FLAG) $(BUILDX_ARGS) \
 		--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --platform=$(TARGET_PLATFORMS) -t "$(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)" --push .
 	@echo "Pushed $(REPO)/$(IMAGE_PREFIX)enforcer:$(TAG)"
+.PHONY: test
 test:
-	go test ./...
+	go test $$(go list ./... | grep -v /e2e )
+
+NV_CHART_VERSION ?= 2.10.3
+
+.PHONY: test-e2e
+test-e2e:
+ifeq ($(E2E_NO_REBUILD),)
+	TAG=latest $(MAKE) build-controller-image build-enforcer-image
+endif
+	NV_CHART_VERSION=${NV_CHART_VERSION} go test -C test/e2e -v -timeout 30m .

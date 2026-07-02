@@ -14,6 +14,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -97,8 +98,6 @@ var cfgEndpoints []*cfgEndpoint = []*cfgEndpoint{
 	{name: share.CFGEndpointApikey, key: share.CLUSConfigApikeyStore, isStore: true,
 		section: api.ConfSectionUser, lock: share.CLUSLockApikeyKey},
 
-	{name: share.CFGEndpointLicense, key: share.CLUSConfigLicenseKey, isStore: false,
-		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 	{name: share.CFGEndpointEULA, key: share.CLUSConfigEULAKey, isStore: false,
 		section: api.ConfSectionConfig, lock: share.CLUSLockConfigKey},
 
@@ -181,7 +180,10 @@ func purgeGroupFilter(epName, key string) bool {
 	accAdmin := access.NewFedAdminAccessControl()
 
 	name := share.CLUSGroupKey2Name(key)
-	group, _, _ := clusHelper.GetGroup(name, accAdmin)
+	group, _, err := clusHelper.GetGroup(name, accAdmin)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group during purge filter")
+	}
 
 	// Keep the learned, ground group & reserved local/fed groups
 	return group == nil || ((group.CfgType == share.FederalCfg || group.CfgType == share.UserCreated) && !group.Reserved)
@@ -226,7 +228,10 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 	case _filterFedPolicyObjects:
 		policyRulePrefix := share.CLUSConfigPolicyStore + "default/rule/"
 		if strings.HasPrefix(key, policyRulePrefix) {
-			idRaw, _ := strconv.Atoi(key[len(policyRulePrefix):])
+			idRaw, err := strconv.Atoi(key[len(policyRulePrefix):])
+			if err != nil {
+				log.WithError(err).Warn("Failed to parse policy rule id from key")
+			}
 			id := uint32(idRaw)
 			if id > api.PolicyFedRuleIDBase && id < api.PolicyFedRuleIDMax {
 				return true, nil
@@ -248,7 +253,12 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 					tmpvalue = uzb
 				}
 
-				if nvJsonUnmarshal(key, tmpvalue, &rhs) == nil {
+				if err := nvJsonUnmarshal(key, tmpvalue, &rhs); err != nil {
+					log.WithError(err).Warn("failed to unmarshal rule heads")
+					if !restore {
+						return false, uzb
+					}
+				} else {
 					// because fed policies are always in top, we can simply iterate thru rhs
 					firstNonFedIdx := len(rhs)
 					for idx, rh := range rhs {
@@ -258,17 +268,16 @@ func isFedObject(filterFedObjectType int, key string, value []byte, restore bool
 						}
 					}
 					if firstNonFedIdx > 0 {
-						newValue, _ := json.Marshal(rhs[firstNonFedIdx:])
+						newValue, err := json.Marshal(rhs[firstNonFedIdx:])
+						if err != nil {
+							log.WithError(err).Warn("failed to marshal rule heads")
+						}
 						return false, newValue
 					} else {
 						//in case there are no fed policies
 						if !restore {
 							return false, uzb
 						}
-					}
-				} else {
-					if !restore {
-						return false, uzb
 					}
 				}
 			}
@@ -415,7 +424,9 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 			subKey := share.CLUSKeyNthToken(key, 3)
 			if subKey == share.CLUSFedMembershipSubKey {
 				var m share.CLUSFedMembership
-				if nvJsonUnmarshal(key, []byte(value), &m) == nil {
+				if err := nvJsonUnmarshal(key, []byte(value), &m); err != nil {
+					log.WithError(err).Warn("failed to unmarshal federation membership")
+				} else {
 					importInfo.fedRole = m.FedRole
 					log.WithFields(log.Fields{"fedRole": importInfo.fedRole}).Info()
 				}
@@ -474,30 +485,36 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 
 		if ep.name == share.CFGEndpointUser {
 			var u share.CLUSUser
-			if nvJsonUnmarshal(key, []byte(value), &u) == nil {
+			if err := nvJsonUnmarshal(key, []byte(value), &u); err != nil {
+				log.WithError(err).Warn("failed to unmarshal user for import")
+			} else {
 				u.FailedLoginCount = 0
 				u.BlockLoginSince = time.Time{}
 				u.PwdResetTime = time.Now().UTC()
-				data, _ := json.Marshal(&u)
-				value = string(data)
-				if u.Fullname == common.DefaultAdminUser && u.Server == "" {
-					importInfo.defAdminRestored = true
+				data, err := json.Marshal(&u)
+				if err != nil {
+					log.WithError(err).Warn("failed to marshal user for import")
+				} else {
+					value = string(data)
+					if u.Fullname == common.DefaultAdminUser && u.Server == "" {
+						importInfo.defAdminRestored = true
+					}
 				}
 			}
 		} else if ep.name == share.CFGEndpointGroup && orchPlatform == share.PlatformKubernetes {
 			var g share.CLUSGroup
-			if nvJsonUnmarshal(key, []byte(value), &g) == nil {
-				if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, g.Name); err == nil {
-					// check whether there is an nvgroupdefinitions CR with different criteria/comment in k8s
-					if o, ok := obj.(*resource.NvGroupDefinition); ok {
-						rc := make([]api.RESTCriteriaEntry, 0, len(g.Criteria))
-						for _, c := range g.Criteria {
-							rc = append(rc, api.RESTCriteriaEntry{Key: c.Key, Value: c.Value, Op: c.Op})
-						}
-						if !common.SameGroupCriteria(o.Spec.Selector.Criteria, rc, false) || o.Spec.Selector.Comment != g.Comment {
-							msg := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", g.Name)
-							log.WithFields(log.Fields{"restored": rc, "cr": o.Spec.Selector.Criteria}).Warn(msg)
-						}
+			if err := nvJsonUnmarshal(key, []byte(value), &g); err != nil {
+				log.WithError(err).Warn("failed to unmarshal group for import")
+			} else if obj, err := global.ORCH.GetResource(resource.RscTypeCrdGroupDefinition, resource.NvAdmSvcNamespace, g.Name); err == nil {
+				// check whether there is an nvgroupdefinitions CR with different criteria/comment in k8s
+				if o, ok := obj.(*resource.NvGroupDefinition); ok {
+					rc := make([]v1.CriteriaEntry, 0, len(g.Criteria))
+					for _, c := range g.Criteria {
+						rc = append(rc, v1.CriteriaEntry{Key: c.Key, Value: c.Value, Op: c.Op})
+					}
+					if !common.SameGroupCriteria(o.Spec.Selector.Criteria, rc, false) || o.Spec.Selector.Comment != g.Comment {
+						msg := fmt.Sprintf("NvGroupDefinition CR %s with different criteria/comment exists in k8s", g.Name)
+						log.WithFields(log.Fields{"restored": rc, "cr": o.Spec.Selector.Criteria}).Warn(msg)
 					}
 				}
 			}
@@ -555,11 +572,17 @@ func (ep *cfgEndpoint) restore(importInfo *fedRulesRevInfo, txn *cluster.Cluster
 			if key == policyZipRuleListKey {
 				applyTransaction(txn, nil, false, 0)
 				//zip rulelist before put to cluster during restore
-				_ = clusHelper.PutPolicyRuleListZip(key, array)
+				if err = clusHelper.PutPolicyRuleListZip(key, array); err != nil {
+					log.WithError(err).Warn("Failed to put policy rule list zip during restore")
+				}
 			} else {
-				_ = clusHelper.DuplicateNetworkKeyTxn(txn, key, array)
+				if err = clusHelper.DuplicateNetworkKeyTxn(txn, key, array); err != nil {
+					log.WithError(err).Warn("Failed to duplicate network key in transaction")
+				}
 				//for CLUSConfigSystemKey only
-				_ = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array)
+				if err = clusHelper.DuplicateNetworkSystemKeyTxn(txn, key, array); err != nil {
+					log.WithError(err).Warn("Failed to duplicate network system key in transaction")
+				}
 				if needToZip(key, array) {
 					zb := utils.GzipBytes(array)
 					txn.PutBinary(key, zb)
@@ -663,7 +686,10 @@ func (ep cfgEndpoint) write(writer *bufio.Writer, fedRole string) error {
 
 func (ep cfgEndpoint) purge(txn *cluster.ClusterTransact, importTask *share.CLUSImportTask) error {
 	if ep.isStore {
-		keys, _ := cluster.GetStoreKeys(ep.key)
+		keys, err := cluster.GetStoreKeys(ep.key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get store keys for purge")
+		}
 		if len(keys) > 0 {
 			for _, key := range keys {
 				if ep.purgeFilter == nil || ep.purgeFilter(ep.name, key) {

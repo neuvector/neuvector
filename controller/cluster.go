@@ -121,16 +121,20 @@ func leadChangeHandler(newLead, oldLead string) {
 		// update self ctrl key
 		connStatus, connLastError := GetOrchConnStatus()
 
-		value, _ := json.Marshal(share.CLUSController{
+		value, err := json.Marshal(share.CLUSController{
 			CLUSDevice:        Ctrler.CLUSDevice,
 			Leader:            Ctrler.Leader,
 			OrchConnStatus:    connStatus,
 			OrchConnLastError: connLastError,
 			ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 		})
-		key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
-		if err := cluster.Put(key, value); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to marshal controller data")
+		} else {
+			key := share.CLUSControllerKey(Host.ID, Ctrler.ID)
+			if err = cluster.Put(key, value); err != nil {
+				log.WithFields(log.Fields{"error": err}).Error()
+			}
 		}
 
 		if Ctrler.Leader {
@@ -416,15 +420,20 @@ func ctlrPutLocalInfo() {
 	*/
 	connStatus, connLastError := GetOrchConnStatus()
 
-	value, _ = json.Marshal(share.CLUSController{
+	var err error
+	value, err = json.Marshal(share.CLUSController{
 		CLUSDevice:        Ctrler.CLUSDevice,
 		Leader:            Ctrler.Leader,
 		OrchConnStatus:    connStatus,
 		OrchConnLastError: connLastError,
 		ReadPrimeConfig:   Ctrler.ReadPrimeConfig,
 	})
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to marshal controller data")
+		return
+	}
 	key = share.CLUSControllerKey(Host.ID, Ctrler.ID)
-	if err := cluster.Put(key, value); err != nil {
+	if err = cluster.Put(key, value); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 	}
 }

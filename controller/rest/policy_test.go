@@ -3277,7 +3277,7 @@ func TestPolicyRuleNsUserDeleteRule(t *testing.T) {
 		rNew14Modified := rNew14
 		rNew14Modified.Action = share.PolicyActionDeny
 
-		user1 := makeLocalUserWithRole("user1", "111111", api.UserRoleNone,
+		user1 := makeLocalUserWithRole(t, "user1", "111111", api.UserRoleNone,
 			map[string][]string{api.UserRoleAdmin: {"domain1", "domain2"}},
 		)
 		if err := clusHelper.CreateUser(user1); err != nil {

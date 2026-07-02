@@ -64,8 +64,17 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		}
 
 		reqTo.ID = jointCluster.ID
-		reqTo.JointTicket = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
-		bodyTo, _ := json.Marshal(&reqTo)
+		reqTo.JointTicket, err = jwtGenFedTicket(jointCluster.Secret, jwtFedJointTicketLife)
+		if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
+			return
+		}
+		bodyTo, err := json.Marshal(&reqTo)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("failed to marshal request payload")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrServerError)
+			return
+		}
 		var data []byte
 		urlStr := fmt.Sprintf("https://%s:%d/v1/fed/csp_support_internal", masterCluster.RestInfo.Server, masterCluster.RestInfo.Port)
 		if data, _, _, err = sendRestRequest("", http.MethodPost, urlStr, "", "", "", "", nil, bodyTo, false, nil, accReadAll); err == nil {
@@ -106,7 +115,12 @@ func handlerCspSupportExport(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	} else {
 		nvUsage.CspConfigFrom = resp.CspConfigFrom
-		nvUsageData, _ = json.MarshalIndent(&nvUsage, "", "    ")
+		nvUsageData, err = json.MarshalIndent(&nvUsage, "", "    ")
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("failed to marshal usage data")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrServerError)
+			return
+		}
 	}
 
 	type tFileContent struct {

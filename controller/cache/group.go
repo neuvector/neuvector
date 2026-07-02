@@ -16,6 +16,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/db"
@@ -203,19 +204,23 @@ func group2REST(cache *groupCache, view string, withCap bool) *api.RESTGroup {
 
 	r := api.RESTGroup{
 		RESTGroupBrief: *group2BriefREST(cache, withCap),
-		Criteria:       make([]api.RESTCriteriaEntry, len(group.Criteria)),
+		Criteria:       make([]v1.CriteriaEntry, len(group.Criteria)),
 		Members:        make([]*api.RESTWorkloadBrief, 0),
 		PolicyRules:    make([]uint32, cache.usedByPolicy.Cardinality()),
 		ResponseRules:  make([]uint32, cache.usedByResponseRules.Cardinality()),
 	}
 	for i, crt := range group.Criteria {
-		r.Criteria[i] = api.RESTCriteriaEntry{
+		r.Criteria[i] = v1.CriteriaEntry{
 			Key: crt.Key, Value: crt.Value, Op: crt.Op,
 		}
 	}
 
 	for m := range cache.members.Iter() {
-		if wl, _ := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl()); wl != nil {
+		wl, err := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload brief")
+		}
+		if wl != nil {
 			if (view == api.QueryValueViewPod || view == api.QueryValueViewPodOnly) && wl.ShareNSWith != "" {
 				continue
 			}
@@ -272,19 +277,23 @@ func groupDetail2REST(cache *groupCache, view string, withCap bool) *api.RESTGro
 
 	g := api.RESTGroupDetail{
 		RESTGroupBrief: *group2BriefREST(cache, withCap),
-		Criteria:       make([]api.RESTCriteriaEntry, len(group.Criteria)),
+		Criteria:       make([]v1.CriteriaEntry, len(group.Criteria)),
 		Members:        make([]*api.RESTWorkloadBrief, 0),
 		PolicyRules:    make([]*api.RESTPolicyRule, 0, cache.usedByPolicy.Cardinality()),
 		ResponseRules:  make([]*api.RESTResponseRule, 0, cache.usedByResponseRules.Cardinality()),
 	}
 	for i, crt := range group.Criteria {
-		g.Criteria[i] = api.RESTCriteriaEntry{
+		g.Criteria[i] = v1.CriteriaEntry{
 			Key: crt.Key, Value: crt.Value, Op: crt.Op,
 		}
 	}
 
 	for m := range cache.members.Iter() {
-		if wl, _ := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl()); wl != nil {
+		wl, err := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload brief")
+		}
+		if wl != nil {
 			if (view == api.QueryValueViewPod || view == api.QueryValueViewPodOnly) && wl.ShareNSWith != "" {
 				continue
 			}
@@ -378,7 +387,9 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var group share.CLUSGroup
-		_ = json.Unmarshal(value, &group)
+		if err := json.Unmarshal(value, &group); err != nil {
+			log.WithError(err).Warn("failed to unmarshal group")
+		}
 
 		// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 		// for example, in upgrade case, the group will be created. This is to remove the group as we see it.
@@ -392,7 +403,9 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 
 			kv.DeletePolicyByGroup(group.Name)
 			kv.DeleteResponseRuleByGroup(group.Name)
-			_ = clusHelper.DeleteGroup(group.Name)
+			if err := clusHelper.DeleteGroup(group.Name); err != nil {
+				log.WithError(err).Warn("Failed to delete neuvector group")
+			}
 			log.WithFields(log.Fields{"group": group.Name}).Info("Delete neuvector group")
 			return
 		}
@@ -592,15 +605,27 @@ func groupConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 			evhdls.Trigger(EV_GROUP_DELETE, name, cache)
 		}
 
+		// Partial transaction failures are acceptable: unregistered operations are skipped but the
+		// transaction is still applied with whichever deletions succeeded.
 		var err error
 		txn := cluster.Transact()
-		_ = clusHelper.DeleteProcessProfileTxn(txn, name)
-		_ = clusHelper.DeleteFileMonitorTxn(txn, name)
-		if cache != nil && cache.group != nil && cache.group.Kind == share.GroupKindContainer {
-			_ = clusHelper.DeleteDlpGroup(txn, name)
-			_ = clusHelper.DeleteWafGroup(txn, name)
+		if err = clusHelper.DeleteProcessProfileTxn(txn, name); err != nil {
+			log.WithError(err).Warn("Failed to add process profile deletion to transaction")
 		}
-		_ = clusHelper.DeleteCustomCheckConfig(txn, name)
+		if err = clusHelper.DeleteFileMonitorTxn(txn, name); err != nil {
+			log.WithError(err).Warn("Failed to add file monitor deletion to transaction")
+		}
+		if cache != nil && cache.group != nil && cache.group.Kind == share.GroupKindContainer {
+			if err = clusHelper.DeleteDlpGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to add DLP group deletion to transaction")
+			}
+			if err = clusHelper.DeleteWafGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to add WAF group deletion to transaction")
+			}
+		}
+		if err = clusHelper.DeleteCustomCheckConfig(txn, name); err != nil {
+			log.WithError(err).Warn("Failed to add custom check config deletion to transaction")
+		}
 		dispatchHelper.GroupDeleted(name, txn)
 		_, err = txn.Apply()
 		txn.Close()
@@ -630,7 +655,11 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	svc := utils.MakeServiceName(domain, name)
 	gname := makeServiceIPGroupName(svc)
 	if gCfgType == 0 {
-		if cg, _, _ := clusHelper.GetGroup(gname, access.NewAdminAccessControl()); cg != nil {
+		cg, _, err := clusHelper.GetGroup(gname, access.NewAdminAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("Failed to get service IP group")
+		}
+		if cg != nil {
 			gCfgType = cg.CfgType
 		}
 	}
@@ -670,9 +699,13 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 			txn := cluster.Transact()
 			defer txn.Close()
 
-			_ = clusHelper.PutPolicyRuleListTxn(txn, keeps)
+			if err := clusHelper.PutPolicyRuleListTxn(txn, keeps); err != nil {
+				log.WithError(err).Warn("Failed to add policy rule list update to transaction")
+			}
 			for id := range dels.Iter() {
-				_ = clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+				if err := clusHelper.DeletePolicyRuleTxn(txn, id.(uint32)); err != nil {
+					log.WithError(err).Warn("Failed to add policy rule deletion to transaction")
+				}
 			}
 			if ok, err := txn.Apply(); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("")
@@ -685,7 +718,9 @@ func deleteServiceIPGroup(domain, name string, gCfgType share.TCfgType) {
 	}
 	if gCfgType != share.GroundCfg {
 		// crd nv.ip.xxx group can only be deleted thru k8s
-		_ = clusHelper.DeleteGroup(gname)
+		if err := clusHelper.DeleteGroup(gname); err != nil {
+			log.WithError(err).Warn("Failed to delete service IP group")
+		}
 	}
 }
 
@@ -728,7 +763,10 @@ func addToNetworkEPGroup(nep *share.CLUSNetworkEP) *share.CLUSGroup {
 
 	// only the lead modify the group synchronously
 	accAll := access.NewAdminAccessControl()
-	cg, _, _ := clusHelper.GetGroup(gname, accAll)
+	cg, _, err := clusHelper.GetGroup(gname, accAll)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group")
+	}
 	if cg == nil {
 		cg = &share.CLUSGroup{
 			Name:     gname,
@@ -786,7 +824,10 @@ func removeFromNetworkEPGroup(nepID string) {
 
 	// only the lead modify the group synchronously
 	accAll := access.NewAdminAccessControl()
-	cg, _, _ := clusHelper.GetGroup(gname, accAll)
+	cg, _, err := clusHelper.GetGroup(gname, accAll)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group")
+	}
 	if cg == nil {
 		return
 	}
@@ -897,7 +938,11 @@ func createServiceIPGroup(r *resource.Service) *share.CLUSGroup {
 		Kind:     share.GroupKindIPService,
 		CapIntcp: false,
 	}
-	if g, _, _ := clusHelper.GetGroup(cg.Name, access.NewAdminAccessControl()); g != nil {
+	g, _, err := clusHelper.GetGroup(cg.Name, access.NewAdminAccessControl())
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group")
+	}
+	if g != nil {
 		// if there is an existing nv.ip.xxx group, do not change its CfgType
 		cg.CfgType = g.CfgType
 	}
@@ -1034,7 +1079,9 @@ func groupRemoveEvent(ev share.TLogEvent, group string) {
 		ReportedAt: time.Now().UTC(),
 	}
 	clog.Msg = fmt.Sprintf("Auto remove unused group: %s and related network/response rules.\n", group)
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("Failed to append group remove event")
+	}
 }
 
 const groupsPruneDelay = time.Duration(time.Minute * 10)
@@ -1101,7 +1148,10 @@ func rmEmptyGroupsFromCluster() {
 	defer txn.Close()
 
 	for _, name := range groups {
-		cg, _, _ := clusHelper.GetGroup(name, accAll)
+		cg, _, err := clusHelper.GetGroup(name, accAll)
+		if err != nil {
+			log.WithFields(log.Fields{"group": name, "error": err}).Warn("Failed to get group from kv")
+		}
 		if cg == nil {
 			log.WithFields(log.Fields{"group": name}).Error("Group doesn't exist in kv")
 			delete(groupCacheMap, name)
@@ -1159,7 +1209,11 @@ func scheduleGroupRemoval(cache *groupCache) {
 	task := &groupRemovalEvent{
 		groupname: cache.group.Name,
 	}
-	cache.timerTask, _ = cctx.TimerWheel.AddTask(task, groupRemovalDelay)
+	var err error
+	cache.timerTask, err = cctx.TimerWheel.AddTask(task, groupRemovalDelay)
+	if err != nil {
+		log.WithError(err).Warn("Failed to add timer task for group removal")
+	}
 	if cache.timerTask == "" {
 		log.Error("Fail to insert timer")
 	}
@@ -1193,7 +1247,10 @@ func SchedulePruneGroups() {
 		return
 	}
 	task := &groupPruneEvent{}
-	timertask, _ := cctx.TimerWheel.AddTask(task, groupsPruneDelay)
+	timertask, err := cctx.TimerWheel.AddTask(task, groupsPruneDelay)
+	if err != nil {
+		log.WithError(err).Warn("Failed to add timer task for group pruning")
+	}
 	log.WithFields(log.Fields{"timertask": timertask}).Info("group prune timertask scheduled")
 	if timertask == "" {
 		log.Error("Fail to insert timer")
@@ -1287,7 +1344,9 @@ func hostWorkloadStart(id string, param interface{}) {
 		}
 		host.runningCntrs.Add(wl.ID)
 		host.workloads.Add(wl.ID)
-		_ = db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
+		if err := db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality()); err != nil {
+			log.WithError(err).Warn("Failed to update host container count")
+		}
 	}
 }
 
@@ -1315,7 +1374,9 @@ func hostWorkloadDelete(id string, param interface{}) {
 		host.runningPods.Remove(wl.ID)
 		host.runningCntrs.Remove(wl.ID)
 		host.workloads.Remove(wl.ID)
-		_ = db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality())
+		if err := db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality()); err != nil {
+			log.WithError(err).Warn("Failed to update host container count")
+		}
 	}
 }
 
@@ -1394,7 +1455,9 @@ func groupWorkloadJoin(id string, param interface{}) {
 			if bHasGroupProfile {
 				policyMode, profileMode := getNewServicePolicyMode()
 				cacheMutexUnlock()
-				_ = createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl())
+				if err := createLearnedGroup(wlc, policyMode, profileMode, getNewServiceProfileBaseline(), false, "", access.NewAdminAccessControl()); err != nil {
+					log.WithError(err).Warn("failed to create learned group")
+				}
 				cacheMutexLock()
 				if localDev.Host.Platform == share.PlatformKubernetes {
 					updateK8sPodEvent(wlc.learnedGroupName, wlc.podName, wlc.workload.Domain, id)
@@ -1942,16 +2005,28 @@ func (m CacheMethod) DeleteGroupCache(name string, acc *access.AccessControl) er
 
 	txn := cluster.Transact()
 	//delete group related policy
-	_ = clusHelper.DeleteProcessProfileTxn(txn, name)
-	_ = clusHelper.DeleteFileMonitorTxn(txn, name)
+	if err := clusHelper.DeleteProcessProfileTxn(txn, name); err != nil {
+		log.WithError(err).Warn("Failed to delete process profile txn")
+	}
+	if err := clusHelper.DeleteFileMonitorTxn(txn, name); err != nil {
+		log.WithError(err).Warn("Failed to delete file monitor txn")
+	}
 	if cache != nil && cache.group != nil {
 		if cache.group.Kind == share.GroupKindContainer {
-			_ = clusHelper.DeleteDlpGroup(txn, name)
-			_ = clusHelper.DeleteWafGroup(txn, name)
+			if err := clusHelper.DeleteDlpGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to delete DLP group")
+			}
+			if err := clusHelper.DeleteWafGroup(txn, name); err != nil {
+				log.WithError(err).Warn("Failed to delete WAF group")
+			}
 		}
 	}
-	_ = clusHelper.DeleteCustomCheckConfig(txn, name)
-	_, _ = txn.Apply()
+	if err := clusHelper.DeleteCustomCheckConfig(txn, name); err != nil {
+		log.WithError(err).Warn("Failed to delete custom check config")
+	}
+	if ok, err := txn.Apply(); err != nil || !ok {
+		log.WithFields(log.Fields{"ok": ok, "error": err}).Warn("Failed to apply group deletion transaction")
+	}
 	txn.Close()
 
 	return nil
@@ -2084,7 +2159,11 @@ func group2Service(gc *groupCache, view string, withCap bool) *api.RESTService {
 
 	sv.Members = make([]*api.RESTWorkloadBrief, 0, gc.members.Cardinality())
 	for m := range gc.members.Iter() {
-		if wl, _ := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl()); wl != nil {
+		wl, err := getWorkloadBrief(m.(string), view, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithError(err).Warn("failed to get workload brief")
+		}
+		if wl != nil {
 			if (view == api.QueryValueViewPod || view == api.QueryValueViewPodOnly) && wl.ShareNSWith != "" {
 				continue
 			}

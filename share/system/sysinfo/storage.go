@@ -10,6 +10,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // StorageDevice information.
@@ -95,7 +97,10 @@ func (si *SysInfo) getStorageInfo() {
 			device.Vendor = vendor
 		}
 
-		size, _ := strconv.ParseUint(slurpFile(path.Join(fullpath, "size")), 10, 64)
+		size, err := strconv.ParseUint(slurpFile(path.Join(fullpath, "size")), 10, 64)
+		if err != nil {
+			log.WithError(err).Debug("failed to parse storage device size")
+		}
 		device.Size = uint(size) / 1953125 // GiB
 
 		si.Storage = append(si.Storage, device)

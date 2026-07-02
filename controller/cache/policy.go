@@ -149,7 +149,9 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		if share.CLUSIsPolicyRuleKey(key) {
 			var rule share.CLUSPolicyRule
-			_ = json.Unmarshal(value, &rule)
+			if err := json.Unmarshal(value, &rule); err != nil {
+				log.WithError(err).Warn("failed to unmarshal policy rule")
+			}
 
 			// post-3.2.2 enforcer report nv containers to controller, if the controller happens to be pre-3.2.2,
 			// for example, in upgrade case, the group will be created.
@@ -205,7 +207,9 @@ func policyConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 			}
 		} else if share.CLUSIsPolicyZipRuleListKey(key) {
 			var heads []*share.CLUSRuleHead
-			_ = json.Unmarshal(value, &heads)
+			if err := json.Unmarshal(value, &heads); err != nil {
+				log.WithError(err).Warn("failed to unmarshal policy rule heads")
+			}
 
 			cacheMutexLock()
 			policyCache.ruleHeads = nil
@@ -1589,7 +1593,7 @@ func reorgPolicyIPRulesPerNodePAI(rules []share.CLUSGroupIPPolicy) {
 							break
 						}
 					}
-					if isFromEnforce && !isToEnforce {
+					if isFromEnforce && (!isToEnforce || rul.ID > share.DefaultGroupRuleID) {
 						for _, addr := range rul.From {
 							if hid, ok := wlNode[addr.WlID]; ok {
 								t := tmpNodePolicySGM[hid]
@@ -1721,7 +1725,7 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 						break
 					}
 				}
-				if isToEnforce && !isFromEnforce {
+				if isToEnforce && (!isFromEnforce || rul.ID > share.DefaultGroupRuleID) {
 					for _, addr := range rul.To {
 						if hid, ok := wlNode[addr.WlID]; ok {
 							t := tmpNodePolicySGM[hid]
@@ -1779,12 +1783,18 @@ func reorgPolicyIPRulesPerNode(rules []share.CLUSGroupIPPolicy) {
 func getPolicyIPRulesFromCluster() []share.CLUSGroupIPPolicy {
 	rules := make([]share.CLUSGroupIPPolicy, 0)
 	key := share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName)
-	if value, _ := cluster.Get(key); value != nil {
+	value, err := cluster.Get(key)
+	if err != nil {
+		log.WithError(err).Warn("failed to get policy IP rules from cluster")
+	}
+	if value != nil {
 		uzb := utils.GunzipBytes(value)
 		if uzb == nil {
 			log.Error("Failed to unzip data")
 		} else {
-			_ = json.Unmarshal(uzb, &rules)
+			if err := json.Unmarshal(uzb, &rules); err != nil {
+				log.WithError(err).Warn("failed to unmarshal IP policy rules")
+			}
 		}
 		return rules
 	}
@@ -1872,7 +1882,10 @@ func preparePolicySlotsCommon(rules []share.CLUSGroupIPPolicy) ([][]byte, int, i
 		//zip each slots
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal policy IP rules slot")
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -1932,7 +1945,10 @@ func preparePolicySlotsNode(rules []share.CLUSGroupIPPolicy, wlen int) ([][]byte
 		//zip each slots
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal policy IP rules slot")
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -2021,7 +2037,10 @@ func preparePolicySlots(rules []share.CLUSGroupIPPolicy) ([][]byte, int, int, er
 		//zip each slots
 		zbs := make([][]byte, final_slots)
 		for i, plc := range plcs {
-			value, _ := json.Marshal(plc)
+			value, err := json.Marshal(plc)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal policy IP rules slot")
+			}
 			zb := utils.GzipBytes(value)
 			//log.WithFields(log.Fields{"slot_idx": i, "size": len(zb)}).Debug("gzip policy ip rules")
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -2049,17 +2068,25 @@ func policyIPRulesCleanup(ruleKeys []string) {
 	for _, key := range ruleKeys {
 		txn.Delete(key)
 	}
-	//Ignore failure, missed keys will be removed the next update.
-	_, _ = txn.Apply()
+	// Suppress error: missed keys will be removed on the next update.
+	if _, err := txn.Apply(); err != nil {
+		log.WithError(err).Debug("failed to apply policy IP rules cleanup transaction")
+	}
 }
 
 func policyIPRulesCleanupNode(rule_key, verstr, newCommonRuleKey string, tmpNid map[string]string) {
 	for tnid := range tmpNid {
 		tmpNewNodeKey := fmt.Sprintf("%s%s/%s/", rule_key, tnid, verstr)
-		tmpNewNodeKeys, _ := cluster.GetStoreKeys(tmpNewNodeKey)
+		tmpNewNodeKeys, err := cluster.GetStoreKeys(tmpNewNodeKey)
+		if err != nil {
+			log.WithError(err).Warn("failed to get store keys for node cleanup")
+		}
 		policyIPRulesCleanup(tmpNewNodeKeys)
 	}
-	newCommonKeys, _ := cluster.GetStoreKeys(newCommonRuleKey)
+	newCommonKeys, err := cluster.GetStoreKeys(newCommonRuleKey)
+	if err != nil {
+		log.WithError(err).Warn("failed to get common rule store keys")
+	}
 	policyIPRulesCleanup(newCommonKeys)
 }
 
@@ -2069,7 +2096,10 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 	//change key from "network/GroupIPRules/" to "recalculate/policy/GroupIPRules/"
 	//rule_key := fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	oldKeys, _ := cluster.GetStoreKeys(rule_key)
+	oldKeys, err := cluster.GetStoreKeys(rule_key)
+	if err != nil && !errors.Is(err, cluster.ErrEmptyStore) {
+		log.WithError(err).Warn("failed to get old policy IP rule store keys")
+	}
 
 	verstr := fmt.Sprintf("ver.%d.%d", time.Now().UTC().UnixNano(), time.Now().UTC().UnixNano())
 	newCommonRuleKey := fmt.Sprintf("%s%s/", rule_key, verstr)
@@ -2086,7 +2116,10 @@ func putPolicyIPRulesToClusterScaleNode(rules []share.CLUSGroupIPPolicy) {
 		key := fmt.Sprintf("%s%d", newCommonRuleKey, i)
 		if err = cluster.PutBinary(key, common_zb); err != nil {
 			log.WithFields(log.Fields{"error": err, "commonslot": i, "size": len(common_zbs)}).Error()
-			newCommonKeys, _ := cluster.GetStoreKeys(newCommonRuleKey)
+			newCommonKeys, err := cluster.GetStoreKeys(newCommonRuleKey)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get common rule keys for cleanup")
+			}
 			policyIPRulesCleanup(newCommonKeys)
 			return
 		}
@@ -2176,7 +2209,10 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 	//change key from "network/GroupIPRules/" to "recalculate/policy/GroupIPRules/"
 	//rule_key := fmt.Sprintf("%s/", share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
 	rule_key := fmt.Sprintf("%s/", share.CLUSRecalPolicyIPRulesKey(share.PolicyIPRulesDefaultName))
-	oldKeys, _ := cluster.GetStoreKeys(rule_key)
+	oldKeys, err := cluster.GetStoreKeys(rule_key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get old rule keys")
+	}
 
 	verstr := fmt.Sprintf("ver.%d.%d", time.Now().UTC().UnixNano(), time.Now().UTC().UnixNano())
 	newRuleKey := fmt.Sprintf("%s%s/", rule_key, verstr)
@@ -2193,7 +2229,10 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 		key := fmt.Sprintf("%s%d", newRuleKey, i)
 		if err = cluster.PutBinary(key, zb); err != nil {
 			log.WithFields(log.Fields{"error": err, "slot": i, "size": len(zb)}).Error()
-			newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+			newKeys, err := cluster.GetStoreKeys(newRuleKey)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get new rule keys for cleanup")
+			}
 			policyIPRulesCleanup(newKeys)
 			return
 		}
@@ -2213,7 +2252,10 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 	clusHelper := kv.GetClusterHelper()
 	if err = clusHelper.PutPolicyVer(&polVer); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Failed to write network policy to the cluster")
-		newKeys, _ := cluster.GetStoreKeys(newRuleKey)
+		newKeys, err := cluster.GetStoreKeys(newRuleKey)
+		if err != nil {
+			log.WithError(err).Warn("failed to get store keys for policy cleanup")
+		}
 		policyIPRulesCleanup(newKeys)
 		return
 	}
@@ -2222,7 +2264,11 @@ func putPolicyIPRulesToClusterScale(rules []share.CLUSGroupIPPolicy) {
 
 func putPolicyIPRulesToCluster(rules []share.CLUSGroupIPPolicy) {
 	key := share.CLUSPolicyIPRulesKey(share.PolicyIPRulesDefaultName)
-	value, _ := json.Marshal(rules)
+	value, err := json.Marshal(rules)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal policy IP rules")
+		return
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")

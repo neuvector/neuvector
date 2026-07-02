@@ -46,8 +46,11 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	var rconf api.RESTAcceptedAlerts
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &rconf)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -81,14 +84,21 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		}
 
 		retry := 0
-		secret, _ := utils.GetGuid()
+		secret, err := utils.GetGuid()
+		if err != nil {
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
+			return
+		}
 		newSaltedPwdHash, err := common.HashPassword(secret, nil)
 		if err != nil {
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
 			return
 		}
 		for retry < retryClusterMax {
-			user, rev, _ := clusHelper.GetUserRev(userName, access.NewReaderAccessControl())
+			user, rev, err := clusHelper.GetUserRev(userName, access.NewReaderAccessControl())
+			if err != nil {
+				log.WithError(err).Warn("failed to get user rev for system user init")
+			}
 			if user == nil && userName == common.ReservedNvSystemUser {
 				u := share.CLUSUser{
 					Fullname:     common.ReservedNvSystemUser,
@@ -101,12 +111,18 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 					Locale:       common.OEMDefaultUserLocale,
 					PwdResetTime: time.Now().UTC(),
 				}
-				value, _ := json.Marshal(u)
+				value, err := json.Marshal(u)
+				if err != nil {
+					log.WithError(err).Warn("failed to marshal system user")
+				}
 				key := share.CLUSUserKey(common.ReservedNvSystemUser)
 				if err := cluster.PutIfNotExist(key, value, false); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
 				}
-				user, rev, _ = clusHelper.GetUserRev(common.ReservedNvSystemUser, acc)
+				user, rev, err = clusHelper.GetUserRev(common.ReservedNvSystemUser, acc)
+				if err != nil {
+					log.WithError(err).Warn("failed to get user rev for system user after creation")
+				}
 			}
 			if user == nil {
 				restRespAccessDenied(w, login)

@@ -160,7 +160,10 @@ func (s *SystemTools) getContainerIDByCgroup(path string) (string, bool, error, 
 	}
 
 	// v1
-	id, containerInContainer, _, bFlushed := getContainerIDByCgroupReader(f)
+	id, containerInContainer, err, bFlushed := getContainerIDByCgroupReader(f)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read cgroup v1 container ID")
+	}
 	if id != "" {
 		return id, containerInContainer, nil, bFlushed
 	}

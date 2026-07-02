@@ -1,9 +1,8 @@
 package kv
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -400,10 +399,15 @@ func upgradeAdmissionCert(value []byte) (*share.CLUSAdmissionCertCloaked, bool, 
 			CertNew:   string(certOld.Cert),
 			Cloaked:   true,
 		}
-		valueNew, _ := enc.Marshal(&certNew) // valueNew is byte slice of cloaked object
+		valueNew, err := enc.Marshal(&certNew) // valueNew is byte slice of cloaked object
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal cloaked admission cert")
+		}
 		// we need to do json.Unmarshal here so the return of doUpgrade() can be json.Marshal and wtitten to kv later
 		var cert share.CLUSAdmissionCertCloaked
-		_ = json.Unmarshal(valueNew, &cert)
+		if err := json.Unmarshal(valueNew, &cert); err != nil {
+			log.WithFields(log.Fields{"err": err}).Warn("Failed to unmarshal cloaked admission cert")
+		}
 		// cert.CaKeyNew / cert.CaCertNew / cert.KeyNew / cert.CertNew are still cloaked
 		return &cert, true, true
 	} else {
@@ -437,8 +441,9 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 		switch config {
 		case share.CFGEndpointUser:
 			var user share.CLUSUser
-			_ = nvJsonUnmarshal(key, value, &user)
-			if upd, wrtForUpgrade := upgradeUser(&user); upd {
+			if err := nvJsonUnmarshal(key, value, &user); err != nil {
+				log.WithError(err).Warn("failed to unmarshal user during upgrade")
+			} else if upd, wrtForUpgrade := upgradeUser(&user); upd {
 				return &user, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointSystem:
@@ -457,21 +462,24 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 			}
 		case share.CFGEndpointGroup:
 			var cfg share.CLUSGroup
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrtForUpgrade := upgradeGroup(&cfg); upd {
+			if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal group during upgrade")
+			} else if upd, wrtForUpgrade := upgradeGroup(&cfg); upd {
 				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointPolicy:
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSPolicyRule
-				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrtForUpgrade := upgradePolicyRule(&cfg); upd {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal policy rule during upgrade")
+				} else if upd, wrtForUpgrade := upgradePolicyRule(&cfg); upd {
 					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			} else if share.CLUSIsPolicyZipRuleListKey(key) {
 				var cfg []*share.CLUSRuleHead
-				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrtForUpgrade := upgradePolicyRuleHead(cfg); upd {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal policy rule head during upgrade")
+				} else if upd, wrtForUpgrade := upgradePolicyRuleHead(cfg); upd {
 					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 
@@ -485,26 +493,30 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 			}
 		case share.CFGEndpointProcessProfile:
 			var cfg share.CLUSProcessProfile
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrtForUpgrade := upgradeProcessProfile(&cfg); upd {
+			if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal process profile during upgrade")
+			} else if upd, wrtForUpgrade := upgradeProcessProfile(&cfg); upd {
 				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointFileMonitor:
 			var cfg share.CLUSFileMonitorProfile
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrtForUpgrade := upgradeFileMonitorProfile(&cfg); upd {
+			if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal file monitor profile during upgrade")
+			} else if upd, wrtForUpgrade := upgradeFileMonitorProfile(&cfg); upd {
 				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointDlpGroup:
 			var cfg share.CLUSDlpGroup
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrtForUpgrade := upgradeDlpGroup(&cfg); upd {
+			if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal DLP group during upgrade")
+			} else if upd, wrtForUpgrade := upgradeDlpGroup(&cfg); upd {
 				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointDlpRule:
 			var cfg share.CLUSDlpSensor
-			_ = nvJsonUnmarshal(key, value, &cfg)
-			if upd, wrtForUpgrade := upgradeDlpSensor(&cfg); upd {
+			if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+				log.WithError(err).Warn("failed to unmarshal DLP sensor during upgrade")
+			} else if upd, wrtForUpgrade := upgradeDlpSensor(&cfg); upd {
 				return &cfg, wrtForUpgrade, false, nil, nil
 			}
 		case share.CFGEndpointAdmissionControl, share.CFGEndpointCrd:
@@ -513,8 +525,9 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 				token := share.CLUSPolicyKey2AdmCfgSubkey(key)
 				if token == share.CLUSAdmissionCfgState {
 					var state share.CLUSAdmissionState
-					_ = nvJsonUnmarshal(key, value, &state)
-					if upd, wrtForUpgrade := upgradeAdmCtrlState(config, &state); upd {
+					if err := nvJsonUnmarshal(key, value, &state); err != nil {
+						log.WithError(err).Warn("failed to unmarshal admission state during upgrade")
+					} else if upd, wrtForUpgrade := upgradeAdmCtrlState(config, &state); upd {
 						return &state, wrtForUpgrade, false, nil, nil
 					}
 				} else {
@@ -522,14 +535,16 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 						switch token {
 						case share.CLUSAdmissionCfgRule:
 							var rule share.CLUSAdmissionRule
-							_ = nvJsonUnmarshal(key, value, &rule)
-							if upd, wrtForUpgrade := upgradeAdmCtrlRule(&rule); upd {
+							if err := nvJsonUnmarshal(key, value, &rule); err != nil {
+								log.WithError(err).Warn("failed to unmarshal admission rule during upgrade")
+							} else if upd, wrtForUpgrade := upgradeAdmCtrlRule(&rule); upd {
 								return &rule, wrtForUpgrade, false, nil, nil
 							}
 						case share.CLUSAdmissionCfgRuleList:
 							var cfg []*share.CLUSRuleHead
-							_ = nvJsonUnmarshal(key, value, &cfg)
-							if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
+							if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+								log.WithError(err).Warn("failed to unmarshal admission rule list during upgrade")
+							} else if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
 								return &cfg, wrtForUpgrade, false, nil, nil
 							}
 						case share.CLUSAdmissionCfgCert:
@@ -542,7 +557,9 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 								}
 							} else if dec.ReEncryptRequired {
 								if dataReEncrypted, err2 := enc.Marshal(&cert); err2 == nil {
-									_ = nvJsonUnmarshal(key, dataReEncrypted, &cert)
+									if err3 := nvJsonUnmarshal(key, dataReEncrypted, &cert); err3 != nil {
+										log.WithError(err3).Warn("failed to unmarshal cert after re-encrypt")
+									}
 									return &cert, false, true, nil, nil
 								} else {
 									log.WithFields(log.Fields{"error": err2, "key": key}).Error("re-encrypt object failed")
@@ -554,29 +571,34 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 				}
 			} else if config == share.CFGEndpointCrd && scope == resource.NvSecurityRuleKind {
 				var cfg share.CLUSCrdSecurityRule
-				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrtForUpgrade := upgradeCrdSecurityRule(&cfg); upd {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				} else if upd, wrtForUpgrade := upgradeCrdSecurityRule(&cfg); upd {
 					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			}
 		case share.CFGEndpointResponseRule:
 			if share.CLUSIsPolicyRuleKey(key) {
 				var cfg share.CLUSResponseRule
-				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrtForUpgrade := upgradeResponseRule(&cfg); upd {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				} else if upd, wrtForUpgrade := upgradeResponseRule(&cfg); upd {
 					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			} else if share.CLUSIsPolicyRuleListKey(key) {
 				var cfg []*share.CLUSRuleHead
-				_ = nvJsonUnmarshal(key, value, &cfg)
-				if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				} else if upd, wrtForUpgrade := upgradeRuleHead(cfg); upd {
 					return &cfg, wrtForUpgrade, false, nil, nil
 				}
 			}
 		case share.CFGEndpointVulnerability:
 			if key == share.CLUSVulnerabilityProfileKey(share.DefaultVulnerabilityProfileName) {
 				var cfg share.CLUSVulnerabilityProfile
-				if err := nvJsonUnmarshal(key, value, &cfg); err == nil {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal vulnerability profile")
+				} else {
 					upd := false
 					if cfg.CfgType == 0 {
 						cfg.CfgType = share.UserCreated
@@ -590,7 +612,9 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 		case share.CFGEndpointCompliance:
 			if key == share.CLUSComplianceProfileKey(share.DefaultComplianceProfileName) {
 				var cfg share.CLUSComplianceProfile
-				if err := nvJsonUnmarshal(key, value, &cfg); err == nil {
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal compliance profile")
+				} else {
 					upd := false
 					if cfg.CfgType == 0 {
 						cfg.CfgType = share.UserCreated
@@ -604,19 +628,28 @@ func doUpgrade(key string, value []byte) (interface{}, bool, bool, utils.Set, er
 		case share.CFGEndpointFederation:
 			if key == share.CLUSFedKey(share.CLUSFedMembershipSubKey) {
 				var cfg share.CLUSFedMembership
-				if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil && wrtForReEncrypt {
+				wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg)
+				if err != nil {
+					log.WithError(err).Warn("failed to unmarshal fed membership for re-encryption")
+				} else if wrtForReEncrypt {
 					return &cfg, false, wrtForReEncrypt, failToDecryptFields, nil
 				}
 			} else if share.CLUSFedKey2CfgKey(key) == share.CLUSFedClustersSubKey {
 				var cfg share.CLUSFedJointClusterInfo
-				if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg); err == nil && wrtForReEncrypt {
+				wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cfg)
+				if err != nil {
+					log.WithError(err).Warn("failed to unmarshal fed joint cluster info for re-encryption")
+				} else if wrtForReEncrypt {
 					return &cfg, false, wrtForReEncrypt, failToDecryptFields, nil
 				}
 			}
 		}
 	case "cert":
 		var cert share.CLUSX509Cert
-		if wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cert); err == nil && wrtForReEncrypt {
+		wrtForReEncrypt, failToDecryptFields, err = nvJsonUnmarshalReEncrypt(key, value, &cert)
+		if err != nil {
+			log.WithError(err).Warn("failed to unmarshal cert for re-encryption")
+		} else if wrtForReEncrypt {
 			return &cert, false, wrtForReEncrypt, failToDecryptFields, nil
 		}
 	}
@@ -662,14 +695,21 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 			return value, nil, false
 		}
 	}
-	v, wrtForUpgrade, wrtForReEncrypt, failToDecryptFields, _ = doUpgrade(key, value)
+	var doUpgradeErr error
+	v, wrtForUpgrade, wrtForReEncrypt, failToDecryptFields, doUpgradeErr = doUpgrade(key, value)
+	if doUpgradeErr != nil {
+		log.WithError(doUpgradeErr).Warn("failed to upgrade cluster key value")
+	}
 	// v being nil means no need to upgrade/convert the obj represented by value at all
 	wrt := wrtForUpgrade || wrtForReEncrypt
 	// wrt means need to write v to kv or not (sensitive fields in v are still encrypted)
 
 	if v != nil && wrt {
-		var err error
-		newv, _ := json.Marshal(v)
+		newv, err := json.Marshal(v)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal value during upgrade write")
+			return nil, err, false
+		}
 		// currently we only zip nw policy rulelist & longer-than-512k-crd-keys
 		if policyListKey || needToZip(key, newv) {
 			new_zb := utils.GzipBytes(newv)
@@ -713,7 +753,9 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 			if share.CLUSKeyLength(key) == 4 {
 				if v == nil {
 					var r share.CLUSAwsResource
-					_ = nvJsonUnmarshal(key, value, &r)
+					if err := nvJsonUnmarshal(key, value, &r); err != nil {
+						log.WithError(err).Warn("failed to unmarshal value during upgrade")
+					}
 					v = &r
 				}
 				needToUncloak = true
@@ -726,21 +768,27 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 		case share.CFGEndpointSystem:
 			if v == nil {
 				var cfg share.CLUSSystemConfig
-				_ = nvJsonUnmarshal(key, value, &cfg)
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				}
 				v = &cfg
 			}
 			needToUncloak = true
 		case share.CFGEndpointServer:
 			if v == nil {
 				var cfg share.CLUSServer
-				_ = nvJsonUnmarshal(key, value, &cfg)
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				}
 				v = &cfg
 			}
 			needToUncloak = true
 		case share.CFGEndpointRegistry:
 			if v == nil {
 				var cfg share.CLUSRegistryConfig
-				_ = nvJsonUnmarshal(key, value, &cfg)
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				}
 				v = &cfg
 			}
 			needToUncloak = true
@@ -748,7 +796,9 @@ func UpgradeAndConvert(key string, value []byte) ([]byte, error, bool) {
 			if v == nil {
 				// Currently the only data structure
 				var cfg share.CLUSAwsProjectCfg
-				_ = nvJsonUnmarshal(key, value, &cfg)
+				if err := nvJsonUnmarshal(key, value, &cfg); err != nil {
+					log.WithError(err).Warn("failed to unmarshal value during upgrade")
+				}
 				v = &cfg
 			}
 			needToUncloak = true
@@ -888,9 +938,14 @@ func getControlVersion() *share.CLUSCtrlVersion {
 	var ver share.CLUSCtrlVersion
 
 	key := share.CLUSCtrlVerKey
-	value, _ := cluster.Get(key)
+	value, err := cluster.Get(key)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get control version")
+	}
 	if value != nil {
-		_ = nvJsonUnmarshal(key, value, &ver)
+		if err := nvJsonUnmarshal(key, value, &ver); err != nil {
+			log.WithError(err).Warn("failed to unmarshal value during upgrade")
+		}
 		return &ver
 	}
 
@@ -899,7 +954,10 @@ func getControlVersion() *share.CLUSCtrlVersion {
 
 func putControlVersion(ver *share.CLUSCtrlVersion) error {
 	key := share.CLUSCtrlVerKey
-	value, _ := json.Marshal(ver)
+	value, err := json.Marshal(ver)
+	if err != nil {
+		return fmt.Errorf("failed to marshal control version: %w", err)
+	}
 	return cluster.Put(key, value)
 }
 
@@ -922,7 +980,9 @@ func (m clusterHelper) UpgradeClusterKV(version string) (verUpdated bool) {
 			for _, user := range users {
 				if len(user.AcceptedAlerts) > 0 {
 					user.AcceptedAlerts = nil
-					_ = m.PutUser(user)
+					if err := m.PutUser(user); err != nil {
+						log.WithError(err).Warn("Failed to update user during upgrade")
+					}
 				}
 			}
 		}
@@ -945,8 +1005,12 @@ func (m clusterHelper) UpgradeClusterKV(version string) (verUpdated bool) {
 		KVVersion:   latestKVVersion(),
 	}
 	if ver != newVer {
-		_ = putControlVersion(newVer)
-		_ = cfgHelper.writeBackupVersion()
+		if err := putControlVersion(newVer); err != nil {
+			log.WithError(err).Warn("failed to write control version")
+		}
+		if err := cfgHelper.writeBackupVersion(); err != nil {
+			log.WithError(err).Warn("Failed to write backup version")
+		}
 
 		if !strings.HasPrefix(version, "interim/") {
 			if ver.CtrlVersion != version {
@@ -990,8 +1054,12 @@ func (m clusterHelper) UpgradeClusterImport(importVer *share.CLUSCtrlVersion) {
 		KVVersion:   latestKVVersion(),
 	}
 	if cur_ver == nil || cur_ver.CtrlVersion != newVer.CtrlVersion || cur_ver.KVVersion != newVer.KVVersion {
-		_ = putControlVersion(newVer)
-		_ = cfgHelper.writeBackupVersion()
+		if err := putControlVersion(newVer); err != nil {
+			log.WithError(err).Warn("failed to write control version")
+		}
+		if err := cfgHelper.writeBackupVersion(); err != nil {
+			log.WithError(err).Warn("Failed to write backup version")
+		}
 		log.WithFields(log.Fields{"new": newVer}).Info("After import write new version")
 	}
 	log.WithFields(log.Fields{"imported": importVer, "current": cur_ver, "new": newVer}).Info("After import upgrade")
@@ -1029,7 +1097,12 @@ func (m clusterHelper) FixMissingClusterKV() {
 		}},
 	}
 	for _, keyInit := range keyInits {
-		if !cluster.Exist(keyInit.key) {
+		exists, err := cluster.Exist(keyInit.key)
+		if err != nil {
+			log.WithFields(log.Fields{"key": keyInit.key, "error": err}).Warn("Failed to check key existence during upgrade init")
+			continue
+		}
+		if !exists {
 			log.WithFields(log.Fields{"key": keyInit.key}).Info("Re-create because not found")
 			keyInit.init()
 		}
@@ -1190,12 +1263,17 @@ func filterRoleGroupsMapping(roleGroups map[string][]string, caseSensitive bool)
 }
 
 func upgradeDomainRoles() {
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get server store keys")
+	}
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			server := share.CLUSServer{}
 			updated := false
-			if err = nvJsonUnmarshal(key, value, &server); err == nil {
+			if err = nvJsonUnmarshal(key, value, &server); err != nil {
+				log.WithError(err).Warn("failed to unmarshal server during role group upgrade")
+			} else {
 				caseSensitive := true
 				var roleGroups *map[string][]string
 				if server.LDAP != nil {
@@ -1210,8 +1288,12 @@ func upgradeDomainRoles() {
 				}
 				if len(*roleGroups) > 0 {
 					if updated = filterRoleGroupsMapping(*roleGroups, caseSensitive); updated {
-						value, _ := json.Marshal(&server)
-						if err = cluster.Put(key, value); err != nil {
+						marshaledSrv, marshalErr := json.Marshal(&server)
+						if marshalErr != nil {
+							log.WithError(marshalErr).Warn("failed to marshal server during role upgrade")
+							continue
+						}
+						if err = cluster.Put(key, marshaledSrv); err != nil {
 							log.WithFields(log.Fields{"server": server.Name, "error": err}).Error("Failed to upgrade server for custom roles")
 						}
 					}
@@ -1297,8 +1379,16 @@ func ValidateWebhookCert() {
 	// for a fresh deployment + pv(from 4.2+), after restoring pv there will be no cert in kv anymore.
 	// in this case, we need to explicitly generate those key/cert if they are not found in kv(object/cert/)
 	// i.e. we do not do this in upgrade phases anymore!
-	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
-	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	admKeyPath, admCertPath, _ := GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
+	if admKeyPath == "" || admCertPath == "" {
+		log.WithFields(log.Fields{"svc": resource.NvAdmSvcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+		return
+	}
+	crdKeyPath, crdCertPath, _ := GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	if crdKeyPath == "" || crdCertPath == "" {
+		log.WithFields(log.Fields{"svc": resource.NvCrdSvcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+		return
+	}
 	certsInfo := []*keyCertInfo{
 		{
 			cn:           share.CLUSRootCAKey,
@@ -1338,7 +1428,11 @@ func ValidateWebhookCert() {
 				continue
 			}
 			if !certInfo.verified {
-				if cert, _, _ := clusHelper.GetObjectCertRev(certInfo.cn); cert.IsEmpty() {
+				cert, _, err := clusHelper.GetObjectCertRev(certInfo.cn)
+				if err != nil {
+					log.WithError(err).Warn("Failed to get object cert rev")
+				}
+				if cert.IsEmpty() {
 					// cert is not found under new kv key
 					if !restoreKeyCertFromOldKvKey(certInfo.certSvcNames, certInfo.svcName, certInfo.cn, certInfo.keyPath, certInfo.certPath) {
 						// cert is still not found under new kv key after restoring from old kv key. re-gen key/cert.
@@ -1353,10 +1447,13 @@ func ValidateWebhookCert() {
 
 						case resource.NvAdmSvcName, resource.NvCrdSvcName:
 							if orchPlatform == share.PlatformKubernetes {
-								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
-
+								tlsKeyPath, tlsCertPath, certsDir := GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+								if tlsKeyPath == "" || tlsCertPath == "" || certsDir == "" {
+									log.WithFields(log.Fields{"svc": certInfo.svcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+									continue
+								}
 								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn,
-									tlsCertPath, tlsKeyPath,
+									certsDir, tlsCertPath, tlsKeyPath,
 									AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10}); err != nil {
 									// Make it retry.
 									log.WithError(err).Error("failed to generate Webhook certs")
@@ -1375,12 +1472,18 @@ func ValidateWebhookCert() {
 								os.Remove(certInfo.keyPath)
 								os.Remove(certInfo.certPath)
 								log.WithFields(log.Fields{"cn": certInfo.cn}).Info("invalid cert")
-								tlsKeyPath, tlsCertPath := resource.GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
-
-								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
+								tlsKeyPath, tlsCertPath, certsDir := GetTlsKeyCertPath(certInfo.svcName, resource.NvAdmSvcNamespace)
+								if tlsKeyPath == "" || tlsCertPath == "" || certsDir == "" {
+									log.WithFields(log.Fields{"svc": certInfo.svcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+									continue
+								}
+								if err := GenTlsCertWithCaAndStoreInKv(certInfo.cn, certsDir, tlsCertPath, tlsKeyPath, AdmCACertPath, AdmCAKeyPath, ValidityPeriod{Year: 10, Month: 0, Day: 0}); err != nil {
 									log.WithError(err).Error("failed to generate Webhook certs in ValidateWebhookCert()")
 								}
-								cert, _, _ = clusHelper.GetObjectCertRev(certInfo.cn)
+								cert, _, err = clusHelper.GetObjectCertRev(certInfo.cn)
+								if err != nil {
+									log.WithError(err).Warn("Failed to refresh object cert rev")
+								}
 							}
 						}
 					} else {
@@ -1391,8 +1494,7 @@ func ValidateWebhookCert() {
 						}
 					}
 					if cert != nil {
-						b := sha256.Sum256([]byte(cert.Cert))
-						log.WithFields(log.Fields{"cn": certInfo.cn, "cert": hex.EncodeToString(b[:])}).Info("sha256")
+						log.WithFields(log.Fields{"cn": certInfo.cn}).Info()
 						certInfo.verified = true
 					}
 				}
@@ -1407,7 +1509,11 @@ func ValidateWebhookCert() {
 		if certInfo.k8sEnvOnly && orchPlatform != share.PlatformKubernetes {
 			continue
 		}
-		if cert, _, _ := clusHelper.GetObjectCertRev(certInfo.cn); !cert.IsEmpty() {
+		cert, _, err := clusHelper.GetObjectCertRev(certInfo.cn)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get object cert")
+		}
+		if !cert.IsEmpty() {
 			certData := []byte(cert.Cert)
 			err1 := os.WriteFile(certInfo.keyPath, []byte(cert.Key), 0600)
 			err2 := os.WriteFile(certInfo.certPath, certData, 0600)
@@ -1417,11 +1523,17 @@ func ValidateWebhookCert() {
 						admission.SetCABundle(certInfo.svcName, certData)
 					}
 					// cert migration in kv is done. delete old kv key
-					_ = cluster.Delete(share.CLUSAdmissionCertKey(certInfo.store, share.DefaultPolicyName))
+					if err := cluster.Delete(share.CLUSAdmissionCertKey(certInfo.store, share.DefaultPolicyName)); err != nil {
+						log.WithError(err).Warn("failed to delete old admission cert key")
+					}
 				} else if orchPlatform != share.PlatformKubernetes {
 					// if it's non-k8s env, delete the old cert keys
-					_ = cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigAdmissionControlStore, share.DefaultPolicyName))
-					_ = cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName))
+					if err := cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigAdmissionControlStore, share.DefaultPolicyName)); err != nil {
+						log.WithError(err).Warn("failed to delete old admission control cert key")
+					}
+					if err := cluster.Delete(share.CLUSAdmissionCertKey(share.CLUSConfigCrdStore, share.DefaultPolicyName)); err != nil {
+						log.WithError(err).Warn("failed to delete old CRD cert key")
+					}
 				}
 			} else {
 				log.WithFields(log.Fields{"err1": err1, "err2": err2, "svcName": certInfo.svcName}).Error("failed to restore files")
@@ -1486,19 +1598,30 @@ func renameCustomReservedRoles() {
 	accAdmin := access.NewAdminAccessControl()
 	reservedRoleNames := access.GetReservedRoleNames()
 	roleNameMapping := make(map[string]string, reservedRoleNames.Cardinality())
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigUserRoleStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigUserRoleStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user role store keys")
+	}
 	for _, key := range keys {
 		roleName := key[len(share.CLUSConfigUserRoleStore):]
 		// a pre-existing custom role with reserved name is found
 		if reservedRoleNames.Contains(roleName) {
 			log.WithFields(log.Fields{"roleName": roleName}).Info("Found pre-existing custom role with reserved name")
-			if role, _, _ := clusHelper.GetCustomRoleRev(roleName, accAdmin); role != nil {
+			role, _, err := clusHelper.GetCustomRoleRev(roleName, accAdmin)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get custom role rev")
+			}
+			if role != nil {
 				newRoleName := roleName + "-renamed"
 				roleNameMapping[roleName] = newRoleName
 				role.Name = newRoleName
 				role.Comment += " (renamed)"
-				_ = clusHelper.CreateCustomRole(role, accAdmin)
-				_ = clusHelper.DeleteCustomRole(roleName)
+				if err = clusHelper.CreateCustomRole(role, accAdmin); err != nil {
+					log.WithError(err).Warn("Failed to create renamed custom role")
+				}
+				if err = clusHelper.DeleteCustomRole(roleName); err != nil {
+					log.WithError(err).Warn("Failed to delete old custom role")
+				}
 			}
 		}
 	}
@@ -1506,35 +1629,49 @@ func renameCustomReservedRoles() {
 		return
 	}
 
-	keys, _ = cluster.GetStoreKeys(share.CLUSConfigUserStore)
+	keys, err = cluster.GetStoreKeys(share.CLUSConfigUserStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user store keys")
+	}
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			user := share.CLUSUser{}
-			if err = nvJsonUnmarshal(key, value, &user); err == nil {
-				if updated := reassignMappedUserRoles(&user, roleNameMapping); updated {
-					value, _ := json.Marshal(&user)
-					if err = cluster.Put(key, value); err != nil {
-						log.WithFields(log.Fields{"user": user.Fullname, "error": err}).Error("Failed to upgrade user roles mapping")
-					} else {
-						log.WithFields(log.Fields{"user": user.Fullname}).Info("Remapped user roles")
-					}
+			if err = nvJsonUnmarshal(key, value, &user); err != nil {
+				log.WithError(err).Warn("failed to unmarshal user during role remapping")
+			} else if updated := reassignMappedUserRoles(&user, roleNameMapping); updated {
+				marshaledUser, marshalErr := json.Marshal(&user)
+				if marshalErr != nil {
+					log.WithError(marshalErr).Warn("failed to marshal user during role remapping")
+					continue
+				}
+				if err = cluster.Put(key, marshaledUser); err != nil {
+					log.WithFields(log.Fields{"user": user.Fullname, "error": err}).Error("Failed to upgrade user roles mapping")
+				} else {
+					log.WithFields(log.Fields{"user": user.Fullname}).Info("Remapped user roles")
 				}
 			}
 		}
 	}
 
-	keys, _ = cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	keys, err = cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get server store keys")
+	}
 	for _, key := range keys {
 		if value, err := cluster.Get(key); err == nil {
 			server := share.CLUSServer{}
-			if err = nvJsonUnmarshal(key, value, &server); err == nil {
-				if updated := reassignMappedServerRoles(&server, roleNameMapping); updated {
-					value, _ := json.Marshal(&server)
-					if err = cluster.Put(key, value); err != nil {
-						log.WithFields(log.Fields{"server": server.Name, "error": err}).Error("Failed to upgrade server for custom roles mapping")
-					} else {
-						log.WithFields(log.Fields{"server": server.Name}).Info("Remapped server roles")
-					}
+			if err = nvJsonUnmarshal(key, value, &server); err != nil {
+				log.WithError(err).Warn("failed to unmarshal server during role remapping")
+			} else if updated := reassignMappedServerRoles(&server, roleNameMapping); updated {
+				marshaledSrv, marshalErr := json.Marshal(&server)
+				if marshalErr != nil {
+					log.WithError(marshalErr).Warn("failed to marshal server during role mapping upgrade")
+					continue
+				}
+				if err = cluster.Put(key, marshaledSrv); err != nil {
+					log.WithFields(log.Fields{"server": server.Name, "error": err}).Error("Failed to upgrade server for custom roles mapping")
+				} else {
+					log.WithFields(log.Fields{"server": server.Name}).Info("Remapped server roles")
 				}
 			}
 		}
@@ -1586,11 +1723,19 @@ func upgradeServerGroupRoles() {
 	var updated bool
 
 	acc := access.NewAdminAccessControl()
-	keys, _ := cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSConfigServerStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get server store keys")
+	}
 	for _, key := range keys {
 		updated = false
 		name := key[len(share.CLUSConfigServerStore):]
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		var cs *share.CLUSServer
+		var rev uint64
+		cs, rev, err = clusHelper.GetServerRev(name, acc)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get server rev during upgrade")
+		}
 		if cs != nil {
 			if cs.LDAP != nil {
 				if len(cs.LDAP.RoleGroups) > 0 {
@@ -1697,7 +1842,9 @@ func upgradeDlpGroup(cfg *share.CLUSDlpGroup) (bool, bool) {
 		key := share.CLUSGroupKey(cfg.Name)
 		if value, err := cluster.Get(key); err == nil {
 			var group share.CLUSGroup
-			_ = nvJsonUnmarshal(key, value, &group)
+			if err := nvJsonUnmarshal(key, value, &group); err != nil {
+				log.WithError(err).Warn("failed to unmarshal value during upgrade")
+			}
 			cfg.CfgType = group.CfgType
 			return true, true
 		}
@@ -1753,8 +1900,11 @@ func initFedScanRevKey() {
 			var regConfigRev uint64
 			var scannedRepoRev uint64
 			scannedRegRevs := make(map[string]uint64)
-			keys, _ := cluster.GetStoreKeys(share.CLUSScanDataStore)
-			for _, key := range keys {
+			scanKeys, scanKeysErr := cluster.GetStoreKeys(share.CLUSScanDataStore)
+			if scanKeysErr != nil {
+				log.WithError(scanKeysErr).Warn("failed to get scan data store keys")
+			}
+			for _, key := range scanKeys {
 				regName := share.CLUSKeyNthToken(key, 3)
 				if !strings.HasPrefix(regName, api.FederalGroupPrefix) {
 					continue
@@ -1782,11 +1932,13 @@ func initFedScanRevKey() {
 					scannedRegRevs[currName] = currRev
 				}
 			}
-			_ = clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{
+			if err = clusHelper.PutFedScanRevisions(&share.CLUSFedScanRevisions{
 				RegConfigRev:   regConfigRev,
 				ScannedRegRevs: scannedRegRevs,
 				ScannedRepoRev: scannedRepoRev,
-			}, nil)
+			}, nil); err != nil {
+				log.WithError(err).Warn("Failed to put fed scan revisions during upgrade")
+			}
 		} else if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Failed to read scan revision key")
 		}
@@ -1796,7 +1948,15 @@ func initFedScanRevKey() {
 func upgradeDefSecRisksProfiles() {
 	acc := access.NewAdminAccessControl()
 	// vulnerability profile
-	_, _, _ = clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc)
+	if _, _, err := clusHelper.GetVulnerabilityProfile(share.DefaultVulnerabilityProfileName, acc); err != nil {
+		if !errors.Is(err, common.ErrObjectNotFound) {
+			log.WithError(err).Warn("Failed to get vulnerability profile during upgrade")
+		}
+	}
 	// compliance profile
-	_, _, _ = clusHelper.GetComplianceProfile(share.DefaultComplianceProfileName, acc)
+	if _, _, err := clusHelper.GetComplianceProfile(share.DefaultComplianceProfileName, acc); err != nil {
+		if !errors.Is(err, common.ErrObjectNotFound) {
+			log.WithError(err).Warn("Failed to get compliance profile during upgrade")
+		}
+	}
 }

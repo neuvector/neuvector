@@ -155,10 +155,13 @@ func handlerFileMonitorConfig(w http.ResponseWriter, r *http.Request, ps httprou
 
 	group := ps.ByName("name")
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTFileMonitorConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	config := rconf.Config
 	if err != nil || config == nil ||
 		(config.AddFilters == nil && config.DelFilters == nil && config.UpdateFilters == nil) {

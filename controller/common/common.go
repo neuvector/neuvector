@@ -18,6 +18,7 @@ import (
 
 	syslog "github.com/dmachard/go-clientsyslog"
 	"github.com/neuvector/neuvector/controller/api"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/utils"
@@ -33,6 +34,9 @@ const ReservedUserNameIBMSA string = "~nv.reserved.ibmsa"
 const ScanPlatformID = "platform"
 
 const DefaultCtrlLogLevel string = "info"
+
+const MaxFedManagedClusters = 1024
+const MaxGroupRoleMappings = 4096
 
 var CtrlLogLevel string = DefaultCtrlLogLevel
 
@@ -982,7 +986,7 @@ func GetMappedCspType(pCspType *string, ptCspType *share.TCspType) (share.TCspTy
 	return share.CSP_NONE, "none"
 }
 
-func SameGroupCriteria(src, dst []api.RESTCriteriaEntry, selfComp bool) bool {
+func SameGroupCriteria(src, dst []v1.CriteriaEntry, selfComp bool) bool {
 	var dupFind bool
 	if len(src) != len(dst) {
 		return false

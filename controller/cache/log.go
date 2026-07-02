@@ -815,7 +815,9 @@ func violationUpdate(conn *share.CLUSConnection, server uint32) {
 			f.Direction = "egress"
 		}
 		var param interface{} = &f
-		_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+		if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
+			log.WithError(err).Warn("failed to post to ibmsa")
+		}
 	}
 }
 
@@ -835,7 +837,9 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 		}
 
 		var thrts []share.CLUSThreatLog
-		_ = json.Unmarshal(uzb, &thrts)
+		if err := json.Unmarshal(uzb, &thrts); err != nil {
+			log.WithError(err).Warn("failed to unmarshal threat logs")
+		}
 
 		syncLock(syncCatgThreatIdx)
 		defer syncUnlock(syncCatgThreatIdx)
@@ -888,7 +892,9 @@ func threatLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte, 
 						f.Direction = "egress"
 					}
 					var param interface{} = &f
-					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+					if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
+						log.WithError(err).Warn("failed to post to ibmsa")
+					}
 				}
 			}
 		}
@@ -984,7 +990,9 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 						}
 					}
 					var param interface{} = &f
-					_ = cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param)
+					if err := cctx.StartStopFedPingPollFunc(share.PostToIBMSA, 0, param); err != nil {
+						log.WithError(err).Warn("failed to post to ibmsa")
+					}
 				}
 
 				if isLeader() {
@@ -993,14 +1001,18 @@ func incidentLogUpdate(nType cluster.ClusterNotifyType, key string, value []byte
 						enableAutoScanHost = *scanCfg.EnableAutoScanHost
 					}
 					if enableAutoScanHost && incd.ID == share.CLUSIncidHostPackageUpdated {
-						_ = cacher.ScanHost(incd.HostID, access.NewReaderAccessControl())
+						if err := cacher.ScanHost(incd.HostID, access.NewReaderAccessControl()); err != nil {
+							log.WithError(err).Warn("Failed to trigger host scan")
+						}
 					}
 					enableAutoScanWorkload := scanCfg.AutoScan
 					if scanCfg.EnableAutoScanWorkload != nil {
 						enableAutoScanWorkload = *scanCfg.EnableAutoScanWorkload
 					}
 					if enableAutoScanWorkload && incd.ID == share.CLUSIncidContainerPackageUpdated {
-						_ = cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl())
+						if err := cacher.ScanWorkload(incd.WorkloadID, access.NewReaderAccessControl()); err != nil {
+							log.WithError(err).Warn("Failed to trigger workload scan")
+						}
 					}
 				}
 			}
@@ -1230,7 +1242,11 @@ func syncActivityTx() *syncDataMsg {
 	syncLock(syncCatgEventIdx)
 	if curActivityIndex > 0 {
 		acts := activityCache[0:curActivityIndex]
-		msg.Data, _ = json.Marshal(acts)
+		var err error
+		msg.Data, err = json.Marshal(acts)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal activity log for sync")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgEventIdx)
 	syncUnlock(syncCatgEventIdx)
@@ -1243,7 +1259,10 @@ func syncEventTx() *syncDataMsg {
 	syncLock(syncCatgEventIdx)
 	if curEventIndex > 0 {
 		events := eventCache[0:curEventIndex]
-		msg.Data, _ = json.Marshal(events)
+		var err error
+		if msg.Data, err = json.Marshal(events); err != nil {
+			log.WithError(err).Warn("failed to marshal events")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgEventIdx)
 	syncUnlock(syncCatgEventIdx)
@@ -1255,7 +1274,10 @@ func syncThreatTx() *syncDataMsg {
 	syncLock(syncCatgThreatIdx)
 	if curThrtIndex > 0 {
 		threats := thrtCache[0:curThrtIndex]
-		msg.Data, _ = json.Marshal(threats)
+		var err error
+		if msg.Data, err = json.Marshal(threats); err != nil {
+			log.WithError(err).Warn("failed to marshal threats")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgThreatIdx)
 	syncUnlock(syncCatgThreatIdx)
@@ -1267,7 +1289,10 @@ func syncIncidentTx() *syncDataMsg {
 	syncLock(syncCatgIncidentIdx)
 	if curIncidentIndex > 0 {
 		incidents := incidentCache[0:curIncidentIndex]
-		msg.Data, _ = json.Marshal(incidents)
+		var err error
+		if msg.Data, err = json.Marshal(incidents); err != nil {
+			log.WithError(err).Warn("failed to marshal incidents")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgIncidentIdx)
 	syncUnlock(syncCatgIncidentIdx)
@@ -1279,7 +1304,10 @@ func syncAuditTx() *syncDataMsg {
 	syncLock(syncCatgAuditIdx)
 	if curAuditIndex > 0 {
 		audits := auditCache[0:curAuditIndex]
-		msg.Data, _ = json.Marshal(audits)
+		var err error
+		if msg.Data, err = json.Marshal(audits); err != nil {
+			log.WithError(err).Warn("Failed to marshal audit cache")
+		}
 	}
 	msg.ModifyIdx = getModifyIdx(syncCatgAuditIdx)
 	syncUnlock(syncCatgAuditIdx)
@@ -1491,9 +1519,6 @@ func eventLog2API(ev *share.CLUSEventLog) *api.Event {
 	rlog.RESTMethod = ev.RESTMethod
 	rlog.RESTRequest = ev.RESTRequest
 	rlog.RESTBody = ev.RESTBody
-	if !ev.LicenseExpire.IsZero() {
-		rlog.LicenseExpire = ev.LicenseExpire.Format("2006-01-02")
-	}
 	rlog.EnforcerLimit = ev.EnforcerLimit
 	if ev.Msg != "" {
 		rlog.Msg = ev.Msg
@@ -1791,11 +1816,26 @@ func auditLog2API(audit *share.CLUSAuditLog) *api.Audit {
 					rlog.AggregationFrom = t.Unix()
 				}
 			case nvsysadmission.AuditLogPropCriticalVulsCnt:
-				rlog.CriticalCnt, _ = strconv.Atoi(v)
+				cnt, err := strconv.Atoi(v)
+				if err != nil {
+					// Suppress error: audit log field may be malformed
+					log.WithError(err).Debug("Failed to parse critical vuln count")
+				}
+				rlog.CriticalCnt = cnt
 			case nvsysadmission.AuditLogPropHighVulsCnt:
-				rlog.HighCnt, _ = strconv.Atoi(v)
+				cnt, err := strconv.Atoi(v)
+				if err != nil {
+					// Suppress error: audit log field may be malformed
+					log.WithError(err).Debug("Failed to parse high vuln count")
+				}
+				rlog.HighCnt = cnt
 			case nvsysadmission.AuditLogPropMedVulsCnt:
-				rlog.MediumCnt, _ = strconv.Atoi(v)
+				cnt, err := strconv.Atoi(v)
+				if err != nil {
+					// Suppress error: audit log field may be malformed
+					log.WithError(err).Debug("Failed to parse medium vuln count")
+				}
+				rlog.MediumCnt = cnt
 			case nvsysadmission.AuditLogPropPVCName:
 				rlog.PVCName = v
 			case nvsysadmission.AuditLogPVCStorageClassName:
@@ -2134,7 +2174,10 @@ func auditSuppressSetIdRpts(rlog *api.Audit) {
 
 func checkDefAdminPwd(throttleMinutes uint) {
 	acc := access.NewReaderAccessControl()
-	u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+	u, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, acc)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get default admin user")
+	}
 	if u == nil || common.IsSaltedPasswordHash(u.PasswordHash) {
 		return
 	}
@@ -2143,9 +2186,14 @@ func checkDefAdminPwd(throttleMinutes uint) {
 		var evtsTime share.CLUSThrottledEvents
 		id := share.CLUSEvAuthDefAdminPwdUnchanged
 		key := share.CLUSThrottledEventStore + "events"
-		value, rev, _ := cluster.GetRev(key)
+		value, rev, err := cluster.GetRev(key)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get throttled events from cluster")
+		}
 		if value != nil {
-			_ = json.Unmarshal(value, &evtsTime)
+			if err := json.Unmarshal(value, &evtsTime); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal throttled events")
+			}
 		}
 		if evtsTime.LastReportTime == nil {
 			evtsTime.LastReportTime = make(map[share.TLogEvent]int64)
@@ -2159,13 +2207,22 @@ func checkDefAdminPwd(throttleMinutes uint) {
 			}
 		}
 		if update {
-			_ = CacheEvent(id, "Default admin user's default password is not changed yet.")
+			if err := CacheEvent(id, "Default admin user's default password is not changed yet."); err != nil {
+				log.WithError(err).Warn("failed to cache default password event")
+			}
 			evtsTime.LastReportTime[id] = now.Unix()
-			value, _ := json.Marshal(&evtsTime)
+			value, err := json.Marshal(&evtsTime)
+			if err != nil {
+				log.WithError(err).Warn("Failed to marshal throttled events")
+			}
 			if rev == 0 {
-				_ = cluster.Put(key, value)
+				if err := cluster.Put(key, value); err != nil {
+					log.WithError(err).Warn("Failed to put throttled events to cluster")
+				}
 			} else {
-				_ = cluster.PutRev(key, value, rev)
+				if err := cluster.PutRev(key, value, rev); err != nil {
+					log.WithError(err).Warn("Failed to put throttled events with rev to cluster")
+				}
 			}
 		}
 	}

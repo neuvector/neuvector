@@ -904,6 +904,7 @@ func (a *Agent) Monitor(loglevel string, stopCh <-chan struct{}, q *QueryOptions
 	if loglevel != "" {
 		r.params.Add("loglevel", loglevel)
 	}
+	//nolint:bodyclose // already closed below
 	_, resp, err := requireOK(a.c.doRequest(r))
 	if err != nil {
 		return nil, err

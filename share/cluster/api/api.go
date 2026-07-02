@@ -845,7 +845,9 @@ func (c *Client) write(endpoint string, in, out interface{}, q *WriteOptions) (*
 }
 
 func parseQueryMeta(resp *http.Response, q *QueryMeta) {
-	_ = parseQueryMetaWrapped(resp, q)
+	if err := parseQueryMetaWrapped(resp, q); err != nil {
+		log.Printf("[WARN] failed to parse query meta: %v", err)
+	}
 }
 
 // parseQueryMetaWrapped is used to help parse query meta-data
@@ -867,11 +869,13 @@ func parseQueryMetaWrapped(resp *http.Response, q *QueryMeta) error {
 	q.LastContentHash = header.Get("X-Consul-ContentHash")
 
 	// Parse the X-Consul-LastContact
-	last, err := strconv.ParseUint(header.Get("X-Consul-LastContact"), 10, 64)
-	if err != nil {
-		return fmt.Errorf("Failed to parse X-Consul-LastContact: %v", err)
+	if lastStr := header.Get("X-Consul-LastContact"); lastStr != "" {
+		last, err := strconv.ParseUint(lastStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("Failed to parse X-Consul-LastContact: %v", err)
+		}
+		q.LastContact = time.Duration(last) * time.Millisecond
 	}
-	q.LastContact = time.Duration(last) * time.Millisecond
 
 	// Parse the X-Consul-KnownLeader
 	switch header.Get("X-Consul-KnownLeader") {

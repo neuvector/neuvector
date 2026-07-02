@@ -649,7 +649,11 @@ func programProxyMeshDP(c *containerData, cfgApp, restore bool) {
 	var lomac_str string
 	var lo_oldmac, lo_mac, lo_umac, lo_bmac net.HardwareAddr
 	lomac_str = fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
-	lo_mac, _ = net.ParseMAC(lomac_str)
+	var macErr error
+	lo_mac, macErr = net.ParseMAC(lomac_str)
+	if macErr != nil {
+		log.WithFields(log.Fields{"error": macErr, "mac": lomac_str}).Warn("Failed to parse proxy mesh lo MAC")
+	}
 
 	//pass parent containers IP to service mesh ep so that
 	//when src/dst IP are both 127.0.0.x, we can replace dst
@@ -727,7 +731,11 @@ func programDelProxyMeshDP(c *containerData, ns string) {
 	var lomac_str string
 	var lo_mac net.HardwareAddr
 	lomac_str = fmt.Sprintf(container.KubeProxyMeshLoMacStr, (c.pid>>8)&0xff, c.pid&0xff)
-	lo_mac, _ = net.ParseMAC(lomac_str)
+	var macErr error
+	lo_mac, macErr = net.ParseMAC(lomac_str)
+	if macErr != nil {
+		log.WithFields(log.Fields{"error": macErr, "mac": lomac_str}).Warn("Failed to parse proxy mesh lo MAC")
+	}
 
 	if c.quar || c.inline {
 		//delete dp nfq handle if any then reset iptable rules
@@ -1247,10 +1255,21 @@ func fillContainerProperties(c *containerData, parent *containerData,
 		}
 	}
 
-	c.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
-	c.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
+	var err error
+	c.cgroupMemory, err = global.SYS.GetContainerCgroupPath(info.Pid, "memory")
+	if err != nil {
+		log.WithError(err).WithField("pid", info.Pid).Debug("Failed to get container memory cgroup path")
+	}
+	c.cgroupCPUAcct, err = global.SYS.GetContainerCgroupPath(info.Pid, "cpuacct")
+	if err != nil {
+		log.WithError(err).WithField("pid", info.Pid).Debug("Failed to get container cpuacct cgroup path")
+	}
 
-	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
+	c.upperDir, c.rootFs, err = lookupContainerLayerPath(c.pid, c.id)
+	if err != nil {
+		// Suppress error: storage driver may not support layer path lookup
+		log.WithError(err).Debug("Failed to lookup container layer path")
+	}
 	c.propertyFilled = true
 	log.WithFields(log.Fields{"uppDir": c.upperDir, "rootFs": c.rootFs, "id": c.id}).Debug()
 }
@@ -1719,7 +1738,12 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 	if agentEnv.containerShieldMode {
 		prober.BuildProcessFamilyGroups(c.id, c.nvRole, c.pid, false, info.Privileged, nil)
 		pe.InsertNeuvectorProcessProfilePolicy(group, role)
-		c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
+		var err error
+		c.upperDir, c.rootFs, err = lookupContainerLayerPath(c.pid, c.id)
+		if err != nil {
+			// Suppress error: storage driver may not support layer path lookup
+			log.WithError(err).Debug("Failed to lookup container layer path")
+		}
 		// file monitors : protect mode, core-definitions, only modification alerts
 		fileWatcher.ContainerCleanup(c.pid, false)
 		conf := &fsmon.FsmonConfig{Profile: &fsmon.DefaultContainerConf}
@@ -2268,7 +2292,9 @@ func taskDPConnect() {
 			domainConfigNbeDp(c, newnbe)
 		}
 	}
-	pe.PushFqdnInfoToDP()
+	if err := pe.PushFqdnInfoToDP(); err != nil {
+		log.WithError(err).Warn("Failed to push FQDN info to datapath")
+	}
 	if !gInfo.disableNetPolicy {
 		pe.PushNetworkPolicyToDP()
 	}

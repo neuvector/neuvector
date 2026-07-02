@@ -125,7 +125,9 @@ func fsmonProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 		cacheMutexLock()
 		delete(fsmonProfileGroups, name)
 		cacheMutexUnlock()
-		_ = clusHelper.DeleteFileAccessRule(name)
+		if err := clusHelper.DeleteFileAccessRule(name); err != nil {
+			log.WithError(err).Warn("Failed to delete file access rule")
+		}
 		log.WithFields(log.Fields{"name": name}).Debug("Delete")
 	}
 }
@@ -433,8 +435,12 @@ func createGroupFileMonitor(txn *cluster.ClusterTransact, name, mode string, cfg
 		}
 		return false
 	} else {
-		_ = clusHelper.PutFileMonitorProfileTxn(txn, name, &fmp)
-		_ = clusHelper.PutFileAccessRuleTxn(txn, name, rconf)
+		if err := clusHelper.PutFileMonitorProfileTxn(txn, name, &fmp); err != nil {
+			log.WithError(err).Warn("Failed to put file monitor profile in transaction")
+		}
+		if err := clusHelper.PutFileAccessRuleTxn(txn, name, rconf); err != nil {
+			log.WithError(err).Warn("Failed to put file access rule in transaction")
+		}
 		return true
 	}
 }
@@ -560,7 +566,11 @@ func FileReportBkgSvc() {
 				fileRuleEntries = make([]*share.CLUSFileAccessRuleReq, 0) // reset
 				fileRuleEntryMux.Unlock()
 			} else {
-				if lock, _ := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait); lock != nil {
+				lock, err := clusHelper.AcquireLock(share.CLUSLockPolicyKey, policyClusterLockWait)
+				if err != nil {
+					log.WithError(err).Warn("Failed to acquire policy lock for file monitor update")
+				}
+				if lock != nil {
 					var rules []*share.CLUSFileAccessRuleReq
 					index := length
 					if index > 32 { // 32 entries

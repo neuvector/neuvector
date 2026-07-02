@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,22 +24,37 @@ const registryDataDir = NeuvectorDir + "registry/"
 const summarySuffix = ".sum"
 const reportSuffix = ".gz"
 
-func registryImageSummaryFileName(name, id string) string {
-	return fmt.Sprintf("%s%s/%s%s", registryDataDir, name, id, summarySuffix)
+func checkLocalPath(base string, elem ...string) (string, error) {
+	localpath := path.Join(elem...)
+	if !filepath.IsLocal(localpath) {
+		log.WithFields(log.Fields{"localpath": localpath}).Error("invalid file path")
+		return "", fmt.Errorf("Invalid file path")
+	}
+	return path.Join(base, localpath), nil
 }
 
-func registryImageReportFileName(name, id string) string {
-	return fmt.Sprintf("%s%s/%s%s", registryDataDir, name, id, reportSuffix)
+func registryImageSummaryFileName(name, id string) (string, error) {
+	return checkLocalPath(registryDataDir, name, id+summarySuffix)
+}
+
+func registryImageReportFileName(name, id string) (string, error) {
+	return checkLocalPath(registryDataDir, name, id+reportSuffix)
 }
 
 func writeRegistryImageSummary(name, id string, dat []byte) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			log.WithFields(log.Fields{"error": err, "path": path}).Error()
 		}
 	}
-	filename := registryImageSummaryFileName(name, id)
+	filename, err := registryImageSummaryFileName(name, id)
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(filename, dat, 0755); err != nil {
 		log.WithFields(log.Fields{"error": err, "filename": filename}).Error("Unable to write file")
 		return err
@@ -47,13 +63,19 @@ func writeRegistryImageSummary(name, id string, dat []byte) error {
 }
 
 func writeRegistryImageReport(name, id string, dat []byte) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			log.WithFields(log.Fields{"error": err, "path": path}).Error()
 		}
 	}
-	filename := registryImageReportFileName(name, id)
+	filename, err := registryImageReportFileName(name, id)
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(filename, dat, 0755); err != nil {
 		log.WithFields(log.Fields{"error": err, "filename": filename}).Error("Unable to write file")
 		return err
@@ -62,17 +84,26 @@ func writeRegistryImageReport(name, id string, dat []byte) error {
 }
 
 func deleteRegistryImageSummary(name, id string) error {
-	filename := registryImageSummaryFileName(name, id)
+	filename, err := registryImageSummaryFileName(name, id)
+	if err != nil {
+		return err
+	}
 	return os.Remove(filename)
 }
 
 func deleteRegistryImageReport(name, id string) error {
-	filename := registryImageReportFileName(name, id)
+	filename, err := registryImageReportFileName(name, id)
+	if err != nil {
+		return err
+	}
 	return os.Remove(filename)
 }
 
 func createRegistryDir(name string) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return os.MkdirAll(path, 0755)
 	} else {
@@ -81,7 +112,10 @@ func createRegistryDir(name string) error {
 }
 
 func deleteRegistryDir(name string) error {
-	path := fmt.Sprintf("%s%s", registryDataDir, name)
+	path, err := checkLocalPath(registryDataDir, name)
+	if err != nil {
+		return err
+	}
 	return os.RemoveAll(path)
 }
 
@@ -91,7 +125,11 @@ func restoreToCluster(reg, fedRole string) string {
 	var restored int // # of restored image scan results
 	var scanNotFinished int
 
-	regPath := fmt.Sprintf("%s%s", registryDataDir, reg)
+	regPath, err := checkLocalPath(registryDataDir, reg)
+	if err != nil {
+		log.WithFields(log.Fields{"name": reg, "err": err}).Error("skip")
+		return ""
+	}
 	log.WithFields(log.Fields{"regPath": regPath, "name": reg, "fedRole": fedRole}).Debug("Restore to cluster")
 
 	// 1. Read summary first
@@ -131,15 +169,15 @@ func restoreToCluster(reg, fedRole string) string {
 		sums = sums[:api.ScanPersistImageMax]
 
 		for _, sum := range dels {
-			os.Remove(fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, summarySuffix))
-			os.Remove(fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix))
+			os.Remove(path.Join(regPath, sum.ImageID+summarySuffix))
+			os.Remove(path.Join(regPath, sum.ImageID+reportSuffix))
 		}
 		log.WithFields(log.Fields{"count": len(dels)}).Info("Remove old images")
 	}
 
 	// 3. Read the report and write both into kv
 	for _, sum := range sums {
-		rptFile := fmt.Sprintf("%s/%s%s", regPath, sum.ImageID, reportSuffix)
+		rptFile := path.Join(regPath, sum.ImageID+reportSuffix)
 		vReport, vErr := os.ReadFile(rptFile)
 		if vErr == nil {
 			// 3-1. must restore scan/data/image/{reg}/{id} key first !
@@ -150,9 +188,15 @@ func restoreToCluster(reg, fedRole string) string {
 				// 3-2. then restore scan/state/image/{reg}/{id} key
 				var sErr error
 				sKey := share.CLUSRegistryImageStateKey(reg, sum.ImageID)
-				vSummary, _ := json.Marshal(&sum)
+				vSummary, err := json.Marshal(&sum)
+				if err != nil {
+					log.WithError(err).Warn("failed to marshal registry image summary during restore")
+					continue
+				}
 				if sErr = cluster.Put(sKey, vSummary); sErr != nil {
-					_ = cluster.Delete(vKey)
+					if err := cluster.Delete(vKey); err != nil {
+						log.WithError(err).Warn("failed to delete registry image data key during restore")
+					}
 					log.WithFields(log.Fields{"error": sErr}).Error("Failed to restore summary to cluster")
 				} else {
 					restored++
@@ -167,7 +211,10 @@ func restoreToCluster(reg, fedRole string) string {
 }
 
 func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
-	scanRevs, _, _ := clusHelper.GetFedScanRevisions()
+	scanRevs, _, err := clusHelper.GetFedScanRevisions()
+	if err != nil {
+		log.WithError(err).Warn("Failed to get fed scan revisions")
+	}
 	if scanRevs.Restoring {
 		if elapsed := time.Since(scanRevs.RestoreAt); elapsed > time.Duration(5)*time.Minute {
 			log.WithFields(log.Fields{"restored_at": scanRevs.RestoreAt}).Info()
@@ -186,7 +233,9 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 			}
 			scanRevs.Restoring = true
 			scanRevs.RestoreAt = time.Now().UTC()
-			_ = clusHelper.PutFedScanRevisions(&scanRevs, nil)
+			if err := clusHelper.PutFedScanRevisions(&scanRevs, nil); err != nil {
+				log.WithError(err).Warn("Failed to put fed scan revisions")
+			}
 
 			randRev := uint64(rand.Uint32())
 			if randRev == 0 {
@@ -201,13 +250,19 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 				if info.IsDir() && name != "" && name != "." {
 					skip := false
 					// no matter deployRegScanData/deployRepoScanData is true or not, always restore fed registry/repo scan result(if any in backup)
-					if config, _, _ := clusHelper.GetRegistry(name, acc); config == nil {
+					config, _, err := clusHelper.GetRegistry(name, acc)
+					if err != nil {
+						log.WithError(err).Warn("Failed to get registry during restore")
+					}
+					if config == nil {
 						if name != common.RegistryFedRepoScanName && name != common.RegistryRepoScanName {
 							if strings.HasPrefix(name, api.FederalGroupPrefix) && importInfo.fedRole == api.FedRoleJoint {
 								// when a fed registry's scan result is restored on joint cluster, its fed registry key may not exist in kv yet.
 								// when this happens, we need to create a pseudo fed registry key so that the scan result can be restored successfully
 								log.WithFields(log.Fields{"name": name}).Info("add pseudo fed registry key")
-								_ = clusHelper.PutRegistryIfNotExist(&share.CLUSRegistryConfig{Name: name, CfgType: share.FederalCfg})
+								if err := clusHelper.PutRegistryIfNotExist(&share.CLUSRegistryConfig{Name: name, CfgType: share.FederalCfg}); err != nil {
+									log.WithError(err).Warn("Failed to create pseudo fed registry key")
+								}
 								time.Sleep(time.Second)
 							} else {
 								log.WithFields(log.Fields{"name": name}).Error("registry not found")
@@ -266,7 +321,9 @@ func restoreRegistry(ch chan<- error, importInfo fedRulesRevInfo) {
 								ReportedAt: time.Now().UTC(),
 								Msg:        fmt.Sprintf("Restored scan data: %s", restoreResults),
 							}
-							_ = evqueue.Append(&clog)
+							if err := evqueue.Append(&clog); err != nil {
+								log.WithError(err).Warn("Failed to append scan data restored event")
+							}
 						}
 						break
 					}

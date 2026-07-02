@@ -45,7 +45,13 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// save the data to querystat table (do this before put request to Consul)
-	queryFilter.QueryToken = utils.GetRandomID(6, "") // do not change the length
+	queryFilter.QueryToken, err = db.GenQueryToken()
+	if err != nil {
+		errMsg := "failed to generate query token"
+		log.WithFields(log.Fields{"err": err}).Error(errMsg)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, errMsg)
+		return
+	}
 
 	queryFilterb, err := json.Marshal(queryFilter)
 	if err != nil {
@@ -99,8 +105,14 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	// get [top_image] and [top_nodes] summary,
 	// it's static data (don't interact with filter)
 	start = time.Now()
-	top5Images, _ := db.GetTopAssets(allowed, db.AssetImage, 5)
-	top5Nodes, _ := db.GetTopAssets(allowed, db.AssetNode, 5)
+	top5Images, err := db.GetTopAssets(allowed, db.AssetImage, 5)
+	if err != nil {
+		log.WithError(err).Warn("failed to get top images")
+	}
+	top5Nodes, err := db.GetTopAssets(allowed, db.AssetNode, 5)
+	if err != nil {
+		log.WithError(err).Warn("failed to get top nodes")
+	}
 	elapsed = time.Since(start)
 	queryStat.PerfStats = append(queryStat.PerfStats, fmt.Sprintf("3/4, get summary top_image and top_node, took=%v", elapsed))
 
@@ -418,7 +430,10 @@ func _createAssetQuerySession(qsr *api.QuerySessionRequest) error {
 		return err
 	}
 
-	queryFilterb, _ := json.Marshal(queryFilter)
+	queryFilterb, err := json.Marshal(queryFilter)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal query filter")
+	}
 	qs := &db.QueryStat{
 		Token:        queryFilter.QueryToken,
 		CreationTime: qsr.CreationTime,
@@ -613,9 +628,18 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a query session
-	queryFilter.QueryToken = utils.GetRandomID(6, "") // do not change the length
+	queryFilter.QueryToken, err = db.GenQueryToken()
+	if err != nil {
+		errMsg := "failed to generate query token"
+		log.WithFields(log.Fields{"err": err}).Error(errMsg)
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, errMsg)
+		return
+	}
 
-	queryFilterb, _ := json.Marshal(queryFilter)
+	queryFilterb, err := json.Marshal(queryFilter)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal query filter")
+	}
 	err = createQueryStat(login, db.QueryStateType_Asset, queryFilter.QueryToken, string(queryFilterb))
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("createQueryStat error")

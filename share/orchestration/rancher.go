@@ -3,6 +3,8 @@ package orchestration
 import (
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 )
@@ -98,7 +100,11 @@ func (d *rancher) SetIPAddrScope(ports map[string][]share.CLUSIPAddr,
 	// If container run with "docker run -l io.rancher.container.network=true"
 	key = container.RancherContainerNetwork
 	if v, ok := meta.Labels[key]; ok {
-		if rn, _ := strconv.ParseBool(v); rn {
+		rn, err := strconv.ParseBool(v)
+		if err != nil {
+			log.WithError(err).Debug("failed to parse rancher container network label")
+		}
+		if rn {
 			for name, addrs := range ports {
 				if name == "eth0" && len(addrs) >= 2 {
 					addrs[1].Scope = share.CLUSIPAddrScopeGlobal

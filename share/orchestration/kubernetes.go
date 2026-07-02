@@ -244,7 +244,7 @@ func GetK8sVersion(reGetK8sVersion, reGetOcVersion bool) (string, string) {
 			}
 		}
 		if ocVer == "" && err != nil && !strings.HasPrefix(err.Error(), "Read File fail") {
-			log.Error(err.Error())
+			log.Warn(err.Error())
 		}
 	}
 

@@ -541,7 +541,10 @@ func checkRancherUserRole(cfg *api.RESTSystemConfig, rsessToken string, acc *acc
 								pid = p.ID
 								subType = resource.SUBJECT_GROUP
 							}
-							pripDomainRoles, pripDomainPermits, _ := global.ORCH.GetUserRoles(pid, subType)
+							pripDomainRoles, pripDomainPermits, err := global.ORCH.GetUserRoles(pid, subType)
+							if err != nil {
+								log.WithFields(log.Fields{"error": err, "pid": pid}).Warn("Failed to get user roles from orchestrator")
+							}
 							if len(pripDomainRoles) == 0 && len(pripDomainPermits) == 0 {
 								log.WithFields(log.Fields{"pid": pid, "subType": subType}).Debug("no deduced role/permission")
 							} else {
@@ -625,14 +628,17 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 		} else {
 			parts := strings.Split(apikey[0], ":")
 			if len(parts) == 2 {
-				apikeyAccount, _, _ := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+				apikeyAccount, _, err := clusHelper.GetApikeyRev(parts[0], access.NewReaderAccessControl())
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Warn("Failed to get API key")
+					return nil, userInvalidRequest, rsessToken
+				}
 
 				if apikeyAccount == nil {
 					return nil, userInvalidRequest, rsessToken
 				}
 
 				// check password
-				var err error
 				var hash string
 				if ss := strings.Split(apikeyAccount.SecretKeyHash, "-"); len(ss) == 3 {
 					// new format salted hash
@@ -695,6 +701,7 @@ func restReq2User(r *http.Request) (*loginSession, int, string) {
 	// Validate token
 	claims, err := jwtValidateToken(token[0], "", nil)
 	if err != nil {
+		log.WithError(err).Warn("failed to call jwtValidateToken")
 		return nil, userInvalidRequest, rsessToken
 	}
 
@@ -911,7 +918,10 @@ func lookupShadowUser(server, provider, username, userid, email, role string, ro
 	}
 	retry := 0
 	for retry < retryClusterMax {
-		user, rev, _ := clusHelper.GetUserRev(fullname, access.NewReaderAccessControl())
+		user, rev, err := clusHelper.GetUserRev(fullname, access.NewReaderAccessControl())
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "fullname": fullname}).Warn("Failed to get user")
+		}
 		if user == nil {
 			newUser = &share.CLUSUser{
 				Fullname:            fullname,
@@ -1363,7 +1373,11 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 	if secret == "" {
 		tokenString = encryptedToken
 	} else {
-		tokenString = utils.DecryptSensitive(encryptedToken, []byte(secret))
+		var err error
+		tokenString, err = utils.DecryptSensitive(encryptedToken, []byte(secret))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt token: %w", err)
+		}
 	}
 	if tokenString == "" {
 		return nil, fmt.Errorf("unrecognized token")
@@ -1430,7 +1444,10 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 }
 
 func validateEncryptedData(encryptedData, secret string, checkTime bool) error {
-	data := utils.DecryptSensitive(encryptedData, []byte(secret))
+	data, err := utils.DecryptSensitive(encryptedData, []byte(secret))
+	if err != nil {
+		return fmt.Errorf("failed to decrypt data: %w", err)
+	}
 	if data != "" {
 		var c joinTicket
 		if err := json.Unmarshal([]byte(data), &c); err == nil {
@@ -1458,7 +1475,11 @@ func jwtValidateFedJoinTicket(encryptedTicket, secret string) error {
 func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extraDomainPermits access.DomainPermissions,
 	remote, mainSessionID, mainSessionUser string, sso *SsoSession) (string, string, *tokenClaim, error) {
 
-	id := utils.GetRandomID(idLength, "")
+	id, err := utils.GetRandomID(idLength, "")
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("failed to generate id")
+		return "", "", nil, err
+	}
 	installID, err := clusHelper.GetInstallationID()
 	if err != nil {
 		log.WithError(err).Error("failed to get installation ID")
@@ -1510,24 +1531,33 @@ func jwtGenerateToken(user *share.CLUSUser, domainRoles access.DomainRole, extra
 	return id, tokenString, &c, nil
 }
 
-func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) []byte {
-	ticketString := jwtGenFedTicket(masterCluster.Secret, duration)
+func jwtGenFedJoinToken(masterCluster *api.RESTFedMasterClusterInfo, duration time.Duration) ([]byte, error) {
+	ticketString, err := jwtGenFedTicket(masterCluster.Secret, duration)
+	if err != nil {
+		return nil, err
+	}
 	c := joinToken{
 		MasterServer: masterCluster.RestInfo.Server,
 		MasterPort:   masterCluster.RestInfo.Port,
 		JoinTicket:   ticketString,
 	}
-	tokenBytes, _ := json.Marshal(&c)
-	return tokenBytes
+	tokenBytes, err := json.Marshal(&c)
+	if err != nil {
+		return nil, err
+	}
+	return tokenBytes, nil
 }
 
-func jwtGenFedTicket(secret string, duration time.Duration) string {
+func jwtGenFedTicket(secret string, duration time.Duration) (string, error) {
 	now := time.Now()
 	c := joinTicket{
 		Salt:      mathRand.Intn(math.MaxInt32),
 		ExpiresAt: now.Add(duration).Unix(),
 	}
-	tokenBytes, _ := json.Marshal(&c)
+	tokenBytes, err := json.Marshal(&c)
+	if err != nil {
+		return "", err
+	}
 	return utils.EncryptSensitive(string(tokenBytes), []byte(secret))
 }
 
@@ -1556,7 +1586,7 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 			log.WithFields(log.Fields{"id": clusterID, "err": err}).Error("failed to sign token")
 			return "", err
 		}
-		return utils.EncryptSensitive(tokenString, []byte(secret)), nil
+		return utils.EncryptSensitive(tokenString, []byte(secret))
 	} else {
 		err = errors.New("empty private key")
 		log.WithFields(log.Fields{"id": clusterID, "err": err}).Error()
@@ -1576,7 +1606,11 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 		return "", common.ErrObjectAccessDenied
 	}
 
-	id := utils.GetRandomID(idLength, "")
+	id, err := utils.GetRandomID(idLength, "")
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Debug()
+		return "", err
+	}
 
 	//installID, _ := clusHelper.GetInstallationID()	// no need because it's not verified for master token(multi-clusters)
 	now := time.Now()
@@ -1606,7 +1640,11 @@ func jwtGenFedMasterToken(user *share.CLUSUser, login *loginSession, clusterID, 
 
 func jwtGenFedPingToken(callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) (string, error) {
 	// rsaPrivateKey being non-nil is for validating new public/private keys purpose
-	id := utils.GetRandomID(idLength, "")
+	id, err := utils.GetRandomID(idLength, "")
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Debug()
+		return "", err
+	}
 
 	//installID, _ := clusHelper.GetInstallationID()	// no need because it's not verified for master token(multi-clusters)
 	now := time.Now()
@@ -1634,7 +1672,10 @@ func getAuthServersInOrder(acc *access.AccessControl) []*share.CLUSServer {
 			if name == api.AuthServerLocal {
 				servers = append(servers, &share.CLUSServer{Name: api.AuthServerLocal})
 			} else {
-				cs, _, _ := clusHelper.GetServerRev(name, acc)
+				cs, _, err := clusHelper.GetServerRev(name, acc)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err, "server": name}).Warn("Failed to get server")
+				}
 				if cs != nil && isPasswordAuthServer(cs) && cs.Enable {
 					servers = append(servers, cs)
 				}
@@ -2049,8 +2090,12 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 	retry := 0
 	for retry < retryClusterMax {
 		var rev uint64
+		var err error
 
-		user, rev, _ = clusHelper.GetUserRev(pw.Username, acc)
+		user, rev, err = clusHelper.GetUserRev(pw.Username, acc)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get user")
+		}
 		if user == nil {
 			return nil, result, errors.New("User not found")
 		}
@@ -2062,7 +2107,10 @@ func localPasswordAuth(pw *api.RESTAuthPassword, acc *access.AccessControl) (*sh
 		result.userFound = true
 		origFailedLoginCount := user.FailedLoginCount
 		origBlockLoginSince := user.BlockLoginSince
-		pwdProfile, _ := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+		pwdProfile, err := cacher.GetPwdProfile(share.CLUSSysPwdProfileName)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Warn("Failed to get password profile")
+		}
 		if pwdProfile.EnableBlockAfterFailedLogin {
 			result.blockAfterFailedCount = pwdProfile.BlockAfterFailedCount
 		}
@@ -2203,7 +2251,10 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 
 	acc := access.NewAdminAccessControl()
 	// Retrieve user from the cluster
-	user, _, _ = clusHelper.GetUserRev(userName, acc)
+	user, _, err = clusHelper.GetUserRev(userName, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get user")
+	}
 	if userName == common.ReservedFedUser {
 		if user == nil {
 			newSaltedPwdHash, err := common.HashPassword(secret, nil)
@@ -2222,12 +2273,19 @@ func fedMasterTokenAuth(userName, masterToken, secret string) (*share.CLUSUser, 
 				Locale:       common.OEMDefaultUserLocale,
 				PwdResetTime: time.Now().UTC(),
 			}
-			value, _ := json.Marshal(u)
+			value, err := json.Marshal(u)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("failed to marshal user data")
+				return nil, nil, err
+			}
 			key := share.CLUSUserKey(userName)
 			if err := cluster.PutIfNotExist(key, value, false); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
 			}
-			user, _, _ = clusHelper.GetUserRev(userName, acc)
+			user, _, err = clusHelper.GetUserRev(userName, acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get user rev")
+			}
 		}
 	}
 	if user == nil || user.Server != "" {
@@ -2354,7 +2412,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			return
 		}
 		if role == api.UserRoleAdmin || role == api.UserRoleFedAdmin {
-			if u, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll); u != nil {
+			u, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, accReadAll)
+			if err != nil {
+				log.WithError(err).Warn("failed to get default admin user rev")
+			}
+			if u != nil {
 				if !common.IsSaltedPasswordHash(u.PasswordHash) {
 					if hash := utils.HashPassword(common.DefaultAdminPass); hash == u.PasswordHash {
 						defaultPW = true
@@ -2371,9 +2433,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		mainSessionUser = user.Fullname
 	} else {
 		// Read body
-		body, _ := io.ReadAll(r.Body)
-
-		err := json.Unmarshal(body, &auth)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.WithError(err).Warn("failed to read request body")
+		}
+		err = json.Unmarshal(body, &auth)
 		if err != nil || auth.Password == nil {
 			log.WithFields(log.Fields{"error": err}).Error("Request error")
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2469,7 +2533,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 				// user password passes remote auth but not local auth(user found in local). do not increase local user's FailedLoginCount
 				retry := 0
 				for retry < retryClusterMax {
-					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
+					user, rev, err := clusHelper.GetUserRev(auth.Password.Username, accReadAll)
+					if err != nil {
+						log.WithError(err).Warn("failed to get user rev")
+					}
+					if user != nil {
 						if user.FailedLoginCount > 0 {
 							user.FailedLoginCount--
 							if user.FailedLoginCount < uint32(localAuthResult.blockAfterFailedCount) {
@@ -2506,10 +2574,12 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rc int
-	var err error
 	var login *loginSession
 
-	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
+	fedRole, err := cacher.GetFedMembershipRole(accReadAll)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get federation membership role")
+	}
 	fedUserRoles := utils.NewSet(api.UserRoleFedAdmin, api.UserRoleFedReader)
 	if fedRole == api.FedRoleJoint && (fedUserRoles.Contains(user.Role) || user.ExtraPermits.HasPermFed()) {
 		rc = userInvalidRequest
@@ -2557,7 +2627,11 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 					}
 				}
 				if acceptedAlerts.Cardinality() != len(user.AcceptedAlerts) {
-					if user, rev, _ := clusHelper.GetUserRev(auth.Password.Username, accReadAll); user != nil {
+					user, rev, err := clusHelper.GetUserRev(auth.Password.Username, accReadAll)
+					if err != nil {
+						log.WithError(err).Warn("Failed to get user rev for accepted alerts update")
+					}
+					if user != nil {
 						user.AcceptedAlerts = acceptedAlerts.ToStringSlice()
 						if err := clusHelper.PutUserRev(user, rev); err != nil {
 							log.WithFields(log.Fields{"error": err}).Error("PutUserRev")
@@ -2622,7 +2696,10 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Read body
 	var auth api.RESTFedAuthData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read request body")
+	}
 	err = json.Unmarshal(body, &auth)
 	if err != nil || auth.MasterToken == "" {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -2683,10 +2760,13 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	defer r.Body.Close()
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read request body")
+	}
 
 	var data api.RESTAuthData
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || (data.Password == nil && data.Token == nil) {
 		e := "Request error"
 		log.WithFields(log.Fields{"error": err}).Error(e)
@@ -2732,7 +2812,11 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		case api.AuthServerPlatform:
 			user, err = platformPasswordAuth(data.Password)
 		default:
-			cs, _, _ := clusHelper.GetServerRev(server, accReadAll)
+			var cs *share.CLUSServer
+			cs, _, err = clusHelper.GetServerRev(server, accReadAll)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "server": server}).Warn("Failed to get server")
+			}
 			if cs == nil {
 				e := "Server not found"
 				log.WithFields(log.Fields{"server": server}).Error(e)
@@ -2771,7 +2855,10 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 			defaultPW = true
 		}
 	} else if data.Token != nil {
-		cs, _, _ := clusHelper.GetServerRev(server, accReadAll)
+		cs, _, err := clusHelper.GetServerRev(server, accReadAll)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "server": server}).Warn("Failed to get server")
+		}
 		if cs == nil {
 			log.WithFields(log.Fields{"server": server}).Error("Server not found")
 			restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
@@ -2847,7 +2934,10 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	fedRole, _ := cacher.GetFedMembershipRole(accReadAll)
+	fedRole, err := cacher.GetFedMembershipRole(accReadAll)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get federation membership role")
+	}
 	// Login user accounting
 	login, rc := loginUser(user, nil, nil, remote, _interactiveSessionID, "", fedRole, &sso)
 	if rc != userOK {

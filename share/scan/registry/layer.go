@@ -65,8 +65,12 @@ func (registry *Registry) UploadLayer(repository string, digest digest.Digest, c
 	}
 	upload.Header.Set("Content-Type", "application/octet-stream")
 
-	_, err = registry.Client.Do(upload)
-	return err
+	resp, err := registry.Client.Do(upload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 func (registry *Registry) HasLayer(repository string, digest digest.Digest) (bool, error) {

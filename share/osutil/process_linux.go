@@ -77,14 +77,23 @@ func GetProcessPIDs(pid int) (ppid, gid, sid int, status, cmd string) {
 	}
 
 	status = procStatusMap[sa[2]]
-	ppid, _ = strconv.Atoi(sa[3])
+	ppid, err = strconv.Atoi(sa[3])
+	if err != nil {
+		log.WithError(err).Debug("failed to parse ppid from proc stat")
+	}
 
 	if len(sa) < 5 {
 		return
 	}
 
-	gid, _ = strconv.Atoi(sa[4])
-	sid, _ = strconv.Atoi(sa[5])
+	gid, err = strconv.Atoi(sa[4])
+	if err != nil {
+		log.WithError(err).Debug("failed to parse gid from proc stat")
+	}
+	sid, err = strconv.Atoi(sa[5])
+	if err != nil {
+		log.WithError(err).Debug("failed to parse sid from proc stat")
+	}
 	return
 }
 
@@ -236,10 +245,16 @@ func getCGroupSocketTable(rootPid int, tbl map[uint32]SocketInfo, file string, t
 
 		// TCP: TCP_LISTEN, UDP: TCP_CLOSE (idle)
 		if (tcp && tokens[3] == "0A") || (!tcp && tokens[3] == "07") {
-			fd, _ := strconv.ParseUint(tokens[9], 10, 32)
+			fd, err := strconv.ParseUint(tokens[9], 10, 32)
+			if err != nil {
+				log.WithError(err).Debug("failed to parse inode from net table")
+			}
 			inode := uint32(fd)
 			ip_port := strings.Split(tokens[1], ":")
-			port, _ := strconv.ParseUint(ip_port[1], 16, 16)
+			port, err := strconv.ParseUint(ip_port[1], 16, 16)
+			if err != nil {
+				log.WithError(err).Debug("failed to parse port from net table")
+			}
 			if tcp {
 				tbl[inode] = SocketInfo{Port: uint16(port), IPProto: syscall.IPPROTO_TCP, INode: inode}
 			} else {
@@ -297,7 +312,11 @@ func getConnectionByFile(fileName string, inodes utils.Set, tcp bool, sport uint
 		// State is Established
 		//not to check the state of connection, report no matter any state
 		//exclude listen state
-		inode, _ := strconv.ParseUint(tokens[9], 10, 32)
+		inode, err := strconv.ParseUint(tokens[9], 10, 32)
+		if err != nil {
+			log.WithError(err).Debug("failed to parse inode from connection entry")
+			continue
+		}
 		if inodes.Contains(uint32(inode)) {
 			var locIp, remIp []byte
 			var locPort, remPort uint64
@@ -428,12 +447,21 @@ func GetProcessUIDs(pid int) (name string, ppid, ruid, euid int) {
 				name = ""
 			}
 		} else if strings.HasPrefix(line, "PPid:\t") {
-			ppid, _ = strconv.Atoi(line[6:])
+			ppid, err = strconv.Atoi(line[6:])
+			if err != nil {
+				log.WithError(err).Debug("failed to parse ppid from proc status")
+			}
 		} else if strings.HasPrefix(line, "Uid:\t") {
 			uids := strings.Split(line[5:], "\t")
 			if len(uids) == 4 {
-				ruid, _ = strconv.Atoi(uids[0])
-				euid, _ = strconv.Atoi(uids[1])
+				ruid, err = strconv.Atoi(uids[0])
+				if err != nil {
+					log.WithError(err).Debug("failed to parse ruid from proc status")
+				}
+				euid, err = strconv.Atoi(uids[1])
+				if err != nil {
+					log.WithError(err).Debug("failed to parse euid from proc status")
+				}
 			}
 			break
 		}

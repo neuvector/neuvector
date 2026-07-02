@@ -377,7 +377,10 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 
 	name := ps.ByName("server")
 
-	cs, _, _ := clusHelper.GetServerRev(name, access.NewReaderAccessControl())
+	cs, _, err := clusHelper.GetServerRev(name, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithFields(log.Fields{"server": name, "error": err}).Warn("failed to get server")
+	}
 	if cs == nil {
 		// Only return basic error, no more information
 		log.WithFields(log.Fields{"server": name}).Error("Server not found")
@@ -386,10 +389,13 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var data api.RESTTokenRedirect
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || data.Redirect == "" {
 		e := "Get redirect URL request error"
 		log.WithFields(log.Fields{"error": err, "redirect": data.Redirect}).Error(e)
@@ -1022,10 +1028,13 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1167,9 +1176,12 @@ func configLDAPServer(name string, ldap *api.RESTServerLDAPConfig, acc *access.A
 	var err error
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithFields(log.Fields{"server": name, "error": getErr}).Warn("failed to get server")
+		}
 		if cs == nil {
-			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("Server not found")
+			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("server not found")
 		}
 
 		if cs.LDAP == nil {
@@ -1210,9 +1222,12 @@ func configSAMLServer(name string, saml *api.RESTServerSAMLConfig, acc *access.A
 	var err error
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithFields(log.Fields{"server": name, "error": getErr}).Warn("failed to get server")
+		}
 		if cs == nil {
-			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("Server not found")
+			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("server not found")
 		}
 
 		if cs.SAML == nil {
@@ -1253,7 +1268,10 @@ func configOIDCServer(name string, oidc *api.RESTServerOIDCConfig, acc *access.A
 	var err error
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			return http.StatusNotFound, api.RESTErrObjectNotFound, errors.New("Server not found")
 		}
@@ -1304,10 +1322,13 @@ func handlerServerConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1422,10 +1443,13 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 	role := ps.ByName("role")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerRoleGroupsConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1469,7 +1493,10 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			e := "Server not found"
 			log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1526,7 +1553,11 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 }
 
 func configOneGroupRolesMapping(groupRoleMapping *share.GroupRoleMapping, clusGroupMappedRoles []*share.GroupRoleMapping, acc *access.AccessControl) ([]*share.GroupRoleMapping, error) {
-	newSettings := make([]*share.GroupRoleMapping, 0, len(clusGroupMappedRoles)+1)
+	capacity := len(clusGroupMappedRoles)
+	if capacity < common.MaxGroupRoleMappings {
+		capacity++
+	}
+	newSettings := make([]*share.GroupRoleMapping, 0, capacity)
 	newSettings = append(newSettings, clusGroupMappedRoles...)
 
 	foundIdx := -1
@@ -1560,10 +1591,13 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 	group := ps.ByName("group")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerGroupRoleDomainsConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || rconf.Config.GroupRoleMapping == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1593,7 +1627,10 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			e := "Server not found"
 			log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1762,10 +1799,13 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerGroupsOrderConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1789,7 +1829,10 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 
 	retry := 0
 	for retry < retryClusterMax {
-		cs, rev, _ := clusHelper.GetServerRev(name, acc)
+		cs, rev, getErr := clusHelper.GetServerRev(name, acc)
+		if getErr != nil {
+			log.WithError(getErr).Warn("failed to get server config from cluster")
+		}
 		if cs == nil {
 			e := "Server not found"
 			log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1871,7 +1914,10 @@ func handlerServerDelete(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	cs, _, _ := clusHelper.GetServerRev(name, acc)
+	cs, _, err := clusHelper.GetServerRev(name, acc)
+	if err != nil {
+		log.WithFields(log.Fields{"server": name, "error": err}).Warn("failed to get server")
+	}
 	if cs == nil {
 		e := "Server not found"
 		log.WithFields(log.Fields{"server": name}).Error(e)
@@ -1918,10 +1964,13 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServerTestData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Test == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1940,8 +1989,13 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	if rs.LDAP != nil {
-		cs, _, _ = clusHelper.GetServerRev(rs.Name, acc)
+		var getErr error
+		cs, _, getErr = clusHelper.GetServerRev(rs.Name, acc)
 		if cs == nil {
+			if getErr != nil {
+				// Suppress: expected when testing a new server not yet saved
+				log.WithError(getErr).Debug("GetServerRev: server not yet saved")
+			}
 			// This happens when creating a new server that has never been saved.
 			cldap := &share.CLUSServerLDAP{Port: DefaultLDAPServerPort}
 			cs = &share.CLUSServer{Name: rs.Name, LDAP: cldap}
@@ -1972,10 +2026,11 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 			return
 		}
 	} else if rs.Name != "" {
-		cs, _, _ = clusHelper.GetServerRev(rs.Name, acc)
+		var getErr error
+		cs, _, getErr = clusHelper.GetServerRev(rs.Name, acc)
 		if cs == nil {
 			e := "Server not found"
-			log.WithFields(log.Fields{"server": rs.Name}).Error(e)
+			log.WithFields(log.Fields{"server": rs.Name, "err": getErr}).Error(e)
 			restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, e)
 			return
 		}

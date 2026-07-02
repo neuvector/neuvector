@@ -84,7 +84,10 @@ func filterComplianceChecks(items []*api.RESTBenchItem, cpf *complianceProfileFi
 		domain = api.DomainNodes
 	}
 
-	tags, _ := cacher.GetDomainEffectiveTags(domain, access.NewReaderAccessControl())
+	tags, err := cacher.GetDomainEffectiveTags(domain, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get domain effective tags")
+	}
 	if len(tags) > 0 {
 		// namespace tagged
 		domainTags := utils.NewSetFromSliceKind(tags)
@@ -258,10 +261,15 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
 
 	var rconf api.RESTComplianceProfileConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -340,10 +348,15 @@ func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
 
 	var rconf api.RESTComplianceProfileEntryConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -465,8 +478,13 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	var rconf api.RESTCompProfilesExport
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &rconf)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
+	}
+	err = json.Unmarshal(body, &rconf)
 	if err == nil {
 		for _, name := range rconf.Names {
 			if name != share.DefaultComplianceProfileName {
@@ -505,7 +523,10 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 		if vpNames.Contains(name) {
 			continue
 		}
-		profile, _, _ := clusHelper.GetComplianceProfile(name, acc)
+		profile, _, err := clusHelper.GetComplianceProfile(name, acc)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "name": name}).Warn("Failed to get compliance profile")
+		}
 		if profile == nil {
 			e := "compliance profile doesn't exist"
 			log.WithFields(log.Fields{"name": name}).Error(e)
@@ -570,12 +591,17 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, err := os.ReadFile(importTask.TempFilename)
+	if err != nil {
+		msg := "Failed to read import file"
+		log.WithFields(log.Fields{"error": err}).Error(msg)
+		postImportOp(errors.New(msg), importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)
+		return nil
+	}
 	var secRuleList resource.NvCompProfileSecurityRuleList
 	var secRule resource.NvCompProfileSecurityRule
 	var secRules = []resource.NvCompProfileSecurityRule{}
 	var invalidCrdKind bool
-	var err error
 	if err = json.Unmarshal(json_data, &secRuleList); err != nil || len(secRuleList.Items) == 0 {
 		if err = json.Unmarshal(json_data, &secRule); err == nil {
 			secRules = append(secRules, secRule)
@@ -605,7 +631,10 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(err).Debug("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockCompKey, importCallerRest)
@@ -621,13 +650,19 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 				cmpProfilesCfg = append(cmpProfilesCfg, cpCfgRet)
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 			}
 		}
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 
 		if err == nil {
 			// [2]: import compliance profile defined in the yaml file
@@ -638,11 +673,17 @@ func importCompProfile(scope string, loginDomainRoles access.DomainRole, importT
 				}
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 			}
 		}
 		importTask.Percentage = 90
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 	}
 
 	postImportOp(err, importTask, loginDomainRoles, "", share.IMPORT_TYPE_COMP_PROFILE)

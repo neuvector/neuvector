@@ -11,7 +11,7 @@ func TestPopulateQueryStat(t *testing.T) {
 		t.Errorf("CreateDatabase() returns %v", err)
 	}
 
-	queryToken := "query-token-111"
+	queryToken := "0123456789ab"
 	qs := &QueryStat{
 		Token:        queryToken,
 		CreationTime: time.Now().UTC().Unix(),
@@ -45,7 +45,7 @@ func TestDeleteQuerySession(t *testing.T) {
 		t.Errorf("CreateDatabase() returns %v", err)
 	}
 
-	queryToken := "query-token-111"
+	queryToken := "0123456789ab"
 	qs := &QueryStat{
 		Token:        queryToken,
 		CreationTime: time.Now().UTC().Unix(),

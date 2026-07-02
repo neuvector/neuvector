@@ -60,7 +60,11 @@ var (
 func InitOpaServer() {
 	t := time.Now()
 	tUnixNano := t.UnixNano()
-	data, _ := json.Marshal(tUnixNano)
+	data, err := json.Marshal(tUnixNano)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal OPA init timestamp")
+		return
+	}
 	AddDocument(opaInitKey, string(data))
 	log.WithFields(log.Fields{"ready": string(data)}).Debug("InitOpaServer.")
 }

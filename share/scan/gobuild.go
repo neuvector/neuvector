@@ -223,7 +223,10 @@ func parseBuildInfo(data string) (bi *BuildInfo, err error) {
 				if c := kv[len(rawKey)]; c != '=' {
 					return nil, fmt.Errorf("unexpected character after quoted key: %q", c)
 				}
-				key, _ = strconv.Unquote(rawKey)
+				key, err = strconv.Unquote(rawKey)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unquote key %q: %w", rawKey, err)
+				}
 				rawValue = kv[len(rawKey)+1:]
 
 			default:

@@ -6,10 +6,6 @@ import (
 	"github.com/neuvector/neuvector/share"
 )
 
-func (o *RESTLicenseInfo) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
-	return nil, nil
-}
-
 func (o *RESTSystemStats) GetDomain(f share.GetAccessObjectFunc) ([]string, []string) {
 	return nil, nil
 }

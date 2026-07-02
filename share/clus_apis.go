@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	log "github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
@@ -56,7 +57,6 @@ const (
 	CFGEndpointServer               = "server"
 	CFGEndpointGroup                = "group"
 	CFGEndpointPolicy               = "policy"
-	CFGEndpointLicense              = "license"
 	CFGEndpointResponseRule         = "response_rule"
 	CFGEndpointProcessProfile       = "process_profile"
 	CFGEndpointRegistry             = "registry"
@@ -89,7 +89,6 @@ const CLUSConfigUserStore string = CLUSConfigStore + CFGEndpointUser + "/"
 const CLUSConfigServerStore string = CLUSConfigStore + CFGEndpointServer + "/"
 const CLUSConfigGroupStore string = CLUSConfigStore + CFGEndpointGroup + "/"
 const CLUSConfigPolicyStore string = CLUSConfigStore + CFGEndpointPolicy + "/"
-const CLUSConfigLicenseKey string = CLUSConfigStore + CFGEndpointLicense
 const CLUSConfigResponseRuleStore string = CLUSConfigStore + CFGEndpointResponseRule + "/"
 const CLUSConfigProcessProfileStore string = CLUSConfigStore + CFGEndpointProcessProfile + "/"
 const CLUSConfigRegistryStore string = CLUSConfigStore + CFGEndpointRegistry + "/"
@@ -131,7 +130,6 @@ const CLUSAuditLogStore string = CLUSObjectStore + "auditlog/"
 const CLUSCloudStore string = CLUSObjectStore + "cloud/"
 const CLUSCrdProcStore string = "crdcontent/"
 const CLUSCertStore string = CLUSObjectStore + "cert/"
-const CLUSLicenseStore string = CLUSObjectStore + "license/"
 const CLUSTelemetryStore string = CLUSObjectStore + "telemetry/"
 const CLUSThrottledEventStore string = CLUSObjectStore + "throttled/"
 
@@ -582,7 +580,10 @@ func CLUSWafGroupKey2Name(key string) string {
 
 func CLUSPolicyRuleKey2ID(key string) uint32 {
 	s := keyLastToken(key)
-	id, _ := strconv.Atoi(s)
+	id, err := strconv.Atoi(s)
+	if err != nil {
+		log.WithError(err).Debug("failed to parse policy rule ID from cluster key")
+	}
 	return uint32(id)
 }
 
@@ -1547,7 +1548,6 @@ type CLUSEventLog struct {
 	RESTRequest    string                   `json:"rest_request,omitempty"`
 	RESTBody       string                   `json:"rest_body,omitempty"`
 	EnforcerLimit  int                      `json:"enforcer_limit,omitempty"`
-	LicenseExpire  time.Time                `json:"license_expire,omitempty"`
 	GroupName      string                   `json:"group_name"`
 	Msg            string                   `json:"message"`
 }
@@ -1785,21 +1785,16 @@ type CLUSCustomCheckGroup struct {
 	Scripts []*CLUSCustomCheck `json:"scripts"`
 }
 
-type CLUSEventCondition struct {
-	CondType  string `json:"type,omitempty"`
-	CondValue string `json:"value,omitempty"`
-}
-
 type CLUSResponseRule struct {
-	ID         uint32               `json:"id"`
-	Event      string               `json:"event"`
-	Comment    string               `json:"comment,omitempty"`
-	Group      string               `json:"group,omitempty"`
-	Conditions []CLUSEventCondition `json:"conditions,omitempty"`
-	Actions    []string             `json:"actions"`
-	Webhooks   []string             `json:"webhooks"`
-	Disable    bool                 `json:"disable,omitempty"`
-	CfgType    TCfgType             `json:"cfg_type"`
+	ID         uint32              `json:"id"`
+	Event      string              `json:"event"`
+	Comment    string              `json:"comment,omitempty"`
+	Group      string              `json:"group,omitempty"`
+	Conditions []v1.EventCondition `json:"conditions,omitempty"`
+	Actions    []string            `json:"actions"`
+	Webhooks   []string            `json:"webhooks"`
+	Disable    bool                `json:"disable,omitempty"`
+	CfgType    TCfgType            `json:"cfg_type"`
 }
 
 func CLUSResponseRuleKey(policyName string, id uint32) string {

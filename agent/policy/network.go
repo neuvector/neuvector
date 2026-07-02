@@ -6,6 +6,7 @@ import "C"
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -130,10 +131,8 @@ func fqdnInfoPostPolicyCalc(hid string) {
 		for _, name := range del {
 			if strings.HasPrefix(name, "*") { //wildcard
 				rule_key := share.CLUSFqdnIpKey(hid, name)
-				if cluster.Exist(rule_key) {
-					if dbgError := cluster.Delete(rule_key); dbgError != nil {
-						log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-					}
+				if dbgError := cluster.Delete(rule_key); dbgError != nil {
+					log.WithFields(log.Fields{"dbgError": dbgError, "key": rule_key}).Warn("Failed to delete FQDN key from cluster")
 				}
 			}
 			delete(fqdnMap, name)
@@ -958,7 +957,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					e.createWorkloadRule(from, to, &pp, pInfo, false, sameHost)
 				} else {
 					isFromNbe := pInfo.Nbe
-					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(from, addrMap) && !utils.IsPolicyModeEnforce(to, addrMap)
+					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(from, addrMap) &&
+						(!utils.IsPolicyModeEnforce(to, addrMap) || pp.ID > share.DefaultGroupRuleID)
 					// Only configure egress rule to external, as east-west egress traffic
 					// will be automatically allowed at DP
 					if isStrict || isFromNbe || to.WlID == share.CLUSWLExternal || to.WlID == share.CLUSWLAddressGroup ||
@@ -1002,7 +1002,8 @@ func (e *Engine) parseGroupIPPolicy(p []share.CLUSGroupIPPolicy, workloadPolicyM
 					e.createWorkloadRule(from, to, &pp, pInfo, true, sameHost)
 				} else {
 					isToNbe := pInfo.Nbe
-					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(to, addrMap) && !utils.IsPolicyModeEnforce(from, addrMap)
+					isStrict := StrictGroupMode && utils.IsPolicyModeEnforce(to, addrMap) &&
+						(!utils.IsPolicyModeEnforce(from, addrMap) || pp.ID > share.DefaultGroupRuleID)
 					// Only configure ingress rule from external, as east-west ingress traffic
 					// will be automatically allowed at DP
 					if isStrict || isToNbe || from.WlID == share.CLUSWLExternal || from.WlID == share.CLUSWLAddressGroup ||
@@ -1157,9 +1158,14 @@ func add_unkn_ip_cache(uip_desc *unknown_ip_desc, polver uint16, iptype string, 
 	task.desc.sip = uip_desc.sip
 	task.desc.dip = uip_desc.dip
 
-	cache.timerTask, _ = aTimerWheel.AddTask(task, UNKN_IP_CACHE_TIMEOUT)
-	if cache.timerTask == "" {
-		log.Error("Fail to insert unknown IP cache timer")
+	var err error
+	cache.timerTask, err = aTimerWheel.AddTask(task, UNKN_IP_CACHE_TIMEOUT)
+	if err != nil {
+		// Log at debug: called per network connection for unknown IPs
+		log.WithError(err).Debug("Failed to add unknown IP cache timer task")
+	} else if cache.timerTask == "" {
+		// Log at debug: called per network connection for unknown IPs
+		log.Debug("Failed to insert unknown IP cache timer: empty task ID")
 	}
 	unknown_ip_map_mutex.Lock()
 	unknown_ip_map[*uip_desc] = cache
@@ -1490,21 +1496,40 @@ func (e *Engine) PushNetworkPolicyToDP() {
 	dp.DPCtrlConfigPolicyAddr(policyAddr)
 }
 
-func (e *Engine) PushFqdnInfoToDP() {
+func (e *Engine) PushFqdnInfoToDP() error {
 	fqdn_key := fmt.Sprintf("%s%s/", share.CLUSFqdnIpStore, e.HostID)
-	allKeys, _ := cluster.GetStoreKeys(fqdn_key)
+	allKeys, err := cluster.GetStoreKeys(fqdn_key)
+	if err != nil {
+		return fmt.Errorf("failed to get FQDN store keys: %w", err)
+	}
+	var errs []error
 	for _, key := range allKeys {
-		if value, _ := cluster.Get(key); value != nil {
+		value, err := cluster.GetWithRetry(key)
+		if err != nil {
+			log.WithError(err).WithField("key", key).Warn("Failed to get FQDN value from cluster")
+			errs = append(errs, fmt.Errorf("key %s: %w", key, err))
+			continue
+		}
+		if value != nil {
 			uzb := utils.GunzipBytes(value)
-			if uzb != nil {
-				var fqdnip share.CLUSFqdnIp
-				if dbgError := json.Unmarshal(uzb, &fqdnip); dbgError != nil {
-					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-				}
-				dp.DPCtrlSetFqdnIp(&fqdnip)
+			if uzb == nil {
+				log.WithField("key", key).Error("Failed to unzip FQDN data")
+				errs = append(errs, fmt.Errorf("key %s: failed to unzip", key))
+				continue
 			}
+			var fqdnip share.CLUSFqdnIp
+			if dbgError := json.Unmarshal(uzb, &fqdnip); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError, "key": key}).Error("Failed to decode FQDN data")
+				errs = append(errs, fmt.Errorf("key %s: %w", key, dbgError))
+				continue
+			}
+			dp.DPCtrlSetFqdnIp(&fqdnip)
 		}
 	}
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to push %d of %d FQDN entries: %w", len(errs), len(allKeys), errors.Join(errs...))
+	}
+	return nil
 }
 
 // dlp

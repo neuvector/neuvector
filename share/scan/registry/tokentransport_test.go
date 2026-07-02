@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockData struct {
@@ -112,7 +113,7 @@ func TestDockerHubAuth(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			_ = transport.AddMockData(md)
+			require.NoError(t, transport.AddMockData(md))
 		}
 	}
 
@@ -128,6 +129,8 @@ func TestDockerHubAuth(t *testing.T) {
 
 		if tc.responseMsg != "" {
 			respMsg, readErr := io.ReadAll(resp.Body)
+			assert.Nil(t, resp.Body.Close())
+
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
@@ -244,7 +247,7 @@ func TestDockerHubReauth(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			_ = transport.AddMockData(md)
+			require.NoError(t, transport.AddMockData(md))
 		}
 	}
 
@@ -261,6 +264,7 @@ func TestDockerHubReauth(t *testing.T) {
 		if tc.responseMsg != "" {
 			respMsg, readErr := io.ReadAll(resp.Body)
 			assert.Nil(t, readErr)
+			assert.Nil(t, resp.Body.Close())
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {
 			assert.Nil(t, resp)
@@ -425,7 +429,7 @@ func TestDockerHubRoundTrip(t *testing.T) {
 
 	for _, tc := range tcs {
 		for _, md := range tc.mockdata {
-			_ = transport.AddMockData(md)
+			require.NoError(t, transport.AddMockData(md))
 		}
 	}
 
@@ -441,6 +445,7 @@ func TestDockerHubRoundTrip(t *testing.T) {
 
 		if tc.responseMsg != "" {
 			respMsg, readErr := io.ReadAll(resp.Body)
+			assert.Nil(t, resp.Body.Close())
 			assert.Nil(t, readErr)
 			assert.Equal(t, tc.responseMsg, string(respMsg))
 		} else {

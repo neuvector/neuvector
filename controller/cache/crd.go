@@ -35,7 +35,9 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 		switch cfgType {
 		case share.CLUSAdmissionCfgState:
 			var state share.CLUSAdmissionState
-			_ = json.Unmarshal(value, &state)
+			if err := json.Unmarshal(value, &state); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal admission state")
+			}
 			sameUri := true
 			for admType, ctrlState := range state.CtrlStates {
 				switch admType {
@@ -45,7 +47,9 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 							sameUri = false
 							cacheCtrlState.Uri = ctrlState.Uri
 							var param interface{} = &resource.NvCrdSvcName
-							_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+							if err := cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param); err != nil {
+								log.WithError(err).Warn("failed to restart crd webhook server")
+							}
 						}
 					}
 				}
@@ -72,15 +76,21 @@ func crdConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 							},
 						},
 					}
-					_, _ = admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState)
+					if _, err := admission.ConfigK8sAdmissionControl(&k8sResInfo, ctrlState); err != nil {
+						log.WithError(err).Warn("Failed to configure k8s admission control for CRD")
+					}
 				}
 			}
 		case share.CLUSCrdContentCount:
 			if isLeader() {
 				var queueInfo share.CLUSCrdEventQueueInfo
-				_ = json.Unmarshal(value, &queueInfo)
+				if err := json.Unmarshal(value, &queueInfo); err != nil {
+					log.WithError(err).Warn("Failed to unmarshal CRD queue info")
+				}
 				if queueInfo.Count > 0 {
-					_ = cctx.StartStopFedPingPollFunc(share.ProcessCrdQueue, 0, nil)
+					if err := cctx.StartStopFedPingPollFunc(share.ProcessCrdQueue, 0, nil); err != nil {
+						log.WithError(err).Warn("failed to process crd request queue")
+					}
 				}
 			}
 		}

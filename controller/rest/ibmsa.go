@@ -261,8 +261,16 @@ func handlerGetIBMSASetupURL(w http.ResponseWriter, r *http.Request, ps httprout
 		}
 	}
 
-	installID, _ := clusHelper.GetInstallationID()
-	id := strings.ReplaceAll(jwtGenFedTicket(installID, time.Duration(jwtIbmSaTokenLife)), "/", "-")
+	installID, err := clusHelper.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Warn("failed to get installation ID")
+	}
+	ticketString, err := jwtGenFedTicket(installID, time.Duration(jwtIbmSaTokenLife))
+	if err != nil {
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
+		return
+	}
+	id := strings.ReplaceAll(ticketString, "/", "-")
 	resp := api.RESTIBMSASetupUrl{URL: fmt.Sprintf("/v1/partner/ibm_sa/%s/setup", url.QueryEscape(id))}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get IBM SA setup endpoint")
@@ -291,8 +299,11 @@ func handlerGetIBMSAConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 
 func verifyIBMSAEpSetupID(w http.ResponseWriter, ps httprouter.Params, checkTime bool) error {
 	id := strings.ReplaceAll(ps.ByName("id"), "-", "/")
-	installID, _ := clusHelper.GetInstallationID()
-	err := validateEncryptedData(id, installID, checkTime)
+	installID, err := clusHelper.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Warn("failed to get installation ID")
+	}
+	err = validateEncryptedData(id, installID, checkTime)
 	if err != nil {
 		restRespErrorMessage(w, http.StatusForbidden, api.RESTErrObjectAccessDenied, err.Error())
 	}
@@ -317,9 +328,15 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	user, _, _ := clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
+	user, _, err := clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get IBMSA user rev")
+	}
 	if user == nil {
-		secret, _ := utils.GetGuid()
+		secret, err := utils.GetGuid()
+		if err != nil {
+			log.WithError(err).Warn("failed to generate IBMSA user secret")
+		}
 		newSaltedPwdHash, err := common.HashPassword(secret, nil)
 		if err != nil {
 			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrOpNotAllowed, err.Error())
@@ -336,12 +353,20 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 			Locale:       common.OEMDefaultUserLocale,
 			PwdResetTime: time.Now().UTC(),
 		}
-		value, _ := json.Marshal(u)
+		value, err := json.Marshal(u)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err}).Error("failed to marshal user data")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrServerError)
+			return
+		}
 		key := share.CLUSUserKey(common.ReservedUserNameIBMSA)
 		if err := cluster.PutIfNotExist(key, value, false); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("PutIfNotExist")
 		}
-		user, _, _ = clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
+		user, _, err = clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get IBMSA user rev after creation")
+		}
 	}
 	if user != nil {
 		remote := r.RemoteAddr
@@ -377,10 +402,18 @@ func handlerGetIBMSAEpInfo(w http.ResponseWriter, r *http.Request, ps httprouter
 	var epDashboardURL string
 	var providerID string
 	acc := access.NewReaderAccessControl() // it's because IBM SA does not carry NV's auth token when it calls these 2 GET APIs
-	if cfgNV, _ := cacher.GetIBMSAConfigNV(acc); cfgNV.EpEnabled && cfgNV.EpDashboardURL != "" {
+	cfgNV, err := cacher.GetIBMSAConfigNV(acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get IBMSA config NV")
+	}
+	if cfgNV.EpEnabled && cfgNV.EpDashboardURL != "" {
 		epDashboardURL = cfgNV.EpDashboardURL
 		if cfgNV.EpStart == 1 {
-			if cfg, _ := cacher.GetIBMSAConfig(acc); cfg != nil {
+			cfg, err := cacher.GetIBMSAConfig(acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get IBMSA config")
+			}
+			if cfg != nil {
 				providerID = cfg.ProviderID
 			}
 		} else {
@@ -492,7 +525,10 @@ func handlerPostIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httprout
 	var err error
 
 	action := ps.ByName("action")
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	switch action {
 	case "configuration":
 		err = json.Unmarshal(body, &cfg)
@@ -754,7 +790,11 @@ func ibmsaPostThreatFinding(f *api.IBMSAFinding) error {
 		occur.Finding.Severity = "LOW"
 	}
 
-	value, _ := json.Marshal(&occur)
+	value, err := json.Marshal(&occur)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("failed to marshal occurrence data")
+		return err
+	}
 	url := fmt.Sprintf("%s/%s/providers/%s/occurrences", ibmsaCfg.FindingsURL, ibmsaCfg.AccountID, ibmsaCfg.ProviderID)
 	return ibmsaCreateOccurence(url, value, &ibmsaCfg)
 }
@@ -896,7 +936,11 @@ func handlerDeleteIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	// IBM SA carries an NV's auth token that is ibmsa role
-	if ibmsaConfig, _ := cacher.GetIBMSAConfigNV(access.NewReaderAccessControl()); !ibmsaConfig.EpEnabled {
+	ibmsaConfig, err := cacher.GetIBMSAConfigNV(access.NewReaderAccessControl())
+	if err != nil {
+		log.WithError(err).Warn("failed to get IBMSA config NV")
+	}
+	if !ibmsaConfig.EpEnabled {
 		restRespError(w, http.StatusForbidden, api.RESTErrObjectAccessDenied)
 		return
 	}
@@ -942,7 +986,10 @@ func handlerTestOccurrences(w http.ResponseWriter, r *http.Request, ps httproute
 
 	//accountID := ps.ByName("accountID")
 	//providerID := ps.ByName("providerID")
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	err = json.Unmarshal(body, &occur)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")

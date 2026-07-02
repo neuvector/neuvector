@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/neuvector/neuvector/controller/common"
 	"github.com/neuvector/neuvector/controller/kv"
@@ -130,7 +131,7 @@ func TestLocalRepoScan(t *testing.T) {
 	}
 
 	// Store another result, same name different ID
-	_ = smd.StoreRepoScanResult(&sr2)
+	require.NoError(t, smd.StoreRepoScanResult(&sr2))
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
 	_, ok = mockCluster.ScanSums[key]
 	if !ok {
@@ -175,13 +176,13 @@ func TestRemoteRepoScan(t *testing.T) {
 	newRepoScanRegistry(common.RegistryRepoScanName)
 
 	// store a local image
-	_ = smd.StoreRepoScanResult(&sr1)
+	require.NoError(t, smd.StoreRepoScanResult(&sr1))
 	key := share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr1.ImageID)
 	sum := mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr1.ImageID, sum, false, nil)
 
 	// store a remote image
-	_ = smd.StoreRepoScanResult(&sr3)
+	require.NoError(t, smd.StoreRepoScanResult(&sr3))
 	key = share.CLUSRegistryImageStateKey(common.RegistryRepoScanName, sr3.ImageID)
 	sum = mockCluster.ScanSums[key]
 	RegistryImageStateUpdate(common.RegistryRepoScanName, sr3.ImageID, sum, false, nil)

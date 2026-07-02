@@ -12,6 +12,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
@@ -121,7 +122,7 @@ func (m CacheMethod) ResponseRule2REST(rule *share.CLUSResponseRule) *api.RESTRe
 		Disable: rule.Disable,
 		CfgType: common.TCfgTypeToApi(rule.CfgType),
 	}
-	restRule.Conditions = make([]share.CLUSEventCondition, len(rule.Conditions))
+	restRule.Conditions = make([]v1.EventCondition, len(rule.Conditions))
 	copy(restRule.Conditions, rule.Conditions)
 
 	if len(rule.Actions) == 0 {
@@ -154,7 +155,10 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 		switch cfgType {
 		case share.CLUSResCfgRule:
 			var rule share.CLUSResponseRule
-			_ = json.Unmarshal(value, &rule)
+			if err := json.Unmarshal(value, &rule); err != nil {
+				log.WithError(err).Warn("failed to unmarshal response rule")
+				return
+			}
 			if exist, ok := resPolicyCache.ruleMap[rule.ID]; ok {
 				if gc, ok := groupCacheMap[exist.Group]; ok {
 					gc.usedByResponseRules.Remove(exist.ID)
@@ -174,7 +178,10 @@ func responseRuleConfigUpdate(nType cluster.ClusterNotifyType, key string, value
 			}
 		case share.CLUSResCfgRuleList:
 			var heads []*share.CLUSRuleHead
-			_ = json.Unmarshal(value, &heads)
+			if err := json.Unmarshal(value, &heads); err != nil {
+				log.WithError(err).Warn("failed to unmarshal response rule heads")
+				return
+			}
 			resPolicyCache.ruleHeads = heads
 			resPolicyCache.ruleOrderMap = ruleHeads2OrderMap(heads)
 		}
@@ -228,7 +235,7 @@ func matchCVEWithFixConditions(condValue string, cveFixedInfo []scanUtils.FixedV
 	return true
 }
 
-func matchConditions(desc *eventDesc, conds []share.CLUSEventCondition) bool {
+func matchConditions(desc *eventDesc, conds []v1.EventCondition) bool {
 	// AND op within a rule. Return false if one criterion doesn't match
 	var match = true
 	for _, d := range conds {
@@ -448,17 +455,25 @@ func responseRuleLookup(desc *eventDesc) {
 
 						var cconf share.CLUSWorkloadConfig
 						key := share.CLUSUniconfWorkloadKey(wlc.workload.HostID, wlc.workload.ID)
-						value, rev, _ := cluster.GetRev(key)
+						value, rev, err := cluster.GetRev(key)
+						if err != nil {
+							log.WithError(err).Warn("failed to get workload config for quarantine")
+						}
 						if value != nil {
-							_ = json.Unmarshal(value, &cconf)
+							if err := json.Unmarshal(value, &cconf); err != nil {
+								log.WithError(err).Warn("failed to unmarshal workload config for quarantine")
+							}
 						} else {
 							cconf.Wire = share.WireDefault
 						}
 						if !cconf.Quarantine {
 							cconf.Quarantine = true
 							cconf.QuarReason = share.QuarantineReasonEvent(desc.event, id)
-							value, _ = json.Marshal(&cconf)
-							if err := cluster.PutRev(key, value, rev); err != nil {
+							var marshalErr error
+							value, marshalErr = json.Marshal(&cconf)
+							if marshalErr != nil {
+								log.WithError(marshalErr).Warn("failed to marshal container config")
+							} else if err := cluster.PutRev(key, value, rev); err != nil {
 								log.WithFields(log.Fields{"error": err, "rev": rev}).Error("")
 							}
 						}

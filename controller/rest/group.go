@@ -22,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/controller/rpc"
@@ -33,10 +34,10 @@ import (
 
 var defGroups utils.Set = utils.NewSet(api.LearnedExternal, api.AllHostGroup, api.AllContainerGroup, api.FedAllHostGroup, api.FedAllContainerGroup)
 
-func criteria2REST(inEntries []share.CLUSCriteriaEntry) []api.RESTCriteriaEntry {
-	var outEntries []api.RESTCriteriaEntry
+func criteria2REST(inEntries []share.CLUSCriteriaEntry) []v1.CriteriaEntry {
+	var outEntries []v1.CriteriaEntry
 	for _, inC := range inEntries {
-		outC := api.RESTCriteriaEntry{
+		outC := v1.CriteriaEntry{
 			Key:   inC.Key,
 			Value: inC.Value,
 			Op:    inC.Op,
@@ -594,10 +595,13 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTGroupConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -718,10 +722,13 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTGroupConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -781,7 +788,10 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	defer clusHelper.ReleaseLock(lock)
 
 	// Read from cluster
-	cg, _, _ := clusHelper.GetGroup(name, acc)
+	cg, _, err := clusHelper.GetGroup(name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get group from cluster")
+	}
 	if cg == nil {
 		e := "Group doesn't exist"
 		log.WithFields(log.Fields{"name": name}).Error(e)
@@ -951,7 +961,10 @@ func handlerGroupDelete(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 	defer clusHelper.ReleaseLock(lock)
 
-	cg, _, _ := clusHelper.GetGroup(name, acc)
+	cg, _, err := clusHelper.GetGroup(name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get group from cluster")
+	}
 	if cg == nil {
 		log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
 		//NVSHAS-7386, Empty group deletion return errs "Object not found"
@@ -1023,10 +1036,13 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1083,7 +1099,11 @@ func configPolicyMode(grp *share.CLUSGroup) error {
 }
 
 func isManagedByCRD(grpName string, acc *access.AccessControl) bool {
-	if cached, _ := cacher.GetGroup(grpName, "", false, acc); cached != nil {
+	cached, err := cacher.GetGroup(grpName, "", false, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get group from cache")
+	}
+	if cached != nil {
 		if cached.CfgType == api.CfgTypeGround {
 			return true
 		} else {
@@ -1110,10 +1130,13 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceBatchConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || len(rconf.Config.Services) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1160,7 +1183,10 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 			name = svc
 		}
 
-		grp, _, _ := clusHelper.GetGroup(name, acc)
+		grp, _, err := clusHelper.GetGroup(name, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group from cluster")
+		}
 		if grp == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Service doesn't exist or access denied")
 			continue
@@ -1571,10 +1597,13 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceBatchConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || len(rconf.Config.Services) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1607,7 +1636,10 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 			name = svc
 		}
 
-		grp, _, _ := clusHelper.GetGroup(name, acc)
+		grp, _, err := clusHelper.GetGroup(name, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group from cluster")
+		}
 		if grp == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Service doesn't exist or access denied")
 			continue
@@ -1666,10 +1698,13 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTServiceBatchConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil || len(rconf.Config.Services) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1702,7 +1737,10 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 			name = svc
 		}
 
-		grp, _, _ := clusHelper.GetGroup(name, acc)
+		grp, _, err := clusHelper.GetGroup(name, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group from cluster")
+		}
 		if grp == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Service doesn't exist or access denied")
 			continue
@@ -1804,7 +1842,10 @@ func handlerGetGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprou
 
 	importRunning := false
 	importNoResponse := false
-	importTask, _ := clusHelper.GetImportTask()
+	importTask, err := clusHelper.GetImportTask()
+	if err != nil {
+		log.WithError(err).Warn("failed to get import task")
+	}
 	if importTask.TID != "" && (importTask.Status == share.IMPORT_PREPARE || importTask.Status == share.IMPORT_RUNNING) {
 		importRunning = true
 		if !importTask.LastUpdateTime.IsZero() && time.Now().UTC().Sub(importTask.LastUpdateTime).Seconds() > share.IMPORT_QUERY_INTERVAL {
@@ -1837,7 +1878,7 @@ func handlerGetGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprou
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get import status")
 }
 
-func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resource.NvGroupDefinition, error) {
+func parseGroupYamlFile(importData []byte) ([]v1.NvSecurityRule, []resource.NvGroupDefinition, error) {
 
 	importDataStr := string(importData)
 	yamlParts := strings.Split(importDataStr, "\n---\n")
@@ -1849,7 +1890,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 
 	var err error
 	var nvGrpDefs []resource.NvGroupDefinition
-	var nvSecRules []resource.NvSecurityRule
+	var nvSecRules []v1.NvSecurityRule
 
 	for i, yamlPart := range yamlParts {
 		var sb strings.Builder
@@ -1887,7 +1928,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 								nvGrpDefs = append(nvGrpDefs, nvGrpDefList.Items...)
 							}
 						case resource.NvClusterSecurityRuleKind, resource.NvSecurityRuleKind:
-							var nvSecRuleList resource.NvSecurityRuleList
+							var nvSecRuleList v1.NvSecurityRuleList
 							if err = json.Unmarshal(jsonData, &nvSecRuleList); err == nil {
 								nvSecRules = append(nvSecRules, nvSecRuleList.Items...)
 							}
@@ -1903,7 +1944,7 @@ func parseGroupYamlFile(importData []byte) ([]resource.NvSecurityRule, []resourc
 							nvGrpDefs = append(nvGrpDefs, nvGrpDef)
 						}
 					case resource.NvClusterSecurityRuleKind, resource.NvSecurityRuleKind:
-						var nvSecRule resource.NvSecurityRule
+						var nvSecRule v1.NvSecurityRule
 						if err = json.Unmarshal(jsonData, &nvSecRule); err == nil {
 							nvSecRules = append(nvSecRules, nvSecRule)
 						}
@@ -1951,7 +1992,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	var secRules []resource.NvSecurityRule
+	var secRules []v1.NvSecurityRule
 	var nvGrpDefs []resource.NvGroupDefinition
 	importData, err := os.ReadFile(importTask.TempFilename)
 	if err == nil {
@@ -1978,7 +2019,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(err).Debug("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -2010,7 +2054,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 		updatedFedRuleTypes := utils.NewSet(share.FedGroupType, share.FedNetworkRulesType)
 
 		// The following code does the same job as crdGFwRuleProcessRecord(grpCfgRet, resource.NvSecurityRuleKind, namebase)
@@ -2038,7 +2085,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if err := clusHelper.PutImportTask(&importTask); err != nil {
+			// Suppress error: progress update is non-critical
+			log.WithError(err).Debug("failed to update import task progress")
+		}
 
 		if err == nil {
 			var updatedGroups utils.Set
@@ -2062,7 +2112,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 			}
 
 			if err == nil {
@@ -2070,7 +2123,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 				kv.DeletePolicyByGroups(targetGroups)
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 
 				// [4] delete all response rules of all the target groups (not all referenced groups)
 				kv.DeleteResponseRuleByGroups(targetGroups)
@@ -2104,10 +2160,12 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 					if len(grpCfgRet.GroupResponseCfg) > 0 {
 						//  import response rules for this group
-						grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+						grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 							grpCfgRet.TargetName: grpCfgRet.GroupResponseCfg,
 						}
-						_, _ = crdHandler.crdHandleGroupResponseRules(importTask.Scope, grpResponseCfg, grpCfgRet.CfgType)
+						if _, err := crdHandler.crdHandleGroupResponseRules(importTask.Scope, grpResponseCfg, grpCfgRet.CfgType); err != nil {
+							log.WithError(err).Warn("failed to handle group response rules during import")
+						}
 						if importTask.Scope == share.ScopeFed {
 							updatedFedRuleTypes.Add(share.FedResponseRulesType)
 						}
@@ -2123,10 +2181,10 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 					if hasDlpWafSetting, ok := targetGroupDlpWAF[grpCfgRet.TargetName]; ok && hasDlpWafSetting {
 						if grpCfgRet.DlpGroupCfg == nil {
-							grpCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]api.RESTCrdDlpGroupSetting, 0)}
+							grpCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]v1.DlpGroupSetting, 0)}
 						}
 						if grpCfgRet.WafGroupCfg == nil {
-							grpCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]api.RESTCrdWafGroupSetting, 0)}
+							grpCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]v1.WafGroupSetting, 0)}
 						}
 
 						txn := cluster.Transact()
@@ -2142,12 +2200,18 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 
 					progress += inc
 					importTask.Percentage = int(progress)
-					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+					if err := clusHelper.PutImportTask(&importTask); err != nil {
+						// Suppress error: progress update is non-critical
+						log.WithError(err).Debug("failed to update import task progress")
+					}
 				}
 
 				progress += inc
 				importTask.Percentage = int(progress)
-				_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					// Suppress error: progress update is non-critical
+					log.WithError(err).Debug("failed to update import task progress")
+				}
 
 				if importTask.Scope == share.ScopeFed && oneSuccess && updatedFedRuleTypes.Cardinality() > 0 {
 					updateFedRulesRevision(updatedFedRuleTypes.ToStringSlice(), acc, login)
@@ -2162,7 +2226,7 @@ func importGroupPolicy(loginDomainRoles access.DomainRole, importTask share.CLUS
 }
 
 // Create/update all the imported groups except for the reserved group, external/nodes/containers/Workload:ingress
-func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (utils.Set, bool, error) {
+func importGroup(scope, targetGroup string, groups []v1.GroupConfig) (utils.Set, bool, error) {
 	var targetGroupDlpWAF bool
 	updatedGroups := utils.NewSet()
 	acc := access.NewAdminAccessControl()
@@ -2174,7 +2238,7 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 		if isDefaultGroup(group.Name) {
 			continue
 		}
-		groupCriteria := []api.RESTCriteriaEntry{}
+		groupCriteria := []v1.CriteriaEntry{}
 		isNvIpGroup := strings.HasPrefix(group.Name, api.LearnedSvcGroupPrefix)
 		// keep processing imported nv.ip.xxx group that has empty criteria when the group is not learned yet on docker swarm
 		if len(group.Criteria) == 0 && !isNvIpGroup {
@@ -2197,7 +2261,10 @@ func importGroup(scope, targetGroup string, groups []api.RESTCrdGroupConfig) (ut
 		}
 
 		create := true
-		cg, _, _ := clusHelper.GetGroup(group.Name, acc)
+		cg, _, err := clusHelper.GetGroup(group.Name, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group for CRD processing")
+		}
 		if cg != nil {
 			// group update case
 			if scope == share.ScopeLocal && cg.CfgType == share.GroundCfg {
@@ -2463,7 +2530,10 @@ func handlerGroupStats(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	host_wl_map := make(map[string]utils.Set)
-	gr, _ := cacher.GetGroup(groupname, "", false, acc)
+	gr, err := cacher.GetGroup(groupname, "", false, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get group from cache")
+	}
 	if gr != nil && len(gr.Members) > 0 {
 		for _, wl := range gr.Members {
 			if wl.HasDatapath {

@@ -106,7 +106,11 @@ func statsLoop(bPassiveContainerDetect bool) {
 	for {
 		select {
 		case <-statsTicker:
-			system, _ := global.SYS.GetHostCPUUsage()
+			// Suppress error: called every 5 seconds in the stats loop
+			system, err := global.SYS.GetHostCPUUsage()
+			if err != nil {
+				log.WithError(err).Debug("Failed to get host CPU usage")
+			}
 			gInfoRLock()
 			updateAgentStats(system)
 			updateContainerStats(system)
@@ -228,10 +232,20 @@ func dpTaskCallback(task *dp.DPTask) {
 func updateAgentStats(cpuSystem uint64) {
 	var mem, cpu uint64 = 0, 0
 	if agentEnv.cgroupMemory != "" {
-		mem, _ = global.SYS.GetContainerMemoryUsage(agentEnv.cgroupMemory)
+		var err error
+		// Suppress error: called every 5 seconds in the stats loop
+		mem, err = global.SYS.GetContainerMemoryUsage(agentEnv.cgroupMemory)
+		if err != nil {
+			log.WithError(err).Debug("Failed to get agent memory usage")
+		}
 	}
 	if agentEnv.cgroupCPUAcct != "" {
-		cpu, _ = global.SYS.GetContainerCPUUsage(agentEnv.cgroupCPUAcct)
+		var err error
+		// Suppress error: called every 5 seconds in the stats loop
+		cpu, err = global.SYS.GetContainerCPUUsage(agentEnv.cgroupCPUAcct)
+		if err != nil {
+			log.WithError(err).Debug("Failed to get agent CPU usage")
+		}
 	}
 	system.UpdateStats(&gInfo.agentStats, mem, cpu, cpuSystem)
 }
@@ -241,10 +255,20 @@ func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
 		var mem, cpu uint64 = 0, 0
 		if c.cgroupMemory != "" {
-			mem, _ = global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
+			var err error
+			// Suppress error: called per-container every 5 seconds, can be high-frequency
+			mem, err = global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "cgroup": c.cgroupMemory}).Debug("Failed to get container memory usage")
+			}
 		}
 		if c.cgroupCPUAcct != "" {
-			cpu, _ = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
+			var err error
+			// Suppress error: called per-container every 5 seconds, can be high-frequency
+			cpu, err = global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
+			if err != nil {
+				log.WithFields(log.Fields{"error": err, "cgroup": c.cgroupCPUAcct}).Debug("Failed to get container CPU usage")
+			}
 		}
 		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
 	}
@@ -260,7 +284,11 @@ func putFqdnIps() {
 
 	for _, fqdnip := range fqdnips {
 		key := share.CLUSFqdnIpKey(Host.ID, fqdnip.FqdnName)
-		value, _ := json.Marshal(fqdnip)
+		value, err := json.Marshal(fqdnip)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal fqdnip")
+			continue
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key, "fqdnip": fqdnip}).Debug("Put fqdn ip")
 		if err := cluster.PutBinary(key, zb); err != nil {
@@ -297,7 +325,11 @@ func putThreatLogs() {
 
 	if len(tlogs) > 0 {
 		key := share.CLUSThreatLogKey(Host.ID, Agent.ID)
-		value, _ := json.Marshal(tlogs)
+		value, err := json.Marshal(tlogs)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal threat logs")
+			return
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key}).Debug("Put threat log")
 		if err := cluster.PutBinary(key, zb); err != nil {
@@ -315,7 +347,11 @@ func putIncidentLogs() {
 
 	if len(tmp) > 0 {
 		key := share.CLUSIncidentLogKey(Host.ID, Agent.ID)
-		value, _ := json.Marshal(tmp)
+		value, err := json.Marshal(tmp)
+		if err != nil {
+			log.WithError(err).Warn("Failed to marshal incident logs")
+			return
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key, "len": len(tmp)}).Debug("Put incident log")
 		if err := cluster.PutBinary(key, zb); err != nil {
@@ -333,7 +369,10 @@ func putAuditLogs() {
 
 	if len(tmp) > 0 {
 		key := share.CLUSAuditLogKey(Host.ID, Agent.ID)
-		value, _ := json.Marshal(tmp)
+		value, err := json.Marshal(tmp)
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal audit log")
+		}
 		zb := utils.GzipBytes(value)
 		log.WithFields(log.Fields{"key": key, "len": len(tmp)}).Debug("Put audit log")
 		if err := cluster.PutBinary(key, zb); err != nil {

@@ -15,12 +15,12 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
     # The FOSSA token is shared between all repos in NeuVector's GH org. It can
     # be used directly and there is no need to request specific access to EIO.
     - name: Read FOSSA token
-      uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+      uses: rancher-eio/read-vault-secrets@7282bf97898cd1c16c89f837e0bb442e6d384c89
       with:
         secrets: |
           secret/data/github/org/neuvector/fossa/credentials token | FOSSA_API_KEY_PUSH_ONLY

@@ -193,15 +193,13 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
 	}
 
-	body, _ := io.ReadAll(r.Body)
-
 	var data api.RESTScanRepoReqData
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || data.Request == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -295,15 +293,13 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
 	}
 
-	body, _ := io.ReadAll(r.Body)
-
 	var data api.RESTScanRepoSubmitData
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil || data.Result == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

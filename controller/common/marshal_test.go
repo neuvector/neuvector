@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/neuvector/neuvector/controller/api"
+	"github.com/stretchr/testify/require"
 )
 
 type MaskEmbed struct {
@@ -48,7 +49,8 @@ func TestMask(t *testing.T) {
 	u2.City = "San Francisco"
 
 	var user maskUser
-	body, _ := m.Marshal(&u1)
+	body, err := m.Marshal(&u1)
+	require.NoError(t, err)
 	unmarshalJSON(t, body, &user)
 	if user.Password != api.RESTMaskedValue || *user.Secret != api.RESTMaskedValue {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
@@ -56,7 +58,8 @@ func TestMask(t *testing.T) {
 
 	var pair maskUserPair
 	p := maskUserPair{User1: u1, User2: &u2}
-	body, _ = m.Marshal(&p)
+	body, err = m.Marshal(&p)
+	require.NoError(t, err)
 	unmarshalJSON(t, body, &pair)
 	if pair.User1.Password != api.RESTMaskedValue || *pair.User1.Secret != api.RESTMaskedValue ||
 		pair.User2.Password != api.RESTMaskedValue || *pair.User2.Secret != api.RESTMaskedValue {
@@ -65,7 +68,8 @@ func TestMask(t *testing.T) {
 
 	var list maskUserList
 	l := maskUserList{Users: []*maskUser{&u1, &u2}}
-	body, _ = m.Marshal(&l)
+	body, err = m.Marshal(&l)
+	require.NoError(t, err)
 	unmarshalJSON(t, body, &list)
 	if list.Users[0].Password != api.RESTMaskedValue || *list.Users[0].Secret != api.RESTMaskedValue ||
 		list.Users[1].Password != api.RESTMaskedValue || *list.Users[1].Secret != api.RESTMaskedValue {
@@ -78,14 +82,16 @@ func TestMaskEmpty(t *testing.T) {
 	var d maskEmpty
 
 	d1 := maskEmpty{Map: make(map[string]int), List: make([]int, 0)}
-	body, _ := m.Marshal(&d1)
+	body, err := m.Marshal(&d1)
+	require.NoError(t, err)
 	unmarshalJSON(t, body, &d)
 	if d.Map == nil || d.List == nil {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
 	}
 
 	d1 = maskEmpty{}
-	body, _ = m.Marshal(&d1)
+	body, err = m.Marshal(&d1)
+	require.NoError(t, err)
 	unmarshalJSON(t, body, &d)
 	if d.Map != nil || d.List != nil {
 		t.Errorf("Incorrect mask marshal: %s", string(body[:]))
@@ -101,25 +107,29 @@ func TestEncrypt(t *testing.T) {
 	u2 := maskUser{Username: "mary", Password: "mary123", Secret: &secret}
 
 	var user maskUser
-	body, _ := enc.Marshal(&u1)
-	if err := dec.Unmarshal(body, &user); err != nil {
+	body, err := enc.Marshal(&u1)
+	require.NoError(t, err)
+	if err = dec.Unmarshal(body, &user); err != nil {
 		t.Errorf("Unmarshal error: %v", err)
 	}
 	if !reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-		body, _ = json.Marshal(&user)
+		body, err = json.Marshal(&user)
+		require.NoError(t, err)
 		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
 	}
 
 	var pair maskUserPair
 	p := maskUserPair{User1: u1, User2: &u2}
-	body, _ = enc.Marshal(&p)
-	if err := dec.Unmarshal(body, &pair); err != nil {
+	body, err = enc.Marshal(&p)
+	require.NoError(t, err)
+	if err = dec.Unmarshal(body, &pair); err != nil {
 		t.Errorf("Unmarshal error: %v", err)
 	}
 	if !reflect.DeepEqual(pair.User1, u1) || !reflect.DeepEqual(*pair.User2, u2) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-		body, _ = json.Marshal(&pair)
+		body, err = json.Marshal(&pair)
+		require.NoError(t, err)
 		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
 	}
 }
@@ -189,8 +199,9 @@ func TestAesGcmEncrypt(t *testing.T) {
 		t.Errorf("Failed to decrypt %v", failed)
 	} else if !reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s, user=%v, u1=%v", string(body[:]), user, u1)
-		body, _ := json.Marshal(&user)
-		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+		debugBody, err := json.Marshal(&user)
+		require.NoError(t, err)
+		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 	}
 
 	var pair maskUserPair
@@ -215,8 +226,9 @@ func TestAesGcmEncrypt(t *testing.T) {
 			t.Errorf("Failed to decrypt %v", failed)
 		} else if !reflect.DeepEqual(pair.User1, u1) || !reflect.DeepEqual(*pair.User2, u2) {
 			t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-			body, _ := json.Marshal(&pair)
-			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+			debugBody, err := json.Marshal(&pair)
+			require.NoError(t, err)
+			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 		}
 	}
 
@@ -262,8 +274,9 @@ func TestAesGcmDecryptWithRotation(t *testing.T) {
 		t.Errorf("Failed to decrypt %v", failed)
 	} else if !reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s, user=%v, u1=%v", string(body[:]), user, u1)
-		body, _ := json.Marshal(&user)
-		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+		debugBody, err := json.Marshal(&user)
+		require.NoError(t, err)
+		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 	}
 
 	// now currentDekSeed is set to version 2
@@ -284,8 +297,9 @@ func TestAesGcmDecryptWithRotation(t *testing.T) {
 		t.Errorf("Failed to decrypt %v", failed)
 	} else if !reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s, user=%v, u1=%v", string(body[:]), user, u1)
-		body, _ := json.Marshal(&user)
-		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+		debugBody, err := json.Marshal(&user)
+		require.NoError(t, err)
+		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 	}
 
 	// now intentionally delete dekSeed-v1 from cache (ideally should not happen in real world)
@@ -305,8 +319,8 @@ func TestAesGcmDecryptWithRotation(t *testing.T) {
 	}
 
 	// Now try enc.Marshal again. Because current DEK is dekSeed-v2, it's expected the marshaled data is different
-	body2, err2 := enc.Marshal(&u1) // enc marshal with DEK (current DEK is dekSeed-v2)
-	if u1.Secret == nil || err2 != nil {
+	body2, err := enc.Marshal(&u1) // enc marshal with DEK (current DEK is dekSeed-v2)
+	if u1.Secret == nil || err != nil {
 		t.Errorf("enc.Marshal error: %v (u1.Secret=%v)", err, u1.Secret)
 	} else if string(body) == string(body2) {
 		t.Errorf("Expected to have different marshaled data because sensitive fields in the objects are encrypted with different dekSeed")
@@ -348,8 +362,9 @@ func TestAesGcmDecryptNegative(t *testing.T) {
 		t.Errorf("Unexpected that all sensitive fields can be decrypt")
 	} else if reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-		body, _ := json.Marshal(&user)
-		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+		debugBody, err := json.Marshal(&user)
+		require.NoError(t, err)
+		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 	}
 
 	resetDekSeeds()
@@ -383,8 +398,9 @@ func TestAesGcmMigrateDecryptUnmarshaller(t *testing.T) {
 		t.Errorf("dec.Unmarshal error: %v", err)
 	} else if !reflect.DeepEqual(user, u1) {
 		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-		body, _ := json.Marshal(&user)
-		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+		debugBody, err := json.Marshal(&user)
+		require.NoError(t, err)
+		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 	}
 
 	keyVersion := "1"
@@ -403,8 +419,9 @@ func TestAesGcmMigrateDecryptUnmarshaller(t *testing.T) {
 	} else {
 		if !reflect.DeepEqual(user1, u1) {
 			t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-			body, _ := json.Marshal(&user)
-			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+			debugBody, err := json.Marshal(&user)
+			require.NoError(t, err)
+			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 		}
 	}
 
@@ -414,8 +431,9 @@ func TestAesGcmMigrateDecryptUnmarshaller(t *testing.T) {
 	} else {
 		if !reflect.DeepEqual(user1, user2) {
 			t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-			body, _ := json.Marshal(&user2)
-			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+			debugBody, err := json.Marshal(&user2)
+			require.NoError(t, err)
+			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 		}
 	}
 
@@ -431,8 +449,9 @@ func TestAesGcmMigrateDecryptUnmarshaller(t *testing.T) {
 		} else {
 			if !reflect.DeepEqual(user3, u1) {
 				t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-				body, _ := json.Marshal(&user3)
-				t.Errorf("Incorrect mask marshal: unmarshal=%s", string(body[:]))
+				debugBody, err := json.Marshal(&user3)
+				require.NoError(t, err)
+				t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
 			}
 		}
 	}
@@ -455,8 +474,9 @@ func TestSpecialType(t *testing.T) {
 		IP: net.IPv4(1, 2, 3, 4), Array: []byte{4, 5, 6, 7},
 		IPs: []net.IP{net.IPv4(1, 2, 3, 4), net.IPv4(9, 8, 7, 6)},
 	}
-	body, _ := enc.Marshal(&a)
-	if err := dec.Unmarshal(body, &b); err != nil {
+	body, err := enc.Marshal(&a)
+	require.NoError(t, err)
+	if err = dec.Unmarshal(body, &b); err != nil {
 		t.Errorf("Unmarshal error: %v", err)
 	}
 	if !reflect.DeepEqual(a, b) {
@@ -471,7 +491,8 @@ func TestAuthServer(t *testing.T) {
 	unmarshalJSON(t, []byte(body), &rconf)
 
 	var m MaskMarshaller
-	masked, _ := m.Marshal(&rconf)
+	masked, err := m.Marshal(&rconf)
+	require.NoError(t, err)
 
 	var maskedConf api.RESTServerConfigData
 	unmarshalJSON(t, masked, &maskedConf)

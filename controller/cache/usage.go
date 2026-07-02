@@ -2,6 +2,7 @@ package cache
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -19,10 +20,11 @@ const usageReportHistory = 180
 
 func writeUsageReport() error {
 	r := getUsageReport()
-	value, _ := json.Marshal(*r)
+	value, err := json.Marshal(*r)
+	if err != nil {
+		return fmt.Errorf("failed to marshal usage report: %w", err)
+	}
 	key := share.CLUSCtrlUsageReportKey(r.ReportedAt.Unix())
-
-	var err error
 	for i := 0; i < 3; i++ {
 		if err = cluster.Put(key, value); err != nil {
 			time.Sleep(usageReportRetryWait)
@@ -37,7 +39,10 @@ func writeUsageReport() error {
 	}
 
 	// clean up
-	keys, _ := cluster.GetStoreKeys(share.CLUSCtrlUsageReportStore)
+	keys, err := cluster.GetStoreKeys(share.CLUSCtrlUsageReportStore)
+	if err != nil {
+		log.WithError(err).Warn("failed to get store keys for usage cleanup")
+	}
 	if len(keys) > usageReportHistory {
 		all := make([]int64, 0, len(keys))
 		for _, key := range keys {
@@ -52,7 +57,9 @@ func writeUsageReport() error {
 
 		for i := usageReportHistory; i < len(all); i++ {
 			key := share.CLUSCtrlUsageReportKey(all[i])
-			_ = cluster.Delete(key)
+			if err := cluster.Delete(key); err != nil {
+				log.WithError(err).Warn("failed to delete usage report")
+			}
 		}
 	}
 
@@ -109,10 +116,16 @@ func getUsageReport() *share.CLUSSystemUsageReport {
 	fedCacheMutexRUnlock()
 
 	store := share.CLUSConfigCloudStore
-	keys, _ := cluster.GetStoreKeys(store)
+	keys, err := cluster.GetStoreKeys(store)
+	if err != nil {
+		log.WithError(err).Warn("failed to get cloud store keys")
+	}
 	r.SLessProjs = len(keys)
 
-	r.InstallationID, _ = clusHelper.GetInstallationID()
+	r.InstallationID, err = clusHelper.GetInstallationID()
+	if err != nil {
+		log.WithError(err).Warn("failed to get installation ID for usage report")
+	}
 
 	return &r
 }

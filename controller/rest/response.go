@@ -23,6 +23,7 @@ import (
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/controller/resource"
 	"github.com/neuvector/neuvector/share"
@@ -393,7 +394,10 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 
 	grpCfgType := utils.ApiCfgTypeToTCfgType[r.CfgType]
 	if r.Group != "" {
-		grp, _, _ := clusHelper.GetGroup(r.Group, acc)
+		grp, _, err := clusHelper.GetGroup(r.Group, acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group")
+		}
 		if grpMustExist && grp == nil {
 			return fmt.Errorf("Group %s is not found", r.Group)
 		} else if grp != nil {
@@ -504,11 +508,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	size := query.limit
-	if size == 0 {
-		size = 20
-	}
-	resp := api.RESTResponseRulesData{Rules: make([]*api.RESTResponseRule, 0, size)}
+	resp := api.RESTResponseRulesData{Rules: []*api.RESTResponseRule{}}
 	if cacher.GetResponseRuleCount(scope, acc) <= query.start {
 		restRespSuccess(w, r, &resp, acc, login, nil, "Get response rule list")
 		return
@@ -533,7 +533,7 @@ func handlerResponseRuleList(w http.ResponseWriter, r *http.Request, ps httprout
 		collectedRules = rules[query.start:end]
 	}
 
-	resp.Rules = append(resp.Rules, collectedRules...)
+	resp.Rules = collectedRules
 
 	log.WithFields(log.Fields{"entries": len(resp.Rules)}).Debug("Response")
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get response rule list")
@@ -747,10 +747,13 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTResponseRuleActionData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -807,7 +810,10 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTResponseRuleConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -1087,7 +1093,10 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var rconf api.RESTResponseRulesExport
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	err = json.Unmarshal(body, &rconf)
 	if err != nil || len(rconf.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1179,7 +1188,7 @@ func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httpro
 	_importHandler(w, r, tid, share.IMPORT_TYPE_RESPONSE, share.PREFIX_IMPORT_RESPONSE, share.PERMS_RUNTIME_POLICIES, acc, login)
 }
 
-func genResponseRuleCrName(id uint32, scope string, crdRule resource.NvCrdResponseRule) (string, error) {
+func genResponseRuleCrName(id uint32, scope string, crdRule v1.NvCrdResponseRule) (string, error) {
 	rMini := api.RESTResponseRule{
 		ID:         id,
 		Event:      crdRule.Event,
@@ -1200,7 +1209,7 @@ func genResponseRuleCrName(id uint32, scope string, crdRule resource.NvCrdRespon
 	return crName, nil
 }
 
-func exportResponseRules(scope, gName string, id uint32, acc *access.AccessControl) ([]*resource.NvCrdResponseRule, error) {
+func exportResponseRules(scope, gName string, id uint32, acc *access.AccessControl) ([]*v1.NvCrdResponseRule, error) {
 	policyName := getResponseExportPolicyName(gName, id)
 	if id != 0 {
 		// export a specific response rule
@@ -1216,7 +1225,7 @@ func exportResponseRules(scope, gName string, id uint32, acc *access.AccessContr
 			}
 			return nil, fmt.Errorf("response rule %d is for group <%s>", id, r.Group)
 		}
-		crdRule := &resource.NvCrdResponseRule{
+		crdRule := &v1.NvCrdResponseRule{
 			PolicyName: policyName,
 			Event:      r.Event,
 			Actions:    r.Actions,
@@ -1225,15 +1234,15 @@ func exportResponseRules(scope, gName string, id uint32, acc *access.AccessContr
 			Webhooks:   r.Webhooks,
 			Conditions: r.Conditions,
 		}
-		return []*resource.NvCrdResponseRule{crdRule}, nil
+		return []*v1.NvCrdResponseRule{crdRule}, nil
 	}
 	if gName != "" {
-		var rules []*resource.NvCrdResponseRule
+		var rules []*v1.NvCrdResponseRule
 		// export all response rules that are for the group
 		allRules := cacher.GetAllResponseRules(scope, acc)
 		for _, r := range allRules {
 			if r.Group == gName {
-				crdRule := &resource.NvCrdResponseRule{
+				crdRule := &v1.NvCrdResponseRule{
 					PolicyName: policyName,
 					Event:      r.Event,
 					Actions:    r.Actions,
@@ -1365,7 +1374,9 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+		log.WithError(putErr).Warn("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -1398,7 +1409,9 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 		oneSuccess := false
 		progress += inc
 		importTask.Percentage = int(progress)
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+			log.WithError(putErr).Warn("failed to update import task progress")
+		}
 
 		for _, parsedCfg := range parsedResponseCfgs {
 			cacheRecord := share.CLUSCrdSecurityRule{
@@ -1412,10 +1425,14 @@ func importResponse(loginDomainRoles access.DomainRole, importTask share.CLUSImp
 			oneSuccess = true
 			progress += inc
 			importTask.Percentage = int(progress)
-			_ = clusHelper.PutImportTask(&importTask)
+			if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+				log.WithError(putErr).Warn("failed to update import task progress")
+			}
 		}
 		importTask.Percentage = 90
-		_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+		if putErr := clusHelper.PutImportTask(&importTask); putErr != nil {
+			log.WithError(putErr).Warn("failed to update import task progress")
+		}
 
 		if oneSuccess && importTask.Scope == share.ScopeFed {
 			updateFedRulesRevision([]string{share.FedResponseRulesType}, acc, login)

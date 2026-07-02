@@ -35,6 +35,9 @@ var errSizeTooBig error = errors.New("size too big")
 const putRetryTimes int = 2
 const putRetryInterval time.Duration = time.Millisecond * 500
 
+const KVGetRetryTimes int = 3
+const KVGetRetryInterval time.Duration = time.Millisecond * 200
+
 var errorRestart bool
 
 type ClusterConfig struct {
@@ -134,7 +137,9 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 		lead = waitClusterReady(time.Second*2, 60)
 
 		// Set ready flag so the controller IP can participate selection after restart
-		_ = utils.SetReady("ctrl init done")
+		if err := utils.SetReady("ctrl init done"); err != nil {
+			log.WithError(err).Warn("failed to set cluster ready flag")
+		}
 
 		if lead == "" {
 			return "", errors.New("Failed to elect leader")
@@ -189,7 +194,10 @@ func StartCluster(cc *ClusterConfig) (string, error) {
 
 			// If cluster cannot elect lead due to dns resolve issue, redo the resolve and
 			// restart cluster
-			lead, _ := driver.GetLead()
+			lead, err := driver.GetLead()
+			if err != nil {
+				log.WithError(err).Debug("failed to get cluster lead")
+			}
 			if lead != "" {
 				log.WithFields(log.Fields{"lead": lead}).Info("Lead elected")
 				retryCluster = 0
@@ -305,7 +313,10 @@ func ForceLeave(node string, server bool) {
 }
 
 func GetClusterLead() string {
-	lead, _ := driver.GetLead()
+	lead, err := driver.GetLead()
+	if err != nil {
+		log.WithError(err).Debug("failed to get cluster lead")
+	}
 	if lead != "" {
 		idx := strings.Index(lead, ":")
 		return lead[:idx]
@@ -323,7 +334,11 @@ func waitClusterReady(t time.Duration, maxRetry int) string {
 
 Wait:
 	for {
-		lead, _ = driver.GetLead()
+		var err error
+		lead, err = driver.GetLead()
+		if err != nil {
+			log.WithError(err).Debug("failed to get cluster lead")
+		}
 		if lead == "" {
 			time.Sleep(t)
 			retry++
@@ -416,7 +431,7 @@ type ClusterDriver interface {
 	NewSession(name string, ttl time.Duration) (SessionInterface, error)
 
 	// KV
-	Exist(key string) bool
+	Exist(key string) (bool, error)
 	GetKeys(prefix, separater string) ([]string, error)
 	Get(key string) ([]byte, error)
 	GetRev(key string) ([]byte, uint64, error)
@@ -455,7 +470,7 @@ func NewSession(name string, ttl time.Duration) (SessionInterface, error) {
 	return driver.NewSession(name, ttl)
 }
 
-func Exist(key string) bool {
+func Exist(key string) (bool, error) {
 	return driver.Exist(key)
 }
 
@@ -466,6 +481,24 @@ func GetKeys(prefix, separater string) ([]string, error) {
 func Get(key string) ([]byte, error) {
 	// log.WithFields(log.Fields{"key": key}).Debug("")
 	return driver.Get(key)
+}
+
+func GetWithRetry(key string) ([]byte, error) {
+	var lastErr error
+	for attempt := 1; attempt <= KVGetRetryTimes; attempt++ {
+		value, err := Get(key)
+		if err == nil {
+			return value, nil
+		}
+		lastErr = err
+		if attempt < KVGetRetryTimes {
+			log.WithFields(log.Fields{
+				"error": err, "key": key, "attempt": attempt,
+			}).Warn("Failed to get key from cluster, retrying")
+			time.Sleep(KVGetRetryInterval)
+		}
+	}
+	return nil, lastErr
 }
 
 func GetRev(key string) ([]byte, uint64, error) {
@@ -994,7 +1027,9 @@ func FillClusterAddrs(cfg *ClusterConfig, sys *system.SystemTools) error {
 				// for lead election; if dns is resolved, other servers are already running - it's possible it's
 				// in the rolling upgrade process, don't make self ready until lead is found.
 				if retry == 1 && cfg.Server {
-					_ = utils.SetReady("cluster init")
+					if err := utils.SetReady("cluster init"); err != nil {
+						log.WithError(err).Warn("failed to set cluster ready flag")
+					}
 				}
 				time.Sleep(time.Second * (1 << retry))
 			} else {

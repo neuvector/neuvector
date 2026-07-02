@@ -409,10 +409,6 @@ func (m *MockCache) GetAuditCount(acc *access.AccessControl) int {
 	return 0
 }
 
-func (m *MockCache) GetCurrentLicense(acc *access.AccessControl) api.RESTLicenseInfo {
-	return api.RESTLicenseInfo{}
-}
-
 func (m *MockCache) GetProcessProfile(group string, acc *access.AccessControl) (*api.RESTProcessProfile, error) {
 	return nil, nil
 }

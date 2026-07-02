@@ -219,6 +219,8 @@ func IsCertRevisionUpToDate(ctx context.Context, client dynamic.Interface, names
 			return false, fmt.Errorf("failed to connect to healthz endpoint for pod %s: %w", pod.Name, err)
 		}
 
+		defer res.Body.Close()
+
 		err = json.NewDecoder(res.Body).Decode(&status)
 		if err != nil {
 			return false, fmt.Errorf("failed to unmarshal healthz response for pod %s: %w", pod.Name, err)

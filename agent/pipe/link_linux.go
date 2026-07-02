@@ -5,6 +5,7 @@ import (
 	"net"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
@@ -14,7 +15,10 @@ var native = nl.NativeEndian()
 
 func ensureIndex(link *netlink.LinkAttrs) {
 	if link != nil && link.Index == 0 {
-		newlink, _ := netlink.LinkByName(link.Name)
+		newlink, err := netlink.LinkByName(link.Name)
+		if err != nil {
+			log.WithFields(log.Fields{"link": link.Name, "error": err}).Debug("Link not found by name")
+		}
 		if newlink != nil {
 			link.Index = newlink.Attrs().Index
 		}

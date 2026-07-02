@@ -332,10 +332,13 @@ func handlerCustomCheckConfig(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("Failed to read request body")
+	}
 
 	var rconf api.RESTCustomCheckConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	config := rconf.Config
 	if err != nil || config == nil ||
 		(config.Add == nil && config.Del == nil && config.Update == nil) {

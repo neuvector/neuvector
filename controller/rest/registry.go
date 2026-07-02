@@ -238,17 +238,15 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	var data api.RESTRegistryConfigData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryConfigDataV2
-		err := json.Unmarshal(body, &v2data)
+		err = json.Unmarshal(body, &v2data)
 		if err != nil || v2data.Config == nil {
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 			return
@@ -285,7 +283,11 @@ func handlerRegistryCreate(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if cc, _, _ := clusHelper.GetRegistry(rconf.Name, acc); cc != nil {
+	cc, _, err := clusHelper.GetRegistry(rconf.Name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get registry")
+	}
+	if cc != nil {
 		log.WithFields(log.Fields{"Name": cc.Name}).Error("Duplicate registry name")
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrDuplicateName, "Duplicate registry name found")
 		return
@@ -585,17 +587,15 @@ func handlerRegistryConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	var data api.RESTRegistryConfigData
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	if getRequestApiVersion(r) == ApiVersion2 {
 		var v2data api.RESTRegistryConfigDataV2
-		err := json.Unmarshal(body, &v2data)
+		err = json.Unmarshal(body, &v2data)
 		if err != nil || v2data.Config == nil {
 			restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
 			return
@@ -1092,11 +1092,6 @@ func handlerRegistryStart(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	name := ps.ByName("name")
 
 	// To start scanning on a registry, the caller only needs reg_scan:w permission on one of the registry's domains
@@ -1133,11 +1128,6 @@ func handlerRegistryStop(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	name := ps.ByName("name")
 
 	// To stop scanning on a registry, the caller only needs reg_scan:w permission on one of the registry's domains
@@ -1171,11 +1161,6 @@ func handlerRegistryDelete(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 
@@ -1288,7 +1273,11 @@ func replaceFedRegistryConfig(newRegs []*share.CLUSRegistryConfig) bool {
 			delete(oldRegs, n.Name)
 		}
 		if !foundSameReg {
-			value, _ := json.Marshal(*n)
+			value, err := json.Marshal(*n)
+			if err != nil {
+				log.WithError(err).Warn("failed to marshal registry config")
+				continue
+			}
 			txn.Put(share.CLUSRegistryConfigKey(n.Name), value)
 		}
 	}

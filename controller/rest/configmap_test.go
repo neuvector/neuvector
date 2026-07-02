@@ -8,6 +8,7 @@ import (
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/kv"
 	"github.com/neuvector/neuvector/share"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCustomRoleCfg(t *testing.T) {
@@ -63,17 +64,20 @@ func TestCustomRoleCfg(t *testing.T) {
 		t.Errorf("handlerolecfg return error:%v\n", err)
 	}
 
-	s1, _, _ := clusHelper.GetCustomRoleRev("role1", accAdmin)
+	s1, _, err := clusHelper.GetCustomRoleRev("role1", accAdmin)
+	require.NoError(t, err)
 	if s1 == nil {
 		t.Errorf("Failed to get role1 config\n")
 	}
 
-	s2, _, _ := clusHelper.GetCustomRoleRev("role2", accAdmin)
+	s2, _, err := clusHelper.GetCustomRoleRev("role2", accAdmin)
+	require.NoError(t, err)
 	if s2 == nil {
 		t.Errorf("Failed to get role2 config")
 	}
 
-	s3, _, _ := clusHelper.GetCustomRoleRev("role3", accAdmin)
+	s3, _, err := clusHelper.GetCustomRoleRev("role3", accAdmin)
+	require.NoError(t, err)
 	if s3 == nil {
 		t.Errorf("Failed to get role3 config")
 	}

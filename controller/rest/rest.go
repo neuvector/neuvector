@@ -204,7 +204,11 @@ func restRespPartial(w http.ResponseWriter, r *http.Request, resp interface{}) {
 	var data []byte
 	if resp != nil {
 		var e common.EmptyMarshaller
-		data, _ = e.Marshal(resp)
+		var marshalErr error
+		data, marshalErr = e.Marshal(resp)
+		if marshalErr != nil {
+			log.WithError(marshalErr).Warn("failed to marshal partial response")
+		}
 
 		if hdrs, ok := r.Header["Accept-Encoding"]; ok {
 		loop:
@@ -238,7 +242,11 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 	if resp != nil {
 		if restIsSupportReq(r) {
 			var m common.MaskMarshaller
-			data, _ = m.Marshal(resp)
+			var marshalErr error
+			data, marshalErr = m.Marshal(resp)
+			if marshalErr != nil {
+				log.WithError(marshalErr).Warn("failed to marshal response")
+			}
 		} else {
 			accept := r.Header.Get("Accept")
 			if accept == "application/gob" {
@@ -251,7 +259,11 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 				ct = accept
 			} else {
 				var e common.EmptyMarshaller
-				data, _ = e.Marshal(resp)
+				var marshalErr error
+				data, marshalErr = e.Marshal(resp)
+				if marshalErr != nil {
+					log.WithError(marshalErr).Warn("failed to marshal response")
+				}
 			}
 		}
 
@@ -288,7 +300,11 @@ func restRespSuccess(w http.ResponseWriter, r *http.Request, resp interface{},
 			var masked []byte
 			if req != nil {
 				var m common.MaskMarshaller
-				masked, _ = m.Marshal(req)
+				var marshalErr error
+				masked, marshalErr = m.Marshal(req)
+				if marshalErr != nil {
+					log.WithError(marshalErr).Warn("failed to marshal request for audit log")
+				}
 			}
 			restEventLog(r, masked, login, restLogFields{restLogFieldMsg: msg})
 		}
@@ -1067,13 +1083,19 @@ func getNewestVersion(vers utils.Set) string {
 
 func isObjectNameValid(name string) bool {
 	// Object name must starts with letters or digits
-	valid, _ := regexp.MatchString("^[a-zA-Z0-9]+[.:a-zA-Z0-9_-]*$", name)
+	valid, err := regexp.MatchString("^[a-zA-Z0-9]+[.:a-zA-Z0-9_-]*$", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match object name pattern")
+	}
 	return valid
 }
 
 func isObjectNameWithSpaceValid(name string) bool {
 	// Object name must starts with letters or digits
-	valid, _ := regexp.MatchString("(^[a-zA-Z0-9]$)|(^[a-zA-Z0-9]+[ .:a-zA-Z0-9_-]*[.:a-zA-Z0-9_-]+$)", name)
+	valid, err := regexp.MatchString("(^[a-zA-Z0-9]$)|(^[a-zA-Z0-9]+[ .:a-zA-Z0-9_-]*[.:a-zA-Z0-9_-]+$)", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match object name pattern")
+	}
 	return valid
 }
 
@@ -1093,14 +1115,20 @@ func isUserNameValid(name string) bool {
 
 func isNamePathValid(name string) bool {
 	// Accept name or path, such as "https://mydomain.com/groups" or "/groups"
-	valid, _ := regexp.MatchString("^[/a-zA-Z0-9]+[/.:a-zA-Z0-9_-]*$", name)
+	valid, err := regexp.MatchString("^[/a-zA-Z0-9]+[/.:a-zA-Z0-9_-]*$", name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match name path pattern")
+	}
 	return valid
 }
 
 func isDomainNameValid(name string) bool {
 	// k8s namesapce naming rule: a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc')
 	// plus, we support * at the end of namespace configuration for regex matching
-	valid, _ := regexp.MatchString(`^[a-z0-9]+[-a-z0-9\*]*[\*a-z0-9]$`, name)
+	valid, err := regexp.MatchString(`^[a-z0-9]+[-a-z0-9\*]*[\*a-z0-9]$`, name)
+	if err != nil {
+		log.WithError(err).Warn("failed to match domain name pattern")
+	}
 	return valid
 }
 
@@ -1991,7 +2019,7 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
-		MinVersion:               tls.VersionTLS11,
+		MinVersion:               tls.VersionTLS13,
 		PreferServerCipherSuites: true,
 		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
 	}
@@ -2061,7 +2089,7 @@ func startFedRestServer(fedPingInterval uint32) {
 	r.POST("/v1/fed/csp_support_internal", handlerCspSupportInternal)    // Skip API document, called from joint cluster to master cluster for collecting support config
 	r.GET("/v1/fed/healthcheck", handlerFedHealthCheck)                  // for fed master REST server health-check. no token required
 
-	config := &tls.Config{MinVersion: tls.VersionTLS11}
+	config := &tls.Config{MinVersion: tls.VersionTLS13}
 	server := &http.Server{
 		Addr:      addr,
 		Handler:   restLogger{r},
@@ -2298,8 +2326,18 @@ func doExport(filename, exportType string, remoteExportOptions *api.RESTRemoteEx
 
 	data, isRespByteSlice = resp.([]byte)
 	if !isRespByteSlice {
-		json_data, _ := json.MarshalIndent(resp, "", "  ")
-		data, _ = yaml.JSONToYAML(json_data)
+		json_data, err := json.MarshalIndent(resp, "", "  ")
+		if err != nil {
+			log.WithError(err).Error("failed to marshal export data as JSON")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailExport)
+			return
+		}
+		data, err = yaml.JSONToYAML(json_data)
+		if err != nil {
+			log.WithError(err).Error("failed to convert export data to YAML")
+			restRespError(w, http.StatusInternalServerError, api.RESTErrFailExport)
+			return
+		}
 	}
 
 	if remoteExportOptions != nil {

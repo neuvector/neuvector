@@ -67,3 +67,32 @@ func TestAssetBasedFilterParsing(t *testing.T) {
 		t.Error("Asset based filter doesn't contains container type")
 	}
 }
+
+func TestAssetBasedFilterParsingForImage(t *testing.T) {
+	url := "/v1/vulassets"
+	method := "POST"
+
+	// prepare two asset based filters
+	payload := []byte(`{"matchTypeImage": "contains", "imageName": "iperf", "matchTypeImageBaseOS": "contains", "imageBaseOS": "alpine"}`)
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
+	if err != nil {
+		t.Errorf("create http request failed, returned %v", err)
+		return
+	}
+
+	// parse it
+	queryFilter, err := GetVulnerabilityQuery(req)
+	if err != nil {
+		t.Errorf("GetVulnerabilityQuery returned %v", err)
+	}
+
+	// verify it can parse correctly
+	filters := queryFilter.GetAssestBasedFilters()
+	if filters[AssetRuleImage] != 1 {
+		t.Error("Asset based filter doesn't contains image type")
+	}
+	if (queryFilter.Filters.ImageNameMatchType != "contains" && queryFilter.Filters.ImageName != "iperf" ||
+		queryFilter.Filters.ImageBaseOSMatchType != "contains") && queryFilter.Filters.ImageBaseOS != "alpine" {
+		t.Errorf("Enexpected asset based filter result: %v", *queryFilter.Filters)
+	}
+}

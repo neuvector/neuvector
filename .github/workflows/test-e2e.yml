@@ -1,0 +1,40 @@
+name: E2E Tests
+
+on:
+  pull_request:
+
+jobs:
+  test-e2e:
+    permissions:
+      contents: read
+    name: E2E test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: "go.mod"
+      - name: Setup kvm
+        run: |
+          sudo apt update
+          sudo apt-get install qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+          sudo usermod -a -G libvirt $USER
+      - name: Install minikube
+        env:
+          MINIKUBE_VERSION: v1.38.1
+        run: |
+          curl -sSLo minikube https://storage.googleapis.com/minikube/releases/${{ env.MINIKUBE_VERSION }}/minikube-linux-amd64
+          sudo install minikube /usr/local/bin/minikube
+      - name: Running Test e2e
+        run: |
+          sg libvirt -c "make test-e2e"
+      - name: Upload cluster logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-test-cluster-logs
+          path: test/e2e/logs
+          if-no-files-found: error
+          retention-days: 7

@@ -615,7 +615,9 @@ func hostUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 		var newHost, ok bool
 		var cache *hostCache
 		var host share.CLUSHost
-		_ = json.Unmarshal(value, &host)
+		if err := json.Unmarshal(value, &host); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal host")
+		}
 
 		if localDev.Host.Platform == share.PlatformKubernetes && localDev.Host.Flavor == share.FlavorRancher && host.Flavor == "" {
 			host.Flavor = share.FlavorRancher
@@ -736,7 +738,9 @@ func agentUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var agent share.CLUSAgent
 		var newAgent bool
-		_ = json.Unmarshal(value, &agent)
+		if err := json.Unmarshal(value, &agent); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal agent")
+		}
 
 		log.WithFields(log.Fields{"agent": agent}).Info("Add or update enforcer")
 
@@ -839,7 +843,9 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var ctrl share.CLUSController
 		var newCtrl bool
-		_ = json.Unmarshal(value, &ctrl)
+		if err := json.Unmarshal(value, &ctrl); err != nil {
+			log.WithError(err).Warn("failed to unmarshal controller")
+		}
 
 		log.WithFields(log.Fields{"controller": ctrl}).Info("Add or update controller")
 
@@ -856,7 +862,9 @@ func controllerUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 			for _, cc = range ctrlCacheMap {
 				if cc.ctrl.ID != ctrl.ID && cc.ctrl.ClusterIP == ctrl.ClusterIP {
 					log.WithFields(log.Fields{"controller": cc.ctrl}).Info("duplicated controller")
-					_ = cluster.Delete(cc.clusKey)
+					if err := cluster.Delete(cc.clusKey); err != nil {
+						log.WithError(err).Warn("failed to delete duplicated controller")
+					}
 				}
 			}
 
@@ -1365,7 +1373,9 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var wl share.CLUSWorkload
-		_ = json.Unmarshal(value, &wl)
+		if err := json.Unmarshal(value, &wl); err != nil {
+			log.WithError(err).Warn("failed to unmarshal workload")
+		}
 
 		// Check if it's NeuVector containers first
 		if wl.PlatformRole == container.PlatformContainerNeuVector {
@@ -1512,7 +1522,9 @@ func workloadUpdate(nType cluster.ClusterNotifyType, key string, value []byte) {
 					log.WithFields(log.Fields{"group": wlCache.learnedGroupName}).Debug("Fix group fields")
 					gc.group.CapIntcp = wl.CapIntcp
 					gc.group.PlatformRole = wl.PlatformRole
-					_ = clusHelper.PutGroup(gc.group, false)
+					if err := clusHelper.PutGroup(gc.group, false); err != nil {
+						log.WithError(err).Warn("failed to update group in cluster")
+					}
 				}
 			}
 		}
@@ -1604,7 +1616,9 @@ func networkEPUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var nep share.CLUSNetworkEP
-		_ = json.Unmarshal(value, &nep)
+		if err := json.Unmarshal(value, &nep); err != nil {
+			log.WithError(err).Warn("failed to unmarshal network endpoint")
+		}
 		addToNetworkEPGroup(&nep)
 	case cluster.ClusterNotifyDelete:
 		id := share.CLUSNetworkEPKey2ID(key)
@@ -1651,7 +1665,11 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 	case "uniconf":
 		uniconfUpdate(nType, key, value)
 	case "cert":
-		value, _, _ = kv.UpgradeAndConvert(key, value)
+		var err error
+		value, err, _ = kv.UpgradeAndConvert(key, value)
+		if err != nil {
+			log.WithError(err).Warn("failed to upgrade/convert cert object")
+		}
 		certObjectUpdate(nType, key, value)
 	case "throttled", "telemetry":
 	default:
@@ -1660,7 +1678,11 @@ func ObjectUpdateHandler(nType cluster.ClusterNotifyType, key string, value []by
 }
 
 func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
-	value, _, _ = kv.UpgradeAndConvert(key, value)
+	var err error
+	value, err, _ = kv.UpgradeAndConvert(key, value)
+	if err != nil {
+		log.WithError(err).Warn("failed to upgrade/convert config object")
+	}
 
 	config := share.CLUSConfigKey2Config(key)
 
@@ -1679,8 +1701,6 @@ func configUpdate(nType cluster.ClusterNotifyType, key string, value []byte, mod
 		policyConfigUpdate(nType, key, value)
 	case share.CFGEndpointScan:
 		scanConfigUpdate(nType, value)
-	case share.CFGEndpointLicense:
-		licenseConfigUpdate(nType, key, value)
 	case share.CFGEndpointResponseRule:
 		responseRuleConfigUpdate(nType, key, value)
 	case share.CFGEndpointProcessProfile:
@@ -1851,7 +1871,9 @@ func logAgentEvent(ev share.TLogEvent, agent *share.CLUSAgent, msg string) {
 
 	clog.ReportedAt = time.Now().UTC()
 
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("failed to append agent event to queue")
+	}
 }
 
 func logControllerEvent(ev share.TLogEvent, ctrl *share.CLUSController, msg string) {
@@ -1868,7 +1890,9 @@ func logControllerEvent(ev share.TLogEvent, ctrl *share.CLUSController, msg stri
 	}
 	clog.ReportedAt = time.Now().UTC()
 
-	_ = cctx.EvQueue.Append(&clog)
+	if err := cctx.EvQueue.Append(&clog); err != nil {
+		log.WithError(err).Warn("failed to append controller event to queue")
+	}
 }
 
 func markWorkloadState(workloads utils.Set, state string) {
@@ -1925,7 +1949,10 @@ func putSpecialIPNetToCluseter(checkDiff bool) {
 	}
 
 	key := share.CLUSInternalIPNetsKey(share.SpecialIPNetDefaultName)
-	value, _ := json.Marshal(subnets)
+	value, err := json.Marshal(subnets)
+	if err != nil {
+		log.WithError(err).Warn("Failed to marshal subnets")
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")
@@ -1967,7 +1994,11 @@ func putInternalIPNetToCluseter(checkDiff bool) {
 	}
 
 	key := share.CLUSInternalIPNetsKey(share.InternalIPNetDefaultName)
-	value, _ := json.Marshal(subnets)
+	value, err := json.Marshal(subnets)
+	if err != nil {
+		log.WithError(err).Warn("failed to marshal internal IP subnets")
+		return
+	}
 	zb := utils.GzipBytes(value)
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Error in putting to cluster")
@@ -2280,7 +2311,9 @@ func querySessionRequest(nType cluster.ClusterNotifyType, key string, value []by
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var qsr api.QuerySessionRequest
-		_ = json.Unmarshal(value, &qsr)
+		if err := json.Unmarshal(value, &qsr); err != nil {
+			log.WithError(err).Warn("failed to unmarshal query session request")
+		}
 
 		log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key, "qsr": qsr}).Debug("[multi-cluster] consul kv watcher added event. Will call rest.CreateQuerySession()")
 

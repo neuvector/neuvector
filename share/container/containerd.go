@@ -72,7 +72,11 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 
 	// optional
 	snapshotter := ""
-	id, _, _ := sys.GetSelfContainerID() // not relaible, could be sandboxID
+	id, _, err := sys.GetSelfContainerID() // not reliable, could be sandboxID
+	if err != nil {
+		// Suppress error: initial container ID detection is best-effort
+		log.WithError(err).Debug("failed to get self container ID")
+	}
 	cri, criVer, err := newCriClient(endpoint, ctx)
 	if err == nil {
 		log.WithFields(log.Fields{"version": criVer}).Info("cri")
@@ -85,7 +89,12 @@ func containerdConnect(endpoint string, sys *system.SystemTools) (Runtime, error
 			log.WithFields(log.Fields{"error": err}).Error("cri info")
 		}
 
-		id, _ = criGetSelfID(cri, ctx, id)
+		var criErr error
+		id, criErr = criGetSelfID(cri, ctx, id)
+		if criErr != nil {
+			// Suppress error: best-effort self ID detection via CRI
+			log.WithError(criErr).Debug("Failed to get self container ID via CRI")
+		}
 		sockPath, err = criGetContainerSocketPath(cri, ctx, id, endpoint)
 		if err == nil {
 			log.WithFields(log.Fields{"selfID": id, "sockPath": sockPath}).Info()
@@ -696,7 +705,10 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 			Running:   pod.Status.State == criRT.PodSandboxState_SANDBOX_READY,
 		}
 		attempt = pod.Status.Metadata.Attempt
-		pid, _ = d.getContainerPid_CRI(pod.GetInfo())
+		pid, err = d.getContainerPid_CRI(pod.GetInfo())
+		if err != nil {
+			log.WithError(err).Warn("failed to get container PID for CRI pod")
+		}
 	} else {
 		// an APP container
 		cs, err2 := criContainerStatus(d.criClient, ctx, id)
@@ -710,7 +722,10 @@ func (d *containerdDriver) GetContainerCriSupplement(id string) (*ContainerMetaE
 			Running:  cs.Status.State == criRT.ContainerState_CONTAINER_RUNNING || cs.Status.State == criRT.ContainerState_CONTAINER_CREATED,
 		}
 		attempt = cs.Status.Metadata.Attempt
-		pid, _ = d.getContainerPid_CRI(cs.GetInfo())
+		pid, err2 = d.getContainerPid_CRI(cs.GetInfo())
+		if err2 != nil {
+			log.WithError(err2).Warn("failed to get container PID for CRI container")
+		}
 	}
 	return meta, pid, attempt, nil
 }

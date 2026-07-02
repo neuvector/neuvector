@@ -63,6 +63,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 
 	q.Filters.ServiceNameMatchType = validateOrDefault(q.Filters.ServiceNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.ImageNameMatchType = validateOrDefault(q.Filters.ImageNameMatchType, []string{"equals", "contains"}, "")
+	q.Filters.ImageBaseOSMatchType = validateOrDefault(q.Filters.ImageBaseOSMatchType, []string{"equals", "contains"}, "")
 	q.Filters.NodeNameMatchType = validateOrDefault(q.Filters.NodeNameMatchType, []string{"equals", "contains"}, "")
 	q.Filters.ContainerNameMatchType = validateOrDefault(q.Filters.ContainerNameMatchType, []string{"equals", "contains"}, "")
 
@@ -105,7 +106,8 @@ func (q *VulQueryFilter) GetAssestBasedFilters() map[string]int {
 		stats[AssetRuleNode] = 1
 	}
 
-	if (q.Filters.ImageNameMatchType == "equals" || q.Filters.ImageNameMatchType == "contains") && q.Filters.ImageName != "" {
+	if ((q.Filters.ImageNameMatchType == "equals" || q.Filters.ImageNameMatchType == "contains") && q.Filters.ImageName != "") ||
+		((q.Filters.ImageBaseOSMatchType == "equals" || q.Filters.ImageBaseOSMatchType == "contains") && q.Filters.ImageBaseOS != "") {
 		stats[AssetRuleImage] = 1
 	}
 
@@ -133,7 +135,10 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 
 	columns := []interface{}{"id", "type", "assetid", "idns", "vulsb"}
 
-	statement, args, _ := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select(columns...).Where(buildAssetFilterWhereClause(queryFilter.Filters)).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, 0, perf, CVEDBReady, fmt.Errorf("failed to build asset query: %w", err)
+	}
 	log.WithFields(log.Fields{"statement": statement, "args": args, "CVEDBReady": CVEDBReady}).Debug("GetVulAssetSessionV2, fetch assets")
 	rows, err := db.Query(statement, args...)
 	if err != nil {
@@ -219,10 +224,23 @@ func FilterVulAssetsV2(allowed map[string]utils.Set, queryFilter *VulQueryFilter
 			continue
 		}
 
-		vulasset.Workloads, _ = convertToJSON(vulasset.WorkloadItems)
-		vulasset.Nodes, _ = convertToJSON(vulasset.NodeItems)
-		vulasset.Images, _ = convertToJSON(vulasset.ImageItems)
-		vulasset.Platforms, _ = convertToJSON(vulasset.PlatformItems)
+		var jsonErr error
+		vulasset.Workloads, jsonErr = convertToJSON(vulasset.WorkloadItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert workload items to JSON")
+		}
+		vulasset.Nodes, jsonErr = convertToJSON(vulasset.NodeItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert node items to JSON")
+		}
+		vulasset.Images, jsonErr = convertToJSON(vulasset.ImageItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert image items to JSON")
+		}
+		vulasset.Platforms, jsonErr = convertToJSON(vulasset.PlatformItems)
+		if jsonErr != nil {
+			log.WithError(jsonErr).Warn("failed to convert platform items to JSON")
+		}
 
 		vulasset.MeetSearch = true
 		vulasset.ImpactWeight = len(vulasset.WorkloadItems) + len(vulasset.NodeItems) + len(vulasset.ImageItems) + len(vulasset.PlatformItems)
@@ -307,6 +325,9 @@ func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {
 }
 
 func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, LastModifiedTime int64) (map[string]*DbVulAsset, map[string][]string, error) {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return nil, nil, err
+	}
 	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
@@ -314,7 +335,10 @@ func GetSessionMatchedVuls(allowed map[string]utils.Set, sessionToken string, La
 		"vectors", "score_v3", "vectors_v3", "published_timestamp", "last_modified_timestamp",
 		"workloads", "nodes", "images", "platforms"}
 
-	statement, args, _ := dialect.From(sessionTemp).Select(columns...).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(sessionTemp).Select(columns...).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build session vul query: %w", err)
+	}
 
 	queryStat, err := GetQueryStat(sessionToken)
 	if err != nil {
@@ -383,6 +407,9 @@ func addAssetsToSet(assetsIDStr string, assetSet utils.Set) {
 }
 
 func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	// create a new db file using the sessionToken as filename
 	db, err := createSessionFileDb(sessionToken)
 	if err != nil {
@@ -416,6 +443,9 @@ func PopulateSessionToFile(sessionToken string, vulAssets []*DbVulAsset) error {
 }
 
 func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memoryDb bool) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
@@ -425,6 +455,12 @@ func PopulateSessionVulAssets(sessionToken string, vulAssets []*DbVulAsset, memo
 }
 
 func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerabilityAssetDataV2, utils.Set, error) {
+	if requesetQuery != nil {
+		if err := vaildateQueryToken(requesetQuery.QueryToken); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	getOrderColumn := func(filters *api.VulQueryFilterViewModel) exp.OrderedExpression {
 		column := "name"
 		if filters.OrderByColumn == "name" || filters.OrderByColumn == "score" || filters.OrderByColumn == "score_v3" || filters.OrderByColumn == "published_timestamp" || filters.OrderByColumn == "feed_rating" {
@@ -491,10 +527,14 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
 	var args []interface{}
+	var sqlErr error
 	if row == -1 {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
+		statement, args, sqlErr = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Prepared(true).ToSQL() // select all
 	} else {
-		statement, args, _ = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+		statement, args, sqlErr = dialect.From(sessionTemp).Select(columns...).Where(quickFilterExp).Order(getOrderColumn(queryFilter.Filters)).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+	}
+	if sqlErr != nil {
+		return nil, nil, fmt.Errorf("failed to build session query: %w", sqlErr)
 	}
 
 	// if file db is ready, use it..
@@ -579,7 +619,10 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 	expAssets := goqu.Ex{"assetid": assets}
 	columns = []interface{}{"idns", "vulsb"}
 
-	statement, args, _ = dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
+	statement, args, sqlErr = dialect.From(Table_assetvuls).Select(columns...).Where(goqu.And(expAssets)).Prepared(true).ToSQL()
+	if sqlErr != nil {
+		return nil, nil, sqlErr
+	}
 	rows, err = dbHandle.Query(statement, args...)
 	if err != nil {
 		return nil, nil, err
@@ -631,7 +674,10 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 
 	// get quick filter count for navigation
 	if requesetQuery.Filters.QuickFilter != "" {
-		sql, _, _ := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(quickFilterExp).ToSQL()
+		sql, _, sqlErr2 := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(quickFilterExp).ToSQL()
+		if sqlErr2 != nil {
+			return nil, nil, sqlErr2
+		}
 
 		rows, err := db.Query(sql)
 		if err != nil {
@@ -653,6 +699,10 @@ func GetVulAssetSessionV2(requesetQuery *VulQueryFilter) (*api.RESTVulnerability
 }
 
 func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
+
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
@@ -685,6 +735,9 @@ func CeateSessionVulAssetTable(sessionToken string, memoryDb bool) error {
 }
 
 func CreateSessionAssetTable(sessionToken string, memoryDb bool) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	db := dbHandle
 	if memoryDb {
 		db = memoryDbHandle
@@ -951,7 +1004,10 @@ func GetTopAssets(allowed map[string]utils.Set, assetType string, topN int) ([]*
 	}
 
 	dialect := goqu.Dialect("sqlite3")
-	statement, args, _ := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
+	statement, args, err := dialect.From(Table_assetvuls).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(buildWhereClause(assetType, allowedAssets)).Order(goqu.C("cve_count").Desc()).Limit(5).Prepared(true).ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	db := dbHandle
 	rows, err := db.Query(statement, args...)
@@ -981,8 +1037,11 @@ func DeleteAssetByID(assetType string, assetid string) error {
 	db := dbHandle
 
 	// delete asset in assetvul table
-	sql, args, _ := dialect.Delete(Table_assetvuls).Where(goqu.Ex{"type": assetType, "assetid": assetid}).Prepared(true).ToSQL()
-	_, err := db.Exec(sql, args...)
+	sql, args, err := dialect.Delete(Table_assetvuls).Where(goqu.Ex{"type": assetType, "assetid": assetid}).Prepared(true).ToSQL()
+	if err != nil {
+		return fmt.Errorf("failed to build asset delete query: %w", err)
+	}
+	_, err = db.Exec(sql, args...)
 	if err != nil {
 		return err
 	}

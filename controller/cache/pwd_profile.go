@@ -38,7 +38,10 @@ func pwdProfileConfigUpdate(nType cluster.ClusterNotifyType, key string, value [
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var profile share.CLUSPwdProfile
-		_ = json.Unmarshal(value, &profile)
+		if err := json.Unmarshal(value, &profile); err != nil {
+			log.WithError(err).Warn("failed to unmarshal password profile")
+			return
+		}
 		cacheMutexLock()
 		pwdProfiles[name] = &profile
 		if name == activePwdProfileName && profile.SessionTimeout != 0 {

@@ -153,8 +153,14 @@ func getLocalInfo(selfID string, pid2ID map[int]string) error {
 	Agent.HostID = Host.ID
 	Agent.Ver = Version
 
-	agentEnv.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(0, "memory")
-	agentEnv.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(0, "cpuacct")
+	agentEnv.cgroupMemory, err = global.SYS.GetContainerCgroupPath(0, "memory")
+	if err != nil {
+		log.WithError(err).Debug("Failed to get memory cgroup path")
+	}
+	agentEnv.cgroupCPUAcct, err = global.SYS.GetContainerCgroupPath(0, "cpuacct")
+	if err != nil {
+		log.WithError(err).Debug("Failed to get cpuacct cgroup path")
+	}
 	return nil
 }
 
@@ -445,7 +451,10 @@ func main() {
 	agentEnv.runWithController = *withCtlr
 	agentEnv.runInContainer = global.SYS.IsRunningInContainer()
 	if agentEnv.runInContainer {
-		_, agentEnv.containerInContainer, _ = global.SYS.GetSelfContainerID()
+		_, agentEnv.containerInContainer, err = global.SYS.GetSelfContainerID()
+		if err != nil {
+			log.WithError(err).Warn("Failed to get self container ID")
+		}
 		selfID = global.RT.GetSelfID()
 		if selfID == "" { // it is a POD ID in the k8s cgroup v2; otherwise, a real container ID
 			log.WithFields(log.Fields{"error": err}).Error("Unsupported system. Exit!")
@@ -766,7 +775,10 @@ func main() {
 	putLocalInfo()
 	logAgent(share.CLUSEvAgentJoin)
 
-	clusterLoop(existing)
+	if err := clusterLoop(existing); err != nil {
+		log.WithError(err).Error("Failed to initialize cluster loop")
+		os.Exit(-1)
+	}
 	existing = nil
 
 	go statsLoop(bPassiveContainerDetect)

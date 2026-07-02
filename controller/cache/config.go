@@ -45,7 +45,10 @@ func workloadConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSWorkloadConfig
-		_ = json.Unmarshal(value, &cconf)
+		if err := json.Unmarshal(value, &cconf); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal workload config")
+			return
+		}
 
 		cacheMutexLock()
 		if cache, ok := wlCacheMap[id]; ok {
@@ -63,7 +66,10 @@ func agentConfig(nType cluster.ClusterNotifyType, key string, value []byte) {
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSAgentConfig
-		_ = json.Unmarshal(value, &cconf)
+		if err := json.Unmarshal(value, &cconf); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal agent config")
+			return
+		}
 
 		cacheMutexLock()
 		if cache, ok := agentCacheMap[id]; ok {
@@ -137,7 +143,10 @@ func controllerConfig(nType cluster.ClusterNotifyType, key string, value []byte)
 		id := share.CLUSUniconfKey2ID(key)
 
 		var cconf share.CLUSControllerConfig
-		_ = json.Unmarshal(value, &cconf)
+		if err := json.Unmarshal(value, &cconf); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal controller config")
+			return
+		}
 
 		cacheMutexLock()
 		if cache, ok := ctrlCacheMap[id]; ok {
@@ -191,7 +200,9 @@ func uniconfWorkloadDelete(id string, param interface{}) {
 	cache := param.(*workloadCache)
 	hostID := cache.workload.HostID
 	key := share.CLUSUniconfWorkloadKey(hostID, id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete workload config key")
+	}
 }
 
 func uniconfAgentDelete(id string, param interface{}) {
@@ -200,7 +211,9 @@ func uniconfAgentDelete(id string, param interface{}) {
 	}
 	agent := param.(*agentCache).agent
 	key := share.CLUSUniconfAgentKey(agent.HostID, id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete agent config key")
+	}
 }
 
 func uniconfControllerDelete(id string, param interface{}) {
@@ -208,7 +221,9 @@ func uniconfControllerDelete(id string, param interface{}) {
 		return
 	}
 	key := share.CLUSUniconfControllerKey(id, id)
-	_ = cluster.Delete(key)
+	if err := cluster.Delete(key); err != nil {
+		log.WithError(err).Warn("Failed to delete controller uniconfig key")
+	}
 }
 
 func getNewServicePolicyMode() (string, string) {
@@ -489,11 +504,15 @@ func encMigrateSystemConfig(valueBackup, value []byte) {
 							encMigratedConfigRestored = true
 						}
 					} else {
-						_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+						if err := cluster.Delete(share.CLUSSystemEncMigratedKey); err != nil {
+							log.WithError(err).Warn("Failed to delete encryption-migrated config backup key")
+						}
 						log.Info("encryption-migrated config backup is deleted")
 					}
 				} else {
-					_ = cluster.Delete(share.CLUSSystemEncMigratedKey)
+					if err := cluster.Delete(share.CLUSSystemEncMigratedKey); err != nil {
+						log.WithError(err).Warn("Failed to delete encryption-migrated config backup key")
+					}
 					log.WithFields(log.Fields{"err": err}).Error("failed to json unmarshal encryption-migrated config")
 				}
 			} else if err != nil {
@@ -511,11 +530,18 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	bSchedulePolicy := false
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		_ = json.Unmarshal(value, &cfg)
+		if err := json.Unmarshal(value, &cfg); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal system config")
+			return
+		}
 		log.WithFields(log.Fields{"config": cfg}).Debug()
 
 		if nType == cluster.ClusterNotifyModify {
-			if valueBackup, _ := cluster.Get(share.CLUSSystemEncMigratedKey); len(valueBackup) > 0 {
+			valueBackup, err := cluster.Get(share.CLUSSystemEncMigratedKey)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get system enc migrated key")
+			}
+			if len(valueBackup) > 0 {
 				if !encMigratedConfigRestored {
 					encMigrateSystemConfig(valueBackup, value)
 				}
@@ -525,11 +551,15 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 			if isLeader() {
 				var param interface{} = &cfg.IBMSAConfig
-				_ = cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
+				if err := cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param); err != nil {
+					log.WithError(err).Warn("failed to start posting to ibmsa")
+				}
 			}
 		} else {
 			// customer explicitly disables IBM SA endpoint
-			_ = cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil)
+			if err := cctx.StartStopFedPingPollFunc(share.StopPostToIBMSA, 0, nil); err != nil {
+				log.WithError(err).Warn("failed to stop posting to ibmsa")
+			}
 		}
 		//if global network policy mode enabled/disabled or mode changes
 		//shedule policy calculation
@@ -571,12 +601,14 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 		httpsProxy := httpclient.ParseProxy(&cfg.RegistryHttpsProxy)
 
 		// NoProxy is empty for now.
-		_ = httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
+		if err := httpclient.SetDefaultTLSClientConfig(&httpclient.TLSClientSettings{
 			TLSconfig: &tls.Config{
 				InsecureSkipVerify: !cfg.EnableTLSVerification,
 				RootCAs:            pool,
 			},
-		}, httpProxy, httpsProxy, "")
+		}, httpProxy, httpsProxy, ""); err != nil {
+			log.WithError(err).Warn("Failed to set default TLS client config")
+		}
 
 		go func() {
 			scannerConfigTimeout := DefaultScannerConfigUpdateTimeout
@@ -642,7 +674,9 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	httpProxy := cfg.RegistryHttpProxy
 	var param1 interface{} = &httpsProxy
 	var param2 interface{} = &httpProxy
-	_ = cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2)
+	if err := cctx.RestConfigFunc(share.UpdateProxyInfo, 0, param1, param2); err != nil {
+		log.WithError(err).Warn("failed to update proxy info")
+	}
 
 	webhookCachTemp := make(map[string]*webhookCache, 0)
 	for _, h := range systemConfigCache.Webhooks {
@@ -739,7 +773,9 @@ func configInit() {
 	}
 	if cfg.IBMSAConfigNV.EpEnabled && cfg.IBMSAConfigNV.EpStart == 1 {
 		var param interface{} = &cfg.IBMSAConfig
-		_ = cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param)
+		if err := cctx.StartStopFedPingPollFunc(share.StartPostToIBMSA, 0, param); err != nil {
+			log.WithError(err).Warn("failed to start posting to ibmsa")
+		}
 	}
 	if !utils.CompareSliceWithoutOrder(systemConfigCache.ControllerDebug, cctx.Debug) {
 		systemConfigCache.ControllerDebug = cctx.Debug

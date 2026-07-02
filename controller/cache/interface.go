@@ -124,9 +124,6 @@ type CacheInterface interface {
 	GetAudits(acc *access.AccessControl) []*api.Audit
 	GetAuditCount(acc *access.AccessControl) int
 
-	// License
-	GetCurrentLicense(acc *access.AccessControl) api.RESTLicenseInfo
-
 	// Process profile
 	GetProcessProfile(group string, acc *access.AccessControl) (*api.RESTProcessProfile, error)
 	GetAllProcessProfile(scope string, acc *access.AccessControl) [][]*api.RESTProcessProfile

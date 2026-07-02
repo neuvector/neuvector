@@ -508,7 +508,9 @@ func deletePolicyRules(txn *cluster.ClusterTransact, dels utils.Set) {
 	for id := range dels.Iter() {
 		// This function cannot return an error, as there is no possibility for one to occur.
 		// However, we retain the error return type to accommodate the mock dependency.
-		_ = clusHelper.DeletePolicyRuleTxn(txn, id.(uint32))
+		if err := clusHelper.DeletePolicyRuleTxn(txn, id.(uint32)); err != nil {
+			log.WithError(err).Warn("failed to delete policy rule from transaction")
+		}
 	}
 }
 
@@ -1471,9 +1473,12 @@ func handlerPolicyRuleAction(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTPolicyRuleActionData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1569,7 +1574,10 @@ func handlerPolicyRuleConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTPolicyRuleConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -2008,7 +2016,11 @@ func parseDerivedPolicyRules(ruleMap map[string]*share.CLUSDerivedPolicyRuleArra
 	wlrs := make([]*api.RESTDerivedWorkloadPolicyRule, 0)
 	for wlID, arr := range ruleMap {
 		var wl *api.RESTWorkloadBrief
-		if wl, _ = cacher.GetWorkloadBrief(wlID, "", acc); wl == nil {
+		wl, err := cacher.GetWorkloadBrief(wlID, "", acc)
+		if err != nil {
+			log.WithError(err).Debug("failed to get workload brief for derived policy")
+		}
+		if wl == nil {
 			continue
 		}
 		wlPolicy := api.RESTDerivedWorkloadPolicyRule{
@@ -2095,7 +2107,9 @@ func replaceFedNwRules(rulesNew []*share.CLUSPolicyRule, rhsNew []*share.CLUSRul
 	for _, rhExisting := range rhsExisting {
 		if rhExisting.CfgType == share.FederalCfg {
 			if _, ok := rulesMap[rhExisting.ID]; !ok { // in existing but not in new. so delete it
-				_ = clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID)
+				if err := clusHelper.DeletePolicyRuleTxn(txn, rhExisting.ID); err != nil {
+					log.WithError(err).Warn("failed to delete policy rule from federation transaction")
+				}
 			}
 		} else {
 			nonFedPolicies++
@@ -2150,8 +2164,11 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var promoteData api.RESTPolicyPromoteRequestData
-	body, _ := io.ReadAll(r.Body)
-	err := json.Unmarshal(body, &promoteData)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
+	err = json.Unmarshal(body, &promoteData)
 	if err != nil || promoteData.Request == nil || len(promoteData.Request.IDs) == 0 {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -2256,7 +2273,11 @@ LOOP_ALL_IDS:
 						errMsg = fmt.Sprintf("failed to obtain file monitor profile %s(for rule %d)", grpName, id)
 						break LOOP_ALL_IDS
 					} else {
-						reservedLen := len(mon.Filters) + len(mon.FiltersCRD)
+						reservedLen := min(len(mon.Filters), cluster.KVValueSizeMax) + min(len(mon.FiltersCRD), cluster.KVValueSizeMax)
+						// KVValueSizeMax is 512 * 1024. So it's reasonable to assume there is no more than 512 * 1024 mon.Filters+mon.FiltersCRD entries
+						if reservedLen > cluster.KVValueSizeMax {
+							reservedLen = cluster.KVValueSizeMax
+						}
 						pmap := make(map[string]*share.CLUSFileMonitorFilter, reservedLen)
 						for i, ffp := range mon.Filters {
 							pmap[ffp.Filter] = &mon.Filters[i]

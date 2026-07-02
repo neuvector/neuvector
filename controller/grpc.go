@@ -95,7 +95,10 @@ func (ss *ScanService) prepareDBSlots(data *share.ScannerRegisterData, cvedb map
 		}
 
 		for i, db := range dbs {
-			value, _ := json.Marshal(db)
+			value, err := json.Marshal(db)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal db slot %d: %w", i, err)
+			}
 			zb := utils.GzipBytes(value)
 			log.WithFields(log.Fields{"slot": i, "size": len(zb)}).Debug()
 			if len(zb) >= cluster.KVValueSizeMax {
@@ -115,7 +118,11 @@ func (ss *ScanService) prepareDBSlots(data *share.ScannerRegisterData, cvedb map
 
 func (ss *ScanService) registerFailureCleanup(newDBStore string) {
 	// Remove new keys that have been written
-	newKeys, _ := cluster.GetStoreKeys(newDBStore)
+	newKeys, err := cluster.GetStoreKeys(newDBStore)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get store keys for cleanup")
+		return
+	}
 	for _, key := range newKeys {
 		if err := cluster.Delete(key); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Delete")
@@ -178,7 +185,11 @@ func (ss *ScanService) HealthCheck(ctx context.Context, data *share.ScannerRegis
 	}
 
 	clusHelper := kv.GetClusterHelper()
-	s := clusHelper.GetScanner(scannerID, access.NewReaderAccessControl())
+	s, err := clusHelper.GetScanner(scannerID, access.NewReaderAccessControl())
+	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+		log.WithFields(log.Fields{"error": err, "scanner": scannerID}).Warn("Failed to get scanner during health check")
+		return nil, fmt.Errorf("failed to get scanner %s: %w", scannerID, err)
+	}
 	if s != nil {
 		visible = true
 	}
@@ -192,7 +203,10 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	}).Info()
 
 	writeDB := false
-	newVer, _ := utils.NewVersion(data.CVEDBVersion)
+	newVer, err := utils.NewVersion(data.CVEDBVersion)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "version": data.CVEDBVersion}).Warn("Failed to parse scanner CVE DB version")
+	}
 
 	newScanner := share.CLUSScanner{
 		ID:                           data.ID,
@@ -220,12 +234,26 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	}
 	defer clusHelper.ReleaseLock(lock)
 
+	hasCveDB := len(data.CVEDB) > 0
+	if !hasCveDB {
+		log.WithFields(log.Fields{"scanner": data.ID, "version": data.CVEDBVersion}).Warn("Skip empty scanner DB update")
+		return errors.New("scanner cvedb is empty")
+	}
+
 	// Check if the database is newer.
-	s := clusHelper.GetScanner(share.CLUSScannerDBVersionID, access.NewReaderAccessControl())
+	s, err := clusHelper.GetScanner(share.CLUSScannerDBVersionID, access.NewReaderAccessControl())
+	if err != nil && !errors.Is(err, cluster.ErrKeyNotFound) {
+		log.WithFields(log.Fields{"error": err, "version": data.CVEDBVersion}).Warn("Failed to get scanner DB version record")
+		return fmt.Errorf("failed to get scanner DB version record: %w", err)
+	}
 	if s == nil {
 		writeDB = true
 	} else {
-		ver, _ := utils.NewVersion(s.CVEDBVersion)
+		var ver utils.Version
+		ver, err = utils.NewVersion(s.CVEDBVersion)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "version": s.CVEDBVersion}).Warn("Failed to parse existing scanner CVE DB version")
+		}
 		if newVer.Compare(ver) > 0 || len(data.CVEDB) > s.CVEDBEntries {
 			writeDB = true
 		}
@@ -235,7 +263,10 @@ func (ss *ScanService) scannerRegister(data *share.ScannerRegisterData) error {
 	// Consul value size limit is 512K. The limit also applies to the total value size in a transaction.
 	// => so we cannot really use transaction to write database.
 
-	oldStores, _ := cluster.GetStoreKeys(share.CLUSScannerDBStore)
+	oldStores, err := cluster.GetStoreKeys(share.CLUSScannerDBStore)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Warn("Failed to get old scanner DB stores")
+	}
 	newStore := fmt.Sprintf("%s%s/", share.CLUSScannerDBStore, data.CVEDBVersion)
 
 	txn := cluster.Transact()
@@ -617,15 +648,26 @@ func (cs *ControllerService) ReportConnections(ctx context.Context, rarray *shar
 
 func (cs *ControllerService) GetControllerCounter(ctx context.Context, v *share.RPCVoid) (*share.CLUSControllerCounter, error) {
 	pid := os.Getpid()
-	lsof, _ := sh.Command("lsof", "-Pn", "-p", strconv.Itoa(pid)).Command("grep", "-v", "IPv4\\|IPv6").Output()
+	// Suppress error: diagnostic commands, failures are non-fatal
+	lsof, err := sh.Command("lsof", "-Pn", "-p", strconv.Itoa(pid)).Command("grep", "-v", "IPv4\\|IPv6").Output()
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Failed to run lsof")
+	}
 
 	// Finding correct group pid
 	var ps []byte
-	if name, _ := os.Readlink("/proc/1/exe"); name == "/usr/local/bin/monitor" { // when pid mode != host
-		ps, _ = sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-A").Output()
+	name, err := os.Readlink("/proc/1/exe")
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Failed to readlink /proc/1/exe")
+	}
+	if name == "/usr/local/bin/monitor" { // when pid mode != host
+		ps, err = sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-A").Output()
 	} else {
 		// processes under the controller
-		ps, _ = sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(Ctrler.Pid)).Output()
+		ps, err = sh.Command("ps", "-o", "pid,ppid,vsz,rss,comm", "-g", strconv.Itoa(Ctrler.Pid)).Output()
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Debug("Failed to run ps")
 	}
 
 	c := share.CLUSControllerCounter{

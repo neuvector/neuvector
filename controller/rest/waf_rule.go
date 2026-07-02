@@ -430,9 +430,12 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTWafSensorConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -784,9 +787,12 @@ func handlerWafSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTWafSensorConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -902,9 +908,12 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTWafGroupConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err, "rconf": rconf}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -923,7 +932,11 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
 	}
-	if g, _ := cacher.GetGroupCache(conf.Name, acc); g != nil && g.CfgType == share.GroundCfg {
+	g, err := cacher.GetGroupCache(conf.Name, acc)
+	if err != nil {
+		log.WithError(err).Warn("failed to get group cache")
+	}
+	if g != nil && g.CfgType == share.GroundCfg {
 		restRespError(w, http.StatusBadRequest, api.RESTErrOpNotAllowed)
 		return
 	}
@@ -1112,7 +1125,10 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTWafSensorExport
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -1238,7 +1254,10 @@ func importWaf(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 	log.Debug()
 	defer os.Remove(importTask.TempFilename)
 
-	json_data, _ := os.ReadFile(importTask.TempFilename)
+	json_data, readErr := os.ReadFile(importTask.TempFilename)
+	if readErr != nil {
+		log.WithError(readErr).Warn("failed to read import file")
+	}
 	var secRuleList resource.NvWafSecurityRuleList
 	var secRule resource.NvWafSecurityRule
 	var secRules []resource.NvWafSecurityRule
@@ -1273,7 +1292,10 @@ func importWaf(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 
 	importTask.Percentage = int(progress)
 	importTask.Status = share.IMPORT_RUNNING
-	_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+	if err := clusHelper.PutImportTask(&importTask); err != nil {
+		// Suppress error: progress update is non-critical
+		log.WithError(err).Debug("failed to update import task progress")
+	}
 
 	var crdHandler nvCrdHandler
 	crdHandler.Init(share.CLUSLockPolicyKey, importCallerRest)
@@ -1298,7 +1320,10 @@ func importWaf(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 			oneSuccess := false
 			progress += inc
 			importTask.Percentage = int(progress)
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				// Suppress error: progress update is non-critical
+				log.WithError(err).Debug("failed to update import task progress")
+			}
 
 			// [2]: import a waf sensor in the yaml file
 			for _, parsedCfg := range parsedWafCfgs {
@@ -1312,11 +1337,17 @@ func importWaf(loginDomainRoles access.DomainRole, importTask share.CLUSImportTa
 					oneSuccess = true
 					progress += inc
 					importTask.Percentage = int(progress)
-					_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+					if err := clusHelper.PutImportTask(&importTask); err != nil {
+						// Suppress error: progress update is non-critical
+						log.WithError(err).Debug("failed to update import task progress")
+					}
 				}
 			}
 			importTask.Percentage = 90
-			_ = clusHelper.PutImportTask(&importTask) // Ignore error because progress update is non-critical
+			if err := clusHelper.PutImportTask(&importTask); err != nil {
+				// Suppress error: progress update is non-critical
+				log.WithError(err).Debug("failed to update import task progress")
+			}
 
 			if oneSuccess && importTask.Scope == share.ScopeFed {
 				updateFedRulesRevision([]string{share.FedWafSensorGrpType}, acc, login)
@@ -1719,7 +1750,11 @@ func promoteFedWafGroup(grpName string, acc *access.AccessControl, login *loginS
 		return
 	}
 	for _, sensor := range cg.Sensors { //local
-		if cs, _ := cacher.GetWafSensor(sensor.Name, acc); cs != nil {
+		cs, sensorErr := cacher.GetWafSensor(sensor.Name, acc)
+		if sensorErr != nil {
+			log.WithError(sensorErr).Warn("failed to get WAF sensor")
+		}
+		if cs != nil {
 			fedWafSensorPromote(cs, acc, login)
 		}
 	}
@@ -1738,10 +1773,13 @@ func promoteFedWafGroup(grpName string, acc *access.AccessControl, login *loginS
 			return
 		}
 	}
-	if cached, _ := cacher.GetWafGroup(grpName, acc); cached == nil {
+	cached, grpErr := cacher.GetWafGroup(grpName, acc)
+	if grpErr != nil {
+		log.WithError(grpErr).Warn("failed to get WAF group")
+	}
+	if cached == nil {
 		log.WithFields(log.Fields{"group": grpName}).Debug("Local waf group does not exist.")
 		return
-	} else {
-		fedWafGroupConfig(cached, acc, login)
 	}
+	fedWafGroupConfig(cached, acc, login)
 }

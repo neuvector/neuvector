@@ -30,8 +30,16 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 
 	cnAdm := fmt.Sprintf("%s.%s.svc", resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
 	cnCrd := fmt.Sprintf("%s.%s.svc", resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
-	admKeyPath, admCertPath := resource.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
-	crdKeyPath, crdCertPath := resource.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	admKeyPath, admCertPath, _ := kv.GetTlsKeyCertPath(resource.NvAdmSvcName, resource.NvAdmSvcNamespace)
+	if admKeyPath == "" || admCertPath == "" {
+		log.WithFields(log.Fields{"svc": resource.NvAdmSvcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+		return
+	}
+	crdKeyPath, crdCertPath, _ := kv.GetTlsKeyCertPath(resource.NvCrdSvcName, resource.NvAdmSvcNamespace)
+	if crdKeyPath == "" || crdCertPath == "" {
+		log.WithFields(log.Fields{"svc": resource.NvCrdSvcName, "ns": resource.NvAdmSvcNamespace}).Error("failed to get TLS key/cert files path")
+		return
+	}
 	pathInfoMap := map[string]*keyCertFileInfo{
 		share.CLUSRootCAKey: {share.CLUSRootCAKey, kv.AdmCAKeyPath, kv.AdmCACertPath, false},
 		cnAdm:               {resource.NvAdmSvcName, admKeyPath, admCertPath, true},
@@ -46,7 +54,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 	if pathInfo, ok := pathInfoMap[cn]; !ok {
 		if _, ok := certmanagerCerts[cn]; ok {
 			if cctx.NotifyCertChange != nil {
-				_ = cctx.NotifyCertChange(cn)
+				if err := cctx.NotifyCertChange(cn); err != nil {
+					log.WithError(err).Warn("Failed to notify cert change")
+				}
 			}
 		} else {
 			log.WithFields(log.Fields{"cn": cn}).Debug("unsupported")
@@ -58,7 +68,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 		case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 			var cert share.CLUSX509Cert
 			var dec common.DecryptUnmarshaller
-			_ = dec.Unmarshal(value, &cert)
+			if err := dec.Unmarshal(value, &cert); err != nil {
+				log.WithFields(log.Fields{"err": err}).Warn("failed to unmarshal certificate")
+			}
 
 			if len(cert.Key) > 0 && len(cert.Cert) > 0 {
 				if err := os.WriteFile(pathInfo.keyPath, []byte(cert.Key), 0600); err == nil {
@@ -71,7 +83,9 @@ func certObjectUpdate(nType cluster.ClusterNotifyType, key string, value []byte)
 							if admission.ResetCABundle(pathInfo.svcName, certData) {
 								// remembered cert is updated with new cert. in rest.restartWebhookServer() it will re-register the webhook resource to k8s
 								var param interface{} = &pathInfo.svcName
-								_ = cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param)
+								if err := cctx.StartStopFedPingPollFunc(share.RestartWebhookServer, 0, param); err != nil {
+									log.WithError(err).Warn("failed to restart webhook server")
+								}
 							}
 						}
 					}

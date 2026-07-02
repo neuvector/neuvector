@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -182,7 +183,10 @@ func getSystemMemoryFromProcMeminfo() (uint64, error) {
 			tokens := strings.Split(text, " ")
 			for i, token := range tokens {
 				if i > 0 && len(token) > 0 {
-					size, _ := strconv.ParseUint(token, 10, 64)
+					size, err := strconv.ParseUint(token, 10, 64)
+					if err != nil {
+						return 0, fmt.Errorf("failed to parse MemTotal token %q: %w", token, err)
+					}
 					return size, nil
 				}
 			}
@@ -197,7 +201,11 @@ func (si *SysInfo) getMemoryInfo() {
 	if err != nil {
 		if targetKB := slurpFile("/sys/devices/system/xen_memory/xen_memory0/target_kb"); targetKB != "" {
 			si.Memory.Type = "DRAM"
-			size, _ := strconv.ParseUint(targetKB, 10, 64)
+			var size uint64
+			size, err = strconv.ParseUint(targetKB, 10, 64)
+			if err != nil {
+				log.WithError(err).Debug("failed to parse xen memory target_kb")
+			}
 			si.Memory.Size = uint(size) / 1024
 		}
 

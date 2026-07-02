@@ -2,8 +2,6 @@ package rest
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +9,6 @@ import (
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/yaml"
 
 	"net/http"
@@ -25,6 +22,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/controller/cache"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/controller/kv"
 	admission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg"
 	nvsysadmission "github.com/neuvector/neuvector/controller/nvk8sapi/nvvalidatewebhookcfg/admission"
@@ -102,11 +100,11 @@ func (h *nvCrdHandler) ReleaseLock() {
 	h.kvLocked = false
 }
 
-func group2RESTConfig(group *api.RESTGroup, useNameReferral bool) api.RESTCrdGroupConfig {
+func group2RESTConfig(group *api.RESTGroup, useNameReferral bool) v1.GroupConfig {
 
 	appendCriteria := false
-	criteria := make([]api.RESTCriteriaEntry, 0, len(group.Criteria))
-	r := api.RESTCrdGroupConfig{
+	criteria := make([]v1.CriteriaEntry, 0, len(group.Criteria))
+	r := v1.GroupConfig{
 		Name:    group.Name,
 		Comment: group.Comment,
 	}
@@ -120,7 +118,7 @@ func group2RESTConfig(group *api.RESTGroup, useNameReferral bool) api.RESTCrdGro
 		}
 	} else {
 		if group.Name == api.AllContainerGroup {
-			r.Criteria = []api.RESTCriteriaEntry{
+			r.Criteria = []v1.CriteriaEntry{
 				{Key: "container", Op: "=", Value: "*"},
 			}
 		} else if group.Name != api.AllHostGroup && group.Name != api.LearnedExternal {
@@ -129,7 +127,7 @@ func group2RESTConfig(group *api.RESTGroup, useNameReferral bool) api.RESTCrdGro
 	}
 	if appendCriteria {
 		for _, crt := range group.Criteria {
-			criteria = append(criteria, api.RESTCriteriaEntry{
+			criteria = append(criteria, v1.CriteriaEntry{
 				Key: crt.Key, Value: crt.Value, Op: crt.Op,
 			})
 		}
@@ -139,9 +137,9 @@ func group2RESTConfig(group *api.RESTGroup, useNameReferral bool) api.RESTCrdGro
 	return r
 }
 
-func crdConfig2GroupConfig(group *api.RESTCrdGroupConfig) *api.RESTGroupConfig {
+func crdConfig2GroupConfig(group *v1.GroupConfig) *api.RESTGroupConfig {
 	if group.Criteria == nil {
-		group.Criteria = []api.RESTCriteriaEntry{}
+		group.Criteria = []v1.CriteriaEntry{}
 	}
 	r := api.RESTGroupConfig{
 		Name:         group.Name,
@@ -243,7 +241,7 @@ func (h *nvCrdHandler) crdDelAll(k8sKind, kvCrdKind string, recordList map[strin
 
 // Create/update all the groups and return groups referenced in this CR (i.e. for import by CRD only)
 // policyModeCfg & procProfileCfg are for target group only
-func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targetGroup string,
+func (h *nvCrdHandler) crdHandleGroupsAdd(groups []v1.GroupConfig, targetGroup string,
 	policyModeCfg *api.RESTServiceConfig, procProfileCfg *api.RESTProcessProfile) ([]string, bool) {
 
 	txn := cluster.Transact()
@@ -307,7 +305,10 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []api.RESTCrdGroupConfig, targe
 		}
 
 		isNvIpGroup := strings.HasPrefix(group.Name, api.LearnedSvcGroupPrefix)
-		cg, _, _ := clusHelper.GetGroup(group.Name, h.acc)
+		cg, _, err := clusHelper.GetGroup(group.Name, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group")
+		}
 		if cg != nil {
 			// group update case
 			updateKV := false
@@ -491,7 +492,9 @@ func (h *nvCrdHandler) crdDeleteNetworkRules(delRules map[string]uint32) {
 		delRuleIDs.Add(id)
 		// This function cannot return an error, as there is no possibility for one to occur.
 		// However, we retain the error return type to accommodate the mock dependency.
-		_ = clusHelper.DeletePolicyRuleTxn(txn, id)
+		if err := clusHelper.DeletePolicyRuleTxn(txn, id); err != nil {
+			log.WithError(err).Warn("failed to delete policy rule in txn")
+		}
 	}
 	for _, crh := range crhs {
 		if crh.CfgType != share.GroundCfg || !delRuleIDs.Contains(crh.ID) {
@@ -615,7 +618,11 @@ func findAbsentGroups(cacheRecord *share.CLUSCrdSecurityRule, groupNew []string)
 func (h *nvCrdHandler) crdDeleteGroup(delGroups []string) {
 	names := make([]string, 0, len(delGroups))
 	for _, name := range delGroups {
-		if cg, _, _ := clusHelper.GetGroup(name, h.acc); cg == nil {
+		cg, _, err := clusHelper.GetGroup(name, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group for deletion")
+		}
+		if cg == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
 			continue
 		}
@@ -652,7 +659,10 @@ func (h *nvCrdHandler) crdUpdateGroup(updateGroup []string) {
 
 	var lastTxnError error
 	for _, name := range updateGroup {
-		cg, _, _ := clusHelper.GetGroup(name, h.acc)
+		cg, _, err := clusHelper.GetGroup(name, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("failed to get group for update")
+		}
 		if cg == nil {
 			log.WithFields(log.Fields{"name": name}).Error("Group doesn't exist")
 			continue
@@ -920,7 +930,10 @@ LOOPALLDEL:
 		if kvOnly {
 			groupsToUpdate = append(groupsToUpdate, cur)
 		} else {
-			group, _ := cacher.GetGroup(cur, "", false, h.acc)
+			group, err := cacher.GetGroup(cur, "", false, h.acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get group from cache")
+			}
 			if group != nil {
 				// if group exist before crd apply when delete we should not touch it
 				if group.CfgType != api.CfgTypeGround {
@@ -1215,7 +1228,10 @@ func (h *nvCrdHandler) crdHandleFileProfile(group, mode string, profile *api.RES
 
 func (h *nvCrdHandler) crdHandlePolicyMode(groupName, policyMode, profileMode, baseline string) {
 	if utils.DoesGroupHavePolicyMode(groupName) {
-		grp, _, _ := clusHelper.GetGroup(groupName, h.acc)
+		grp, _, err := clusHelper.GetGroup(groupName, h.acc)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get group from cluster")
+		}
 		if grp == nil {
 			log.WithFields(log.Fields{"name": groupName}).Error("Service doesn't exist or access denied")
 			return
@@ -1429,7 +1445,9 @@ func (h *nvCrdHandler) crdHandleNetworkRules(rules []api.RESTPolicyRuleConfig, c
 		if newId, ok := newRules[cacheName]; ok && newId == cacheId {
 			continue
 		}
-		_ = clusHelper.DeletePolicyRuleTxn(txn, cacheId)
+		if err := clusHelper.DeletePolicyRuleTxn(txn, cacheId); err != nil {
+			log.WithError(err).Warn("failed to delete policy rule in txn")
+		}
 		delete(ruleHead, cacheId)
 	}
 
@@ -1491,7 +1509,10 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(cfgType share.TCfgType, allAdmCtrlR
 		ruleTypeKeys = append(ruleTypeKeys, api.ValidatingExceptRuleType, api.ValidatingDenyRuleType)
 	}
 	for _, ruleType := range ruleTypeKeys {
-		arhs, _ := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+		arhs, err := clusHelper.GetAdmissionRuleList(admission.NvAdmValidateType, ruleType)
+		if err != nil {
+			log.WithError(err).Warn("failed to get admission rule list")
+		}
 		clusArhsNew[ruleType] = arhs
 		for _, arh := range arhs {
 			ids.Add(arh.ID)
@@ -1559,7 +1580,10 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(cfgType share.TCfgType, allAdmCtrlR
 					}
 				} else {
 					// it's non-default rule
-					cr.Criteria, _ = cache.AdmCriteria2CLUS(ruleConf.Criteria)
+					var err error
+					if cr.Criteria, err = cache.AdmCriteria2CLUS(ruleConf.Criteria); err != nil {
+						log.WithError(err).Warn("failed to convert admission criteria")
+					}
 					cr.Comment = ruleConf.Comment
 					cr.Disable = ruleConf.Disabled
 				}
@@ -1709,7 +1733,7 @@ func (h *nvCrdHandler) crdHandleAdmCtrlConfig(cfgType share.TCfgType, crdConfig 
 // caller must own CLUSLockPolicyKey lock
 // This function is for handling per-group's response rules & response rules with empty group field.
 // There could be multiple response rules dependent on a specific group
-func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg map[string][]*resource.NvCrdResponseRule,
+func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg map[string][]*v1.NvCrdResponseRule,
 	cfgType share.TCfgType) ([]uint32, error) {
 	if len(grpResponseCfg) == 0 {
 		return nil, nil
@@ -1763,7 +1787,7 @@ func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg 
 // caller must own CLUSLockPolicyKey lock
 // This function is for handling the response rules that are for all groups only.
 // Every such response rule is a CR
-func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponseCfg *resource.NvCrdResponseRule,
+func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponseCfg *v1.NvCrdResponseRule,
 	cacheRecord *share.CLUSCrdSecurityRule, reviewType share.TReviewType) error {
 	var err error
 	scope := share.ScopeLocal
@@ -1771,9 +1795,9 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 		scope = share.ScopeFed
 	}
 
-	responseCfgs := []*resource.NvCrdResponseRule{crdResponseCfg}
+	responseCfgs := []*v1.NvCrdResponseRule{crdResponseCfg}
 	cacheRecord.ResponseRules.PolicyName = crdResponseCfg.PolicyName
-	grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+	grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 		"": responseCfgs,
 	}
 
@@ -1998,7 +2022,10 @@ func (h *nvCrdHandler) crdHandleVulnProfile(vulnProfileCfg *resource.NvCrdVulnPr
 
 	var err error
 	if vulnProfileCfg.Profile != nil {
-		cvp, _, _ := clusHelper.GetVulnerabilityProfile(vulnProfileCfg.Profile.Name, h.acc)
+		cvp, _, cvpErr := clusHelper.GetVulnerabilityProfile(vulnProfileCfg.Profile.Name, h.acc)
+		if cvpErr != nil {
+			log.WithError(cvpErr).Warn("failed to get vulnerability profile")
+		}
 		if cvp == nil {
 			cvp = &share.CLUSVulnerabilityProfile{
 				Name:    vulnProfileCfg.Profile.Name,
@@ -2028,7 +2055,10 @@ func (h *nvCrdHandler) crdHandleCompProfile(compProfileCfg *resource.NvCrdCompPr
 
 	var err error
 	if compProfileCfg.Templates != nil {
-		ccp, _, _ := clusHelper.GetComplianceProfile(compProfileCfg.Templates.Name, h.acc)
+		ccp, _, ccpErr := clusHelper.GetComplianceProfile(compProfileCfg.Templates.Name, h.acc)
+		if ccpErr != nil {
+			log.WithError(ccpErr).Warn("failed to get compliance profile")
+		}
 		if ccp != nil && ccp.CfgType != cfgType && ccp.CfgType == share.GroundCfg {
 			log.WithFields(log.Fields{"name": compProfileCfg.Templates.Name}).Error("profile is managed by CRD")
 			return errors.New(restErrMessage[api.RESTErrOpNotAllowed])
@@ -2048,7 +2078,7 @@ func (h *nvCrdHandler) crdHandleCompProfile(compProfileCfg *resource.NvCrdCompPr
 	return err
 }
 
-func groupNameHashFromCriteria(gCriteria []api.RESTCriteriaEntry, reviewType share.TReviewType) uint32 {
+func groupNameHashFromCriteria(gCriteria []v1.CriteriaEntry, reviewType share.TReviewType) uint32 {
 	var name string
 	sort.Slice(gCriteria[:], func(i, j int) bool {
 		if gCriteria[i].Key != gCriteria[j].Key {
@@ -2070,7 +2100,7 @@ func groupNameHashFromCriteria(gCriteria []api.RESTCriteriaEntry, reviewType sha
 	return hasher.Sum32()
 }
 
-func referToGroupDefCR(name string, crdGroupCfg *api.RESTCrdGroupConfig) (bool, string) {
+func referToGroupDefCR(name string, crdGroupCfg *v1.GroupConfig) (bool, string) {
 	var groupSrcDesc string
 	foundRefered := false
 	if k8sPlatform {
@@ -2088,12 +2118,12 @@ func referToGroupDefCR(name string, crdGroupCfg *api.RESTCrdGroupConfig) (bool, 
 }
 
 // it returns (error string, group source description)
-func (h *nvCrdHandler) doGroupReferral(owner string, crdGroupCfg *api.RESTCrdGroupConfig) (string, string) {
+func (h *nvCrdHandler) doGroupReferral(owner string, crdGroupCfg *v1.GroupConfig) (string, string) {
 
 	name := crdGroupCfg.Name
 	if isReservedNvGroupDefName(name) {
 		if name == api.AllContainerGroup {
-			crdGroupCfg.Criteria = []api.RESTCriteriaEntry{
+			crdGroupCfg.Criteria = []v1.CriteriaEntry{
 				{Key: "container", Op: "=", Value: "*"},
 			}
 		}
@@ -2126,20 +2156,20 @@ func (h *nvCrdHandler) doGroupReferral(owner string, crdGroupCfg *api.RESTCrdGro
 			}
 		}
 		if compareWithCR {
-			var k8sCrGroupDefs api.RESTCrdGroupConfig
+			var k8sCrGroupDefs v1.GroupConfig
 			if found, _ := referToGroupDefCR(name, &k8sCrGroupDefs); found {
 				src := crdGroupCfg.Criteria    // from REST/CRD import
 				dst := k8sCrGroupDefs.Criteria // from k8s
 				if strings.HasPrefix(name, api.LearnedSvcGroupPrefix) {
 					// for nv.ip.xxx group, we only compare its "domain" criteria
-					src = make([]api.RESTCriteriaEntry, 0, 1)
+					src = make([]v1.CriteriaEntry, 0, 1)
 					for _, ct := range crdGroupCfg.Criteria {
 						if ct.Key == share.CriteriaKeyDomain {
 							src = append(src, ct)
 							break
 						}
 					}
-					dst = make([]api.RESTCriteriaEntry, 0, 1)
+					dst = make([]v1.CriteriaEntry, 0, 1)
 					for _, ct := range k8sCrGroupDefs.Criteria {
 						if ct.Key == share.CriteriaKeyDomain {
 							dst = append(dst, ct)
@@ -2192,7 +2222,7 @@ func (h *nvCrdHandler) doGroupReferral(owner string, crdGroupCfg *api.RESTCrdGro
 		  if a learned/regualr group already exists, replace it
 */
 
-func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgroupCfg *api.RESTCrdGroupConfig, curGroups *[]api.RESTCrdGroupConfig,
+func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgroupCfg *v1.GroupConfig, curGroups *[]v1.GroupConfig,
 	groupsInSecRule utils.Set, recordList map[string]*share.CLUSCrdSecurityRule, recordName string,
 	hasDlpWafCfg bool, reviewType share.TReviewType, reviewTypeDisplay, owner string) (string, int) {
 	var err int
@@ -2303,7 +2333,7 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 			}
 		}
 		// make sure Criteria didn't duplicate
-		dst := append([]api.RESTCriteriaEntry(nil), *groupCfg.Criteria...)
+		dst := append([]v1.CriteriaEntry(nil), *groupCfg.Criteria...)
 		if !common.SameGroupCriteria(*groupCfg.Criteria, dst, true) {
 			retMsg = fmt.Sprintf("%s: Group %s has duplicate/conflict criteria", errMsgSubject, groupStr)
 			log.WithFields(log.Fields{"name": groupStr}).Error(retMsg)
@@ -2318,7 +2348,7 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 		if !isNvIpGroup && (g.OriginalName == groupCfg.Name) {
 			e := "Group already added"
 			log.WithFields(log.Fields{"name": groupStr}).Info(e)
-			dst := append([]api.RESTCriteriaEntry(nil), *groupCfg.Criteria...)
+			dst := append([]v1.CriteriaEntry(nil), *groupCfg.Criteria...)
 			if !common.SameGroupCriteria(g.Criteria, dst, false) {
 				retMsg = fmt.Sprintf("%s: Group %s added with different criteria", errMsgSubject, groupStr)
 				log.WithFields(log.Fields{"name": groupStr}).Error(retMsg)
@@ -2340,7 +2370,11 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 	// 1. If the learned group already exists, promote it to crd later.
 	// 2. If the crd group already exists, keep the existing crd group unchanged.
 	// 3. If group doesn't exist yet, create a crd nv.ip.xxx group that has "domain" key(if applicable) in criteria (i.e. drop "address" & other criteria).
-	if g, _, _ := clusHelper.GetGroup(groupCfg.Name, h.acc); g != nil {
+	g, _, grpErr := clusHelper.GetGroup(groupCfg.Name, h.acc)
+	if grpErr != nil {
+		log.WithError(grpErr).Warn("Failed to get group from cluster")
+	}
+	if g != nil {
 		if g.Kind != share.GroupKindContainer && hasDlpWafCfg {
 			retMsg = fmt.Sprintf("%s: Group %s cannot have DLP/WAF policy", errMsgSubject, groupStr)
 			return retMsg, api.RESTErrInvalidRequest
@@ -2366,7 +2400,11 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 					newName = fmt.Sprintf("%s-%s-%d", groupCfg.Name, fmt.Sprint(hashval), reviewType)
 				}
 				// Make sure alternative group name is avialiable for non-nv.ip.xxx group
-				if variation_g, _, _ := clusHelper.GetGroup(newName, h.acc); variation_g != nil {
+				variation_g, _, varGrpErr := clusHelper.GetGroup(newName, h.acc)
+				if varGrpErr != nil {
+					log.WithError(varGrpErr).Warn("Failed to get variation group from cluster")
+				}
+				if variation_g != nil {
 					vrg_criteria := criteria2REST(variation_g.Criteria)
 					if !common.SameGroupCriteria(*groupCfg.Criteria, vrg_criteria, false) {
 						retMsg = fmt.Sprintf("%s: Group %s and alternative name %s both taken", errMsgSubject, groupStr, newName)
@@ -2421,7 +2459,7 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 		if isNvIpGroup {
 			// when creating a new nv.ip.xxx group, only keep "domain" key in its criteria. hopefully it should be learned later
 			crdGroupCriteria := crdgroupCfg.Criteria
-			criteria := make([]api.RESTCriteriaEntry, 0, 1)
+			criteria := make([]v1.CriteriaEntry, 0, 1)
 			for _, ct := range crdGroupCriteria {
 				if ct.Key == share.CriteriaKeyDomain {
 					criteria = append(criteria, ct)
@@ -2436,7 +2474,11 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 				// the group based on variation
 				// 1. if already created then it is duplicated create, so keep the variation
 				// 2. if not exist, then use the original name to create the group
-				if variation_g, _, _ := clusHelper.GetGroup(newName, h.acc); variation_g != nil {
+				variation_g2, _, varGrp2Err := clusHelper.GetGroup(newName, h.acc)
+				if varGrp2Err != nil {
+					log.WithError(varGrp2Err).Warn("Failed to get variation group from cluster")
+				}
+				if variation_g2 != nil {
 					crdgroupCfg.Name = newName
 				}
 			}
@@ -2449,7 +2491,7 @@ func (h *nvCrdHandler) parseCrdGroup(targetName string, inFedSecRule bool, crdgr
 	return "", err
 }
 
-func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail resource.NvSecurityRuleDetail, ruleSet utils.Set,
+func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail v1.NvSecurityRuleDetail, ruleSet utils.Set,
 	reviewType share.TReviewType, owner string) (api.RESTPolicyRuleConfig, string, int) {
 
 	var buffer bytes.Buffer
@@ -2490,7 +2532,7 @@ func (h *nvCrdHandler) parseCrdFwRule(from, to, recordName string, ruleDetail re
 	return ruleCfg, "", 0
 }
 
-func (h *nvCrdHandler) validateCrdResponseRule(idx int, gName string, cfgType share.TCfgType, rule resource.NvCrdResponseRule,
+func (h *nvCrdHandler) validateCrdResponseRule(idx int, gName string, cfgType share.TCfgType, rule v1.NvCrdResponseRule,
 	acc *access.AccessControl) (string, int) {
 	if gName != rule.Group {
 		return fmt.Sprintf("wrong group %s", rule.Group), 1
@@ -2626,7 +2668,7 @@ func (h *nvCrdHandler) validateCrdFileRules(rules []*api.RESTFileMonitorFilter) 
 
 }
 
-func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec) (string, int) {
+func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *v1.NvSecurityRuleSpec) (string, int) {
 	var errCnt int
 	var buffer bytes.Buffer
 
@@ -2660,7 +2702,7 @@ func (h *nvCrdHandler) validateCrdDlpWafGroup(spec *resource.NvSecurityRuleSpec)
 }
 
 // for CRD & group import
-func (h *nvCrdHandler) parseCurCrdGfwContent(scope string, gfwrule *resource.NvSecurityRule, recordList map[string]*share.CLUSCrdSecurityRule,
+func (h *nvCrdHandler) parseCurCrdGfwContent(scope string, gfwrule *v1.NvSecurityRule, recordList map[string]*share.CLUSCrdSecurityRule,
 	reviewType share.TReviewType, reviewTypeDisplay string) (*resource.NvSecurityParse, int, string, string) {
 	var buffer bytes.Buffer
 	var errNo int
@@ -2988,7 +3030,7 @@ targetpass:
 	}
 
 	// 6. Get response rules for the group
-	var responseRules []*resource.NvCrdResponseRule
+	var responseRules []*v1.NvCrdResponseRule
 	for i, ruleDetail := range gfwrule.Spec.ResponseRule {
 		// the contents will be justified
 		ruleDetail.Group = crdCfgRet.TargetName
@@ -3034,7 +3076,7 @@ func (h *nvCrdHandler) parseCurCrdGrpDefContent(grpDef *resource.NvGroupDefiniti
 
 	groupsInSecRule := utils.NewSet()
 	selector := grpDef.Spec.Selector
-	crdgroupCfg := api.RESTCrdGroupConfig{
+	crdgroupCfg := v1.GroupConfig{
 		Name:     selector.Name,
 		Criteria: selector.Criteria,
 	}
@@ -3400,7 +3442,11 @@ func (h *nvCrdHandler) parseCurCrdDlpContent(dlpSecRule *resource.NvDlpSecurityR
 			errMsg := fmt.Sprintf("%s:   cannot create sensor with reserved name %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
-		if cs, _ := cacher.GetDlpSensor(sensor.Name, h.acc); cs != nil && cs.Predefine {
+		cs, csErr := cacher.GetDlpSensor(sensor.Name, h.acc)
+		if csErr != nil {
+			log.WithError(csErr).Warn("failed to get DLP sensor")
+		}
+		if cs != nil && cs.Predefine {
 			errMsg := fmt.Sprintf("%s:   cannot modify predefined sensor %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
@@ -3472,7 +3518,11 @@ func (h *nvCrdHandler) parseCurCrdWafContent(wafSecRule *resource.NvWafSecurityR
 			errMsg := fmt.Sprintf("%s:   cannot create sensor with reserved name %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
-		if cs, _ := cacher.GetWafSensor(sensor.Name, h.acc); cs != nil && cs.Predefine {
+		cs, csErr := cacher.GetWafSensor(sensor.Name, h.acc)
+		if csErr != nil {
+			log.WithError(csErr).Warn("failed to get WAF sensor")
+		}
+		if cs != nil && cs.Predefine {
 			errMsg := fmt.Sprintf("%s:   cannot modify predefined sensor %s", errMsgSubject, name)
 			return nil, 1, errMsg, recordName
 		}
@@ -3687,10 +3737,10 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 	crdRecord.Rules = *ruleNew
 	if targetGroupDlpWAF {
 		if crdCfgRet.DlpGroupCfg == nil {
-			crdCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]api.RESTCrdDlpGroupSetting, 0)}
+			crdCfgRet.DlpGroupCfg = &api.RESTCrdDlpGroupConfig{RepSensors: make([]v1.DlpGroupSetting, 0)}
 		}
 		if crdCfgRet.WafGroupCfg == nil {
-			crdCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]api.RESTCrdWafGroupSetting, 0)}
+			crdCfgRet.WafGroupCfg = &api.RESTCrdWafGroupConfig{RepSensors: make([]v1.WafGroupSetting, 0)}
 		}
 		txn := cluster.Transact()
 		crdRecord.DlpGroupSensors = h.crdHandleDlpGroup(txn, crdCfgRet.TargetName, crdCfgRet.DlpGroupCfg, crdCfgRet.CfgType)
@@ -3703,7 +3753,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 
 	if len(crdCfgRet.GroupResponseCfg) > 0 {
 		// handling response rules for the group
-		grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
+		grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 			crdCfgRet.TargetName: crdCfgRet.GroupResponseCfg,
 		}
 		ruleIDs, err := h.crdHandleGroupResponseRules(share.ScopeLocal, grpResponseCfg, crdCfgRet.CfgType)
@@ -3857,8 +3907,8 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 	*resource.NvSecurityParse, int, string, string) {
 
 	var crdCfgRet *resource.NvSecurityParse
-	var gfwrule *resource.NvSecurityRule
-	var gfwruleObj resource.NvSecurityRule
+	var gfwrule *v1.NvSecurityRule
+	var gfwruleObj v1.NvSecurityRule
 	var grpDef *resource.NvGroupDefinition
 	var admCtrlSecRule *resource.NvAdmCtrlSecurityRule
 	var responseSecRule *resource.NvResponseSecurityRule
@@ -3871,11 +3921,11 @@ func (h *nvCrdHandler) parseCrdContent(kind string, crdSecRule interface{}, reco
 
 	switch kind {
 	case resource.NvSecurityRuleKind:
-		gfwrule, ok = crdSecRule.(*resource.NvSecurityRule)
+		gfwrule, ok = crdSecRule.(*v1.NvSecurityRule)
 	case resource.NvClusterSecurityRuleKind:
-		var gfwruleTemp *resource.NvClusterSecurityRule
-		if gfwruleTemp, ok = crdSecRule.(*resource.NvClusterSecurityRule); ok {
-			gfwruleObj = resource.NvSecurityRule(*gfwruleTemp)
+		var gfwruleTemp *v1.NvClusterSecurityRule
+		if gfwruleTemp, ok = crdSecRule.(*v1.NvClusterSecurityRule); ok {
+			gfwruleObj = v1.NvSecurityRule(*gfwruleTemp)
 			gfwrule = &gfwruleObj
 		}
 	case resource.NvGroupDefKind:
@@ -4032,7 +4082,10 @@ func isExportSkipGroupName(name, owner string, alwaysAllowNsUser bool, acc *acce
 		group, err := cacher.GetGroup(name, "", false, acc)
 		if group == nil {
 			if owner != "target" && err == common.ErrObjectAccessDenied && alwaysAllowNsUser {
-				group, _ = cacher.GetGroup(name, "", false, acc)
+				group, err = cacher.GetGroup(name, "", false, acc)
+				if err != nil {
+					log.WithError(err).Warn("failed to get group with ns user access")
+				}
 			}
 		}
 		if group == nil {
@@ -4043,8 +4096,8 @@ func isExportSkipGroupName(name, owner string, alwaysAllowNsUser bool, acc *acce
 }
 
 func exportAttachRule(scope string, rule *api.RESTPolicyRule, owner string, acc *access.AccessControl, cnt int,
-	useNameReferral, alwaysAllowNsUser bool) (*resource.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
-	var detail resource.NvSecurityRuleDetail
+	useNameReferral, alwaysAllowNsUser bool) (*v1.NvSecurityRuleDetail, resource.NvGroupDefCfg) {
+	var detail v1.NvSecurityRuleDetail
 	var group *api.RESTGroup
 	var nvGroupDefCfg resource.NvGroupDefCfg
 	var skip bool
@@ -4154,7 +4207,10 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTGroupExport
 
 	err = json.Unmarshal(body, &rconf)
@@ -4171,7 +4227,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	}
 
 	apiVersion := resource.NvSecurityRuleVersion
-	resp := resource.NvSecurityRuleList{
+	resp := v1.NvSecurityRuleList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       resource.NvListKind,
 			APIVersion: apiVersion,
@@ -4238,7 +4294,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 			}
 		}
 
-		resptmp := resource.NvSecurityRule{
+		resptmp := v1.NvSecurityRule{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       targetKind,
 				APIVersion: apiversion,
@@ -4247,14 +4303,14 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				Name:      kindName,
 				Namespace: targetNs,
 			},
-			Spec: resource.NvSecurityRuleSpec{
-				Target: resource.NvSecurityTarget{
+			Spec: v1.NvSecurityRuleSpec{
+				Target: v1.NvSecurityTarget{
 					Selector: tgroup,
 				},
-				IngressRule: make([]resource.NvSecurityRuleDetail, 0),
-				EgressRule:  make([]resource.NvSecurityRuleDetail, 0),
-				ProcessRule: make([]resource.NvSecurityProcessRule, 0),
-				FileRule:    make([]resource.NvSecurityFileRule, 0),
+				IngressRule: make([]v1.NvSecurityRuleDetail, 0),
+				EgressRule:  make([]v1.NvSecurityRuleDetail, 0),
+				ProcessRule: make([]v1.NvSecurityProcessRule, 0),
+				FileRule:    make([]v1.NvSecurityFileRule, 0),
 			},
 		}
 		if isFedScope && tgroup.Name == api.LearnedExternal {
@@ -4332,7 +4388,10 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 				continue
 			}
 			policy_ids.Add(idx)
-			rule, _ := cacher.GetPolicyRule(idx, acc)
+			rule, err := cacher.GetPolicyRule(idx, acc)
+			if err != nil {
+				log.WithError(err).Warn("failed to get policy rule")
+			}
 			if rule != nil {
 				nvGrpDefItem := resource.NvGroupDefinition{
 					TypeMeta: metav1.TypeMeta{
@@ -4344,7 +4403,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 					},
 				}
 
-				var detail *resource.NvSecurityRuleDetail
+				var detail *v1.NvSecurityRuleDetail
 				var nvGroupDefCfg resource.NvGroupDefCfg
 				if rule.To == gname {
 					fromFedGroup := strings.HasPrefix(rule.From, api.FederalGroupPrefix)
@@ -4386,11 +4445,23 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 	// We don't know the default policy mode in other system so in current system just export
 
 	if rconf.UseNameReferral {
-		json_data1, _ := json.MarshalIndent(respGroupDefs, "", "  ")
-		data, _ := yaml.JSONToYAML(json_data1)
+		json_data1, err := json.MarshalIndent(respGroupDefs, "", "  ")
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal group defs")
+		}
+		data, err := yaml.JSONToYAML(json_data1)
+		if err != nil {
+			log.WithError(err).Warn("failed to convert group defs to YAML")
+		}
 		data = append(data, []byte("\n---\n\n")...)
-		json_data2, _ := json.MarshalIndent(resp, "", "  ")
-		data2, _ := yaml.JSONToYAML(json_data2)
+		json_data2, err := json.MarshalIndent(resp, "", "  ")
+		if err != nil {
+			log.WithError(err).Warn("failed to marshal export response")
+		}
+		data2, err := yaml.JSONToYAML(json_data2)
+		if err != nil {
+			log.WithError(err).Warn("failed to convert export response to YAML")
+		}
 		data = append(data, data2...)
 		doExport(exportFileName, exportType, rconf.RemoteExportOptions, data, w, r, acc, login)
 	} else {
@@ -4451,7 +4522,7 @@ func (h *nvCrdHandler) crdGetFileRules(profile *api.RESTFileMonitorProfile) []sh
 	return rules
 }
 
-func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
+func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *v1.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if profile, err := cacher.GetProcessProfile(group, acc); err == nil {
 		if utils.DoesGroupHavePolicyMode(group) {
@@ -4459,7 +4530,7 @@ func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resour
 			if profile.Baseline == share.ProfileBasic {
 				baseline = share.ProfileBasic
 			}
-			secRule.ProcessProfile = &resource.NvSecurityProcessProfile{Baseline: &baseline}
+			secRule.ProcessProfile = &v1.NvSecurityProcessProfile{Baseline: &baseline}
 			if rconf.ProfileMode != "" {
 				secRule.ProcessProfile.Mode = &rconf.ProfileMode
 			} else if profile.Mode != "" {
@@ -4473,7 +4544,7 @@ func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resour
 			if !dupChecker.Contains(key) {
 				dupChecker.Add(key)
 				//
-				r := &resource.NvSecurityProcessRule{
+				r := &v1.NvSecurityProcessRule{
 					Name:            gproc.Name,
 					Path:            gproc.Path,
 					Action:          gproc.Action,
@@ -4489,7 +4560,7 @@ func exportProcessRule(group string, rconf *api.RESTGroupExport, secRule *resour
 	return false
 }
 
-func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *access.AccessControl) bool {
+func exportFileRule(group string, rules *v1.NvSecurityRuleSpec, acc *access.AccessControl) bool {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	// not include predefined list
 	if profile, err := cacher.GetFileMonitorProfile(group, acc, false); err == nil {
@@ -4499,7 +4570,7 @@ func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *acces
 			if !dupChecker.Contains(key) {
 				dupChecker.Add(key)
 				//
-				r := &resource.NvSecurityFileRule{
+				r := &v1.NvSecurityFileRule{
 					Filter:    ff.Filter,
 					Recursive: ff.Recursive,
 					Behavior:  ff.Behavior,
@@ -4516,17 +4587,17 @@ func exportFileRule(group string, rules *resource.NvSecurityRuleSpec, acc *acces
 	return false
 }
 
-func exportDlpWafGroup(group string, secRule *resource.NvSecurityRule, acc *access.AccessControl) {
+func exportDlpWafGroup(group string, secRule *v1.NvSecurityRule, acc *access.AccessControl) {
 	log.WithFields(log.Fields{"name": group}).Debug()
 	if dlpGroup, err := cacher.GetDlpGroup(group, acc); err == nil {
-		settings := make([]api.RESTCrdDlpGroupSetting, len(dlpGroup.Sensors))
+		settings := make([]v1.DlpGroupSetting, len(dlpGroup.Sensors))
 		for idx, s := range dlpGroup.Sensors {
-			settings[idx] = api.RESTCrdDlpGroupSetting{
+			settings[idx] = v1.DlpGroupSetting{
 				Name:   s.Name,
 				Action: s.Action,
 			}
 		}
-		secRule.Spec.DlpGroup = &resource.NvSecurityDlpGroup{
+		secRule.Spec.DlpGroup = &v1.NvSecurityDlpGroup{
 			Status:   dlpGroup.Status,
 			Settings: settings,
 		}
@@ -4535,14 +4606,14 @@ func exportDlpWafGroup(group string, secRule *resource.NvSecurityRule, acc *acce
 	}
 
 	if wafGroup, err := cacher.GetWafGroup(group, acc); err == nil {
-		settings := make([]api.RESTCrdWafGroupSetting, len(wafGroup.Sensors))
+		settings := make([]v1.WafGroupSetting, len(wafGroup.Sensors))
 		for idx, s := range wafGroup.Sensors {
-			settings[idx] = api.RESTCrdWafGroupSetting{
+			settings[idx] = v1.WafGroupSetting{
 				Name:   s.Name,
 				Action: s.Action,
 			}
 		}
-		secRule.Spec.WafGroup = &resource.NvSecurityWafGroup{
+		secRule.Spec.WafGroup = &v1.NvSecurityWafGroup{
 			Status:   wafGroup.Status,
 			Settings: settings,
 		}
@@ -4773,36 +4844,12 @@ func (h *nvCrdHandler) getCrInfo(crdSecRule interface{}) (string, bool, error) {
 		Annotations:       objectMeta.GetAnnotations(),
 		OwnerReferences:   objectMeta.GetOwnerReferences(),
 	}
-	// clear those variant fields in input metadata for calculating hash of the cr.
-	objectMeta.SetCreationTimestamp(metav1.Time{})
-	objectMeta.SetResourceVersion("")
-	objectMeta.SetGeneration(0)
-	objectMeta.SetUID(types.UID(""))
-	objectMeta.SetLabels(nil)
-	objectMeta.SetAnnotations(nil)
-	objectMeta.SetOwnerReferences(nil)
 
 	h.mdName = objectMeta.GetName()
-	ruleJsonValue, _ := json.Marshal(crdSecRule)
-	crdHash := h.calcCrdSecRuleHash(ruleJsonValue)
-
-	// revert those variant fields in input metadata to their original values.
-	objectMeta.SetCreationTimestamp(mdBackup.CreationTimestamp)
-	objectMeta.SetResourceVersion(mdBackup.ResourceVersion)
-	objectMeta.SetGeneration(mdBackup.Generation)
-	objectMeta.SetUID(mdBackup.UID)
-	objectMeta.SetLabels(mdBackup.Labels)
-	objectMeta.SetAnnotations(mdBackup.Annotations)
-	objectMeta.SetOwnerReferences(mdBackup.OwnerReferences)
+	// crdHash is for debugging purpose only. So simply leverage CR's uid & generation for composing crdHash
+	crdHash := fmt.Sprintf("%s/%v", string(mdBackup.UID), mdBackup.Generation)
 
 	return crdHash, false, nil
-}
-
-// calculate sha256 of the crd security rule(cr resource)
-// after sha256 is calculated, we need to revert those variant fields in metadata to their original values.
-func (h *nvCrdHandler) calcCrdSecRuleHash(ruleJsonValue []byte) string {
-	crdHashTemp := sha256.Sum256(ruleJsonValue)
-	return hex.EncodeToString(crdHashTemp[:])
 }
 
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
@@ -4891,7 +4938,11 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
 		}
-		if crdHash, skip, _ = crdHandler.getCrInfo(obj); skip {
+		var getCrErr error
+		if crdHash, skip, getCrErr = crdHandler.getCrInfo(obj); getCrErr != nil {
+			log.WithError(getCrErr).Warn("Failed to get CRD info")
+		}
+		if skip {
 			continue
 		}
 		if !crdHandler.AcquireLock(clusterLockWait) {

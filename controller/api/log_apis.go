@@ -253,7 +253,6 @@ type Event struct {
 	RESTRequest     string            `json:"rest_request,omitempty"`
 	RESTBody        string            `json:"rest_body,omitempty"`
 	EnforcerLimit   int               `json:"enforcer_limit,omitempty"`
-	LicenseExpire   string            `json:"license_expire,omitempty"`
 	Msg             string            `json:"message"`
 }
 

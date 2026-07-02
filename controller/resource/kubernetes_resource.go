@@ -37,6 +37,7 @@ import (
 
 	"github.com/neuvector/neuvector/controller/access"
 	"github.com/neuvector/neuvector/controller/common"
+	v1 "github.com/neuvector/neuvector/controller/k8sapi/v1"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/global"
 	orchAPI "github.com/neuvector/neuvector/share/orchestration"
@@ -577,8 +578,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvSecurityRule) },
-				func() metav1.ListInterface { return new(NvSecurityRuleList) },
+				func() metav1.Object { return new(v1.NvSecurityRule) },
+				func() metav1.ListInterface { return new(v1.NvSecurityRuleList) },
 				xlateCrdNvSecurityRule,
 				nil,
 			},
@@ -590,8 +591,8 @@ var resourceMakers map[string]k8sResource = map[string]k8sResource{
 		makers: []*resourceMaker{
 			{
 				"v1",
-				func() metav1.Object { return new(NvClusterSecurityRule) },
-				func() metav1.ListInterface { return new(NvClusterSecurityRuleList) },
+				func() metav1.Object { return new(v1.NvClusterSecurityRule) },
+				func() metav1.ListInterface { return new(v1.NvClusterSecurityRuleList) },
 				xlateCrdNvClusterSecurityRule,
 				nil,
 			},
@@ -1121,7 +1122,7 @@ func xlateCrd(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvSecurityRule); ok {
+	if o, ok := obj.(*v1.NvSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1129,7 +1130,7 @@ func xlateCrdNvSecurityRule(obj metav1.Object) (string, interface{}) {
 }
 
 func xlateCrdNvClusterSecurityRule(obj metav1.Object) (string, interface{}) {
-	if o, ok := obj.(*NvClusterSecurityRule); ok {
+	if o, ok := obj.(*v1.NvClusterSecurityRule); ok {
 		return string(obj.GetUID()), o
 	}
 
@@ -1345,7 +1346,7 @@ exit_watcher:
 					d.lock.Lock()
 					for rt, rtWatcher := range d.watchers {
 						if rtWatcher != nil && rtWatcher.cancel != nil {
-							log.WithFields(log.Fields{"resource": rt}).Info("Cancel context")
+							log.WithFields(log.Fields{"resource": rt}).Debug("Canceling context")
 							rtWatcher.tokenRenewed = true
 							rtWatcher.cancel()
 							// 1. watchResource() is notified. It sends an error(ex: context.Canceled) to errCh channel and returns
@@ -1464,11 +1465,11 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		d.lock.Lock()
 		switch rt {
 		case RscTypeCrdSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &NvSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", NvSecurityRulePlural, true, &v1.NvSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", NvSecurityRulePlural, true, &v1.NvSecurityRuleList{})
 		case RscTypeCrdClusterSecurityRule:
-			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRule{})
-			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &NvClusterSecurityRuleList{})
+			k8s.Register("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &v1.NvClusterSecurityRule{})
+			k8s.RegisterList("neuvector.com", "v1", NvClusterSecurityRulePlural, false, &v1.NvClusterSecurityRuleList{})
 		case RscTypeCrdGroupDefinition:
 			k8s.Register("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinition{})
 			k8s.RegisterList("neuvector.com", "v1", NvGroupDefPlural, true, &NvGroupDefinitionList{})
@@ -1503,7 +1504,11 @@ func (d *kubernetes) RegisterResource(rt string) error {
 		}
 	}
 	if err != nil {
-		log.WithFields(log.Fields{"resource": rt, "error": err}).Error("fail to register")
+		if rt == RscTypeImage {
+			log.WithFields(log.Fields{"resource": rt, "error": err}).Info("OpenShift image resource not available, skipping")
+		} else {
+			log.WithFields(log.Fields{"resource": rt, "error": err}).Error("fail to register")
+		}
 	}
 
 	return err
@@ -1694,7 +1699,7 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 					tokenRenewed = rtWatcher.tokenRenewed
 				}
 				d.lock.RUnlock()
-				log.WithFields(log.Fields{"resource": rt, "tokenRenewed": tokenRenewed}).Info("Context cancelled")
+				log.WithFields(log.Fields{"resource": rt, "tokenRenewed": tokenRenewed}).Debug("Context cancelled")
 				if !tokenRenewed {
 					// The context is cancelled not because of k8s token renewal
 					// It means this go routine should be exiting now.
@@ -2137,7 +2142,11 @@ func GetK8sVersion() (int, int) {
 		SetK8sVersion(k8sVer)
 		if ocVersionMajor == 0 {
 			if ss := strings.Split(ocVer, "."); len(ss) > 0 {
-				ocVersionMajor, _ = strconv.Atoi(ss[0])
+				var err error
+				ocVersionMajor, err = strconv.Atoi(ss[0])
+				if err != nil {
+					log.WithError(err).Info("OC version not available, skipping")
+				}
 			}
 		}
 	}
@@ -2155,7 +2164,11 @@ func SetK8sVersion(k8sVer string) {
 		}
 	}
 	if len(ss) >= 2 {
-		k8sVersionMinor, _ = strconv.Atoi(ss[1])
+		var err error
+		k8sVersionMinor, err = strconv.Atoi(ss[1])
+		if err != nil {
+			log.WithError(err).Warn("Failed to parse k8s version minor")
+		}
 	}
 }
 
@@ -2521,7 +2534,10 @@ func RetrieveStorePassphrases() (common.EncKeys, string, string, error) {
 	var currEncKeyIdx uint64
 	var currEncKeyVer string
 
-	_, secretData, rscVersion, foundSecret, _ := retrieveSecretData(nvStoreSecret, "")
+	_, secretData, rscVersion, foundSecret, err := retrieveSecretData(nvStoreSecret, "")
+	if err != nil {
+		log.WithError(err).Warn("failed to retrieve store secret data for passphrases")
+	}
 	encKeys := make(common.EncKeys, len(secretData))
 	for k, v := range secretData {
 		if ui64, err := strconv.ParseUint(k, 10, 64); err == nil {
@@ -2577,7 +2593,10 @@ func AddStorePassphrase() error {
 	var err error
 	var currEncKeyIdx uint64
 
-	_, secretData, rscVersion, foundSecret, _ := retrieveSecretData(nvStoreSecret, "")
+	_, secretData, rscVersion, foundSecret, err := retrieveSecretData(nvStoreSecret, "")
+	if err != nil {
+		log.WithError(err).Warn("failed to retrieve store secret data for adding passphrase")
+	}
 	for k := range secretData {
 		if ui64, err := strconv.ParseUint(k, 10, 64); err == nil {
 			if ui64 > currEncKeyIdx {

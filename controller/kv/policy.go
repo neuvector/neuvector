@@ -15,9 +15,13 @@ import (
 func writePolicyToKvClusterTxn(txn *cluster.ClusterTransact, dels []uint32, keeps []*share.CLUSRuleHead) int {
 	// Write updated rules to the cluster
 	if len(dels) > 0 {
-		_ = clusHelper.PutPolicyRuleListTxn(txn, keeps)
+		if err := clusHelper.PutPolicyRuleListTxn(txn, keeps); err != nil {
+			log.WithError(err).Warn("Failed to put policy rule list in transaction")
+		}
 		for _, id := range dels {
-			_ = clusHelper.DeletePolicyRuleTxn(txn, id)
+			if err := clusHelper.DeletePolicyRuleTxn(txn, id); err != nil {
+				log.WithError(err).Warn("Failed to delete policy rule in transaction")
+			}
 		}
 	}
 	return len(dels)
@@ -142,7 +146,9 @@ func deleteResponseRuleByGroupTxn(txn *cluster.ClusterTransact, name string, cfg
 
 		// Write updated rules to the cluster by transaction
 		if dels.Cardinality() > 0 {
-			_ = clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
+			if err := clusHelper.PutResponseRuleListTxn(policyName, txn, keeps); err != nil {
+				log.WithError(err).Warn("Failed to put response rule list in transaction")
+			}
 			for id := range dels.Iter() {
 				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
 			}
@@ -193,7 +199,9 @@ func deleteResponseRuleByGroupsTxn(txn *cluster.ClusterTransact, names []string)
 		}
 		// Write updated rules to the cluster by transaction
 		if dels.Cardinality() > 0 {
-			_ = clusHelper.PutResponseRuleListTxn(policyName, txn, keeps)
+			if err := clusHelper.PutResponseRuleListTxn(policyName, txn, keeps); err != nil {
+				log.WithError(err).Warn("Failed to put response rule list in transaction")
+			}
 			for id := range dels.Iter() {
 				clusHelper.DeleteResponseRuleTxn(policyName, txn, id.(uint32))
 			}

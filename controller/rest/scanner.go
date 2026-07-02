@@ -53,7 +53,10 @@ func applyScanConfigUpdates(sconf *api.RESTScanConfigConfig) (*share.CLUSScanCon
 	// For example, if only some auto-scan flags are being updated, we want to keep the
 	// previous values for any flags that aren't being modified in this request.
 	var cconf *share.CLUSScanConfig
-	oldCfg, _ := cluster.Get(share.CLUSConfigScanKey)
+	oldCfg, err := cluster.Get(share.CLUSConfigScanKey)
+	if err != nil {
+		log.WithError(err).Warn("failed to get scan config from cluster")
+	}
 	if oldCfg != nil {
 		var oldCLUSScanConfig share.CLUSScanConfig
 		err := json.Unmarshal(oldCfg, &oldCLUSScanConfig)
@@ -90,15 +93,13 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
 	}
 
-	body, _ := io.ReadAll(r.Body)
-
 	var sconf api.RESTScanConfigData
-	err := json.Unmarshal(body, &sconf)
+	err = json.Unmarshal(body, &sconf)
 	if err != nil || sconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -117,7 +118,11 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	value, _ := json.Marshal(cconf)
+	value, err := json.Marshal(cconf)
+	if err != nil {
+		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
+		return
+	}
 	if err := cluster.Put(share.CLUSConfigScanKey, value); err != nil {
 		restRespError(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster)
 	} else {
@@ -155,11 +160,6 @@ func handlerScanWorkloadReq(w http.ResponseWriter, r *http.Request, ps httproute
 
 	id := ps.ByName("id")
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	if err := cacher.ScanWorkload(id, acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -182,11 +182,6 @@ func handlerScanHostReq(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	id := ps.ByName("id")
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	if err := cacher.ScanHost(id, acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -204,11 +199,6 @@ func handlerScanPlatformReq(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	} else if !acc.HasRequiredPermissions() {
 		restRespAccessDenied(w, login)
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 
@@ -265,7 +255,10 @@ func handlerScanWorkloadReport(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var resp *api.RESTScanReportData
 
-	vuls, modules, _ := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, modules, err := cacher.GetVulnerabilityReport(id, showTag)
+	if err != nil && err != common.ErrObjectNotFound {
+		log.WithError(err).Warn("failed to get vulnerability report")
+	}
 	if vuls == nil {
 		// Return an empty list if workload has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
@@ -384,10 +377,13 @@ func filterAssets(filters []api.RESTAssetsScanReportFilter, cursor *api.RESTScan
 }
 
 // filterAndSortCVE applies the filters to the CVEs and returns the filtered list.
-func filterAndSortCVE(filter *api.RESTVulScoreFilter, vuls []*api.RESTVulnerability) ([]*api.RESTVulnerability, error) {
+func filterAndSortCVE(scoreFilter *api.RESTVulScoreFilter, severityFilter string, vuls []*api.RESTVulnerability) ([]*api.RESTVulnerability, error) {
 	ret := []*api.RESTVulnerability{}
 	for _, vul := range vuls {
-		if filter != nil && skipCVE(*filter, vul) {
+		if scoreFilter != nil && skipCVE(*scoreFilter, vul) {
+			continue
+		}
+		if severityFilter != "" && severityFilter != vul.Severity {
 			continue
 		}
 		ret = append(ret, vul)
@@ -450,9 +446,12 @@ func handlerAssetsScanReportInternal(
 	maxReached := false
 outer:
 	for _, asset = range cachedAssets {
-		vuls, _, _ := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
+		vuls, _, vulErr := cacheInterface.GetVulnerabilityReport(asset.GetID(), showTag)
+		if vulErr != nil && vulErr != common.ErrObjectNotFound {
+			log.WithError(vulErr).Warn("failed to get vulnerability report")
+		}
 
-		vuls, err = filterAndSortCVE(rconf.VulScoreFilter, vuls)
+		vuls, err = filterAndSortCVE(rconf.VulScoreFilter, rconf.SeverityFilter, vuls)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Warn("Failed to filter vulnerabilities.  Continue with unfiltered vulnerabilities")
 		}
@@ -493,11 +492,14 @@ func handlerWorkloadsScanReport(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, _ := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	// validation
 	var rconf api.RESTAssetsScanReportQuery
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -740,7 +742,10 @@ func handlerScanHostReport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	var resp *api.RESTScanReportData
 
-	vuls, _, _ := cacher.GetVulnerabilityReport(id, showTag)
+	vuls, _, err := cacher.GetVulnerabilityReport(id, showTag)
+	if err != nil && err != common.ErrObjectNotFound {
+		log.WithError(err).Warn("failed to get vulnerability report")
+	}
 	if vuls == nil {
 		// Return an empty list if node has not been scanned
 		resp = &api.RESTScanReportData{Report: &api.RESTScanReport{
@@ -762,11 +767,14 @@ func handlerHostsScanReport(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	body, _ := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	// validation
 	var rconf api.RESTAssetsScanReportQuery
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -940,7 +948,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		for _, wl := range pod.Children {
 			setImagePolicyMode(img2mode, wl.ImageID, wl.PolicyMode)
 
-			reportVuls, _ := db.GetVulnerability(wl.ID)
+			reportVuls, err := db.GetVulnerability(wl.ID)
+			if err != nil {
+				log.WithError(err).Warn("failed to get workload vulnerability report")
+			}
 			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, wl.BaseOS, localVulTraits, "", false)
@@ -958,7 +969,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 		nodes := cacher.GetAllHostsRisk(acc)
 		for _, n := range nodes {
 
-			reportVuls, _ := db.GetVulnerability(n.ID)
+			reportVuls, err := db.GetVulnerability(n.ID)
+			if err != nil {
+				log.WithError(err).Warn("failed to get node vulnerability report")
+			}
 			localVulTraits := scanUtils.ExtractVulnerability(reportVuls)
 
 			vuls := scanUtils.FillVulTraits(sdb.CVEDB, n.BaseOS, localVulTraits, "", false)
@@ -974,7 +988,10 @@ func getAllVulnerabilities(acc *access.AccessControl) (map[string]*vulAsset, *ap
 
 	if acc.HasGlobalPermissions(share.PERMS_RUNTIME_SCAN, 0) {
 		platform, _, _ := cacher.GetPlatform()
-		vuls, _, _ := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
+		vuls, _, err := cacher.GetVulnerabilityReport(common.ScanPlatformID, "")
+		if err != nil && err != common.ErrObjectNotFound {
+			log.WithError(err).Warn("failed to get platform vulnerability report")
+		}
 		if vuls != nil {
 			for _, vul := range vuls {
 				va := addVulAsset(all, vul)
@@ -1178,11 +1195,6 @@ func handlerScanCacheStat(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
-	}
-
 	id := ps.ByName("id")
 	if res, err := rpc.ScanCacheGetStat(id); err != nil {
 		restRespError(w, http.StatusBadRequest, api.RESTErrObjectNotFound)
@@ -1203,11 +1215,6 @@ func handlerScanCacheData(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
-		return
-	}
-
-	if !licenseAllowScan() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
 		return
 	}
 

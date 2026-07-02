@@ -785,7 +785,10 @@ func deleteRuleFromLprWrapperMap(r *share.CLUSPolicyRule) {
 }
 
 func getNodesFromGroup(groupName string) []string {
-	gr, _ := cacher.GetGroup(groupName, "", false, access.NewReaderAccessControl())
+	gr, err := cacher.GetGroup(groupName, "", false, access.NewReaderAccessControl())
+	if err != nil {
+		log.WithError(err).Warn("Failed to get group members")
+	}
 	if gr != nil && len(gr.Members) > 0 {
 		nodes := make([]string, len(gr.Members))
 		for i, wl := range gr.Members {
@@ -971,7 +974,9 @@ func procLearnedPolicy(updateCluster bool) int {
 				cr.Applications = rule.Applications
 				cr.Ports = rule.Ports
 				cr.LastModAt = time.Now().UTC()
-				_ = clusHelper.PutPolicyRuleTxn(txn, cr)
+				if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+					log.WithError(err).Warn("Failed to put policy rule txn")
+				}
 				cctx.ConnLog.WithFields(log.Fields{
 					"from": cr.From, "to": cr.To, "id": cr.ID,
 				}).Debug("update")
@@ -995,14 +1000,18 @@ func procLearnedPolicy(updateCluster bool) int {
 
 			if lenDel > 0 {
 				for id := range deleteMap {
-					_ = clusHelper.DeletePolicyRuleTxn(txn, id)
+					if err := clusHelper.DeletePolicyRuleTxn(txn, id); err != nil {
+						log.WithError(err).Warn("Failed to delete policy rule txn")
+					}
 				}
 			}
 
 			if lenAdd > 0 {
 				sort.Slice(addList, func(i, j int) bool { return addList[i].ID < addList[j].ID })
 				for _, rule := range addList {
-					_ = clusHelper.PutPolicyRuleTxn(txn, rule)
+					if err := clusHelper.PutPolicyRuleTxn(txn, rule); err != nil {
+						log.WithError(err).Warn("Failed to put policy rule txn")
+					}
 					cctx.ConnLog.WithFields(log.Fields{
 						"from": rule.From, "to": rule.To, "id": rule.ID,
 					}).Debug("add")
@@ -1062,7 +1071,9 @@ func syncLearnedPolicyToCluster() int {
 				if !cmpLearnedApps(cr.Applications, lpr.objs) {
 					cr.Applications = apps2Slice(lpr.objs)
 					cr.LastModAt = time.Now().UTC()
-					_ = clusHelper.PutPolicyRuleTxn(txn, cr)
+					if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+						log.WithError(err).Warn("Failed to put policy rule txn")
+					}
 
 					log.WithFields(log.Fields{
 						"from": pair.from, "to": pair.to, "apps": lpr.objs,
@@ -1073,7 +1084,9 @@ func syncLearnedPolicyToCluster() int {
 				if cr.Ports != newPorts {
 					cr.Ports = newPorts
 					cr.LastModAt = time.Now().UTC()
-					_ = clusHelper.PutPolicyRuleTxn(txn, cr)
+					if err := clusHelper.PutPolicyRuleTxn(txn, cr); err != nil {
+						log.WithError(err).Warn("Failed to put policy rule txn")
+					}
 				}
 			}
 		} else {
@@ -1090,14 +1103,18 @@ func syncLearnedPolicyToCluster() int {
 		} else if _, ok := lprWrapperMapById[r.ID]; ok {
 			newList = append(newList, r)
 		} else {
-			_ = clusHelper.DeletePolicyRuleTxn(txn, r.ID)
+			if err := clusHelper.DeletePolicyRuleTxn(txn, r.ID); err != nil {
+				log.WithError(err).Warn("Failed to delete policy rule txn")
+			}
 		}
 	}
 
 	if len(addList) > 0 {
 		sort.Slice(addList, func(i, j int) bool { return addList[i].ID < addList[j].ID })
 		for _, rule := range addList {
-			_ = clusHelper.PutPolicyRuleTxn(txn, rule)
+			if err := clusHelper.PutPolicyRuleTxn(txn, rule); err != nil {
+				log.WithError(err).Warn("Failed to put policy rule txn")
+			}
 			log.WithFields(log.Fields{
 				"from": rule.From, "to": rule.To, "id": rule.ID,
 			}).Debug("add")

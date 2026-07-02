@@ -133,8 +133,16 @@ func getLocalInfo(selfID string, pid2ID map[int]string) error {
 	Ctrler.HostName = Host.Name
 	Ctrler.Ver = Version
 
-	ctrlEnv.cgroupMemory, _ = global.SYS.GetContainerCgroupPath(0, "memory")
-	ctrlEnv.cgroupCPUAcct, _ = global.SYS.GetContainerCgroupPath(0, "cpuacct")
+	ctrlEnv.cgroupMemory, err = global.SYS.GetContainerCgroupPath(0, "memory")
+	if err != nil {
+		// Suppress error: cgroup path may not be available outside containers
+		log.WithError(err).Debug("failed to get memory cgroup path")
+	}
+	ctrlEnv.cgroupCPUAcct, err = global.SYS.GetContainerCgroupPath(0, "cpuacct")
+	if err != nil {
+		// Suppress error: cgroup path may not be available outside containers
+		log.WithError(err).Debug("failed to get cpuacct cgroup path")
+	}
 	return nil
 }
 
@@ -193,9 +201,21 @@ type localSystemInfo struct {
 var gInfo localSystemInfo
 
 func updateStats() {
-	cpuSystem, _ := global.SYS.GetHostCPUUsage()
-	mem, _ := global.SYS.GetContainerMemoryUsage(ctrlEnv.cgroupMemory)
-	cpu, _ := global.SYS.GetContainerCPUUsage(ctrlEnv.cgroupCPUAcct)
+	cpuSystem, err := global.SYS.GetHostCPUUsage()
+	if err != nil {
+		// Suppress error: called periodically, can exceed 60/min
+		log.WithError(err).Debug("failed to get host CPU usage")
+	}
+	mem, err := global.SYS.GetContainerMemoryUsage(ctrlEnv.cgroupMemory)
+	if err != nil {
+		// Suppress error: called periodically, can exceed 60/min
+		log.WithError(err).Debug("failed to get container memory usage")
+	}
+	cpu, err := global.SYS.GetContainerCPUUsage(ctrlEnv.cgroupCPUAcct)
+	if err != nil {
+		// Suppress error: called periodically, can exceed 60/min
+		log.WithError(err).Debug("failed to get container CPU usage")
+	}
 
 	gInfo.mutex.Lock()
 	system.UpdateStats(&gInfo.stats, mem, cpu, cpuSystem)
@@ -856,7 +876,10 @@ func main() {
 	var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
 	var nvSemanticVersion string // in the format v{major}.{minor}.{patch}
 	{
-		if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+		value, err := cluster.Get(share.CLUSCtrlVerKey)
+		if err != nil {
+			log.WithError(err).Warn("failed to get controller version key")
+		} else if value != nil {
 			// ver.CtrlVersion   : in the format v{major}.{minor}.{patch}[-s{#}] or interim/master.xxxx
 			// nvAppFullVersion  : in the format  {major}.{minor}.{patch}[-s{#}]
 			// nvSemanticVersion : in the format v{major}.{minor}.{patch}
@@ -896,7 +919,9 @@ func main() {
 		*teleNeuvectorEP = ""
 	}
 
-	if value, _ := cluster.Get(share.CLUSCtrlVerKey); value != nil {
+	if value, err := cluster.Get(share.CLUSCtrlVerKey); err != nil {
+		log.WithError(err).Warn("failed to get controller version key")
+	} else if value != nil {
 		var ver share.CLUSCtrlVersion
 		if err := json.Unmarshal(value, &ver); err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("Unmarshal")
@@ -1075,7 +1100,9 @@ func main() {
 	}
 
 	if !*noDefAdmin {
-		if user, _, _ := clusHelper.GetUserRev(common.DefaultAdminUser, access.NewFedAdminAccessControl()); user != nil {
+		if user, _, err := clusHelper.GetUserRev(common.DefaultAdminUser, access.NewFedAdminAccessControl()); err != nil {
+			log.WithError(err).Warn("failed to get default admin user rev")
+		} else if user != nil {
 			if user.PasswordHash == "" {
 				log.Error("invalid password hash for default admin user")
 				os.Exit(-2)

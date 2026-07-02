@@ -113,7 +113,10 @@ func (r *gitlab) Login(cfg *share.CLUSRegistryConfig) error {
 }
 
 func (r *gitlab) getData(ur string) ([]byte, string, error) {
-	request, _ := http.NewRequest("GET", ur, nil)
+	request, err := http.NewRequest("GET", ur, nil)
+	if err != nil {
+		return nil, noNextPageURL, fmt.Errorf("failed to create request: %w", err)
+	}
 	request.Header.Add("PRIVATE-TOKEN", r.privateToken)
 	resp, err := r.gitlabClient.Do(request)
 	if err != nil {

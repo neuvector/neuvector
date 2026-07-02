@@ -32,9 +32,6 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	acc, login := getAccessControl(w, r, access.AccessOPRead)
 	if acc == nil {
 		return
-	} else if !licenseAllowEnforce() {
-		restRespError(w, http.StatusBadRequest, api.RESTErrLicenseFail)
-		return
 	} else if _, err := cacher.GetAdmissionState(acc); err != nil {
 		restRespNotFoundLogAccessDenied(w, login, err)
 		return
@@ -63,7 +60,10 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	var whsvr WebhookServer
 	var stamps api.AdmCtlTimeStamps
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	body = _preprocessImportBody(body)
 	yamlParts := strings.Split(string(body), "\n---\n")
 

@@ -782,10 +782,24 @@ func (fn *FaNotify) lookupContainer(pid int) (r *rootFd, pInfo *ProcInfo) {
 			// log.WithFields(log.Fields{"pid": pid, "pInfo": pInfo, "mntId": mntId}).Debug("FMON: not found")
 			return
 		}
-		pInfo.Name, pInfo.PPid, _ = fn.sys.GetProcessName(pid)
-		pInfo.Path, _ = fn.sys.GetFilePath(pid)
-		pInfo.PPath, _ = fn.sys.GetFilePath(pInfo.PPid)
-		pInfo.Cmds, _ = fn.sys.ReadCmdLine(pid)
+		// Suppress error: these lookups can fail frequently for short-lived processes
+		var err error
+		pInfo.Name, pInfo.PPid, err = fn.sys.GetProcessName(pid)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.WithError(err).Debug("Failed to get process name")
+		}
+		pInfo.Path, err = fn.sys.GetFilePath(pid)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.WithError(err).Debug("Failed to get process file path")
+		}
+		pInfo.PPath, err = fn.sys.GetFilePath(pInfo.PPid)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.WithError(err).Debug("Failed to get parent process file path")
+		}
+		pInfo.Cmds, err = fn.sys.ReadCmdLine(pid)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.WithError(err).Debug("Failed to read process cmdline")
+		}
 		if len(pInfo.Cmds) > 0 {
 			pInfo.Name = pInfo.Cmds[0]
 		}

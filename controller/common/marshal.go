@@ -693,6 +693,7 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 				case cloakEncrypt:
 					var m string
 					if strVal := val.Interface().(string); strVal != "" {
+						var err2 error
 						if currentDekSeed.isAvailable() {
 							var err error
 							if m, err = aesGcmEncrypt(strVal); err != nil {
@@ -702,10 +703,13 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 								if err == ErrEmptyValue {
 									marshalResult.AddEmptyFieldToEncrypt(jsonTag)
 								}
-								m = utils.EncryptPassword(strVal)
+								m, err2 = utils.EncryptPassword(strVal)
 							}
 						} else {
-							m = utils.EncryptPassword(strVal)
+							m, err2 = utils.EncryptPassword(strVal)
+						}
+						if err2 != nil {
+							log.WithFields(log.Fields{"err2": err2, "jsonTag": jsonTag}).Error()
 						}
 					}
 					val = reflect.ValueOf(m)
@@ -789,7 +793,8 @@ func marshalValue(cloak string, v reflect.Value, marshalResult tMarshallResult) 
 			return dest, nil
 		}
 		if mapKeys[0].Kind() != reflect.String {
-			return nil, MarshalInvalidTypeError{t: mapKeys[0].Kind(), data: val}
+			// Do not include val as it could be sensitive.
+			return nil, MarshalInvalidTypeError{t: mapKeys[0].Kind()}
 		}
 		for _, key := range mapKeys {
 			d, err := marshalValue(cloak, v.MapIndex(key), marshalResult)

@@ -135,7 +135,10 @@ func handlerConverEndpointConfig(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	// Read body
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var rconf api.RESTConversationEndpointConfigData
 	err = json.Unmarshal(body, &rconf)
@@ -254,10 +257,13 @@ func handlerConverShow(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	from := ps.ByName("from")
 	to := ps.ByName("to")
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 
 	var data api.RESTConversationQueryData
-	err := json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 
 	var conver *api.RESTConversationDetail
 	if err != nil || data.Query == nil {

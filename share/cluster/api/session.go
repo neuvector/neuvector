@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -173,13 +174,18 @@ func (s *Session) RenewPeriodic(initialTTL string, id string, q *WriteOptions, d
 			}
 
 			// Handle the server updating the TTL
-			ttl, _ = time.ParseDuration(entry.TTL)
+			ttl, err = time.ParseDuration(entry.TTL)
+			if err != nil {
+				log.Printf("[WARN] failed to parse session TTL %q: %v", entry.TTL, err)
+			}
 			waitDur = ttl / 2
 			lastRenewTime = time.Now()
 
 		case <-doneCh:
 			// Attempt a session destroy
-			_, _ = s.Destroy(id, q)
+			if _, err := s.Destroy(id, q); err != nil {
+				log.Printf("[WARN] failed to destroy session %q: %v", id, err)
+			}
 			return nil
 
 		case <-ctx.Done():

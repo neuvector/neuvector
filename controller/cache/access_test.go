@@ -8,6 +8,7 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/stretchr/testify/require"
 )
 
 const D1 string = "d1"
@@ -25,7 +26,8 @@ func TestAccessResource(t *testing.T) {
 	wl2 := share.CLUSWorkload{ID: "2", Name: "c2", Domain: D2, Service: S2}
 	wlCacheMap[wl2.ID] = &workloadCache{workload: &wl2, displayName: "container2"}
 
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/workload", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/workload", nil)
+	require.NoError(t, err)
 	acc := access.NewAccessControl(r, access.AccessOPRead, map[string]string{D1: api.UserRoleAdmin}, nil)
 	accReadAll := access.NewReaderAccessControl()
 
@@ -64,7 +66,8 @@ func TestAccessGroup(t *testing.T) {
 		members:             utils.NewSet(G2),
 	}
 
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/group", nil)
+	require.NoError(t, err)
 	acc := access.NewAccessControl(r, access.AccessOPRead, map[string]string{D1: api.UserRoleAdmin}, nil)
 	accReadAll := access.NewReaderAccessControl()
 
@@ -153,7 +156,8 @@ func TestAccessPolicy(t *testing.T) {
 	policyCache.ruleHeads = rhs
 	policyCache.ruleOrderMap = ruleHeads2OrderMap(rhs)
 
-	r, _ := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/policy/rule", nil)
+	r, err := http.NewRequest(http.MethodGet, "https://10.1.1.1/v1/policy/rule", nil)
+	require.NoError(t, err)
 	// test
 	acc := access.NewAccessControl(r, access.AccessOPRead, map[string]string{"d1": api.UserRoleAdmin}, nil)
 	n := cacher.GetPolicyRuleCount(acc)

@@ -27,6 +27,10 @@ import (
 type BuildWhereClauseFunc func(allowedID []string, queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 
+const (
+	queryTokenIdLen = 6 // do not change the length
+)
+
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
 	dialect := goqu.Dialect("sqlite3")
 	statement, args, err := dialect.From(Table_assetvuls).Select("id").Where(goqu.C("assetid").Eq(assetID)).Prepared(true).ToSQL()
@@ -801,6 +805,7 @@ func buildWhereClauseForImage(allowedID []string, queryFilter *api.VulQueryFilte
 		}
 	}
 
+	filterByImageName := false
 	part_image_equal := goqu.Ex{}
 	part_image_contains := make([]exp.Expression, 0)
 	if queryFilter.ImageNameMatchType != "" && queryFilter.ImageName != "" {
@@ -812,8 +817,33 @@ func buildWhereClauseForImage(allowedID []string, queryFilter *api.VulQueryFilte
 		case "contains":
 			part_image_contains = append(part_image_contains, goqu.C("name").Like(fmt.Sprintf("%%%s%%", queryFilter.ImageName)))
 		}
+		filterByImageName = true
 	}
 
+	filterByImageOS := false
+	part_image_os_equal := goqu.Ex{}
+	part_image_os_contains := make([]exp.Expression, 0)
+	if queryFilter.ImageBaseOSMatchType != "" && queryFilter.ImageBaseOS != "" {
+		switch queryFilter.ImageBaseOSMatchType {
+		case "equals":
+			part_image_os_equal = goqu.Ex{
+				"I_base_os": queryFilter.ImageBaseOS,
+			}
+		case "contains":
+			part_image_os_contains = append(part_image_os_contains, goqu.C("I_base_os").Like(fmt.Sprintf("%%%s%%", queryFilter.ImageBaseOS)))
+		}
+		filterByImageOS = true
+	}
+
+	if filterByImageName && filterByImageOS {
+		return goqu.And(part1_assetType, part2_allowed,
+			part_image_equal, goqu.Or(part_image_contains...),
+			part_image_os_equal, goqu.Or(part_image_os_contains...))
+	}
+	if filterByImageOS {
+		return goqu.And(part1_assetType, part2_allowed,
+			part_image_os_equal, goqu.Or(part_image_os_contains...))
+	}
 	return goqu.And(part1_assetType, part2_allowed,
 		part_image_equal, goqu.Or(part_image_contains...))
 }
@@ -875,11 +905,19 @@ func encodeAndCompress(data interface{}) ([]byte, error) {
 func getCompiledAssetVulRecord(assetVul *DbAssetVul) *exp.Record {
 	var vulsBytes, modulesBytes []byte
 	if len(assetVul.Vuls) > 0 {
-		vulsBytes, _ = encodeAndCompress(assetVul.Vuls)
+		var err error
+		vulsBytes, err = encodeAndCompress(assetVul.Vuls)
+		if err != nil {
+			log.WithError(err).Warn("failed to encode/compress vulnerability data")
+		}
 	}
 
 	if len(assetVul.Modules) > 0 {
-		modulesBytes, _ = encodeAndCompress(assetVul.Modules)
+		var err error
+		modulesBytes, err = encodeAndCompress(assetVul.Modules)
+		if err != nil {
+			log.WithError(err).Warn("failed to encode/compress module data")
+		}
 	}
 
 	record := &goqu.Record{
@@ -966,6 +1004,29 @@ func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages ma
 	})
 }
 
+func GenQueryToken() (string, error) {
+	queryToken, err := utils.GetRandomID(queryTokenIdLen, "") // do not change the length
+	if err != nil {
+		return "", err
+	}
+	return queryToken, nil
+}
+
+func vaildateQueryToken(queryToken string) error {
+	invalidToken := errors.New("invalid query token")
+	if len(queryToken) != queryTokenIdLen*2 {
+		return invalidToken
+	}
+	for i := 0; i < len(queryToken); i++ {
+		c := queryToken[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+			continue
+		}
+		return invalidToken
+	}
+	return nil
+}
+
 func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 	q := &AssetQueryFilter{
 		Filters: &api.AssetQueryFilterViewModel{},
@@ -1004,6 +1065,11 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 }
 
 func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter) (int, []*api.AssetCVECount, error) {
+	if queryFilter != nil {
+		if err := vaildateQueryToken(queryFilter.QueryToken); err != nil {
+			return 0, nil, err
+		}
+	}
 	dialect := goqu.Dialect("sqlite3")
 	db := dbHandle
 
@@ -1140,6 +1206,9 @@ func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAsset
 }
 
 func DupAssetSessionTableToFile(sessionToken string) error {
+	if err := vaildateQueryToken(sessionToken); err != nil {
+		return err
+	}
 	dialect := goqu.Dialect("sqlite3")
 	sessionDb, err := createSessionFileDb(sessionToken)
 	if err != nil {
@@ -1201,7 +1270,11 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 }
 
 func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetViewV2, int, error) {
-
+	if queryFilter != nil {
+		if err := vaildateQueryToken(queryFilter.QueryToken); err != nil {
+			return nil, 0, err
+		}
+	}
 	getOrderColumn := func(queryFilter *AssetQueryFilter) []exp.OrderedExpression {
 		if queryFilter.Filters.OrderByColumn == "cvecount" {
 			if queryFilter.Filters.OrderByType == "desc" {

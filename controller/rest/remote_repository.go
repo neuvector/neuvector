@@ -25,9 +25,12 @@ func handlerRemoteRepositoryPost(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var remoteRepository api.RESTRemoteRepository
-	err := json.Unmarshal(body, &remoteRepository)
+	err = json.Unmarshal(body, &remoteRepository)
 	if err != nil {
 		msg := fmt.Sprintf("Could not unmarshal request body: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)
@@ -186,9 +189,12 @@ func handlerRemoteRepositoryPatch(w http.ResponseWriter, r *http.Request, ps htt
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Warn("failed to read request body")
+	}
 	var rconf api.RESTRemoteRepositoryConfigData
-	err := json.Unmarshal(body, &rconf)
+	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		msg := fmt.Sprintf("Could not unmarshal request body: %s", err.Error())
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, msg)

@@ -3,6 +3,7 @@ package kv
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -149,8 +150,9 @@ func (m *MockCluster) GetCustomRoleRev(name string, acc *access.AccessControl) (
 func (m *MockCluster) PutCustomRoleRev(role *share.CLUSUserRole, rev uint64, acc *access.AccessControl) error {
 	m.customrolesCluster[role.Name] = role
 	if m.mockKvRoleConfigUpdateFunc != nil {
-		value, _ := json.Marshal(*role)
-		m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSUserRoleKey(role.Name), value)
+		if value, err := json.Marshal(*role); err == nil {
+			m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSUserRoleKey(role.Name), value)
+		}
 	}
 
 	return nil
@@ -159,8 +161,9 @@ func (m *MockCluster) PutCustomRoleRev(role *share.CLUSUserRole, rev uint64, acc
 func (m *MockCluster) CreateCustomRole(role *share.CLUSUserRole, acc *access.AccessControl) error {
 	m.customrolesCluster[role.Name] = role
 	if m.mockKvRoleConfigUpdateFunc != nil {
-		value, _ := json.Marshal(*role)
-		m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyAdd, share.CLUSUserRoleKey(role.Name), value)
+		if value, err := json.Marshal(*role); err == nil {
+			m.mockKvRoleConfigUpdateFunc(cluster.ClusterNotifyAdd, share.CLUSUserRoleKey(role.Name), value)
+		}
 	}
 
 	return nil
@@ -223,8 +226,13 @@ func (m *MockCluster) GetUserRev(fullname string, acc *access.AccessControl) (*s
 	if user, ok := m.usersCluster[fullname]; ok {
 		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
 		var clone share.CLUSUser
-		value, _ := json.Marshal(user)
-		_ = json.Unmarshal(value, &clone)
+		value, err := json.Marshal(user)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal user: %w", err)
+		}
+		if err = json.Unmarshal(value, &clone); err != nil {
+			return nil, 0, fmt.Errorf("failed to unmarshal user: %w", err)
+		}
 		if !acc.Authorize(&clone, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
 		}
@@ -271,8 +279,9 @@ func (m *MockCluster) GetSystemConfigRev(acc *access.AccessControl) (*share.CLUS
 func (m *MockCluster) PutSystemConfigRev(conf *share.CLUSSystemConfig, rev uint64) error {
 	m.sysconfig = *conf
 	if m.mockKvSystemConfigUpdateFunc != nil {
-		value, _ := json.Marshal(*conf)
-		m.mockKvSystemConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSConfigSystemKey, value)
+		if value, err := json.Marshal(*conf); err == nil {
+			m.mockKvSystemConfigUpdateFunc(cluster.ClusterNotifyModify, share.CLUSConfigSystemKey, value)
+		}
 	}
 	return nil
 }
@@ -526,6 +535,20 @@ func (m *MockCluster) GetScannerRev(id string) (*share.CLUSScanner, uint64, erro
 	return nil, 0, common.ErrObjectNotFound
 }
 
+func (m *MockCluster) GetScanner(id string, acc *access.AccessControl) (*share.CLUSScanner, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if scanner, ok := m.scanners[id]; ok {
+		clone := *scanner
+		if !acc.Authorize(&clone, nil) {
+			return nil, common.ErrObjectAccessDenied
+		}
+		return &clone, nil
+	}
+	return nil, cluster.ErrKeyNotFound
+}
+
 func (m *MockCluster) PickLeastLoadedScanner() (*share.CLUSScanner, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -645,8 +668,13 @@ func (m *MockCluster) GetApikeyRev(fullname string, acc *access.AccessControl) (
 	if user, ok := m.apikeysCluster[fullname]; ok {
 		// REST code modify the object before writing to the cluster. Create a copy to protect the original data.
 		var clone share.CLUSApikey
-		value, _ := json.Marshal(user)
-		_ = json.Unmarshal(value, &clone)
+		value, err := json.Marshal(user)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal apikey: %w", err)
+		}
+		if err = json.Unmarshal(value, &clone); err != nil {
+			return nil, 0, fmt.Errorf("failed to unmarshal apikey: %w", err)
+		}
 		if !acc.Authorize(&clone, nil) {
 			return nil, 0, common.ErrObjectAccessDenied
 		}
@@ -675,7 +703,10 @@ func (m *MockCluster) DeleteApikey(name string) error {
 }
 
 func (m *MockCluster) PutObjectCert(cn, keyPath, certPath string, cert *share.CLUSX509Cert) error {
-	value, _ := json.Marshal(cert)
+	value, err := json.Marshal(cert)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cert: %w", err)
+	}
 	m.kv[cn] = string(value)
 	return nil
 }

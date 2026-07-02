@@ -44,7 +44,10 @@ func domainAdd(name string, labels map[string]string) {
 	retry := 0
 	for retry < retryClusterMax {
 		var prev *uint64
-		cd, rev, _ := clusHelper.GetDomain(name, accReadAll)
+		cd, rev, err := clusHelper.GetDomain(name, accReadAll)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get domain from cluster")
+		}
 		if cd == nil {
 			cd = initDomain(name, labels)
 		} else {
@@ -106,7 +109,10 @@ func domainConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var domain share.CLUSDomain
-		_ = json.Unmarshal(value, &domain)
+		if err := json.Unmarshal(value, &domain); err != nil {
+			log.WithError(err).Warn("Failed to unmarshal domain")
+			return
+		}
 
 		domainMutex.Lock()
 		oDomain := domainCacheMap[name]

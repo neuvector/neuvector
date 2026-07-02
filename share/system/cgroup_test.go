@@ -4,6 +4,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDockerIDDebian(t *testing.T) {
@@ -19,7 +21,8 @@ func TestDockerIDDebian(t *testing.T) {
 2:cpu:/4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970
 `
 	r := strings.NewReader(cgroup)
-	id, _, _, _ := getContainerIDByCgroupReader(r)
+	id, _, err, _ := getContainerIDByCgroupReader(r)
+	require.NoError(t, err)
 	if id != "4f797c539e6c745de61a93ca3ff892358ecbcaccd8414d5db545c38428142970" {
 		t.Errorf("Invalid Debian docker ID: %v\n", id)
 	}
@@ -39,7 +42,8 @@ func TestDockerIDCentOS(t *testing.T) {
 1:name=systemd:/system.slice/docker-9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d.scope
 `
 	r := strings.NewReader(cgroup)
-	id, _, _, _ := getContainerIDByCgroupReader(r)
+	id, _, err, _ := getContainerIDByCgroupReader(r)
+	require.NoError(t, err)
 	if id != "9ec39b91f3d70e1beff50a308f77067065ea6be0d91a3378375056cd4422cf3d" {
 		t.Errorf("Invalid CentOS docker ID: %v\n", id)
 	}
@@ -699,7 +703,8 @@ func TestDockerNative_Container_Cgroupv2(t *testing.T) {
 	}
 
 	// Optional:
-	_, _ = r.Seek(0, io.SeekStart)
+	_, err := r.Seek(0, io.SeekStart)
+	require.NoError(t, err)
 	id, _, found = getContainerIDByCgroupReaderV2(r, from_fscgroup)
 	if id != "1f1d6e2d4940ddac13abd421a2617992bf89f0e0f9a902ed58278c5f843e9ae7" || !found {
 		t.Errorf("detect wrong container ID, fscgroup: %v, %v\n", id, found)
@@ -755,7 +760,8 @@ func TestDockerK8s_Ubuntu_Container_Cgroupv2(t *testing.T) {
 	}
 
 	// Optional:
-	_, _ = r.Seek(0, io.SeekStart)
+	_, err := r.Seek(0, io.SeekStart)
+	require.NoError(t, err)
 	id, _, found = getContainerIDByCgroupReaderV2(r, from_fscgroup)
 	if id != "2cc65c162ca1388b6b8d5ccfb701d22fc96675ccf8b2f1590c490c2c4039547f" || !found {
 		t.Errorf("detect wrong dcontainer ID, fscgroup: %v, %v\n", id, found)

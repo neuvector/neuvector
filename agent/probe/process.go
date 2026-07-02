@@ -2,8 +2,10 @@ package probe
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -482,7 +484,13 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 		proc.user = p.getUserName(proc.pid, proc.euid)
 	}
 	if proc.path == "" {
-		proc.path, _ = global.SYS.GetFilePath(proc.pid)
+		if path, err := global.SYS.GetFilePath(proc.pid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debug("failed to get file path for proc")
+			}
+		} else {
+			proc.path = path
+		}
 	}
 	if proc.name == "" {
 		proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
@@ -492,7 +500,13 @@ func (p *Probe) inspectFirstContainerProc(proc *procInternal) {
 	if ppid > 1 {
 		proc.ppid = ppid
 		proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
-		proc.ppath, _ = global.SYS.GetFilePath(proc.ppid)
+		if path, err := global.SYS.GetFilePath(proc.ppid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debug("failed to get file path for parent proc")
+			}
+		} else {
+			proc.ppath = path
+		}
 	}
 }
 
@@ -813,8 +827,11 @@ func (p *Probe) evalNewRunningApp(pid int) {
 		p.unlockProcMux() // minimum section lock
 
 		if proc.cmds != nil && proc.cmds[0] != "sshd:" {
-			cmds, _ := global.SYS.ReadCmdLine(proc.pid)
-			if cmds != nil && cmds[0] != "" {
+			if cmds, err := global.SYS.ReadCmdLine(proc.pid); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					log.WithError(err).Debug("failed to read cmdline for proc")
+				}
+			} else if cmds != nil && cmds[0] != "" {
 				proc.cmds = cmds // caught the last movement
 			}
 		}
@@ -972,7 +989,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 		// construct parent process
 		p.updateProcess(parent)                              // get name, ppid, ruid, euid
 		parent.user = p.getUserName(parent.pid, parent.euid) // get parent's username
-		parent.path, _ = global.SYS.GetFilePath(parent.pid)  // get parent's executable name
+		if path, err := global.SYS.GetFilePath(parent.pid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.WithError(err).Debug("failed to get file path for parent proc")
+			}
+		} else {
+			parent.path = path // get parent's executable name
+		}
 		p.pidProcMap[parent.pid] = parent
 		p.addContainerProcess(c, parent.pid) // add parent
 		log.WithFields(log.Fields{"pid": parent.pid, "ruid": parent.ruid}).Debug("PROC: patch parent")
@@ -1012,7 +1035,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 
 		if notAuth {
 			if len(parent.cmds) == 0 {
-				parent.cmds, _ = global.SYS.ReadCmdLine(proc.ppid)
+				if cmds, err := global.SYS.ReadCmdLine(proc.ppid); err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						log.WithError(err).Debug("failed to read cmdline for parent proc")
+					}
+				} else {
+					parent.cmds = cmds
+				}
 			}
 
 			if p.isSudoChild(proc) {
@@ -1035,7 +1064,13 @@ func (p *Probe) rootEscalationCheck_uidChange(proc *procInternal, c *procContain
 				p.unlockProcMux() // minimum section lock
 				if ok {
 					if len(gp.cmds) == 0 {
-						gp.cmds, _ = global.SYS.ReadCmdLine(gp.pid)
+						if cmds, err := global.SYS.ReadCmdLine(gp.pid); err != nil {
+							if !errors.Is(err, os.ErrNotExist) {
+								log.WithError(err).Debug("failed to read cmdline for grandparent proc")
+							}
+						} else {
+							gp.cmds = cmds
+						}
 					}
 
 					// filter false-positive cases: grandparent is root
@@ -1099,7 +1134,12 @@ func (p *Probe) handleProcFork(pid, ppid int, name string) (inContainer bool, pc
 			proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid) // get parent's name
 		}
 		if proc.ppath == "" {
-			proc.ppath, _ = global.SYS.GetFilePath(proc.ppid) // get parent's executable name
+			var err error
+			proc.ppath, err = global.SYS.GetFilePath(proc.ppid) // get parent's executable name
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to get parent executable path")
+			}
 		}
 
 		if exist, ok := p.pidProcMap[proc.pid]; ok {
@@ -1145,7 +1185,12 @@ func (p *Probe) handleProcFork(pid, ppid int, name string) (inContainer bool, pc
 		// construct parent process
 		p.updateProcess(proc_p)                              // get name, ppid, ruid, euid
 		proc_p.user = p.getUserName(proc_p.pid, proc_p.euid) // get parent's username
-		proc_p.path, _ = global.SYS.GetFilePath(ppid)        // get parent's executable name
+		var err error
+		proc_p.path, err = global.SYS.GetFilePath(ppid) // get parent's executable name
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+			log.WithError(err).Debug("failed to get parent executable path")
+		}
 
 		// current child proc
 		proc.user = proc_p.user
@@ -1212,7 +1257,12 @@ func (p *Probe) handleProcExec(pid int, bInit bool) (bKubeProc bool) {
 			}
 
 			if proc.cmds == nil {
-				proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+				var err error
+				proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to read process cmdline")
+				}
 			}
 
 			if proc.name != "" {
@@ -1241,8 +1291,17 @@ func (p *Probe) handleProcExec(pid int, bInit bool) (bKubeProc bool) {
 				id = c1.id // just copy id
 				p.pidProcMap[proc.pid] = proc
 				proc.user = p.getUserName(proc.ppid, proc.euid) // get parent's username
-				proc.path, _ = global.SYS.GetFilePath(proc.pid) // exe path
-				proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+				var err error
+				proc.path, err = global.SYS.GetFilePath(proc.pid) // exe path
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to get process executable path")
+				}
+				proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to read process cmdline")
+				}
 				proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
 				bEvalFlag = !p.isDockerDaemonProcess(proc, id)
 			}
@@ -1522,8 +1581,16 @@ func (p *Probe) buildProcessMap(pids utils.Set) map[int]*procInternal {
 	for pid := range pids.Iter() {
 		if name, ppid, ruid, euid := osutil.GetProcessUIDs(pid.(int)); ppid >= 0 {
 			//not set start time, because it already start long time
-			cmds, _ := global.SYS.ReadCmdLine(pid.(int))
-			path, _ := global.SYS.GetFilePath(pid.(int))
+			cmds, err := global.SYS.ReadCmdLine(pid.(int))
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to read process cmdline")
+			}
+			path, err := global.SYS.GetFilePath(pid.(int))
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to get process executable path")
+			}
 			procMap[pid.(int)] = &procInternal{
 				name:      name,
 				pid:       pid.(int),
@@ -1931,7 +1998,12 @@ func (p *Probe) checkReversedShellProcess(id string, proc *procInternal) bool {
 				log.WithFields(log.Fields{"name": proc.name, "pid": proc.pid}).Debug("Initial report reverse shell")
 			} else { // confirmed
 				if proc.cmds == nil {
-					proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+					var err error
+					proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+					if err != nil && !errors.Is(err, os.ErrNotExist) {
+						// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+						log.WithError(err).Debug("failed to read process cmdline")
+					}
 				}
 
 				go func() {
@@ -1979,7 +2051,12 @@ func (p *Probe) inspectNewProcesses(bInit bool) {
 			}
 
 			if proc.path == "" {
-				proc.path, _ = global.SYS.GetFilePath(proc.pid)
+				var err error
+				proc.path, err = global.SYS.GetFilePath(proc.pid)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to get process executable path")
+				}
 			}
 
 			if proc.name == "" || (insideContainer && global.RT.IsRuntimeProcess(proc.name, nil)) {
@@ -2115,7 +2192,12 @@ func (p *Probe) CheckDNSTunneling(ids []string, clientPort share.CLUSProtoPort, 
 								proc.user = p.getUserName(proc.pid, proc.euid)
 							}
 							if proc.cmds == nil {
-								proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+								var err error
+								proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+								if err != nil && !errors.Is(err, os.ErrNotExist) {
+									// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+									log.WithError(err).Debug("failed to read process cmdline")
+								}
 							}
 							if conn := osutil.GetProcessConnection(proc.pid, &clientPort, nil); conn != nil {
 								go func() {
@@ -2648,7 +2730,12 @@ func (p *Probe) ProcessLookup(pid int) *fsmon.ProcInfo {
 		pInfo := &fsmon.ProcInfo{RootPid: c.rootPid}
 		if proc := p.pidProcMap[pid]; proc != nil {
 			if proc.path == "" {
-				proc.path, _ = global.SYS.GetFilePath(proc.pid)
+				var err error
+				proc.path, err = global.SYS.GetFilePath(proc.pid)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to get process executable path")
+				}
 			}
 			if proc.name == "" {
 				proc.name, _, _, _ = osutil.GetProcessUIDs(proc.pid)
@@ -2825,11 +2912,25 @@ func (p *Probe) evaluateApp(pid int, id string, bReScanCgroup bool) {
 			proc.name, proc.ppid, _, _ = osutil.GetProcessUIDs(proc.pid)
 			if !global.RT.IsRuntimeProcess(proc.name, nil) {
 				if proc.cmds != nil && proc.cmds[0] != "sshd:" {
-					proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+					var err error
+					proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+					if err != nil && !errors.Is(err, os.ErrNotExist) {
+						// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+						log.WithError(err).Debug("failed to read process cmdline")
+					}
 				}
-				proc.path, _ = global.SYS.GetFilePath(proc.pid)
+				var err error
+				proc.path, err = global.SYS.GetFilePath(proc.pid)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to get process executable path")
+				}
 				proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
-				proc.ppath, _ = global.SYS.GetFilePath(proc.ppid)
+				proc.ppath, err = global.SYS.GetFilePath(proc.ppid)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+					log.WithError(err).Debug("failed to get parent executable path")
+				}
 				idn := id
 				if bReScanCgroup {
 					if c1, ok := p.addContainerCandidateFromProc(proc); ok && c1.id != "" {
@@ -2994,8 +3095,17 @@ func (p *Probe) PatchContainerProcess(pid int, bEval bool) bool {
 		if c, ok := p.addContainerCandidateFromProc(proc); ok {
 			p.updateProcess(proc)
 			proc.user = p.getUserName(proc.ppid, proc.euid) // get parent's username
-			proc.path, _ = global.SYS.GetFilePath(proc.pid) // exe path
-			proc.cmds, _ = global.SYS.ReadCmdLine(proc.pid)
+			var err error
+			proc.path, err = global.SYS.GetFilePath(proc.pid) // exe path
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to get process executable path")
+			}
+			proc.cmds, err = global.SYS.ReadCmdLine(proc.pid)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				// Log debug: called per process event, skip os.ErrNotExist (common for short-lived processes)
+				log.WithError(err).Debug("failed to read process cmdline")
+			}
 			proc.pname, _, _, _ = osutil.GetProcessUIDs(proc.ppid)
 			p.pidProcMap[proc.pid] = proc
 			p.addProcHistory(c.id, proc, true)
