@@ -1186,7 +1186,7 @@ func registryImageStateHandler(nType cluster.ClusterNotifyType, key string, valu
 					if !ok || currImagesHash == nil {
 						currImagesHash = make(map[string]string, 1)
 					}
-					if report != nil && report.SignatureInfo != nil {
+					if report.SignatureInfo != nil {
 						if report.SignatureInfo.Verifiers != nil {
 							sort.Strings(report.SignatureInfo.Verifiers)
 						}

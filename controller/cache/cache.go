@@ -1985,7 +1985,7 @@ func startWorkerThread(ctx *Context) {
 							}
 							cacheMutexUnlock()
 						}
-					} else if o != nil && n == nil { // delete
+					} else if o != nil { // delete
 						cacheMutexLock()
 						if podSAMap := nodePodSAMap[o.Node]; podSAMap != nil {
 							for _, containerID := range o.ContainerIDs {

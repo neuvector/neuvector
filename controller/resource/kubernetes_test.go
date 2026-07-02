@@ -328,12 +328,7 @@ func TestRBAC(t *testing.T) {
 
 	// Remove gary's admin role binding in ns2
 	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "16", name: "dev-gary", domain: "ns2", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
+	rb = &k8sRoleBinding{uid: "16"}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
 		d.cbResourceRoleBinding(rt, ev, nil, old)
 	}
@@ -410,12 +405,7 @@ func TestRBAC(t *testing.T) {
 
 	// Remove gary's admin role binding in ns2
 	rt = K8sRscTypeClusRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "14", name: "reader-gary", domain: "", role: k8sObjectRef{name: "view", domain: ""},
-		users: []k8sSubjectObjRef{
-			{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
+	rb = &k8sRoleBinding{uid: "14"}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
 		d.cbResourceRoleBinding(rt, ev, nil, old)
 	}
@@ -433,24 +423,14 @@ func TestRBAC(t *testing.T) {
 
 	// Remove gary's role binding in ns1
 	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "15", name: "dev-gary", domain: "ns1", role: k8sObjectRef{name: "edit", domain: ""},
-		users: []k8sSubjectObjRef{
-			{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
+	rb = &k8sRoleBinding{uid: "15"}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
 		d.cbResourceRoleBinding(rt, ev, nil, old)
 	}
 
 	// Remove gary's role binding in ns2
 	rt = k8sRscTypeRoleBinding
-	rb = &k8sRoleBinding{
-		uid: "17", name: "ns2-dev-gary", domain: "ns2", role: k8sObjectRef{name: "ns2-dev", domain: "ns2"},
-		users: []k8sSubjectObjRef{
-			{name: "gary", domain: "", subType: SUBJECT_USER},
-		},
-	}
+	rb = &k8sRoleBinding{uid: "17"}
 	if ev, old := d.deleteResourceCache(rt, rb.uid); ev != "" {
 		d.cbResourceRoleBinding(rt, ev, nil, old)
 	}

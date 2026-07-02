@@ -803,9 +803,7 @@ func (fn *FaNotify) lookupContainer(pid int) (r *rootFd, pInfo *ProcInfo) {
 		if len(pInfo.Cmds) > 0 {
 			pInfo.Name = pInfo.Cmds[0]
 		}
-		if r != nil {
-			pInfo.RootPid = r.pid
-		}
+		pInfo.RootPid = r.pid
 	}
 	if pInfo.Pid == 0 {
 		pInfo.Pid = pid

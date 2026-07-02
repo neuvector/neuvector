@@ -153,7 +153,7 @@ func ParseProcEvent(data []byte) *ProcEvent {
 	pe := (*ProcEvent)(unsafe.Pointer(&data[SizeofCnMsg]))
 	switch pe.What {
 	case PROC_EVENT_NONE:
-		pe.Data = *(*ProcEventExit)(nil)
+		pe.Data = ProcEventNone{}
 	case PROC_EVENT_FORK:
 		pe.Data = *(*ProcEventFork)(unsafe.Pointer(&data[SizeofCnMsg+SizeofProcEventHeader]))
 	case PROC_EVENT_EXEC:
@@ -173,7 +173,7 @@ func ParseProcEvent(data []byte) *ProcEvent {
 	case PROC_EVENT_EXIT:
 		pe.Data = *(*ProcEventExit)(unsafe.Pointer(&data[SizeofCnMsg+SizeofProcEventHeader]))
 	default:
-		pe.Data = *(*ProcEventExit)(nil)
+		pe.Data = ProcEventNone{}
 	}
 	return pe
 }

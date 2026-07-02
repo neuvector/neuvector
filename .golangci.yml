@@ -12,6 +12,21 @@ linters:
   settings:
     errcheck:
       check-blank: true
+    govet:
+      # Enable all analyzers.
+      # Default: false
+      enable-all: true
+      # Disable analyzers by name.
+      # Run `GL_DEBUG=govet golangci-lint run --enable=govet` to see default, all available analyzers, and enabled analyzers.
+      # Default: []
+      disable:
+        - fieldalignment # too strict
+      # Settings per analyzer.
+      settings:
+        shadow:
+          # Whether to be strict about shadowing; can be noisy.
+          # Default: false
+          strict: false
   exclusions:
     generated: lax
     presets:
@@ -20,6 +35,9 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      - linters:
+          - govet
+        text: 'shadow:' # noisy
       - linters:
           - staticcheck
         path: share/
