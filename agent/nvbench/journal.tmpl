@@ -11,7 +11,11 @@ fetch_kube_cmd() {
     echo "$JOURNAL_LOG" |  grep "Running $1" | tail -n1   | sed "s/[\"']//g"
 }
 
-JOURNAL_LOG=$(journalctl -D /var/log/journal -u k3s)
+# Only the "Running <component>" lines are used below (see fetch_kube_cmd), so
+# filter them out here instead of buffering the entire k3s journal into this
+# variable. On a control-plane node with a large journal that slurp can reach
+# several GB of shell memory and OOM-kill the enforcer.
+JOURNAL_LOG=$(journalctl -D /var/log/journal -u k3s | grep 'Running')
 
 # Read logs for each component
 kube_apiserver_cmd=$(fetch_kube_cmd "$CIS_APISERVER_CMD")
