@@ -28,9 +28,9 @@ type BuildWhereClauseFunc func(allowedID []string, queryFilter *api.VulQueryFilt
 type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 
 const (
-	queryTokenIdLen = 6 // do not change the length
+	queryIdLen = 6 // do not change the length
 
-	apikeyLoginIdPrefix = "apikey_"
+	idPrefix = "api_"
 )
 
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
@@ -1006,21 +1006,20 @@ func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages ma
 	})
 }
 
-func GenQueryToken(loginID string) (string, error) {
-	loginID = strings.TrimPrefix(loginID, apikeyLoginIdPrefix)
-	queryToken, err := utils.GetRandomID(queryTokenIdLen, "") // do not change the length
+func GenQueryID(id string) (string, error) {
+	id = strings.TrimPrefix(id, idPrefix)
+	queryID, err := utils.GetRandomID(queryIdLen, "") // do not change the length
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s_%s", queryToken, loginID), nil
+	return fmt.Sprintf("%s_%s", queryID, id), nil
 }
 
-func vaildateQueryToken(queryToken, loginID string) error {
+func vaildateQueryID(queryID, id string) error {
 	invalidToken := errors.New("invalid query token")
-	loginID = strings.TrimPrefix(loginID, apikeyLoginIdPrefix)
-	parts := strings.Split(queryToken, "_")
-	if len(parts) != 2 || len(parts[0]) != queryTokenIdLen*2 || parts[1] != loginID {
-		log.WithFields(log.Fields{"queryToken": queryToken, "loginID": loginID}).Error("=> test : 1")
+	id = strings.TrimPrefix(id, idPrefix)
+	parts := strings.Split(queryID, "_")
+	if len(parts) != 2 || len(parts[0]) != queryIdLen*2 || parts[1] != id {
 		return invalidToken
 	}
 	for i := 0; i < len(parts[0]); i++ {
@@ -1028,7 +1027,6 @@ func vaildateQueryToken(queryToken, loginID string) error {
 		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
 			continue
 		}
-		log.WithFields(log.Fields{"queryToken": queryToken, "loginID": loginID}).Error("=> test : 2")
 		return invalidToken
 	}
 	return nil
@@ -1039,7 +1037,7 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 		Filters: &api.AssetQueryFilterViewModel{},
 	}
 
-	q.QueryToken = r.URL.Query().Get("token")
+	q.QueryID = r.URL.Query().Get("token")
 	q.QueryStart = getQueryParamInteger(r, startQueryParam, defaultStart)
 	q.QueryCount = getQueryParamInteger(r, rowQueryParam, defaultRowCount)
 	q.Debug = getQueryParamInteger(r, "debug", defaultDebugMode)
@@ -1071,9 +1069,9 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 	return q, nil
 }
 
-func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter, loginID string) (int, []*api.AssetCVECount, error) {
+func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter, id string) (int, []*api.AssetCVECount, error) {
 	if queryFilter != nil {
-		if err := vaildateQueryToken(queryFilter.QueryToken, loginID); err != nil {
+		if err := vaildateQueryID(queryFilter.QueryID, id); err != nil {
 			return 0, nil, err
 		}
 	}
@@ -1095,9 +1093,9 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	}
 	defer rows.Close()
 
-	queryToken := queryFilter.QueryToken
+	queryID := queryFilter.QueryID
 
-	err = CreateSessionAssetTable(queryToken, true, loginID)
+	err = CreateSessionAssetTable(queryID, true, id)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1140,7 +1138,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 				asset.CVE_medium = medCount
 			}
 
-			_, err = insertSessionAssetRecord(memoryDbHandle, queryToken, asset, loginID)
+			_, err = insertSessionAssetRecord(memoryDbHandle, queryID, asset, id)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -1148,7 +1146,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	}
 
 	// do summary - top5 and others
-	sessionTable, err := formatSessionTempTableName(queryToken, loginID)
+	sessionTable, err := formatSessionTempTableName(queryID, id)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1190,8 +1188,8 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	return assetCount, tops, nil
 }
 
-func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul, loginID string) (int, error) {
-	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul, id string) (int, error) {
+	tableName, err := formatSessionTempTableName(sessionToken, id)
 	if err != nil {
 		return 0, err
 	}
@@ -1218,19 +1216,19 @@ func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAsset
 	return int(lastInsertID), nil
 }
 
-func DupAssetSessionTableToFile(sessionToken, loginID string) error {
-	tableName, err := formatSessionTempTableName(sessionToken, loginID)
+func DupAssetSessionTableToFile(sessionToken, id string) error {
+	tableName, err := formatSessionTempTableName(sessionToken, id)
 	if err != nil {
 		return err
 	}
 	dialect := goqu.Dialect("sqlite3")
-	sessionDb, err := createSessionFileDb(sessionToken, loginID)
+	sessionDb, err := createSessionFileDb(sessionToken, id)
 	if err != nil {
 		return err
 	}
 	defer sessionDb.Close()
 
-	err = createSessionAssetTable(sessionDb, sessionToken, loginID)
+	err = createSessionAssetTable(sessionDb, sessionToken, id)
 	if err != nil {
 		return err
 	}
@@ -1261,7 +1259,7 @@ func DupAssetSessionTableToFile(sessionToken, loginID string) error {
 			return err
 		}
 
-		_, err := insertSessionAssetRecord(sessionDb, sessionToken, asset, loginID)
+		_, err := insertSessionAssetRecord(sessionDb, sessionToken, asset, id)
 		if err != nil {
 			return err
 		}
@@ -1275,16 +1273,16 @@ func DupAssetSessionTableToFile(sessionToken, loginID string) error {
 
 	// delete session table in memory, allow some time for the ongoing read operation to complete before proceeding
 	time.Sleep(30 * time.Second)
-	if err := deleteSessionTempTableInMemDb(sessionToken, loginID); err != nil {
+	if err := deleteSessionTempTableInMemDb(sessionToken, id); err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("deleteSessionTempTableInMemDb")
 	}
 
 	return nil
 }
 
-func GetImageAssetSession(queryFilter *AssetQueryFilter, loginID string) ([]*api.RESTImageAssetViewV2, int, error) {
+func GetImageAssetSession(queryFilter *AssetQueryFilter, id string) ([]*api.RESTImageAssetViewV2, int, error) {
 	if queryFilter != nil {
-		if err := vaildateQueryToken(queryFilter.QueryToken, loginID); err != nil {
+		if err := vaildateQueryID(queryFilter.QueryID, id); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -1342,11 +1340,11 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter, loginID string) ([]*api
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
-	sessionToken := queryFilter.QueryToken
+	sessionToken := queryFilter.QueryID
 	start := queryFilter.QueryStart
 	row := queryFilter.QueryCount
 
-	sessionTemp, err := formatSessionTempTableName(sessionToken, loginID)
+	sessionTemp, err := formatSessionTempTableName(sessionToken, id)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1363,7 +1361,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter, loginID string) ([]*api
 		return nil, 0, err
 	}
 
-	queryStat, err := GetQueryStat(sessionToken, loginID)
+	queryStat, err := GetQueryStat(sessionToken, id)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1371,7 +1369,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter, loginID string) ([]*api
 	// fetch data
 	var db *sql.DB
 	if queryStat.FileDBReady == 1 {
-		db, err = openSessionFileDb(sessionToken, loginID)
+		db, err = openSessionFileDb(sessionToken, id)
 		if err != nil {
 			return nil, 0, err
 		}

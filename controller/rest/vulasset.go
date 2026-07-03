@@ -45,7 +45,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// save the data to querystat table (do this before put request to Consul)
-	queryFilter.QueryToken, err = db.GenQueryToken(login.id)
+	queryFilter.QueryID, err = db.GenQueryID(login.id)
 	if err != nil {
 		errMsg := "failed to generate query token"
 		log.WithFields(log.Fields{"err": err}).Error(errMsg)
@@ -60,7 +60,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = createQueryStat(login, db.QueryStateType_Vul, queryFilter.QueryToken, string(queryFilterb))
+	err = createQueryStat(login, db.QueryStateType_Vul, queryFilter.QueryID, string(queryFilterb))
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("createQueryStat error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
@@ -68,7 +68,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// put to Consul to signal other controllers to build the same query session
-	err = createRequestInConsul(acc, login, 0, queryFilter.QueryToken, queryFilter.Filters, nil)
+	err = createRequestInConsul(acc, login, 0, queryFilter.QueryID, queryFilter.Filters, nil)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Write create session request to consul error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
@@ -122,14 +122,14 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 
 	// save to session temp table
 	start = time.Now()
-	err = db.CeateSessionVulAssetTable(queryFilter.QueryToken, true, login.id)
+	err = db.CeateSessionVulAssetTable(queryFilter.QueryID, true, login.id)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("CeateSessionVulAssetTable error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
 		return
 	}
 
-	err = db.PopulateSessionVulAssets(queryFilter.QueryToken, vulAssets, true, login.id)
+	err = db.PopulateSessionVulAssets(queryFilter.QueryID, vulAssets, true, login.id)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("PopulateSessionVulAssets error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
@@ -141,7 +141,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 	// get statistics and return to caller
 	queryStat.TotalRecordCount = nTotalCVE
 	queryStat.TotalMatchedRecordCount = nMatchedRecordCount
-	queryStat.QueryToken = queryFilter.QueryToken
+	queryStat.QueryID = queryFilter.QueryID
 	queryStat.Summary = &api.VulAssetSessionSummary{}
 	queryStat.Summary.CountDist = CVEDist
 	queryStat.Summary.TopImages = top5Images
@@ -155,7 +155,7 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 		queryStat.Summary.TopNodes = []*api.AssetCVECount{}
 	}
 
-	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "querytoken": queryStat.QueryToken, "CVEDBReady": CVEDBReady}).Debug("createVulAssetSession")
+	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "queryID": queryStat.QueryID, "CVEDBReady": CVEDBReady}).Debug("createVulAssetSession")
 
 	if queryFilter.Debug == 0 {
 		queryStat.PerfStats = nil
@@ -174,14 +174,14 @@ func createVulAssetSessionV2(w http.ResponseWriter, r *http.Request) {
 
 	// populate the result to file-based database
 	go func() {
-		err = db.PopulateSessionToFile(queryFilter.QueryToken, vulAssets, login.id)
+		err = db.PopulateSessionToFile(queryFilter.QueryID, vulAssets, login.id)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("PopulateSessionToFile error")
 		}
 	}()
 }
 
-func createRequestInConsul(acc *access.AccessControl, login *loginSession, reqType int, queryToken string, filterVul *api.VulQueryFilterViewModel, filterAsset *api.AssetQueryFilterViewModel) error {
+func createRequestInConsul(acc *access.AccessControl, login *loginSession, reqType int, queryID string, filterVul *api.VulQueryFilterViewModel, filterAsset *api.AssetQueryFilterViewModel) error {
 	loginType := login.loginType
 
 	// for backward compatiable
@@ -200,7 +200,7 @@ func createRequestInConsul(acc *access.AccessControl, login *loginSession, reqTy
 	userAccess.LoginType = loginType
 	qsr := &api.QuerySessionRequest{
 		Type:         reqType,
-		QueryToken:   queryToken,
+		QueryID:      queryID,
 		LoginID:      login.id,
 		UserAccess:   userAccess,
 		Filters:      filterVul,
@@ -216,10 +216,10 @@ func createRequestInConsul(acc *access.AccessControl, login *loginSession, reqTy
 	return nil
 }
 
-func createQueryStat(login *loginSession, nType int, queryToken, data1 string) error {
+func createQueryStat(login *loginSession, nType int, queryID, data1 string) error {
 	loginType := login.loginType
 	qs := &db.QueryStat{
-		Token:        queryToken,
+		QueryID:      queryID,
 		CreationTime: time.Now().UTC().Unix(),
 		LoginType:    loginType,
 		LoginID:      login.id,
@@ -256,11 +256,11 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if queryObj.QueryToken != "" {
+	if queryObj.QueryID != "" {
 		resp, allAssets, err := db.GetVulAssetSessionV2(queryObj, login.id)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("GetVulAssetSessionV2 fail")
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, fmt.Sprintf("get session vuls error %s", err))
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryID, fmt.Sprintf("get session vuls error %s", err))
 			return
 		}
 
@@ -268,7 +268,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		assetMaps, err := db.GetAssetsMeta(allAssets)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("GetAssetsMeta fail")
-			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, fmt.Sprintf("get assets error %s", err))
+			restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryID, fmt.Sprintf("get assets error %s", err))
 			return
 		}
 
@@ -280,7 +280,7 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		elapsed := time.Since(start)
 		resp.PerfStats = append(resp.PerfStats, fmt.Sprintf("4/4, get asset meta, took=%v", elapsed))
 
-		log.WithFields(log.Fields{"PerfStats": strings.Join(resp.PerfStats, ";"), "querytoken": queryObj.QueryToken}).Debug("getVulAssetSession returns")
+		log.WithFields(log.Fields{"PerfStats": strings.Join(resp.PerfStats, ";"), "queryID": queryObj.QueryID}).Debug("getVulAssetSession returns")
 
 		if queryObj.Debug == 0 {
 			resp.PerfStats = nil
@@ -289,15 +289,15 @@ func getVulAssetSession(w http.ResponseWriter, r *http.Request) {
 		restRespSuccess(w, r, resp, nil, nil, nil, "get vulasset session")
 		return
 	}
-	restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidQueryToken, "invalid request, no query token provided")
+	restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidQueryID, "invalid request, no query token provided")
 }
 
 // called by KV watcher when a query session request being added
 func CreateQuerySession(qsr *api.QuerySessionRequest) error {
 	log.WithFields(log.Fields{"qsr": qsr}).Debug("rest.CreateQuerySession(), execute qsr here")
 
-	// check the table already exist, use qsr.QueryToken to check
-	_, err := db.GetQueryStat(qsr.QueryToken, qsr.LoginID)
+	// check the table already exist, use qsr.QueryID to check
+	_, err := db.GetQueryStat(qsr.QueryID, qsr.LoginID)
 	if err == nil {
 		log.WithFields(log.Fields{"qsr": qsr}).Debug("rest.CreateQuerySession(), session temp table exist. skip.")
 		return err
@@ -331,9 +331,9 @@ func CreateQuerySession(qsr *api.QuerySessionRequest) error {
 	return nil
 }
 
-func DeleteQuerySession(queryToken string) error {
-	log.WithFields(log.Fields{"queryToken": queryToken}).Debug("rest.DeleteQuerySession(), delete query session")
-	return db.DeleteQuerySessionByToken(queryToken)
+func DeleteQuerySession(queryID string) error {
+	log.WithFields(log.Fields{"queryID": queryID}).Debug("rest.DeleteQuerySession(), delete query session")
+	return db.DeleteQuerySessionByQueryID(queryID)
 }
 
 func _createVulQuerySession(qsr *api.QuerySessionRequest) error {
@@ -342,8 +342,8 @@ func _createVulQuerySession(qsr *api.QuerySessionRequest) error {
 
 	// create advanced filters
 	queryFilter := &db.VulQueryFilter{
-		QueryToken: qsr.QueryToken,
-		Filters:    qsr.Filters,
+		QueryID: qsr.QueryID,
+		Filters: qsr.Filters,
 	}
 
 	if queryFilter.Filters == nil {
@@ -360,12 +360,12 @@ func _createVulQuerySession(qsr *api.QuerySessionRequest) error {
 	}
 
 	// save to session temp table
-	err = db.CeateSessionVulAssetTable(queryFilter.QueryToken, true, qsr.LoginID)
+	err = db.CeateSessionVulAssetTable(queryFilter.QueryID, true, qsr.LoginID)
 	if err != nil {
 		return err
 	}
 
-	err = db.PopulateSessionVulAssets(queryFilter.QueryToken, vulAssets, true, qsr.LoginID)
+	err = db.PopulateSessionVulAssets(queryFilter.QueryID, vulAssets, true, qsr.LoginID)
 	if err != nil {
 		return err
 	}
@@ -377,7 +377,7 @@ func _createVulQuerySession(qsr *api.QuerySessionRequest) error {
 	}
 
 	qs := &db.QueryStat{
-		Token:        queryFilter.QueryToken,
+		QueryID:      queryFilter.QueryID,
 		CreationTime: qsr.CreationTime, // for Consul restore, use the timestamp in the qsr, not current time.
 		LoginType:    qsr.UserAccess.LoginType,
 		LoginID:      qsr.UserAccess.LoginID,
@@ -399,7 +399,7 @@ func _createVulQuerySession(qsr *api.QuerySessionRequest) error {
 
 	// populate the result to file-based database
 	go func() {
-		err := db.PopulateSessionToFile(queryFilter.QueryToken, vulAssets, qsr.LoginID)
+		err := db.PopulateSessionToFile(queryFilter.QueryID, vulAssets, qsr.LoginID)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("PopulateSessionToFile error")
 		}
@@ -412,8 +412,8 @@ func _createAssetQuerySession(qsr *api.QuerySessionRequest) error {
 	acc := access.ImportAccessControl(qsr.UserAccess)
 
 	queryFilter := &db.AssetQueryFilter{
-		QueryToken: qsr.QueryToken,
-		Filters:    qsr.FiltersAsset,
+		QueryID: qsr.QueryID,
+		Filters: qsr.FiltersAsset,
 	}
 
 	if queryFilter.Filters == nil {
@@ -436,7 +436,7 @@ func _createAssetQuerySession(qsr *api.QuerySessionRequest) error {
 		log.WithError(err).Warn("failed to marshal query filter")
 	}
 	qs := &db.QueryStat{
-		Token:        queryFilter.QueryToken,
+		QueryID:      queryFilter.QueryID,
 		CreationTime: qsr.CreationTime,
 		LoginType:    qsr.UserAccess.LoginType,
 		LoginID:      qsr.UserAccess.LoginID,
@@ -460,7 +460,7 @@ func _createAssetQuerySession(qsr *api.QuerySessionRequest) error {
 
 	// populate the result to file-based database
 	go func() {
-		err = db.DupAssetSessionTableToFile(queryFilter.QueryToken, qsr.LoginID)
+		err = db.DupAssetSessionTableToFile(queryFilter.QueryID, qsr.LoginID)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("DupAssetSessionTableToFile error")
 		}
@@ -530,7 +530,7 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	// combine incoming request with existing advanced filters.
 	queryFilter, err := combineQueryFilter(r, login.id)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryID, err.Error())
 		return
 	}
 
@@ -538,9 +538,9 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 
 	// apply cve based filter (last modified time)
 	start := time.Now()
-	vulMap, assetsMap, err := db.GetSessionMatchedVuls(allowed, queryFilter.QueryToken, queryFilter.Filters.LastModifiedTime, login.id)
+	vulMap, assetsMap, err := db.GetSessionMatchedVuls(allowed, queryFilter.QueryID, queryFilter.Filters.LastModifiedTime, login.id)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryID, err.Error())
 		return
 	}
 	elapsed := time.Since(start)
@@ -555,7 +555,7 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	start = time.Now()
 	resp, err := db.GetMatchedAssets(vulMap, assetsMap, noVulImageIDs, queryFilter) // queryFilter *VulQueryFilter
 	if err != nil {
-		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryToken, err.Error())
+		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidQueryID, err.Error())
 		return
 	}
 	fillPolicyMode(resp.Vuls, acc)
@@ -570,23 +570,23 @@ func getAssetViewSession(w http.ResponseWriter, r *http.Request) {
 	restRespSuccess(w, r, resp, acc, login, nil, "getAssetViewSession")
 }
 
-func combineQueryFilter(r *http.Request, loginID string) (*db.VulQueryFilter, error) {
+func combineQueryFilter(r *http.Request, id string) (*db.VulQueryFilter, error) {
 	// combine
-	// 1. QueryToken and LastModifiedTime from incoming request
-	// 2. advanced filter belong to the QueryToken
+	// 1. QueryID and LastModifiedTime from incoming request
+	// 2. advanced filter belong to the QueryID
 	qf, err := db.GetVulnerabilityQuery(r)
 	if err != nil {
 		return nil, err
 	}
 
-	queryStat, err := db.GetQueryStat(qf.QueryToken, loginID)
+	queryStat, err := db.GetQueryStat(qf.QueryID, id)
 	if err != nil {
 		return nil, err
 	}
 
 	queryFilter := &db.VulQueryFilter{
-		QueryToken: qf.QueryToken,
-		Debug:      qf.Debug,
+		QueryID: qf.QueryID,
+		Debug:   qf.Debug,
 	}
 
 	vulQF := &db.VulQueryFilter{}
@@ -629,7 +629,7 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a query session
-	queryFilter.QueryToken, err = db.GenQueryToken(login.id)
+	queryFilter.QueryID, err = db.GenQueryID(login.id)
 	if err != nil {
 		errMsg := "failed to generate query token"
 		log.WithFields(log.Fields{"err": err}).Error(errMsg)
@@ -641,7 +641,7 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.WithError(err).Warn("failed to marshal query filter")
 	}
-	err = createQueryStat(login, db.QueryStateType_Asset, queryFilter.QueryToken, string(queryFilterb))
+	err = createQueryStat(login, db.QueryStateType_Asset, queryFilter.QueryID, string(queryFilterb))
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("createQueryStat error")
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrInvalidRequest, err.Error())
@@ -649,7 +649,7 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// notify other controllers via Consul
-	err = createRequestInConsul(acc, login, 1, queryFilter.QueryToken, nil, queryFilter.Filters)
+	err = createRequestInConsul(acc, login, 1, queryFilter.QueryID, nil, queryFilter.Filters)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Write create session request to consul error")
 	}
@@ -668,11 +668,11 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 
 	// get statistics and return to caller
 	queryStat.TotalRecordCount = assetCount
-	queryStat.QueryToken = queryFilter.QueryToken
+	queryStat.QueryID = queryFilter.QueryID
 	queryStat.Summary = &api.AssetSessionSummary{}
 	queryStat.Summary.TopImages = top5
 
-	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "querytoken": queryStat.QueryToken}).Debug("createAssetSession")
+	log.WithFields(log.Fields{"PerfStats": strings.Join(queryStat.PerfStats, ";"), "queryID": queryStat.QueryID}).Debug("createAssetSession")
 
 	if queryFilter.Debug == 0 {
 		queryStat.PerfStats = nil
@@ -690,7 +690,7 @@ func createAssetSession(w http.ResponseWriter, r *http.Request) {
 
 	// populate the result to file-based database
 	go func() {
-		err = db.DupAssetSessionTableToFile(queryFilter.QueryToken, login.id)
+		err = db.DupAssetSessionTableToFile(queryFilter.QueryID, login.id)
 		if err != nil {
 			log.WithFields(log.Fields{"err": err}).Error("DupAssetSessionTableToFile error")
 		}
@@ -715,9 +715,9 @@ func getAssetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queryStat, err := db.GetQueryStat(queryObj.QueryToken, login.id)
+	queryStat, err := db.GetQueryStat(queryObj.QueryID, login.id)
 	if err != nil {
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidQueryToken, err.Error())
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidQueryID, err.Error())
 		return
 	}
 
@@ -725,7 +725,7 @@ func getAssetSession(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal([]byte(queryStat.Data1), &queryFilter)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("query stat not found")
-		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidQueryToken, err.Error())
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidQueryID, err.Error())
 		return
 	}
 

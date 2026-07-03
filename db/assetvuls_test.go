@@ -96,11 +96,11 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	err = PopulateAssetVul(generateImageDbAssetVul(imageID))
 	assert.NoError(t, err)
 
-	loginID := "0123456789ab"
-	queryToken, err := GenQueryToken(loginID)
+	id := "0123456789ab"
+	queryID, err := GenQueryID(id)
 	assert.NoError(t, err)
 	queryFilter := &AssetQueryFilter{
-		QueryToken: queryToken,
+		QueryID:    queryID,
 		QueryStart: 0,
 		QueryCount: -1,
 		Filters: &api.AssetQueryFilterViewModel{
@@ -113,30 +113,30 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	allowed := map[string]utils.Set{
 		AssetImage: utils.NewSet(imageID),
 	}
-	_, _, err = CreateImageAssetSession(allowed, queryFilter, loginID)
+	_, _, err = CreateImageAssetSession(allowed, queryFilter, id)
 	assert.NoError(t, err)
 
 	filterBytes, err := json.Marshal(queryFilter)
 	assert.NoError(t, err)
 
 	_, err = PopulateQueryStat(&QueryStat{
-		Token:        queryToken,
+		QueryID:      queryID,
 		CreationTime: 1,
 		LoginType:    0,
 		LoginName:    "test",
-		LoginID:      loginID,
+		LoginID:      id,
 		Data1:        string(filterBytes),
 		FileDBReady:  0,
 		Type:         QueryStateType_Asset,
 	})
 	assert.NoError(t, err)
 	defer func() {
-		if err := DeleteQuerySessionByToken(queryToken); err != nil {
-			t.Logf("DeleteQuerySessionByToken returns %v", err)
+		if err := DeleteQuerySessionByQueryID(queryID); err != nil {
+			t.Logf("DeleteQuerySessionByQueryID returns %v", err)
 		}
 	}()
 
-	assets, quickFilterMatched, err := GetImageAssetSession(queryFilter, loginID)
+	assets, quickFilterMatched, err := GetImageAssetSession(queryFilter, id)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, quickFilterMatched)

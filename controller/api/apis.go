@@ -70,7 +70,7 @@ const RESTErrPromoteFail int = 49
 const RESTErrPlatformAuthDisabled int = 50
 const RESTErrRancherUnauthorized int = 51
 const RESTErrRemoteExportFail int = 52
-const RESTErrInvalidQueryToken int = 53
+const RESTErrInvalidQueryID int = 53
 const RESTErrPollJobNotFoundError int = 54
 const RESTErrServerError int = 55
 
@@ -4183,7 +4183,7 @@ type UserAccessControl struct {
 
 type QuerySessionRequest struct {
 	Type         int // 0=vul, 1=asset
-	QueryToken   string
+	QueryID      string
 	LoginID      string
 	CreationTime int64
 	UserAccess   *UserAccessControl
@@ -4289,7 +4289,7 @@ type RESTImageAssetViewV2 struct {
 type RESTVulQueryStats struct {
 	TotalRecordCount        int                     `json:"total_records"`
 	TotalMatchedRecordCount int                     `json:"total_matched_records"`
-	QueryToken              string                  `json:"query_token"`
+	QueryID                 string                  `json:"query_id"`
 	PerfStats               []string                `json:"debug_perf_stats"`
 	Summary                 *VulAssetSessionSummary `json:"summary"`
 	Status                  string                  `json:"status"`
@@ -4298,7 +4298,7 @@ type RESTVulQueryStats struct {
 // for asset pagination
 type RESTAssetQueryStats struct {
 	TotalRecordCount int                  `json:"total_records"`
-	QueryToken       string               `json:"query_token"`
+	QueryID          string               `json:"query_id"`
 	PerfStats        []string             `json:"debug_perf_stats"`
 	Summary          *AssetSessionSummary `json:"summary"`
 }

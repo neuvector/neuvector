@@ -2,8 +2,10 @@ package db
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"database/sql"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,7 +76,7 @@ type DbCVESource struct {
 }
 
 type VulQueryFilter struct {
-	QueryToken                     string
+	QueryID                        string
 	QueryStart                     int
 	QueryCount                     int
 	Debug                          int
@@ -88,7 +90,7 @@ type VulQueryFilter struct {
 }
 
 type AssetQueryFilter struct {
-	QueryToken string
+	QueryID    string
 	QueryStart int
 	QueryCount int
 	Debug      int
@@ -430,11 +432,12 @@ func getAssetvulSchema(uniqueAssetId bool) []string {
 	return schema
 }
 
-func formatSessionTempTableName(queryToken, loginID string) (string, error) {
-	if err := vaildateQueryToken(queryToken, loginID); err != nil {
+func formatSessionTempTableName(queryID, id string) (string, error) {
+	if err := vaildateQueryID(queryID, id); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("tmp_session_%s", queryToken), nil
+	b := sha512.Sum512([]byte(queryID))
+	return fmt.Sprintf("tmp_session_%s", hex.EncodeToString(b[:])), nil
 }
 
 func getQueryParamInteger(r *http.Request, name string, defaultValue int) int {

@@ -12,7 +12,7 @@ import (
 
 type QueryStat struct {
 	Db_ID        int
-	Token        string
+	QueryID      string
 	CreationTime int64
 	LoginID      string // APIKey will be different for each request..
 	LoginName    string
@@ -30,7 +30,7 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 	dialect := goqu.Dialect("sqlite3")
 	ds := dialect.Insert(queryStatTablename).Rows(
 		goqu.Record{
-			"token":            queryStat.Token,
+			"token":            queryStat.QueryID,
 			"create_timestamp": queryStat.CreationTime,
 			"login_type":       queryStat.LoginType,
 			"login_id":         queryStat.LoginID,
@@ -75,8 +75,8 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 	return 0, errors.New("populate query stat failed")
 }
 
-func GetQueryStat(token, loginID string) (*QueryStat, error) {
-	if err := vaildateQueryToken(token, loginID); err != nil {
+func GetQueryStat(token, id string) (*QueryStat, error) {
+	if err := vaildateQueryID(token, id); err != nil {
 		return nil, err
 	}
 	dialect := goqu.Dialect("sqlite3")
@@ -102,7 +102,7 @@ func GetQueryStat(token, loginID string) (*QueryStat, error) {
 
 		stat := &QueryStat{}
 		if rows.Next() {
-			err = rows.Scan(&stat.Db_ID, &stat.Token, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
+			err = rows.Scan(&stat.Db_ID, &stat.QueryID, &stat.CreationTime, &stat.LoginType, &stat.LoginID,
 				&stat.LoginName, &stat.Data1, &stat.Data2, &stat.Data3, &stat.FileDBReady, &stat.Type)
 			if err != nil {
 				return nil, err
@@ -119,14 +119,14 @@ func GetQueryStat(token, loginID string) (*QueryStat, error) {
 	return nil, errors.New("no such query token")
 }
 
-func GetExceededSessions(loginName, loginID string, loginType int) ([]string, error) {
+func GetExceededSessions(loginName, id string, loginType int) ([]string, error) {
 	dialect := goqu.Dialect("sqlite3")
 
 	records := make([]string, 0)
 	columns := []interface{}{"token"}
 
 	expLoginName := goqu.Ex{"login_name": loginName}
-	// expLoginId := goqu.Ex{"login_id": loginID}
+	// expLoginId := goqu.Ex{"login_id": id}
 
 	nLimit := 10
 	if loginType == 1 {
@@ -180,9 +180,9 @@ func GetExceededSessions(loginName, loginID string, loginType int) ([]string, er
 	return records, nil
 }
 
-func setFileDbState(queryToken string, newValue int) error {
+func setFileDbState(queryID string, newValue int) error {
 	dialect := goqu.Dialect("sqlite3")
-	sql, args, err := dialect.Update(queryStatTablename).Where(goqu.C("token").Eq(queryToken)).Set(
+	sql, args, err := dialect.Update(queryStatTablename).Where(goqu.C("token").Eq(queryID)).Set(
 		goqu.Record{
 			"filedb_ready": newValue,
 		},
@@ -199,12 +199,12 @@ func setFileDbState(queryToken string, newValue int) error {
 	return nil
 }
 
-func DeleteQuerySessionByToken(queryToken string) error {
-	_, loginID, found := strings.Cut(queryToken, "_")
+func DeleteQuerySessionByQueryID(queryID string) error {
+	_, id, found := strings.Cut(queryID, "_")
 	if !found {
 		return errors.New("invalid query token")
 	}
-	qs, err := GetQueryStat(queryToken, loginID)
+	qs, err := GetQueryStat(queryID, id)
 	if err != nil {
 		return err
 	}
@@ -221,21 +221,21 @@ func DeleteQuerySessionByToken(queryToken string) error {
 	}
 
 	// delete session table in memory
-	err = deleteSessionTempTableInMemDb(queryToken, loginID)
+	err = deleteSessionTempTableInMemDb(queryID, id)
 	if err != nil {
 		return err
 	}
 
 	// delete the session table in file-based db, ignore the error
-	if err := deleteSessionFileDb(queryToken, loginID); err != nil {
+	if err := deleteSessionFileDb(queryID, id); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func deleteSessionTempTableInMemDb(queryToken, loginID string) error {
-	tableName, err := formatSessionTempTableName(queryToken, loginID)
+func deleteSessionTempTableInMemDb(queryID, id string) error {
+	tableName, err := formatSessionTempTableName(queryID, id)
 	if err != nil {
 		return err
 	}
