@@ -3,7 +3,6 @@ package db
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -75,8 +74,8 @@ func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 	return 0, errors.New("populate query stat failed")
 }
 
-func GetQueryStat(token, id string) (*QueryStat, error) {
-	if err := vaildateQueryID(token, id); err != nil {
+func GetQueryStat(token string) (*QueryStat, error) {
+	if err := vaildateQueryID(token); err != nil {
 		return nil, err
 	}
 	dialect := goqu.Dialect("sqlite3")
@@ -119,14 +118,14 @@ func GetQueryStat(token, id string) (*QueryStat, error) {
 	return nil, errors.New("no such query token")
 }
 
-func GetExceededSessions(loginName, id string, loginType int) ([]string, error) {
+func GetExceededSessions(loginName, loginID string, loginType int) ([]string, error) {
 	dialect := goqu.Dialect("sqlite3")
 
 	records := make([]string, 0)
 	columns := []interface{}{"token"}
 
 	expLoginName := goqu.Ex{"login_name": loginName}
-	// expLoginId := goqu.Ex{"login_id": id}
+	// expLoginId := goqu.Ex{"login_id": loginID}
 
 	nLimit := 10
 	if loginType == 1 {
@@ -200,11 +199,7 @@ func setFileDbState(queryID string, newValue int) error {
 }
 
 func DeleteQuerySessionByQueryID(queryID string) error {
-	_, id, found := strings.Cut(queryID, "_")
-	if !found {
-		return errors.New("invalid query token")
-	}
-	qs, err := GetQueryStat(queryID, id)
+	qs, err := GetQueryStat(queryID)
 	if err != nil {
 		return err
 	}
@@ -221,21 +216,21 @@ func DeleteQuerySessionByQueryID(queryID string) error {
 	}
 
 	// delete session table in memory
-	err = deleteSessionTempTableInMemDb(queryID, id)
+	err = deleteSessionTempTableInMemDb(queryID)
 	if err != nil {
 		return err
 	}
 
 	// delete the session table in file-based db, ignore the error
-	if err := deleteSessionFileDb(queryID, id); err != nil {
+	if err := deleteSessionFileDb(queryID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func deleteSessionTempTableInMemDb(queryID, id string) error {
-	tableName, err := formatSessionTempTableName(queryID, id)
+func deleteSessionTempTableInMemDb(queryID string) error {
+	tableName, err := formatSessionTempTableName(queryID)
 	if err != nil {
 		return err
 	}

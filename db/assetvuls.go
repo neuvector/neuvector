@@ -29,8 +29,6 @@ type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.
 
 const (
 	queryIdLen = 6 // do not change the length
-
-	idPrefix = "api_"
 )
 
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
@@ -1006,24 +1004,21 @@ func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages ma
 	})
 }
 
-func GenQueryID(id string) (string, error) {
-	id = strings.TrimPrefix(id, idPrefix)
+func GenQueryID() (string, error) {
 	queryID, err := utils.GetRandomID(queryIdLen, "") // do not change the length
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s_%s", queryID, id), nil
+	return queryID, nil
 }
 
-func vaildateQueryID(queryID, id string) error {
+func vaildateQueryID(queryID string) error {
 	invalidToken := errors.New("invalid query token")
-	id = strings.TrimPrefix(id, idPrefix)
-	parts := strings.Split(queryID, "_")
-	if len(parts) != 2 || len(parts[0]) != queryIdLen*2 || parts[1] != id {
+	if len(queryID) != queryIdLen*2 {
 		return invalidToken
 	}
-	for i := 0; i < len(parts[0]); i++ {
-		c := parts[0][i]
+	for i := 0; i < len(queryID); i++ {
+		c := queryID[i]
 		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
 			continue
 		}
@@ -1069,9 +1064,9 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 	return q, nil
 }
 
-func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter, id string) (int, []*api.AssetCVECount, error) {
+func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter) (int, []*api.AssetCVECount, error) {
 	if queryFilter != nil {
-		if err := vaildateQueryID(queryFilter.QueryID, id); err != nil {
+		if err := vaildateQueryID(queryFilter.QueryID); err != nil {
 			return 0, nil, err
 		}
 	}
@@ -1095,7 +1090,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 
 	queryID := queryFilter.QueryID
 
-	err = CreateSessionAssetTable(queryID, true, id)
+	err = CreateSessionAssetTable(queryID, true)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1138,7 +1133,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 				asset.CVE_medium = medCount
 			}
 
-			_, err = insertSessionAssetRecord(memoryDbHandle, queryID, asset, id)
+			_, err = insertSessionAssetRecord(memoryDbHandle, queryID, asset)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -1146,7 +1141,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	}
 
 	// do summary - top5 and others
-	sessionTable, err := formatSessionTempTableName(queryID, id)
+	sessionTable, err := formatSessionTempTableName(queryID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1188,8 +1183,8 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	return assetCount, tops, nil
 }
 
-func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul, id string) (int, error) {
-	tableName, err := formatSessionTempTableName(sessionToken, id)
+func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul) (int, error) {
+	tableName, err := formatSessionTempTableName(sessionToken)
 	if err != nil {
 		return 0, err
 	}
@@ -1216,19 +1211,19 @@ func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAsset
 	return int(lastInsertID), nil
 }
 
-func DupAssetSessionTableToFile(sessionToken, id string) error {
-	tableName, err := formatSessionTempTableName(sessionToken, id)
+func DupAssetSessionTableToFile(sessionToken string) error {
+	tableName, err := formatSessionTempTableName(sessionToken)
 	if err != nil {
 		return err
 	}
 	dialect := goqu.Dialect("sqlite3")
-	sessionDb, err := createSessionFileDb(sessionToken, id)
+	sessionDb, err := createSessionFileDb(sessionToken)
 	if err != nil {
 		return err
 	}
 	defer sessionDb.Close()
 
-	err = createSessionAssetTable(sessionDb, sessionToken, id)
+	err = createSessionAssetTable(sessionDb, sessionToken)
 	if err != nil {
 		return err
 	}
@@ -1259,7 +1254,7 @@ func DupAssetSessionTableToFile(sessionToken, id string) error {
 			return err
 		}
 
-		_, err := insertSessionAssetRecord(sessionDb, sessionToken, asset, id)
+		_, err := insertSessionAssetRecord(sessionDb, sessionToken, asset)
 		if err != nil {
 			return err
 		}
@@ -1273,16 +1268,16 @@ func DupAssetSessionTableToFile(sessionToken, id string) error {
 
 	// delete session table in memory, allow some time for the ongoing read operation to complete before proceeding
 	time.Sleep(30 * time.Second)
-	if err := deleteSessionTempTableInMemDb(sessionToken, id); err != nil {
+	if err := deleteSessionTempTableInMemDb(sessionToken); err != nil {
 		log.WithFields(log.Fields{"error": err}).Debug("deleteSessionTempTableInMemDb")
 	}
 
 	return nil
 }
 
-func GetImageAssetSession(queryFilter *AssetQueryFilter, id string) ([]*api.RESTImageAssetViewV2, int, error) {
+func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetViewV2, int, error) {
 	if queryFilter != nil {
-		if err := vaildateQueryID(queryFilter.QueryID, id); err != nil {
+		if err := vaildateQueryID(queryFilter.QueryID); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -1344,7 +1339,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter, id string) ([]*api.REST
 	start := queryFilter.QueryStart
 	row := queryFilter.QueryCount
 
-	sessionTemp, err := formatSessionTempTableName(sessionToken, id)
+	sessionTemp, err := formatSessionTempTableName(sessionToken)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1361,7 +1356,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter, id string) ([]*api.REST
 		return nil, 0, err
 	}
 
-	queryStat, err := GetQueryStat(sessionToken, id)
+	queryStat, err := GetQueryStat(sessionToken)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1369,7 +1364,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter, id string) ([]*api.REST
 	// fetch data
 	var db *sql.DB
 	if queryStat.FileDBReady == 1 {
-		db, err = openSessionFileDb(sessionToken, id)
+		db, err = openSessionFileDb(sessionToken)
 		if err != nil {
 			return nil, 0, err
 		}

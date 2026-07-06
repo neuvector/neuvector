@@ -4184,7 +4184,6 @@ type UserAccessControl struct {
 type QuerySessionRequest struct {
 	Type         int // 0=vul, 1=asset
 	QueryID      string
-	LoginID      string
 	CreationTime int64
 	UserAccess   *UserAccessControl
 	Filters      *VulQueryFilterViewModel

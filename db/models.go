@@ -432,8 +432,8 @@ func getAssetvulSchema(uniqueAssetId bool) []string {
 	return schema
 }
 
-func formatSessionTempTableName(queryID, id string) (string, error) {
-	if err := vaildateQueryID(queryID, id); err != nil {
+func formatSessionTempTableName(queryID string) (string, error) {
+	if err := vaildateQueryID(queryID); err != nil {
 		return "", err
 	}
 	b := sha512.Sum512([]byte(queryID))

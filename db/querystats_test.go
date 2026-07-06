@@ -13,8 +13,7 @@ func TestPopulateQueryStat(t *testing.T) {
 		t.Errorf("CreateDatabase() returns %v", err)
 	}
 
-	id := "0123456789ab"
-	queryID, err := GenQueryID(id)
+	queryID, err := GenQueryID()
 	assert.NoError(t, err)
 	qs := &QueryStat{
 		QueryID:      queryID,
@@ -31,7 +30,7 @@ func TestPopulateQueryStat(t *testing.T) {
 	}
 
 	// read it back
-	readbackQs, err := GetQueryStat(queryID, id)
+	readbackQs, err := GetQueryStat(queryID)
 	if err != nil {
 		t.Errorf("GetQueryStat() returns %v", err)
 	}
@@ -49,14 +48,13 @@ func TestDeleteQuerySession(t *testing.T) {
 		t.Errorf("CreateDatabase() returns %v", err)
 	}
 
-	id := "0123456789ab"
-	queryID, err := GenQueryID(id)
+	queryID, err := GenQueryID()
 	assert.NoError(t, err)
 	qs := &QueryStat{
 		QueryID:      queryID,
 		CreationTime: time.Now().UTC().Unix(),
 		LoginType:    1,
-		LoginID:      id,
+		LoginID:      "111",
 		LoginName:    "admin",
 		Data1:        "",
 	}
@@ -67,7 +65,7 @@ func TestDeleteQuerySession(t *testing.T) {
 	}
 
 	// read it back
-	readbackQs, err := GetQueryStat(queryID, id)
+	readbackQs, err := GetQueryStat(queryID)
 	if err != nil {
 		t.Errorf("GetQueryStat() returns %v", err)
 	}
@@ -82,7 +80,7 @@ func TestDeleteQuerySession(t *testing.T) {
 	_ = DeleteQuerySessionByQueryID(queryID)
 
 	// we should not get any records back
-	readbackQs, err = GetQueryStat(queryID, id)
+	readbackQs, err = GetQueryStat(queryID)
 	if err == nil {
 		t.Error("Read deleted query status, got success return code. Expected error returned.")
 	}
