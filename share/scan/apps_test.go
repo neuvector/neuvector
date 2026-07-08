@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/neuvector/neuvector/share"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +56,7 @@ func TestParsePythonPackage(t *testing.T) {
 		"python:pyparsing":      {ModuleName: "python:pyparsing", Version: "2.3.0"},
 		"python:requests":       {ModuleName: "python:requests", Version: "2.18.4"},
 	}
-	ap := NewScanApps(false)
+	ap := NewScanApps(false, nil)
 	for _, tt := range tests {
 		ap.parsePythonPackage(tt)
 	}
@@ -177,7 +178,7 @@ func TestParseRubyPackage(t *testing.T) {
 		"ruby:did_you_mean": {ModuleName: "ruby:did_you_mean", Version: "1.3.0"},
 		"ruby:xmlrpc":       {ModuleName: "ruby:xmlrpc", Version: "0.3.0"},
 	}
-	ap := NewScanApps(false)
+	ap := NewScanApps(false, nil)
 	for _, tt := range tests {
 		ap.parseRubyPackage(tt)
 	}
@@ -352,12 +353,37 @@ Multi-Release: true
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := strings.NewReader(tt.manifest)
-			pkg, err := parseJarManifestFile("", r)
+			pkg, err := parseJarManifestFile("", r, &share.ParsingCaps{JarAutoModuleName: true})
 			require.NoError(t, err)
 			require.Equal(t, tt.moduleName, pkg.ModuleName)
 			require.Equal(t, tt.version, pkg.Version)
 		})
 	}
+}
+
+func TestParseJarManifestFileGateAutomaticModuleName(t *testing.T) {
+	manifest := `
+Manifest-Version: 1.0
+Automatic-Module-Name: spring.boot
+Build-Jdk-Spec: 17
+Built-By: Spring
+Implementation-Title: Spring Boot
+Implementation-Version: 3.3.10
+`
+
+	t.Run("disabled", func(t *testing.T) {
+		pkg, err := parseJarManifestFile("", strings.NewReader(manifest), nil)
+		require.NoError(t, err)
+		require.Equal(t, "jar:spring-boot", pkg.ModuleName)
+		require.Equal(t, "3.3.10", pkg.Version)
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		pkg, err := parseJarManifestFile("", strings.NewReader(manifest), &share.ParsingCaps{JarAutoModuleName: true})
+		require.NoError(t, err)
+		require.Equal(t, "org.springframework.boot:spring-boot", pkg.ModuleName)
+		require.Equal(t, "3.3.10", pkg.Version)
+	})
 }
 
 func TestParseDotNetModuleNameVersion(t *testing.T) {
