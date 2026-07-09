@@ -31,8 +31,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SEARCH_QUERY: 'repo:owner/repo is:issue created:${{ env.last_month }} -reason:"not planned"'
       - name: Create issue
-        uses: peter-evans/create-issue-from-file@fca9117c27cdc29c6c4db3b86c48e4115a786710 # v6.0.0
-        with:
-          title: Monthly issue metrics report
-          token: ${{ secrets.GITHUB_TOKEN }}
-          content-filepath: ./issue_metrics.md
+        run: |
+          gh issue create \
+            --title "Monthly issue metrics report" \
+            --body-file "issue_metrics.md" \
+            --repo "neuvector/neuvector"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
