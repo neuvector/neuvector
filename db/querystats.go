@@ -241,8 +241,10 @@ func deleteSessionTempTableInMemDb(queryID string) error {
 	db := memoryDbHandle
 
 	// SQLite does not support parameterized substitution for table and column names, only for values.
+	// tableName is in the format "tmp_session_%s" where the "%s" part is a hex-encoded string(consists of the 16 lowercase hexadecimal characters: 0123456789abcdef)
+	// that SQL injection is impossible thru it
+	sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", tableName)
 	for i := 0; i < 10; i++ {
-		sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", tableName)
 		_, err := db.Exec(sql)
 		if err != nil {
 			time.Sleep(100 * time.Millisecond)
