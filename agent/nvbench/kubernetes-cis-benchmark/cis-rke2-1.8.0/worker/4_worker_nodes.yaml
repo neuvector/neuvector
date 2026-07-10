@@ -204,25 +204,20 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
-            file=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
-            file=$(append_prefix "$CONFIG_PREFIX" "$file")
-            if [ -e "$file" ]; then
-              ownership=$(stat -c %u%g $file)
-              if [ "$ownership" = "00" ]; then
-                pass "$check"
-                pass "      * client-ca-file: $file"
-              else
-                warn "$check"
-                warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
-              fi
+          file="/var/lib/rancher/rke2/agent/client-ca.crt"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          if [ -e "$file" ]; then
+            ownership=$(stat -c %u%g $file)
+            if [ "$ownership" = "00" ]; then
+              pass "$check"
+              pass "      * client-ca-file: $file"
             else
               warn "$check"
-              warn "      * File not found, $file"
+              warn "      * Wrong ownership for $file, expected root:root, but is $ownership"
             fi
           else
             warn "$check"
-            warn "      * --client-ca-file not set"
+            warn "      * File not found, $file"
           fi
         remediation: Run the following command to modify the ownership of the --client-ca-file.
           chown root:root <filename>
