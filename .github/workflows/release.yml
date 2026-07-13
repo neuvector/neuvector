@@ -8,7 +8,6 @@ on:
 permissions: {}
 
 jobs:
-
   publish:
     runs-on: ubuntu-latest
     permissions:
@@ -117,52 +116,3 @@ jobs:
         prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
     outputs:
       parsed_tag: ${{ steps.parse_tag_step.outputs.tag_value }}
-
-  update-upgrade-responder:
-      needs: publish
-      runs-on: ubuntu-latest
-      permissions:
-        contents: write
-        pull-requests: write
-      env:
-        TAG_FROM_PUBLISH: ${{ needs.publish.outputs.parsed_tag }}
-        COMMIT_MESSAGE: "chore: update upgrade-responder.json"
-        BRANCH_NAME_PREFIX: "auto-update/upgrade-responder-"
-        GIT_PATH_EXTERNAL_PROD: "external-production/"
-      if: ${{ needs.publish.outputs.parsed_tag != '' }}
-      steps:
-        - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-        - name: Set up Python
-          uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-          with:
-            python-version: '3.14'
-
-        - name: Creating upgrade-responder file
-          run: |
-            python -c '
-            import json, os
-            from datetime import datetime, timezone
-            tag_value = os.environ.get("TAG_FROM_PUBLISH", "unknown")
-            current_date = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-            data = {"Versions": [{"Name": f"v{tag_value}", "ReleaseDate": current_date, "Tags": ["latest", tag_value]}]}
-            with open(".github/upgrade-responder.json", "w") as f: json.dump(data, f, indent=2); f.write("\n")
-            '
-
-        - name: Set git config
-          run: |
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-        - name: Commit and push changes to neuvector
-          env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
-            BRANCH_NAME="${BRANCH_NAME_PREFIX}-$(date +%Y%m%d%H%M%S)"
-            echo "Creating and pushing branch: $BRANCH_NAME"
-            git checkout -b "$BRANCH_NAME"
-            git add .github/upgrade-responder.json
-            git commit -m  "${COMMIT_MESSAGE}"
-            git push origin "$BRANCH_NAME"
-            gh pr create --base main --head "$BRANCH_NAME" --title "Automated: Update upgrade-responder.json to $TAG_FROM_PUBLISH" --body "This PR updates the \`upgrade-responder.json\` file with the version \`$TAG_FROM_PUBLISH\`, generated automatically by GitHub Actions."
-
