@@ -22,7 +22,15 @@ targets:
     kind: golang/gomod
     scmid: default
     spec:
-      file: go.mod
+      files: go.mod
+
+  e2e-gomod:
+    name: 'deps(go): update Go version to {{ source "go" }}'
+    sourceid: go
+    kind: golang/gomod
+    scmid: default
+    spec:
+      file: test/e2e/go.mod
 
   dockerfile:
     name: "deps(go): update Docker image tag"
