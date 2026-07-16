@@ -1,13 +1,66 @@
 package scan
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/docker/distribution"
 	manifestV2 "github.com/docker/distribution/manifest/schema2"
+	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/scan/registry"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestClassifyManifestErr(t *testing.T) {
+	cases := []struct {
+		name     string
+		err      error
+		expected share.ScanErrorCode
+	}{
+		{
+			name:     "nil error returns ImageNotFound",
+			err:      nil,
+			expected: share.ScanErrorCode_ScanErrImageNotFound,
+		},
+		{
+			name:     "x509 certificate error returns Certificate",
+			err:      errors.New(`Get "https://registry.example.com/v2/": tls: failed to verify certificate: x509: certificate signed by unknown authority`),
+			expected: share.ScanErrorCode_ScanErrCertificate,
+		},
+		{
+			name:     "tls handshake error returns Certificate",
+			err:      errors.New(`tls: no supported versions satisfy MinVersion and MaxVersion`),
+			expected: share.ScanErrorCode_ScanErrCertificate,
+		},
+		{
+			name:     "connection refused returns Network",
+			err:      errors.New(`dial tcp 10.0.0.1:443: connect: connection refused`),
+			expected: share.ScanErrorCode_ScanErrNetwork,
+		},
+		{
+			name:     "no such host returns Network",
+			err:      errors.New(`dial tcp: lookup registry.example.com on 8.8.8.8:53: no such host`),
+			expected: share.ScanErrorCode_ScanErrNetwork,
+		},
+		{
+			name:     "dial tcp timeout returns Network",
+			err:      errors.New(`dial tcp 10.0.0.1:443: i/o timeout`),
+			expected: share.ScanErrorCode_ScanErrNetwork,
+		},
+		{
+			name:     "404 not found returns ImageNotFound",
+			err:      errors.New(`manifest unknown: manifest unknown`),
+			expected: share.ScanErrorCode_ScanErrImageNotFound,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.expected, classifyManifestErr(c.err))
+		})
+	}
+}
 
 func printLayers(t *testing.T, imageInfo *ImageInfo) {
 	for i := 0; i < len(imageInfo.Layers); i++ {

@@ -140,8 +140,9 @@ func (r *repoScanTask) Run(arg interface{}) (interface{}, *JobError) {
 			"errMsg":   rsr.errMsg,
 		}).Error("RPC request fail")
 	} else if result.Error != share.ScanErrorCode_ScanErrNone {
-		// Include the error code in Detail to enable ShouldRetry logic
-		scanErr = NewJobError(api.RESTErrFailRepoScan, err, result.Error)
+		// Include the error code in Detail to enable ShouldRetry logic.
+		// Use the human-readable string as Err so it surfaces in the API response body.
+		scanErr = NewJobError(api.RESTErrFailRepoScan, errors.New(scanUtils.ScanErrorToStr(result.Error)), result.Error)
 		log.WithFields(log.Fields{
 			"registry":   req.Registry,
 			"image":      getImageName(req),
