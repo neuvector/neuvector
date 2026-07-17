@@ -1,2 +1,2 @@
 all:
-	go build -ldflags='-s -w' -buildvcs=false
+	go build -ldflags='-s -w'
