@@ -54,14 +54,21 @@ type RemoteAuthInterface interface {
 	OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAuthToken) (map[string]interface{}, error)
 }
 
-func NewRemoteAuther(fakeTime *time.Time) RemoteAuthInterface {
+func NewRemoteAuther(fakeTime *time.Time, encryptState func(string) (string, error), decryptState func(string) (string, error)) RemoteAuthInterface {
+	if encryptState == nil || decryptState == nil {
+		panic("NewRemoteAuther: encryptState and decryptState must not be nil")
+	}
 	return &remoteAuth{
-		fakeTime: fakeTime,
+		fakeTime:     fakeTime,
+		encryptState: encryptState,
+		decryptState: decryptState,
 	}
 }
 
 type remoteAuth struct {
-	fakeTime *time.Time // For unit-tests
+	fakeTime     *time.Time
+	encryptState func(string) (string, error)
+	decryptState func(string) (string, error)
 }
 
 const defaultLDAPAuthTimeout = time.Second * 10
@@ -352,13 +359,17 @@ func (a *remoteAuth) OIDCDiscover(issuer string, proxy string) (string, string, 
 
 func (a *remoteAuth) generateState() (string, error) {
 	s := fmt.Sprintf("%d", time.Now().Unix())
-	return utils.EncryptURLSafe(s)
+	return a.encryptState(s)
 }
 
 func (a *remoteAuth) verifyState(state string) error {
-	tsStr, err := utils.DecryptURLSafe(state)
+	tsStr, err := a.decryptState(state)
 	if err != nil {
-		return fmt.Errorf("Invalid state: wrong encryption: %w", err)
+		// fall back to legacy decryption for states generated before this migration
+		tsStr, err = utils.DecryptURLSafe(state)
+		if err != nil {
+			return fmt.Errorf("Invalid state: wrong encryption: %w", err)
+		}
 	}
 	if tsStr == "" {
 		return errors.New("Invalid state: wrong encryption")
