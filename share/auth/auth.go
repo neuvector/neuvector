@@ -54,14 +54,21 @@ type RemoteAuthInterface interface {
 	OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAuthToken) (map[string]interface{}, error)
 }
 
-func NewRemoteAuther(fakeTime *time.Time) RemoteAuthInterface {
+func NewRemoteAuther(fakeTime *time.Time, encryptState func(string) (string, error), decryptState func(string) (string, error)) RemoteAuthInterface {
+	if encryptState == nil || decryptState == nil {
+		panic("NewRemoteAuther: encryptState and decryptState must not be nil")
+	}
 	return &remoteAuth{
-		fakeTime: fakeTime,
+		fakeTime:     fakeTime,
+		encryptState: encryptState,
+		decryptState: decryptState,
 	}
 }
 
 type remoteAuth struct {
-	fakeTime *time.Time // For unit-tests
+	fakeTime     *time.Time
+	encryptState func(string) (string, error)
+	decryptState func(string) (string, error)
 }
 
 const defaultLDAPAuthTimeout = time.Second * 10
@@ -340,13 +347,18 @@ func (a *remoteAuth) OIDCDiscover(issuer string, proxy string) (string, string, 
 	return "", "", "", "", lastError
 }
 
-func (a *remoteAuth) generateState() string {
+func (a *remoteAuth) generateState() (string, error) {
 	s := fmt.Sprintf("%d", time.Now().Unix())
-	return utils.EncryptURLSafe(s)
+	return a.encryptState(s)
 }
 
 func (a *remoteAuth) verifyState(state string) error {
-	if tsStr := utils.DecryptURLSafe(state); tsStr == "" {
+	tsStr, err := a.decryptState(state)
+	if err != nil {
+		// fall back to legacy decryption for states generated before this migration
+		tsStr = utils.DecryptURLSafe(state)
+	}
+	if tsStr == "" {
 		return errors.New("Invalid state: wrong encryption")
 	} else if ts, err := strconv.ParseInt(tsStr, 10, 64); err != nil {
 		return errors.New("Invalid state: wrong format")
@@ -363,7 +375,11 @@ func (a *remoteAuth) OIDCGetRedirectURL(coidc *share.CLUSServerOIDC, redir *api.
 		Endpoint:     oauth2.Endpoint{AuthURL: coidc.AuthURL, TokenURL: coidc.TokenURL},
 		Scopes:       coidc.Scopes,
 	}
-	url := fmt.Sprintf("%s&redirect_uri=%s", cfg.AuthCodeURL(a.generateState()), redir.Redirect)
+	state, err := a.generateState()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate state: %w", err)
+	}
+	url := fmt.Sprintf("%s&redirect_uri=%s", cfg.AuthCodeURL(state), redir.Redirect)
 	return url, nil
 }
 
