@@ -470,7 +470,7 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	remoteAuth := auth.NewRemoteAuther(nil)
+	remoteAuth := auth.NewRemoteAuther(nil, common.AesGcmEncrypt, common.AesGcmDecrypt)
 	if url, err = remoteAuth.SAMLSPGetLogoutURL(cs.SAML, &data, login.nameid, login.sessionIndex, nil); err != nil {
 		log.WithError(err).Warn("failed to generate saml logout url")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

@@ -252,6 +252,9 @@ func HashPassword(password string, salt []byte) (string, error) {
 	return cipherBundle, nil
 }
 
+func AesGcmEncrypt(plaintext string) (string, error)    { return aesGcmEncrypt(plaintext) }
+func AesGcmDecrypt(cipherBundle string) (string, error) { return aesGcmDecrypt(cipherBundle) }
+
 func aesGcmEncrypt(plaintext string) (string, error) {
 	if plaintext == "" {
 		return "", ErrEmptyValue
@@ -702,10 +705,9 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 								if err == ErrEmptyValue {
 									marshalResult.AddEmptyFieldToEncrypt(jsonTag)
 								}
-								m = utils.EncryptPassword(strVal)
 							}
 						} else {
-							m = utils.EncryptPassword(strVal)
+							log.Error("dek seed is not available")
 						}
 					}
 					val = reflect.ValueOf(m)
