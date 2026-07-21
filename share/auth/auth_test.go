@@ -41,7 +41,10 @@ import (
 // On Okta, validate SAML requests with signature certificates should be "unchecked".
 func TestOktaSAMLUnsignedAuthnRequest(t *testing.T) {
 	fakeTime := time.Date(2023, time.October, 4, 21, 8, 30, 0, time.UTC)
-	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime,
+		func(s string) (string, error) { return s, nil },
+		func(s string) (string, error) { return s, nil },
+	)
 
 	// Generate IdP cert/key
 	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{
@@ -131,7 +134,10 @@ ma7nkie3ORja96UTROAZ77o=
 -----END PRIVATE KEY-----`
 
 	fakeTime := time.Date(2023, time.October, 4, 21, 8, 30, 0, time.UTC)
-	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime,
+		func(s string) (string, error) { return s, nil },
+		func(s string) (string, error) { return s, nil },
+	)
 
 	// Generate IdP cert/key
 	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{
@@ -197,7 +203,10 @@ REg3LA3YSyeLxyhwSUOJSHf+yBKLZFrDlbJQ4w==
 -----END CERTIFICATE-----`
 
 	fakeTime := time.Date(2023, time.October, 6, 00, 52, 0, 0, time.UTC)
-	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime,
+		func(s string) (string, error) { return s, nil },
+		func(s string) (string, error) { return s, nil },
+	)
 
 	nameid, sessionindex, attrs, err := remoteAuth.SAMLSPAuth(&share.CLUSServerSAML{
 		CLUSServerAuth: share.CLUSServerAuth{
@@ -284,7 +293,10 @@ ma7nkie3ORja96UTROAZ77o=
 -----END PRIVATE KEY-----`
 
 	fakeTime := time.Date(2023, time.October, 6, 0, 6, 30, 0, time.UTC)
-	remoteAuth := auth.NewRemoteAuther(&fakeTime)
+	remoteAuth := auth.NewRemoteAuther(&fakeTime,
+		func(s string) (string, error) { return s, nil },
+		func(s string) (string, error) { return s, nil },
+	)
 
 	// Generate IdP cert/key
 	idpCert, _, err := kv.GenTlsKeyCert("IDPKey", "", "", kv.ValidityPeriod{

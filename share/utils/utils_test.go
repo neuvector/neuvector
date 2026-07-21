@@ -204,30 +204,6 @@ func TestUserTokenEncrypt(t *testing.T) {
 	}
 }
 
-func TestPasswordEncrypt(t *testing.T) {
-	password := "123456"
-	encrypt := EncryptPassword(password)
-	decrypt := DecryptPassword(encrypt)
-	if decrypt != password {
-		t.Errorf("Password encrypt error: password=%v decrypt=%v\n", password, decrypt)
-	}
-
-	if EncryptPassword("") != "" {
-		t.Errorf("Empty password should be encrypted as emtpy string\n")
-	}
-
-	e1 := EncryptPassword(password)
-	e2 := EncryptPassword(password)
-	if e1 == e2 {
-		t.Errorf("Encrypt same string twice gives same output\n")
-	}
-
-	decrypt = DecryptPassword("1234567890")
-	if decrypt != "" {
-		t.Errorf("Decrypt invalid string should give empty output\n")
-	}
-}
-
 func TestCompareSliceWithoutOrder(t *testing.T) {
 	a1 := []string{"cpath"}
 	a2 := []string{"all"}

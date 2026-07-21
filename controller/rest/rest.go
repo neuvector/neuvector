@@ -1537,7 +1537,7 @@ func PreInitContext(ctx *Context) {
 	evqueue = ctx.EvQueue
 	auditQueue = ctx.AuditQueue
 
-	remoteAuther = auth.NewRemoteAuther(nil)
+	remoteAuther = auth.NewRemoteAuther(nil, common.AesGcmEncrypt, common.AesGcmDecrypt)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 }
