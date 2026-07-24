@@ -61,6 +61,7 @@ func (l *Conn) WhoAmI(controls []Control) (*WhoAmIResult, error) {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	if packet == nil {
 		return nil, NewError(ErrorNetwork, errors.New("ldap: could not retrieve message"))
 	}
@@ -87,5 +88,13 @@ func (l *Conn) WhoAmI(controls []Control) (*WhoAmIResult, error) {
 		}
 	}
 
+=======
+	// responseValue is OPTIONAL (RFC 4532); Extended leaves Value nil when the
+	// server omits it. Guard the dereference and report an empty authzId.
+	result := &WhoAmIResult{}
+	if resp.Value != nil {
+		result.AuthzID = resp.Value.Data.String()
+	}
+>>>>>>> 2fb306c3 (chore(deps): update module github.com/go-ldap/ldap/v3 to v3.4.14 (#2638))
 	return result, nil
 }
