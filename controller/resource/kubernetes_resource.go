@@ -2346,13 +2346,11 @@ func CreateNvCrdObject(rt string) (interface{}, error) {
 func getNeuvectorSvcAccount() {
 	// controller's sa is known by k8s token, not by deployment resource
 	resInfo := map[string]string{ // resource object name : resource type
+		"neuvector-updater-pod":          RscTypeCronJob,
 		"neuvector-enforcer-pod":         RscTypeDaemonSet,
 		"neuvector-scanner-pod":          RscTypeDeployment,
 		"neuvector-registry-adapter-pod": RscTypeDeployment,
-	}
-	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
-		resInfo["neuvector-updater-pod"] = RscTypeCronJob
-		resInfo["neuvector-cert-upgrader-pod"] = RscTypeCronJob
+		"neuvector-cert-upgrader-pod":    RscTypeCronJob,
 	}
 
 	for objName, rt := range resInfo {
