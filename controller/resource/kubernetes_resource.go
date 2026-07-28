@@ -1651,7 +1651,9 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 						case e := <-errCh:
 							// The last watchResource() go routine probably sent a value to errCh channel
 							// We need to drain that value from errCh channel so that we can keep watching this resource type by the new k8s token
-							log.WithFields(log.Fields{"resource": rt, "e": e}).Info("Drained errCh")
+							if e != nil && e.Error() != "http2: response body closed" {
+								log.WithFields(log.Fields{"resource": rt, "e": e}).Info("Drained errCh")
+							}
 						default:
 						}
 					}
