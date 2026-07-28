@@ -1651,7 +1651,9 @@ func (d *kubernetes) startWatchResource(rt, ns string, wcb orchAPI.WatchCallback
 						case e := <-errCh:
 							// The last watchResource() go routine probably sent a value to errCh channel
 							// We need to drain that value from errCh channel so that we can keep watching this resource type by the new k8s token
-							log.WithFields(log.Fields{"resource": rt, "e": e}).Info("Drained errCh")
+							if e != nil && e.Error() != "http2: response body closed" {
+								log.WithFields(log.Fields{"resource": rt, "e": e}).Info("Drained errCh")
+							}
 						default:
 						}
 					}
@@ -2344,11 +2346,13 @@ func CreateNvCrdObject(rt string) (interface{}, error) {
 func getNeuvectorSvcAccount() {
 	// controller's sa is known by k8s token, not by deployment resource
 	resInfo := map[string]string{ // resource object name : resource type
-		"neuvector-updater-pod":          RscTypeCronJob,
 		"neuvector-enforcer-pod":         RscTypeDaemonSet,
 		"neuvector-scanner-pod":          RscTypeDeployment,
 		"neuvector-registry-adapter-pod": RscTypeDeployment,
-		"neuvector-cert-upgrader-pod":    RscTypeCronJob,
+	}
+	if os.Getenv("AUTO_INTERNAL_CERT") != "" {
+		resInfo["neuvector-updater-pod"] = RscTypeCronJob
+		resInfo["neuvector-cert-upgrader-pod"] = RscTypeCronJob
 	}
 
 	for objName, rt := range resInfo {
