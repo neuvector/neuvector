@@ -23,11 +23,9 @@ type QueryStat struct {
 	Type         int // QueryStateType_Vul(0), QueryStateType_Asset(1)
 }
 
-const queryStatTablename = "querystats"
-
 func PopulateQueryStat(queryStat *QueryStat) (int, error) {
 	dialect := goqu.Dialect("sqlite3")
-	ds := dialect.Insert(queryStatTablename).Rows(
+	ds := dialect.Insert(Table_querystats).Rows(
 		goqu.Record{
 			"token":            queryStat.QueryID,
 			"create_timestamp": queryStat.CreationTime,
@@ -81,7 +79,7 @@ func GetQueryStat(token string) (*QueryStat, error) {
 	dialect := goqu.Dialect("sqlite3")
 
 	columns := []interface{}{"id", "token", "create_timestamp", "login_type", "login_id", "login_name", "data1", "data2", "data3", "filedb_ready", "type"}
-	sql, args, err := dialect.From(queryStatTablename).Select(columns...).Where(goqu.C("token").Eq(token)).Prepared(true).ToSQL()
+	sql, args, err := dialect.From(Table_querystats).Select(columns...).Where(goqu.C("token").Eq(token)).Prepared(true).ToSQL()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
@@ -181,7 +179,7 @@ func GetExceededSessions(loginName, loginID string, loginType int) ([]string, er
 
 func setFileDbState(queryID string, newValue int) error {
 	dialect := goqu.Dialect("sqlite3")
-	sql, args, err := dialect.Update(queryStatTablename).Where(goqu.C("token").Eq(queryID)).Set(
+	sql, args, err := dialect.Update(Table_querystats).Where(goqu.C("token").Eq(queryID)).Set(
 		goqu.Record{
 			"filedb_ready": newValue,
 		},
@@ -216,17 +214,18 @@ func DeleteQuerySessionByQueryID(queryID string) error {
 	}
 
 	// delete session table in memory
-	err = deleteSessionTempTableInMemDb(queryID)
-	if err != nil {
-		return err
+	err1 := deleteSessionTempTableInMemDb(queryID)
+	if err1 != nil {
+		err1 = fmt.Errorf("failed to delete temp table in memory: %w", err1)
 	}
 
 	// delete the session table in file-based db, ignore the error
-	if err := deleteSessionFileDb(queryID); err != nil {
-		return err
+	err2 := deleteSessionFileDb(queryID)
+	if err2 != nil {
+		err2 = fmt.Errorf("failed to delete temp table file: %w", err2)
 	}
 
-	return nil
+	return errors.Join(err1, err2)
 }
 
 func deleteSessionTempTableInMemDb(queryID string) error {
@@ -234,24 +233,31 @@ func deleteSessionTempTableInMemDb(queryID string) error {
 	if err != nil {
 		return err
 	}
+	if !regexTempTableName.MatchString(tableName) {
+		return errors.New("invalid temp table name")
+	}
 
 	memdbMutex.Lock()
 	defer memdbMutex.Unlock()
 
 	db := memoryDbHandle
+	err = nil
 
 	// SQLite does not support parameterized substitution for table and column names, only for values.
 	// tableName is in the format "tmp_session_%s" where the "%s" part is a hex-encoded string(consists of the 16 lowercase hexadecimal characters: 0123456789abcdef)
 	// that SQL injection is impossible thru it
 	sql := fmt.Sprintf("DROP TABLE IF EXISTS '%s';", tableName)
 	for i := 0; i < 10; i++ {
-		_, err := db.Exec(sql)
+		_, err = db.Exec(sql)
 		if err != nil {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		break
 	}
+	if err != nil {
+		err = fmt.Errorf("too many failed attemps: %w", err)
+	}
 
-	return nil
+	return err
 }

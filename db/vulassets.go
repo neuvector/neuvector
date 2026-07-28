@@ -886,6 +886,10 @@ func deleteSessionFileDb(sessionToken string) error {
 	if err != nil {
 		return err
 	}
+	if !regexTempTableName.MatchString(tableName) {
+		return errors.New("invalid temp table name")
+	}
+
 	dbfile := path.Join(dbFile_Folder, tableName)
 
 	err = os.Remove(dbfile)

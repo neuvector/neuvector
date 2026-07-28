@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -200,6 +201,7 @@ const (
 var dbHandle *sql.DB = nil
 var dbCVEHandle *sql.DB = nil
 var memoryDbHandle *sql.DB = nil
+var regexTempTableName *regexp.Regexp
 
 var funcGetCveRecord func(string, string, string) *DbVulAsset
 var funcGetCVEList func([]byte, string) []string
@@ -219,6 +221,12 @@ func deleteDBAndWAL(path string) {
 }
 
 func CreateVulAssetDb(useLocal bool) error {
+	var err error
+	regexTempTableName, err = regexp.Compile("^tmp_session_[0-9a-fA-F]{128}$")
+	if err != nil {
+		return fmt.Errorf("failed to compile temp table name regex: %w", err)
+	}
+
 	dbFile := dbFile_Vulassets
 	if useLocal {
 		dbFile = dbFile_VulassetsLocal
