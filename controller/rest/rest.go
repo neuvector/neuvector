@@ -174,7 +174,7 @@ var restErrMessage = []string{
 	api.RESTErrPlatformAuthDisabled:  "Platform authentication is disabled",
 	api.RESTErrRancherUnauthorized:   "Rancher authentication failed",
 	api.RESTErrRemoteExportFail:      "Failed to export to remote repository",
-	api.RESTErrInvalidQueryToken:     "Invalid or expired query token",
+	api.RESTErrInvalidQueryID:        "Invalid or expired query id",
 	api.RESTErrPollJobNotFoundError:  "Job not found in the Job Queue",
 	api.RESTErrServerError:           "Server Error",
 }

@@ -2326,7 +2326,7 @@ func querySessionRequest(nType cluster.ClusterNotifyType, key string, value []by
 
 		err := cctx.DeleteQuerySessionFunc(queryToken)
 		if err != nil {
-			log.WithFields(log.Fields{"queryToken": queryToken}).Debug("[multi-cluster] consul kv watcher deleted event, call cctx.DeleteQuerySessionFunc() error")
+			log.WithFields(log.Fields{"queryToken": queryToken, "error": err}).Debug("[multi-cluster] consul kv watcher deleted event, call cctx.DeleteQuerySessionFunc() error")
 		} else {
 			log.WithFields(log.Fields{"queryToken": queryToken}).Debug("[multi-cluster] consul kv watcher deleted event")
 		}

@@ -210,7 +210,7 @@ type Context struct {
 	StartStopFedPingPollFunc func(cmd, interval uint32, param1 interface{}) error
 	RestConfigFunc           func(cmd, interval uint32, param1 interface{}, param2 interface{}) error
 	CreateQuerySessionFunc   func(qsr *api.QuerySessionRequest) error
-	DeleteQuerySessionFunc   func(queryToken string) error
+	DeleteQuerySessionFunc   func(queryID string) error
 	NotifyCertChange         func(cn string) error
 }
 
