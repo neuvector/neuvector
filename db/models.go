@@ -2,13 +2,16 @@ package db
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"database/sql"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -74,7 +77,7 @@ type DbCVESource struct {
 }
 
 type VulQueryFilter struct {
-	QueryToken                     string
+	QueryID                        string
 	QueryStart                     int
 	QueryCount                     int
 	Debug                          int
@@ -88,7 +91,7 @@ type VulQueryFilter struct {
 }
 
 type AssetQueryFilter struct {
-	QueryToken string
+	QueryID    string
 	QueryStart int
 	QueryCount int
 	Debug      int
@@ -198,6 +201,7 @@ const (
 var dbHandle *sql.DB = nil
 var dbCVEHandle *sql.DB = nil
 var memoryDbHandle *sql.DB = nil
+var regexTempTableName *regexp.Regexp
 
 var funcGetCveRecord func(string, string, string) *DbVulAsset
 var funcGetCVEList func([]byte, string) []string
@@ -217,6 +221,12 @@ func deleteDBAndWAL(path string) {
 }
 
 func CreateVulAssetDb(useLocal bool) error {
+	var err error
+	regexTempTableName, err = regexp.Compile("^tmp_session_[0-9a-fA-F]{128}$")
+	if err != nil {
+		return fmt.Errorf("failed to compile temp table name regex: %w", err)
+	}
+
 	dbFile := dbFile_Vulassets
 	if useLocal {
 		dbFile = dbFile_VulassetsLocal
@@ -430,8 +440,12 @@ func getAssetvulSchema(uniqueAssetId bool) []string {
 	return schema
 }
 
-func formatSessionTempTableName(queryToken string) string {
-	return fmt.Sprintf("tmp_session_%s", queryToken)
+func formatSessionTempTableName(queryID string) (string, error) {
+	if err := vaildateQueryID(queryID); err != nil {
+		return "", err
+	}
+	b := sha512.Sum512([]byte(queryID))
+	return fmt.Sprintf("tmp_session_%s", hex.EncodeToString(b[:])), nil
 }
 
 func getQueryParamInteger(r *http.Request, name string, defaultValue int) int {

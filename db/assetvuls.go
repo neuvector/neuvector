@@ -28,7 +28,7 @@ type BuildWhereClauseFunc func(allowedID []string, queryFilter *api.VulQueryFilt
 type BuildWhereClauseAllFunc func(queryFilter *api.VulQueryFilterViewModel) exp.ExpressionList
 
 const (
-	queryTokenIdLen = 6 // do not change the length
+	queryIdLen = 6 // do not change the length
 )
 
 func GetAssetVulIDByAssetID(assetID string) (*DbAssetVul, error) {
@@ -1004,21 +1004,21 @@ func batchProcessAssetView(pool *pond.WorkerPool, mu *sync.Mutex, cvePackages ma
 	})
 }
 
-func GenQueryToken() (string, error) {
-	queryToken, err := utils.GetRandomID(queryTokenIdLen, "") // do not change the length
+func GenQueryID() (string, error) {
+	queryID, err := utils.GetRandomID(queryIdLen, "") // do not change the length
 	if err != nil {
 		return "", err
 	}
-	return queryToken, nil
+	return queryID, nil
 }
 
-func vaildateQueryToken(queryToken string) error {
+func vaildateQueryID(queryID string) error {
 	invalidToken := errors.New("invalid query token")
-	if len(queryToken) != queryTokenIdLen*2 {
+	if len(queryID) != queryIdLen*2 {
 		return invalidToken
 	}
-	for i := 0; i < len(queryToken); i++ {
-		c := queryToken[i]
+	for i := 0; i < len(queryID); i++ {
+		c := queryID[i]
 		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
 			continue
 		}
@@ -1032,7 +1032,7 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 		Filters: &api.AssetQueryFilterViewModel{},
 	}
 
-	q.QueryToken = r.URL.Query().Get("token")
+	q.QueryID = r.URL.Query().Get("token")
 	q.QueryStart = getQueryParamInteger(r, startQueryParam, defaultStart)
 	q.QueryCount = getQueryParamInteger(r, rowQueryParam, defaultRowCount)
 	q.Debug = getQueryParamInteger(r, "debug", defaultDebugMode)
@@ -1066,7 +1066,7 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 
 func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQueryFilter) (int, []*api.AssetCVECount, error) {
 	if queryFilter != nil {
-		if err := vaildateQueryToken(queryFilter.QueryToken); err != nil {
+		if err := vaildateQueryID(queryFilter.QueryID); err != nil {
 			return 0, nil, err
 		}
 	}
@@ -1088,9 +1088,9 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	}
 	defer rows.Close()
 
-	queryToken := queryFilter.QueryToken
+	queryID := queryFilter.QueryID
 
-	err = CreateSessionAssetTable(queryToken, true)
+	err = CreateSessionAssetTable(queryID, true)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1133,7 +1133,7 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 				asset.CVE_medium = medCount
 			}
 
-			_, err = insertSessionAssetRecord(memoryDbHandle, queryToken, asset)
+			_, err = insertSessionAssetRecord(memoryDbHandle, queryID, asset)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -1141,7 +1141,10 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 	}
 
 	// do summary - top5 and others
-	sessionTable := formatSessionTempTableName(queryToken)
+	sessionTable, err := formatSessionTempTableName(queryID)
+	if err != nil {
+		return 0, nil, err
+	}
 	statement, args, err = dialect.From(sessionTable).Select("assetid", "name", "cve_critical", "cve_high", "cve_medium", "cve_low").Where(goqu.Ex{"type": "image"}).Order(goqu.C("cve_count").Desc()).Prepared(true).ToSQL()
 	if err != nil {
 		return 0, nil, err
@@ -1181,7 +1184,10 @@ func CreateImageAssetSession(allowed map[string]utils.Set, queryFilter *AssetQue
 }
 
 func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAssetVul) (int, error) {
-	tableName := formatSessionTempTableName(sessionToken)
+	tableName, err := formatSessionTempTableName(sessionToken)
+	if err != nil {
+		return 0, err
+	}
 
 	record := getCompiledAssetVulRecord(assetVul)
 
@@ -1206,7 +1212,8 @@ func insertSessionAssetRecord(db *sql.DB, sessionToken string, assetVul *DbAsset
 }
 
 func DupAssetSessionTableToFile(sessionToken string) error {
-	if err := vaildateQueryToken(sessionToken); err != nil {
+	tableName, err := formatSessionTempTableName(sessionToken)
+	if err != nil {
 		return err
 	}
 	dialect := goqu.Dialect("sqlite3")
@@ -1226,7 +1233,6 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
-	tableName := formatSessionTempTableName(sessionToken)
 	statement, args, err := dialect.From(tableName).Select(columns...).Prepared(true).ToSQL()
 	if err != nil {
 		return err
@@ -1270,10 +1276,13 @@ func DupAssetSessionTableToFile(sessionToken string) error {
 }
 
 func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetViewV2, int, error) {
-	if queryFilter != nil {
-		if err := vaildateQueryToken(queryFilter.QueryToken); err != nil {
-			return nil, 0, err
-		}
+	if queryFilter == nil {
+		return nil, 0, errors.New("nil filter")
+	}
+	sessionToken := queryFilter.QueryID
+	tableName, err := formatSessionTempTableName(sessionToken)
+	if err != nil {
+		return nil, 0, err
 	}
 	getOrderColumn := func(queryFilter *AssetQueryFilter) []exp.OrderedExpression {
 		if queryFilter.Filters.OrderByColumn == "cvecount" {
@@ -1329,20 +1338,16 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 		"I_created_at", "I_scanned_at", "I_digest", "I_base_os", "I_os_scan_status",
 		"I_repository_name", "I_repository_url", "I_size", "I_tag"}
 
-	sessionToken := queryFilter.QueryToken
 	start := queryFilter.QueryStart
 	row := queryFilter.QueryCount
-
-	sessionTemp := formatSessionTempTableName(sessionToken)
 
 	dialect := goqu.Dialect("sqlite3")
 	var statement string
 	var args []interface{}
-	var err error
 	if row == -1 {
-		statement, args, err = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Prepared(true).ToSQL() // select all
+		statement, args, err = dialect.From(tableName).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Prepared(true).ToSQL() // select all
 	} else {
-		statement, args, err = dialect.From(sessionTemp).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
+		statement, args, err = dialect.From(tableName).Select(columns...).Where(buildWhereClause(queryFilter)).Order(getOrderColumn(queryFilter)...).Limit(uint(row)).Offset(uint(start)).Prepared(true).ToSQL()
 	}
 	if err != nil {
 		return nil, 0, err
@@ -1394,7 +1399,7 @@ func GetImageAssetSession(queryFilter *AssetQueryFilter) ([]*api.RESTImageAssetV
 	// 1. when no quick filter, return all assets count
 	// 2. has quick filter, return the matched assets count
 	quickFilterMatched := 0
-	sql, _, err := goqu.From(sessionTemp).Select(goqu.COUNT("*").As("count")).Where(buildWhereClause(queryFilter)).ToSQL()
+	sql, _, err := goqu.From(tableName).Select(goqu.COUNT("*").As("count")).Where(buildWhereClause(queryFilter)).ToSQL()
 	if err != nil {
 		return nil, 0, err
 	}

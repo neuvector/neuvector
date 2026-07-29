@@ -96,9 +96,10 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	err = PopulateAssetVul(generateImageDbAssetVul(imageID))
 	assert.NoError(t, err)
 
-	queryToken := "abc123def456"
+	queryID, err := GenQueryID()
+	assert.NoError(t, err)
 	queryFilter := &AssetQueryFilter{
-		QueryToken: queryToken,
+		QueryID:    queryID,
 		QueryStart: 0,
 		QueryCount: -1,
 		Filters: &api.AssetQueryFilterViewModel{
@@ -118,7 +119,7 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = PopulateQueryStat(&QueryStat{
-		Token:        queryToken,
+		QueryID:      queryID,
 		CreationTime: 1,
 		LoginType:    0,
 		LoginName:    "test",
@@ -128,8 +129,8 @@ func TestGetImageAssetSessionIncludesOSScanStatus(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	defer func() {
-		if err := DeleteQuerySessionByToken(queryToken); err != nil {
-			t.Logf("DeleteQuerySessionByToken returns %v", err)
+		if err := DeleteQuerySessionByQueryID(queryID); err != nil {
+			t.Logf("DeleteQuerySessionByQueryID returns %v", err)
 		}
 	}()
 
