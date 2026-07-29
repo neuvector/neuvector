@@ -336,7 +336,7 @@ type ClusterHelper interface {
 	PutSigstoreTimestamp(txn *cluster.ClusterTransact, rev *uint64) error
 	GetSigstoreTimestamp() (string, *uint64, error)
 	CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error
-	DeleteQuerySessionRequest(queryToken string)
+	DeleteQuerySessionRequest(queryID string)
 
 	// mock for unittest
 	SetCacheMockCallback(keyStore string, mockFunc MockKvConfigUpdateFunc)
@@ -4661,7 +4661,7 @@ func (m clusterHelper) GetSigstoreTimestamp() (string, *uint64, error) {
 }
 
 func (m clusterHelper) CreateQuerySessionRequest(qsr *api.QuerySessionRequest) error {
-	key := share.CLUSQuerySessionKey(qsr.QueryToken)
+	key := share.CLUSQuerySessionKey(qsr.QueryID)
 	value, err := json.Marshal(qsr)
 	if err != nil {
 		return err
@@ -4669,8 +4669,8 @@ func (m clusterHelper) CreateQuerySessionRequest(qsr *api.QuerySessionRequest) e
 	return cluster.PutIfNotExist(key, value, false)
 }
 
-func (m clusterHelper) DeleteQuerySessionRequest(queryToken string) {
-	key := share.CLUSQuerySessionKey(queryToken)
+func (m clusterHelper) DeleteQuerySessionRequest(queryID string) {
+	key := share.CLUSQuerySessionKey(queryID)
 	if err := cluster.Delete(key); err != nil {
 		log.WithError(err).Warn("Failed to delete query session request")
 	}
