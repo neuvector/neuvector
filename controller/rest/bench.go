@@ -213,7 +213,7 @@ func handlerDockerBench(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		cpf = &complianceProfileFilter{disableSystem: cp.DisableSystem, filter: filter, object: host}
 	}
 
-	var ctx benchAssetContext
+	ctx := benchAssetContext{hostRuntime: host.Runtime}
 	rpt, errCode, msg := getCISReportFromCluster(share.BenchDockerHost, id, cpf, ctx, acc)
 	// check the kubernetes status
 	if errCode != 0 {
