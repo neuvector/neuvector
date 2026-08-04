@@ -34,6 +34,39 @@ static uint8_t g_tso_packet[MAX_TSO_SIZE];
 #define FRAME_SIZE_V3 (1024 * 2)
 #define BLOCK_SIZE_V3 (1024 * 64)
 
+/*
+ * The kernel requires tp_block_size to be a multiple of PAGE_SIZE. The block
+ * sizes above are multiples of 4096, so they are fine on a 4K-page kernel but
+ * rejected with EINVAL on a 16K or 64K page kernel (arm64 builds with
+ * CONFIG_ARM64_16K_PAGES / CONFIG_ARM64_64K_PAGES).
+ *
+ * Round the block size up to the page size and divide the block count by the
+ * same factor, so the total ring size, and with it the MAP_LOCKED footprint,
+ * is unchanged. Every block size, frame size and block count here is a power
+ * of two, so the factor divides both exactly: block_size stays a multiple of
+ * frame_size, and ring->size stays a power of two, which dp_rx_v1() and
+ * dp_tx_v1() depend on for their "& (ring->size - 1)" wraparound.
+ *
+ * On a 4K-page kernel this is a no-op.
+ */
+static void dp_ring_fit_page_size(unsigned int *block_size, uint *blocks)
+{
+    long page_size = sysconf(_SC_PAGESIZE);
+
+    if (page_size <= 0 || *block_size == 0 || (*block_size % (unsigned int)page_size) == 0) {
+        return;
+    }
+
+    unsigned int aligned = (((*block_size) + (unsigned int)page_size - 1) /
+                            (unsigned int)page_size) * (unsigned int)page_size;
+    unsigned int factor = aligned / *block_size;
+
+    *block_size = aligned;
+    *blocks = (*blocks > factor) ? (*blocks / factor) : 1;
+
+    DEBUG_INIT("page_size=%ld block_size=%u blocks=%u\n", page_size, *block_size, *blocks);
+}
+
 static int dp_ring_bind(int fd, const char *iface)
 {
     struct sockaddr_ll ll;
@@ -201,13 +234,16 @@ static int dp_ring_v1(int fd, const char *iface, dp_ring_t *ring, bool tap, bool
      * Following comments are quoted from 
      * https://www.kernel.org/doc/Documentation/networking/packet_mmap.txt
      *
-     * Block size needs to be PAGE_SIZE << MAX_ORDER, PAGE_SIZE is 4096 bytes
+     * Block size needs to be a multiple of PAGE_SIZE. PAGE_SIZE is 4096 bytes
+     * on x86_64 and on most arm64 builds, but it is 16384 or 65536 on an arm64
+     * kernel built with CONFIG_ARM64_16K_PAGES or CONFIG_ARM64_64K_PAGES, so it
+     * has to be read at runtime rather than assumed. See dp_ring_fit_page_size().
      *
-     * As stated earlier, each block is a contiguous physical region of memory. 
+     * As stated earlier, each block is a contiguous physical region of memory.
      * These memory regions are allocated with calls to the __get_free_pages() function.
-     * As the name indicates, this function allocates pages of memory, and the second 
+     * As the name indicates, this function allocates pages of memory, and the second
      * argument is "order" or a power of two number of pages, that is (for PAGE_SIZE == 4096)
-     * order=0 ==> 4096 bytes, order=1 ==> 8192 bytes, order=2 ==> 16384 bytes, etc. 
+     * order=0 ==> 4096 bytes, order=1 ==> 8192 bytes, order=2 ==> 16384 bytes, etc.
      *
      */
     if (!tap && jumboframe){
@@ -217,6 +253,7 @@ static int dp_ring_v1(int fd, const char *iface, dp_ring_t *ring, bool tap, bool
         req->tp_block_size = BLOCK_SIZE_V1;
         req->tp_frame_size = FRAME_SIZE_V1;
     }
+    dp_ring_fit_page_size(&req->tp_block_size, &blocks);
     req->tp_block_nr = blocks;
     req->tp_frame_nr = (req->tp_block_size * blocks) / req->tp_frame_size;
     ring->size = req->tp_block_size * blocks;
@@ -227,15 +264,26 @@ static int dp_ring_v1(int fd, const char *iface, dp_ring_t *ring, bool tap, bool
     }
     ring->batch = batch;
 
-    setsockopt(fd, SOL_PACKET, PACKET_RX_RING, req, sizeof(*req));
+    if (setsockopt(fd, SOL_PACKET, PACKET_RX_RING, req, sizeof(*req)) < 0) {
+        DEBUG_ERROR(DBG_CTRL, "fail to set rx ring: %s, block_size=%u frame_size=%u "
+                    "block_nr=%u frame_nr=%u page_size=%ld\n", strerror(errno),
+                    req->tp_block_size, req->tp_frame_size, req->tp_block_nr,
+                    req->tp_frame_nr, sysconf(_SC_PAGESIZE));
+        return -1;
+    }
     if (!tap) {
-        setsockopt(fd, SOL_PACKET, PACKET_TX_RING, req, sizeof(*req));
+        if (setsockopt(fd, SOL_PACKET, PACKET_TX_RING, req, sizeof(*req)) < 0) {
+            DEBUG_ERROR(DBG_CTRL, "fail to set tx ring: %s, block_size=%u frame_size=%u "
+                        "block_nr=%u frame_nr=%u page_size=%ld\n", strerror(errno),
+                        req->tp_block_size, req->tp_frame_size, req->tp_block_nr,
+                        req->tp_frame_nr, sysconf(_SC_PAGESIZE));
+            return -1;
+        }
     }
 
     ring->rx_map = mmap(NULL, ring->map_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, fd, 0);
     if (ring->rx_map == MAP_FAILED) {
-        DEBUG_ERROR(DBG_CTRL, "fail to mmap (size=0x%x).\n", ring->map_size);
-        close(fd);
+        DEBUG_ERROR(DBG_CTRL, "fail to mmap (size=0x%x): %s.\n", ring->map_size, strerror(errno));
         return -1;
     }
 
