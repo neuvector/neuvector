@@ -16,9 +16,14 @@ import (
 	"github.com/neuvector/neuvector/controller/rpc"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/container"
 	scanUtils "github.com/neuvector/neuvector/share/scan"
 	"github.com/neuvector/neuvector/share/utils"
 )
+
+type benchAssetContext struct {
+	hostRuntime string
+}
 
 func bench2REST(bench share.BenchType, item *share.CLUSBenchItem, cpf *complianceProfileFilter, metaMap map[string]api.RESTBenchMeta, tagVersion string) *api.RESTBenchItem {
 	var r *api.RESTBenchItem
@@ -208,7 +213,8 @@ func handlerDockerBench(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		cpf = &complianceProfileFilter{disableSystem: cp.DisableSystem, filter: filter, object: host}
 	}
 
-	rpt, errCode, msg := getCISReportFromCluster(share.BenchDockerHost, id, cpf, acc)
+	ctx := benchAssetContext{hostRuntime: host.Runtime}
+	rpt, errCode, msg := getCISReportFromCluster(share.BenchDockerHost, id, cpf, ctx, acc)
 	// check the kubernetes status
 	if errCode != 0 {
 		if msg != "" {
@@ -569,10 +575,11 @@ func handlerContainerCompliance(w http.ResponseWriter, r *http.Request, ps httpr
 	var ts int64
 	var runAt string
 	var dockerVer string
+	var ctx benchAssetContext
 	items := make([]*api.RESTBenchItem, 0)
 
 	// custom check
-	if rpt, _, _ := getCISReportFromCluster(share.BenchCustomContainer, id, cpf, acc); rpt != nil {
+	if rpt, _, _ := getCISReportFromCluster(share.BenchCustomContainer, id, cpf, ctx, acc); rpt != nil {
 		items = append(items, rpt.Items...)
 		if rpt.RunAtTimeStamp > ts {
 			ts = rpt.RunAtTimeStamp
@@ -581,7 +588,7 @@ func handlerContainerCompliance(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	// docker bench
-	if rpt, _, _ := getCISReportFromCluster(share.BenchContainer, id, cpf, acc); rpt != nil {
+	if rpt, _, _ := getCISReportFromCluster(share.BenchContainer, id, cpf, ctx, acc); rpt != nil {
 		dockerVer = rpt.Version
 		items = append(items, rpt.Items...)
 		if rpt.RunAtTimeStamp > ts {
@@ -591,7 +598,7 @@ func handlerContainerCompliance(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	// secrets bench
-	if rpt, _, _ := getCISReportFromCluster(share.BenchContainerSecret, id, cpf, acc); rpt != nil {
+	if rpt, _, _ := getCISReportFromCluster(share.BenchContainerSecret, id, cpf, ctx, acc); rpt != nil {
 		items = append(items, rpt.Items...)
 		if rpt.RunAtTimeStamp > ts {
 			ts = rpt.RunAtTimeStamp
@@ -600,7 +607,7 @@ func handlerContainerCompliance(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 
 	// setuid, setgid bench
-	if rpt, _, _ := getCISReportFromCluster(share.BenchContainerSetID, id, cpf, acc); rpt != nil {
+	if rpt, _, _ := getCISReportFromCluster(share.BenchContainerSetID, id, cpf, ctx, acc); rpt != nil {
 		items = append(items, rpt.Items...)
 		if rpt.RunAtTimeStamp > ts {
 			ts = rpt.RunAtTimeStamp
@@ -643,6 +650,7 @@ func handlerHostCompliance(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
+	ctx := benchAssetContext{hostRuntime: host.Runtime}
 	cpf := &complianceProfileFilter{filter: make(map[string][]string), object: host}
 	if cp, filter, err := cacher.GetComplianceProfile(share.DefaultComplianceProfileName, access.NewReaderAccessControl()); err != nil {
 		log.WithFields(log.Fields{"profile": share.DefaultComplianceProfileName}).Error("Compliance profile not found")
@@ -655,14 +663,14 @@ func handlerHostCompliance(w http.ResponseWriter, r *http.Request, ps httprouter
 	var dockerVer, kubeVer string
 	items := make([]*api.RESTBenchItem, 0)
 
-	if rpt, _, _ := getCISReportFromCluster(share.BenchCustomHost, id, cpf, acc); rpt != nil {
+	if rpt, _, _ := getCISReportFromCluster(share.BenchCustomHost, id, cpf, ctx, acc); rpt != nil {
 		items = append(items, rpt.Items...)
 		if rpt.RunAtTimeStamp > ts {
 			ts = rpt.RunAtTimeStamp
 			runAt = rpt.RunAt
 		}
 	}
-	if rpt, _, _ := getCISReportFromCluster(share.BenchDockerHost, id, cpf, acc); rpt != nil {
+	if rpt, _, _ := getCISReportFromCluster(share.BenchDockerHost, id, cpf, ctx, acc); rpt != nil {
 		dockerVer = rpt.Version
 		items = append(items, rpt.Items...)
 		if rpt.RunAtTimeStamp > ts {
@@ -686,13 +694,20 @@ func handlerHostCompliance(w http.ResponseWriter, r *http.Request, ps httprouter
 	restRespSuccess(w, r, &data, acc, login, nil, "Get host compliance report")
 }
 
-func _getCISReportFromCluster(bench share.BenchType, id string, readData bool, cpf *complianceProfileFilter) (*api.RESTBenchReport, int, string) {
+func _getCISReportFromCluster(bench share.BenchType, id string, readData bool, cpf *complianceProfileFilter, ctx benchAssetContext) (
+	*api.RESTBenchReport, int, string) {
 	key := share.CLUSBenchReportKey(id, bench)
 
 	var r share.CLUSBenchReport
 	if value, err := cluster.Get(key); err != nil || len(value) == 0 {
-		// not all bench type exist, for example custom check, so use INFO level debug
-		log.WithFields(log.Fields{"error": err, "key": key}).Info("Benchmark report not found")
+		logFields := log.Fields{"error": err, "key": key}
+		logMsg := "Benchmark report not found"
+		if (bench == share.BenchDockerHost && ctx.hostRuntime != container.RuntimeDocker) || bench == share.BenchKubeWorker {
+			log.WithFields(logFields).Debug(logMsg)
+		} else {
+			// not all bench type exist, for example custom check, so use INFO level debug
+			log.WithFields(logFields).Info(logMsg)
+		}
 		return nil, api.RESTErrFailReadCluster, "Failed to read benchmark report"
 	} else {
 		uzb := utils.GunzipBytes(value)
@@ -738,13 +753,14 @@ func _getCISReportFromCluster(bench share.BenchType, id string, readData bool, c
 	return &rpt, 0, utils.BenchStatusToStr(share.BenchStatusFinished)
 }
 
-func getCISStatusFromCluster(bench share.BenchType, id string) (int, string) {
-	_, code, errMsg := _getCISReportFromCluster(bench, id, false, nil)
+func getCISStatusFromCluster(bench share.BenchType, id string, ctx benchAssetContext) (int, string) {
+	_, code, errMsg := _getCISReportFromCluster(bench, id, false, nil, ctx)
 	return code, errMsg
 }
 
-func getCISReportFromCluster(bench share.BenchType, id string, cpf *complianceProfileFilter, acc *access.AccessControl) (*api.RESTBenchReport, int, string) {
-	rpt, code, errMsg := _getCISReportFromCluster(bench, id, true, cpf)
+func getCISReportFromCluster(bench share.BenchType, id string, cpf *complianceProfileFilter, ctx benchAssetContext, acc *access.AccessControl) (
+	*api.RESTBenchReport, int, string) {
+	rpt, code, errMsg := _getCISReportFromCluster(bench, id, true, cpf, ctx)
 	if code == api.RESTErrFailReadCluster {
 		go triggerBenchRescan(bench, id, acc)
 	}
@@ -755,12 +771,13 @@ func getCISReportFromCluster(bench share.BenchType, id string, cpf *compliancePr
 }
 
 func getKubeCISReportFromCluster(id string, cpf *complianceProfileFilter, acc *access.AccessControl) (*api.RESTBenchReport, int, string) {
-	rpt1, code, _ := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, acc)
+	var ctx benchAssetContext
+	rpt1, code, _ := getCISReportFromCluster(share.BenchKubeMaster, id, cpf, ctx, acc)
 	if code != 0 {
 		// Ignore the error in the master node as some nodes are not master. (BenchStatusNotSupport)
 		log.WithFields(log.Fields{"code": code}).Info("Ignore the error in the master node as some nodes are not master")
 	}
-	rpt2, code, errMsg := getCISReportFromCluster(share.BenchKubeWorker, id, cpf, acc)
+	rpt2, code, errMsg := getCISReportFromCluster(share.BenchKubeWorker, id, cpf, ctx, acc)
 	if code != 0 {
 		log.WithFields(log.Fields{"code": code}).Debug("Ignore the error in the worker node as some nodes are not worker")
 		return nil, code, errMsg
