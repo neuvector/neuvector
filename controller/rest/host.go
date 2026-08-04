@@ -11,9 +11,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func getHostBenchStatus(id string) (string, string) {
-	_, dockerStatus := getCISStatusFromCluster(share.BenchDockerHost, id)
-	_, kubeStatus := getCISStatusFromCluster(share.BenchKubeWorker, id)
+func getHostBenchStatus(id, runtime string) (string, string) {
+	ctx := benchAssetContext{hostRuntime: runtime}
+	_, dockerStatus := getCISStatusFromCluster(share.BenchDockerHost, id, ctx)
+	_, kubeStatus := getCISStatusFromCluster(share.BenchKubeWorker, id, ctx)
 	return dockerStatus, kubeStatus
 }
 
@@ -93,7 +94,7 @@ func handlerHostList(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		resp.Hosts = hosts[query.start:end]
 	}
 	for _, host := range resp.Hosts {
-		host.DockerBenchStatus, host.KubeBenchStatus = getHostBenchStatus(host.ID)
+		host.DockerBenchStatus, host.KubeBenchStatus = getHostBenchStatus(host.ID, host.Runtime)
 	}
 
 	log.WithFields(log.Fields{"entries": len(resp.Hosts)}).Debug("Response")
@@ -121,7 +122,7 @@ func handlerHostShow(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		return
 	}
 
-	host.DockerBenchStatus, host.KubeBenchStatus = getHostBenchStatus(host.ID)
+	host.DockerBenchStatus, host.KubeBenchStatus = getHostBenchStatus(host.ID, host.Runtime)
 
 	resp.Host = host
 
