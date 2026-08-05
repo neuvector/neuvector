@@ -215,6 +215,7 @@ static void help(const char *prog)
     printf("  h: help\n");
     printf("  d: debug flags\n");
     printf("     (none, all, int, error, ctrl, packet, session, timer, tcp, parser, log, ddos, policy, dlp)\n");
+    printf("  m: match proxymesh traffic against parent workload policy\n");
     printf("  p: pcap file or directory\n");
     printf("  s: standalone mode (listen to the control channel)\n");
 }
@@ -357,7 +358,7 @@ int main(int argc, char *argv[])
 
     memset(&g_config, 0, sizeof(g_config));
     while (arg != -1) {
-        arg = getopt(argc, argv, "hcd:i:j:n:p:s:v:");
+        arg = getopt(argc, argv, "hcd:i:j:mn:p:s:v:");
 
         switch (arg) {
         case -1:
@@ -377,6 +378,9 @@ int main(int argc, char *argv[])
         case 'i':
             g_in_iface = strdup(optarg);
             g_config.promisc = true;
+            break;
+        case 'm':
+            g_config.match_proxymesh_parent_policy = true;
             break;
         case 'n':
             g_dp_threads = atoi(optarg);
