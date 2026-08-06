@@ -1403,7 +1403,7 @@ func (m clusterHelper) GetAllServers(acc *access.AccessControl) map[string]*shar
 
 	keys, err := cluster.GetStoreKeys(share.CLUSConfigServerStore)
 	if err != nil {
-		log.WithError(err).Warn("Failed to get server store keys")
+		log.WithError(err).Debug("Failed to get server store keys")
 	}
 	for _, key := range keys {
 		value, _, err := m.get(key)
@@ -3785,7 +3785,7 @@ func (m clusterHelper) GetAllCustomCheckConfig() map[string]*share.CLUSCustomChe
 	store := share.CLUSConfigScriptStore
 	keys, err := cluster.GetStoreKeys(store)
 	if err != nil {
-		log.WithError(err).Warn("failed to get custom check config keys from cluster")
+		log.WithError(err).Debug("failed to get custom check config keys from cluster")
 	}
 	for _, key := range keys {
 		group := share.CLUSKeyNthToken(key, 3)
