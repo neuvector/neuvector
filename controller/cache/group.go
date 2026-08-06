@@ -1346,7 +1346,7 @@ func hostWorkloadStart(id string, param interface{}) {
 		host.runningCntrs.Add(wl.ID)
 		host.workloads.Add(wl.ID)
 		if err := db.UpdateHostContainers(wl.HostID, host.workloads.Cardinality()); err != nil {
-			log.WithError(err).Warn("Failed to update host container count")
+			log.WithError(err).Debug("Failed to update host container count")
 		}
 	}
 }
