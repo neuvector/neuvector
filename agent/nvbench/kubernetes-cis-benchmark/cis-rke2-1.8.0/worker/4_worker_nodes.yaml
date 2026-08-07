@@ -489,7 +489,14 @@ groups:
                 warn "$check"
               fi
           else
-              warn "$check"
+              config_file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
+              config_file=$(append_prefix "$CONFIG_PREFIX" "$config_file")
+              if grep -qF 'tlsCertFile: /var/lib/rancher/rke2/agent/serving-kubelet.crt' "$config_file" 2>/dev/null &&
+                 grep -qF 'tlsPrivateKeyFile: /var/lib/rancher/rke2/agent/serving-kubelet.key' "$config_file" 2>/dev/null; then
+                  pass "$check"
+              else
+                  warn "$check"
+              fi
           fi
         remediation: |
           By default, RKE2 automatically provides the TLS certificate and private key for the Kubelet.
