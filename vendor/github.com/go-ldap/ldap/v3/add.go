@@ -1,7 +1,9 @@
 package ldap
 
 import (
+	"errors"
 	"fmt"
+
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
@@ -66,6 +68,10 @@ func NewAddRequest(dn string, controls []Control) *AddRequest {
 
 // Add performs the given AddRequest
 func (l *Conn) Add(addRequest *AddRequest) error {
+	if addRequest == nil {
+		return NewError(ErrorNetwork, errors.New("AddRequest cannot be nil"))
+	}
+
 	msgCtx, err := l.doRequest(addRequest)
 	if err != nil {
 		return err
@@ -77,6 +83,9 @@ func (l *Conn) Add(addRequest *AddRequest) error {
 		return err
 	}
 
+	if len(packet.Children) < 2 {
+		return fmt.Errorf("ldap: malformed response: expected at least 2 children, got %d", len(packet.Children))
+	}
 	if packet.Children[1].Tag == ApplicationAddResponse {
 		err := GetLDAPError(packet)
 		if err != nil {
