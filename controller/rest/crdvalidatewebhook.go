@@ -533,8 +533,15 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 			resultMsg = fmt.Sprintf(" %s denied: %s", reqOp, sizeErrMsg)
 		} else {
 			if ar.Request.DryRun != nil && *ar.Request.DryRun {
+				// The webhook is registered with sideEffects=NoneOnDryRun, so a
+				// dry-run request must not be processed. It must not be denied
+				// either: a real request passing the same checks above is always
+				// allowed, with validation happening asynchronously after
+				// admission. Answer what the real request would get and skip the
+				// processing.
 				skip = true
-				resultMsg = fmt.Sprintf(" %s denied in dry-run", reqOp)
+				allowed = true
+				resultMsg = fmt.Sprintf(" %s allowed in dry-run, not processed", reqOp)
 			} else {
 				allowed = true
 				if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
