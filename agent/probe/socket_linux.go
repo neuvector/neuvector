@@ -10,7 +10,14 @@ import (
 	"github.com/neuvector/neuvector/share/utils"
 )
 
-const inetMonitorSocketSize uint = 1024 * 5
+// Has to be at least NLMSG_GOODSIZE, which the kernel defines as
+// SKB_WITH_OVERHEAD(PAGE_SIZE) capped at SKB_WITH_OVERHEAD(8192), so roughly
+// 7872 bytes on any kernel with PAGE_SIZE >= 8192 (arm64 built with 16K or 64K
+// pages). netlink_dump() only shrinks a dump datagram to the reader's buffer
+// when that buffer is the larger of the two, so anything below NLMSG_GOODSIZE
+// truncates every datagram, which abandons the dump and leaves the socket
+// returning EBUSY for the rest of its life.
+const inetMonitorSocketSize uint = 1024 * 32
 const INET_DIAG_INFO = 2
 
 /* removed by go-lint
