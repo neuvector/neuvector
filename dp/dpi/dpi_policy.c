@@ -640,6 +640,14 @@ int dpi_policy_lookup(dpi_packet_t *p, dpi_policy_hdl_t *hdl, uint32_t app,
                 dip = xff_replace_dst_ip;
             }
             memset(desc, 0, sizeof(dpi_policy_desc_t));
+        } else if (g_io_config && g_io_config->match_proxymesh_parent_policy &&
+                   cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX)) {
+            if (xff_replace_dst_ip > 0) {
+                DEBUG_POLICY("proxymesh xff same sip, change dst ip from :"DBG_IPV4_FORMAT" to :"DBG_IPV4_FORMAT"\n",
+                             DBG_IPV4_TUPLE(dip), DBG_IPV4_TUPLE(xff_replace_dst_ip));
+                dip = xff_replace_dst_ip;
+            }
+            memset(desc, 0, sizeof(dpi_policy_desc_t));
         } else {
             //no need to do policy match if xff ip is same as original
             //keep original desc intact
@@ -1136,6 +1144,16 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
     uint8_t old_xff_action = s->xff_desc.action;
     uint32_t old_xff_rule_id = s->xff_desc.id;
 
+    // Proxymesh 'lo' EP has no meaningful policy; use parent workload hdl.
+    // Enabled only when MATCH_PROXYMESH_PARENT_POLICY is set.
+    if (g_io_config && g_io_config->match_proxymesh_parent_policy &&
+        cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX) && p->ep) {
+        dpi_policy_hdl_t *phdl = (dpi_policy_hdl_t *)get_parent_policy_hdl(&p->ep->pmac);
+        if (phdl) {
+            DEBUG_POLICY("switch policy hdl(%p) to proxymesh parent hdl(%p)\n", hdl, phdl);
+            hdl = phdl;
+        }
+    }
     if (unlikely((s->policy_desc.hdl_ver != p->ep->policy_ver) &&
         (s->policy_desc.flags & POLICY_DESC_UNKNOWN_IP))) {
         dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
@@ -1174,11 +1192,16 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
             iph->saddr == htonl(INADDR_LOOPBACK) || IS_IN_LOOPBACK(ntohl(iph->saddr))) {
         } else {
             bool isproxymesh = cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX);
+            bool match_parent_policy = g_io_config && g_io_config->match_proxymesh_parent_policy;
             dpi_policy_hdl_t *phdl;
             if (isproxymesh && p->ep) {
-                phdl = (dpi_policy_hdl_t *)get_parent_policy_hdl(&p->ep->pmac);
-                DEBUG_POLICY("MESH_TO_SVR switch policy hdl(%p) to proxymesh parent hdl(%p)\n",hdl, phdl);
-                hdl = phdl;
+                // When parent-policy flag is off, switch hdl locally.
+                // When on, hdl was already switched at the top of reeval.
+                if (!match_parent_policy) {
+                    phdl = (dpi_policy_hdl_t *)get_parent_policy_hdl(&p->ep->pmac);
+                    DEBUG_POLICY("MESH_TO_SVR switch policy hdl(%p) to proxymesh parent hdl(%p)\n",hdl, phdl);
+                    hdl = phdl;
+                }
                 dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->policy_desc, 0);
                 if (unlikely((s->policy_desc.action == DP_POLICY_ACTION_CHECK_APP) &&
                     FLAGS_TEST(s->flags, DPI_SESS_FLAG_POLICY_APP_READY))) {
@@ -1204,11 +1227,16 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
         uint32_t dip;
         bool dstlo = false;
         bool isproxymesh = cmp_mac_prefix(p->ep_mac, PROXYMESH_MAC_PREFIX);
+        bool match_parent_policy = g_io_config && g_io_config->match_proxymesh_parent_policy;
         dpi_policy_hdl_t *phdl;
         if (isproxymesh && p->ep) {
-            phdl = (dpi_policy_hdl_t *)get_parent_policy_hdl(&p->ep->pmac);
-            DEBUG_POLICY("XFF switch policy hdl(%p) to proxymesh parent hdl(%p)\n",hdl, phdl);
-            hdl = phdl;
+            // When parent-policy flag is off, switch hdl locally.
+            // When on, hdl was already switched at the top of reeval.
+            if (!match_parent_policy) {
+                phdl = (dpi_policy_hdl_t *)get_parent_policy_hdl(&p->ep->pmac);
+                DEBUG_POLICY("XFF switch policy hdl(%p) to proxymesh parent hdl(%p)\n",hdl, phdl);
+                hdl = phdl;
+            }
             //check whether dst ip is 127.0.0.x
             iph = (struct iphdr *)(p->pkt + p->l3);
             dip = to_server?iph->daddr:iph->saddr;
@@ -1225,20 +1253,32 @@ int dpi_policy_reeval(dpi_packet_t *p, bool to_server)
             //match, most container has just 1 IP, technically it can have
             //more, once we see violation we break out loop
             int idx;
-            if (p->ep && p->ep->pips) {
+            if (p->ep && p->ep->pips && p->ep->pips->count > 0) {
                 for (idx = 0; idx < p->ep->pips->count; idx++) {
                     dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->xff_desc, p->ep->pips->list[idx].ip);
-                    if (unlikely((s->xff_desc.action == DP_POLICY_ACTION_CHECK_APP))) {
+                    if (unlikely(s->xff_desc.action == DP_POLICY_ACTION_CHECK_APP)) {
                         dpi_policy_lookup(p, hdl, s->xff_app, to_server, xff, &s->xff_desc, p->ep->pips->list[idx].ip);
                     }
                     if (DPI_POLICY_LOG_VIOLATE(s->xff_desc.action)) {
                         break;
                     }
                 }
+            } else if (match_parent_policy) {
+                // No parent pips; only use session server IP if it was already
+                // rewritten off loopback (e.g. MESH_TO_SVR).
+                uint32_t pod_ip = s->server.ip.ip4;
+
+                if (pod_ip != 0 && !IS_IN_LOOPBACK(ntohl(pod_ip))) {
+                    dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->xff_desc, pod_ip);
+                    if (unlikely(s->xff_desc.action == DP_POLICY_ACTION_CHECK_APP)) {
+                        dpi_policy_lookup(p, hdl, s->xff_app, to_server, xff,
+                                          &s->xff_desc, pod_ip);
+                    }
+                }
             }
         } else {
             dpi_policy_lookup(p, hdl, 0, to_server, xff, &s->xff_desc, 0);
-            if (unlikely((s->xff_desc.action == DP_POLICY_ACTION_CHECK_APP))) {
+            if (unlikely(s->xff_desc.action == DP_POLICY_ACTION_CHECK_APP)) {
                 dpi_policy_lookup(p, hdl, s->xff_app, to_server, xff, &s->xff_desc, 0);
             }
         }
@@ -1314,6 +1354,13 @@ int dpi_sess_policy_reeval(dpi_session_t *s)
     dport = s->server.port;
     proto = s->ip_proto;
     hdl = (dpi_policy_hdl_t *)ep->policy_hdl;
+    if (g_io_config && g_io_config->match_proxymesh_parent_policy &&
+        cmp_mac_prefix(ep_mac, PROXYMESH_MAC_PREFIX)) {
+        dpi_policy_hdl_t *phdl = (dpi_policy_hdl_t *)get_parent_policy_hdl(&ep->pmac);
+        if (phdl) {
+            hdl = phdl;
+        }
+    }
 
     if (unlikely((s->policy_desc.hdl_ver != ep->policy_ver) &&
         (s->policy_desc.flags & POLICY_DESC_CHECK_VER))) {

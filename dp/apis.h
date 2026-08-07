@@ -222,6 +222,7 @@ typedef struct dpi_config_ {
     bool promisc;
     bool thrt_ssl_tls_1dot0;
     bool thrt_ssl_tls_1dot1;
+    bool match_proxymesh_parent_policy;
 
     io_mac_t dummy_mac;
     io_ep_t dummy_ep;
