@@ -89,6 +89,8 @@
 #define ENV_THRT_SSL_TLS_1DOT0 "THRT_SSL_TLS_1DOT0"
 #define ENV_THRT_SSL_TLS_1DOT1 "THRT_SSL_TLS_1DOT1"
 
+#define ENV_MATCH_PROXYMESH_PARENT_POLICY "MATCH_PROXYMESH_PARENT_POLICY"
+
 #define DP_MISS_HB_MAX 60
 #define PROC_EXIT_LIMIT 10
 
@@ -313,6 +315,13 @@ static pid_t fork_exec(int i)
             {
                 args[a++] = "-v";
                 args[a++] = "thrt_tls_1dot1";
+            }
+        }
+        if ((enable = getenv(ENV_MATCH_PROXYMESH_PARENT_POLICY)) != NULL)
+        {
+            if (checkImplicitEnableFlag(enable) == 1)
+            {
+                args[a++] = "-m";
             }
         }
         args[a] = NULL;
