@@ -117,7 +117,7 @@ require (
 	github.com/neuvector/neuvector/controller/k8sapi v0.0.0-00010101000000-000000000000
 	github.com/quay/clair/v2 v2.1.8
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
-	github.com/urfave/cli/v3 v3.9.0
+	github.com/urfave/cli/v3 v3.10.1
 )
 
 require (
