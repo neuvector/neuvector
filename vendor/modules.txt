@@ -101,7 +101,7 @@ github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/ssooidc
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/beevik/etree v1.6.0
+# github.com/beevik/etree v1.7.0
 ## explicit; go 1.23.0
 github.com/beevik/etree
 # github.com/blang/semver/v4 v4.0.0
