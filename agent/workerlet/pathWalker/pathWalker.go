@@ -226,7 +226,9 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 					return filepath.SkipDir
 				}
 
-				bSkip := true
+				// An empty Dirs means "no directory filter": walk the whole tree.
+				// Only callers that opt into a scope get their traversal limited.
+				bSkip := len(req.Dirs) > 0
 				ldir := path[rootPathLen:]
 				for _, rdir := range req.Dirs {
 					if strings.HasPrefix(ldir, rdir) {
