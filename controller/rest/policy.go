@@ -1574,7 +1574,7 @@ func handlerPolicyRuleConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -2164,7 +2164,7 @@ func handlerPolicyRulesPromote(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var promoteData api.RESTPolicyPromoteRequestData
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

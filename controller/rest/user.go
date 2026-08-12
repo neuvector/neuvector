@@ -99,7 +99,7 @@ func handlerUserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read body
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -604,7 +604,7 @@ func handlerUserConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -885,7 +885,7 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1048,7 +1048,7 @@ func handlerUserRoleDomainsConfig(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1394,7 +1394,7 @@ func handlerApikeyCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

@@ -430,7 +430,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -787,7 +787,7 @@ func handlerWafSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -908,7 +908,7 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1125,7 +1125,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTWafSensorExport
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

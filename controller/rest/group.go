@@ -595,7 +595,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read body
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -722,7 +722,7 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1036,7 +1036,7 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1130,7 +1130,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

@@ -451,7 +451,7 @@ func handlerPatchAdmissionState(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Warn("Failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -996,7 +996,7 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var confData api.RESTAdmissionRuleConfigData
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Warn("Failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1186,7 +1186,7 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 
 	code := 0
 	var confData api.RESTAdmissionRuleConfigData
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Warn("Failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -1452,7 +1452,7 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	var rconf api.RESTAdmCtrlRulesExport
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read admission rules export request body")
 	}
@@ -1711,7 +1711,7 @@ func handlerPromoteAdmissionRules(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	var promoteData api.RESTAdmCtrlPromoteRequestData
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)

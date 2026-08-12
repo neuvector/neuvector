@@ -551,7 +551,7 @@ func handlerDlpSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -669,7 +669,7 @@ func handlerDlpRuleCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 	}
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1003,7 +1003,7 @@ func handlerDlpSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1101,7 +1101,7 @@ func handlerDlpRuleConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1240,7 +1240,7 @@ func handlerDlpGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1714,7 +1714,7 @@ func handlerDlpExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTDlpSensorExport
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

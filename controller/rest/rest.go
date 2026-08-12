@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -2385,6 +2386,10 @@ func getRequestApiVersion(r *http.Request) ApiVersion {
 		return ApiVersion2
 	}
 	return ApiVersion1
+}
+
+func getDefaultReader(r io.Reader) io.Reader {
+	return io.LimitReader(r, MAX_REQUEST_BODY_SIZE)
 }
 
 func IsCertNearExpired(certPath string, expireThresholdDay int) (bool, error) {

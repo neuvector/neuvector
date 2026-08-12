@@ -140,7 +140,7 @@ func handlerPwdProfileConfig(w http.ResponseWriter, r *http.Request, ps httprout
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

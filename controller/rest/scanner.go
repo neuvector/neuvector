@@ -93,7 +93,7 @@ func handlerScanConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -492,7 +492,7 @@ func handlerWorkloadsScanReport(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -767,7 +767,7 @@ func handlerHostsScanReport(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
