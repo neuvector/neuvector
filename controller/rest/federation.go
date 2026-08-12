@@ -2364,7 +2364,7 @@ func handlerJoinFedInternal(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var reqData api.RESTFedJoinReqInternal
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -2566,7 +2566,7 @@ func handlerLeaveFedInternal(w http.ResponseWriter, r *http.Request, ps httprout
 	}
 
 	var req api.RESTFedLeaveReqInternal
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -2608,7 +2608,7 @@ func handlerPingJointInternal(w http.ResponseWriter, r *http.Request, ps httprou
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint {
 		var req api.RESTFedPingReq
 		var resp api.RESTFedPingResp
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 		if err != nil {
 			log.WithError(err).Warn("failed to read request body")
 		}
@@ -3343,7 +3343,7 @@ func handlerPollFedRulesInternal(w http.ResponseWriter, r *http.Request, ps http
 
 	var err error
 	var req api.RESTPollFedRulesReq
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -3605,7 +3605,7 @@ func handlerCspSupportInternal(w http.ResponseWriter, r *http.Request, ps httpro
 
 	var err error
 	var req api.RESTFedCspSupportReq
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

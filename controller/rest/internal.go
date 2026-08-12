@@ -46,7 +46,7 @@ func handlerAcceptAlert(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	var rconf api.RESTAcceptedAlerts
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

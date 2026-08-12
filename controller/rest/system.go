@@ -416,7 +416,7 @@ func handlerPredictSystemScore(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -903,7 +903,7 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1947,7 +1947,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	scope := share.ScopeFed
 	dummy := share.CLUSSystemConfig{CfgType: share.FederalCfg}
 	var rconf api.RESTSystemConfigConfigData
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, MAX_REQUEST_BODY_SIZE))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
