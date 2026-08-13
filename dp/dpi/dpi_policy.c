@@ -1053,7 +1053,11 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
         //egress traffic is to host ip
         if (is_internal && !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS) && !ipv4_ent &&
             iptype != DP_IPTYPE_HOSTIP && iptype != DP_IPTYPE_UWLIP && !is_nbe && !check_sgm) {
-            // east-west egress traffic is always allowed
+            // internal (pod-to-pod) east-west egress traffic is always allowed.
+            // Note: pod->ClusterIP (a service-VIP, not a peer workload) also
+            // reaches here whenever check_sgm is false; only under strict group
+            // mode + Protect is it handled by the dedicated service-VIP block
+            // below.
             desc->id = 0;
             desc->action = DP_POLICY_ACTION_OPEN;
             desc->flags = POLICY_DESC_INTERNAL;
@@ -1068,6 +1072,26 @@ static int dpi_policy_lookup_by_key(dpi_policy_hdl_t *hdl, uint32_t sip, uint32_
             }
             if (is_nbe && iptype == DP_IPTYPE_SVCIP) {
                 //no check for cross namespace for svc ip traffic
+                desc->id = 0;
+                desc->action = DP_POLICY_ACTION_OPEN;
+                desc->flags = POLICY_DESC_INTERNAL;
+                goto exit;
+            }
+            // Strict group mode + Protect on ingress-apply platforms (k8s): a
+            // Service ClusterIP is a virtual service IP, not a peer workload.
+            // This is NOT pod-to-pod east-west traffic - the ClusterIP maps to
+            // nv.ip.<svc>, has no workload identity, and can never match a
+            // destination rule here. kube-proxy DNATs it to a backend pod, and
+            // the real endpoint-to-endpoint hop is enforced post-DNAT at the
+            // backend's ingress. Without this, check_sgm forces the egress
+            // lookup, which finds no rule and drops the packet. So bypass the
+            // lookup (mirror of the !check_sgm fast-path above) instead of
+            // dropping a VIP connection that can never match; ingress
+            // enforcement still applies.
+            //
+            // This will ignore nv.ip explicit deny rules on service ClusterIP by design.
+            if (check_sgm && iptype == DP_IPTYPE_SVCIP &&
+                !(hdl->apply_dir & DP_POLICY_APPLY_EGRESS)) {
                 desc->id = 0;
                 desc->action = DP_POLICY_ACTION_OPEN;
                 desc->flags = POLICY_DESC_INTERNAL;
