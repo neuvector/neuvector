@@ -48,8 +48,8 @@ RUN zypper refresh && zypper --installroot /chroot -n in --no-recommends \
     libnetfilter_queue-devel liburcu-devel libpcap-devel pcre2-devel libjansson-devel libmnl-devel jemalloc-devel
  
 # Install yq from isv:Rancher:dependencies
-RUN zypper addrepo -n rancher-deps https://download.opensuse.org/repositories/isv:Rancher:dependencies/pkgs/isv:Rancher:dependencies.repo && \
-    rpm --import https://download.opensuse.org/repositories/isv:/Rancher:/dependencies/pkgs/repodata/repomd.xml.key && \
+RUN zypper addrepo -n rancher-deps https://download.opensuse.org/repositories/isv:Rancher:dependencies/packages/isv:Rancher:dependencies.repo && \
+    rpm --import https://download.opensuse.org/repositories/isv:/Rancher:/dependencies/packages/repodata/repomd.xml.key && \
     zypper -n --gpg-auto-import-keys refresh && \
     zypper --installroot /chroot install -y --from rancher-deps yq
 
