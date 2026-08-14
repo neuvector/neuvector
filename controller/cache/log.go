@@ -378,7 +378,7 @@ func recordAudit(rlog *api.Audit) {
 
 func getWebhookCache(ruleID int, whName string) *webhookCache {
 	var whc *webhookCache
-	if ruleID > api.StartingFedAdmRespRuleID {
+	if ruleID > api.StartingFedAdmRespRuleID && ruleID < api.MaxFedAdmRespRuleID {
 		whc = fedWebhookCacheMap[whName]
 	} else {
 		whc = webhookCacheMap[whName]
