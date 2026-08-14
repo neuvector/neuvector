@@ -13,7 +13,6 @@ on:
   schedule:
     # Run every hour
     - cron: "0 * * * *"
-
 jobs:
   updatecli:
     name: Run Updatecli
@@ -26,17 +25,14 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
-
       - name: Install Updatecli in the runner
-        uses: updatecli/updatecli-action@e71be7554f3f940bc439cf720b3e4e379823c562 # v3.2.0
-
+        uses: updatecli/updatecli-action@41b9c8d707830a9daebaeaa84c1b62d60b779564 # v3.6.0
       - name: Run Updatecli (dryrun)
         if: github.ref != 'refs/heads/main'
         env:
           UPDATECLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPDATECLI_GITHUB_OWNER: ${{ github.repository_owner }}
         run: "updatecli compose diff --file updatecli/updatecli-compose.yaml"
-
       - name: Run Updatecli
         if: github.ref == 'refs/heads/main'
         env:
