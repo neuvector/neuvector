@@ -88,7 +88,7 @@ jobs:
           public-username: ${{ env.DOCKER_USERNAME }}
           public-password: ${{ env.DOCKER_PASSWORD }}
       - name: Publish rancher manifest
-        uses: rancher/ecm-distro-tools/actions/publish-image@a7a867a6376bf4a1cee397558f3c85393769f069 # v0.69.4
+        uses: rancher/ecm-distro-tools/actions/publish-image@b558c3371d4a363f131e31a87d5c47dae2bbebe7 # v0.75.1
         env:
           IMAGE_PREFIX: neuvector-
         with:
