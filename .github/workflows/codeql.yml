@@ -2,31 +2,24 @@ name: CodeQL
 on:
   workflow_dispatch:
   pull_request:
-
   push:
     branches:
-    - main
-
+      - main
   schedule:
     - cron: '00 9 * * 2'
-
 permissions: {}
-
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-
     permissions:
       actions: read
       contents: read
       security-events: write
-
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'go', 'actions', 'cpp' ]
-
+        language: ['go', 'actions', 'cpp']
     steps:
       - name: Install Dependencies
         if: matrix.language != 'actions'
@@ -37,8 +30,7 @@ jobs:
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 10
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 10
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize CodeQL
         uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
@@ -50,14 +42,12 @@ jobs:
             paths-ignore:
               - vendor/
               - vendor/**/*
-
       - name: Build Controller
         if: matrix.language == 'go'
         run: ./package/build_controller.sh
       - name: Build Enforcer
         if: matrix.language == 'cpp'
         run: ./package/build_enforcer.sh
-
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
