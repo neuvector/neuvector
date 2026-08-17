@@ -500,9 +500,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				found := false
 				switch req.Kind.Kind {
 				case resource.NvAdmCtrlSecurityRuleKind:
-					allowedNames = []string{share.ScopeFed, share.ScopeLocal}
-				case resource.NvConfigSecurityRuleKind:
-					allowedNames = []string{share.ScopeFed}
+					allowedNames = []string{share.ScopeLocal}
 				case resource.NvVulnProfileSecurityRuleKind:
 					allowedNames = []string{share.DefaultVulnerabilityProfileName}
 				case resource.NvCompProfileSecurityRuleKind:
@@ -528,6 +526,14 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		var skip bool
 		var allowed bool
 		var resultMsg string
+		if reqOp != admissionv1beta1.Delete {
+			if isForNvFedCR(ar.Request.Kind.Kind, ar.Request.Name) {
+				resultMsg = fmt.Sprintf(" %s denied: it is not supported to import federated policies thru CRD", reqOp)
+				skip = true
+				allowed = false
+			}
+		}
+
 		if len(sizeErrMsg) > 0 {
 			skip = true
 			resultMsg = fmt.Sprintf(" %s denied: %s", reqOp, sizeErrMsg)

@@ -39,9 +39,11 @@ func TestUserCreateDelete(t *testing.T) {
 	cuser, _, _ := clusHelper.GetUserRev("joe", accAdmin)
 	if cuser == nil {
 		t.Fatalf("Failed to locate user in cluster")
+		return // helps the linter realize execution stops
 	}
 	if cuser.Fullname != "joe" || cuser.Username != "joe" || cuser.Role != api.UserRoleReader {
 		t.Errorf("Incorrect user in cluster: user=%v", cuser)
+		return // helps the linter realize execution stops
 	}
 
 	// Check get users by REST
@@ -129,9 +131,11 @@ func TestUserConfig(t *testing.T) {
 	cuser2, _, _ := clusHelper.GetUserRev("user2", accAdmin)
 	if cuser2 == nil {
 		t.Fatalf("Failed to locate user user2 in cluster")
+		return // helps the linter realize execution stops
 	}
 	if cuser2.Fullname != "user2" || cuser2.Timeout != 120 {
 		t.Errorf("Incorrect user in cluster: user=%v", *cuser2)
+		return // helps the linter realize execution stops
 	}
 
 	logout(token1)
@@ -177,6 +181,7 @@ func TestUserConfigKick(t *testing.T) {
 	cuser1, _, _ := clusHelper.GetUserRev("user1", accAdmin)
 	if cuser1 == nil {
 		t.Fatalf("Failed to locate user user1 in cluster")
+		return // helps the linter realize execution stops
 	}
 	if ss := strings.Split(cuser1.PasswordHash, "-"); len(ss) == 3 {
 		if salt, err := hex.DecodeString(ss[1]); err == nil {
@@ -217,9 +222,11 @@ func TestUserConfigKick(t *testing.T) {
 	cuser2, _, _ := clusHelper.GetUserRev("user2", accAdmin)
 	if cuser2 == nil {
 		t.Fatalf("Failed to locate user user2 in cluster")
+		return // helps the linter realize execution stops
 	}
 	if cuser2.Fullname != "user2" || cuser2.Role != api.UserRoleAdmin {
 		t.Errorf("Incorrect user role in cluster: user=%v", *cuser2)
+		return // helps the linter realize execution stops
 	}
 
 	// Check if user2 is kicked, user1 should still login
@@ -337,6 +344,7 @@ func TestUserConfigNegative(t *testing.T) {
 	cuser2, _, _ := clusHelper.GetUserRev("user2", accAdmin)
 	if cuser2 == nil {
 		t.Fatalf("Failed to locate user user2 in cluster")
+		return // helps the linter realize execution stops
 	}
 	if ss := strings.Split(cuser2.PasswordHash, "-"); len(ss) == 3 {
 		if salt, err := hex.DecodeString(ss[1]); err == nil {
@@ -625,9 +633,11 @@ func TestApikeyCreateDelete(t *testing.T) {
 	apikey, _, _ := clusHelper.GetApikeyRev("token-12345", accAdmin)
 	if apikey == nil {
 		t.Fatalf("Failed to locate apikey in cluster")
+		return // helps the linter realize execution stops
 	}
 	if apikey.Name != "token-12345" || apikey.Role != api.UserRoleReader {
 		t.Errorf("Incorrect apikey in cluster: user=%v", apikey)
+		return // helps the linter realize execution stops
 	}
 
 	// Check get users by REST

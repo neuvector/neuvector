@@ -18,9 +18,11 @@ func verifyCustomRole(testID string, data *api.RESTUserRoleConfigData, acc *acce
 	crole, _, _ := clusHelper.GetCustomRoleRev(data.Config.Name, acc)
 	if crole == nil {
 		t.Fatalf("Failed to locate role in cluster")
+		return // helps the linter realize execution stops
 	}
 	if crole.Name != data.Config.Name || crole.Comment != data.Config.Comment || crole.Reserved {
 		t.Fatalf("Incorrect role in cluster: role=%v", data.Config.Name)
+		return // helps the linter realize execution stops
 	} else {
 		if len(crole.Permissions) != len(data.Config.Permissions) {
 			t.Fatalf("Incorrect role in cluster: role=%v, expected permissions: %v, value=%v", data.Config.Name, len(data.Config.Permissions), len(crole.Permissions))
@@ -93,9 +95,11 @@ func TestRoleCreateDelete(t *testing.T) {
 		role := access.GetRoleDetails(name)
 		if role == nil {
 			t.Fatalf("Failed to locate reserved role in cluster: %s", name)
+			return // helps the linter realize execution stops
 		}
 		if role.Name != name {
 			t.Fatalf("Incorrect reserved role: role name=%v, expected=%v", role.Name, name)
+			return // helps the linter realize execution stops
 		}
 	}
 
@@ -799,9 +803,11 @@ func TestUserWithCustomRole(t *testing.T) {
 	cuser, _, _ := clusHelper.GetUserRev(userData.User.Fullname, accAdmin)
 	if cuser == nil {
 		t.Fatalf("Failed to locate user in cluster")
+		return // helps the linter realize execution stops
 	}
 	if cuser.Fullname != userData.User.Fullname || cuser.Username != userData.User.Fullname || cuser.Role != userData.User.Role {
 		t.Fatalf("Incorrect user in cluster: user=%v", cuser)
+		return // helps the linter realize execution stops
 	}
 
 	// Delete role "custom-role-1" while user "joe" is assigned "custom-role-1" role. Should fail
