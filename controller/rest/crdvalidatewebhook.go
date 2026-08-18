@@ -274,8 +274,6 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 		switch record.Request.Kind.Kind {
 		case resource.NvAdmCtrlSecurityRuleKind:
 			lockKey = share.CLUSLockAdmCtrlKey
-		case resource.NvConfigSecurityRuleKind:
-			lockKey = share.CLUSLockServerKey
 		default:
 			lockKey = share.CLUSLockPolicyKey
 		}
@@ -500,9 +498,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				found := false
 				switch req.Kind.Kind {
 				case resource.NvAdmCtrlSecurityRuleKind:
-					allowedNames = []string{share.ScopeFed, share.ScopeLocal}
-				case resource.NvConfigSecurityRuleKind:
-					allowedNames = []string{share.ScopeFed}
+					allowedNames = []string{share.ScopeLocal}
 				case resource.NvVulnProfileSecurityRuleKind:
 					allowedNames = []string{share.DefaultVulnerabilityProfileName}
 				case resource.NvCompProfileSecurityRuleKind:
@@ -530,22 +526,31 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		var resultMsg string
 		if len(sizeErrMsg) > 0 {
 			skip = true
-			resultMsg = fmt.Sprintf(" %s denied: %s", reqOp, sizeErrMsg)
+			resultMsg = fmt.Sprintf("%s denied: %s", reqOp, sizeErrMsg)
 		} else {
 			if ar.Request.DryRun != nil && *ar.Request.DryRun {
 				skip = true
-				resultMsg = fmt.Sprintf(" %s denied in dry-run", reqOp)
+				resultMsg = fmt.Sprintf("%s denied in dry-run", reqOp)
 			} else {
 				allowed = true
 				if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
 					log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name}).Debug("unsupported operation")
 					skip = true
 				} else {
-					resultMsg = fmt.Sprintf(" %s done", reqOp)
+					resultMsg = fmt.Sprintf("%s done", reqOp)
 				}
 				if skipUpdateReqByK8sGC {
 					skip = true
 				}
+			}
+		}
+
+		if !skip && reqOp != admissionv1beta1.Delete {
+			if isForNvFedCR(ar.Request.Kind.Kind, ar.Request.Name) {
+				resultMsg = fmt.Sprintf("%s denied: it is not supported to import federated %s policy %s through CRD",
+					reqOp, ar.Request.Kind.Kind, ar.Request.Name)
+				skip = true
+				allowed = false
 			}
 		}
 
@@ -557,7 +562,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				// Return the rest call early to prevent webhookvalidating timeout
 				if !crdReqMgr.scheduleKvEnqueue(&ar) {
 					allowed = false
-					resultMsg = fmt.Sprintf(" %s denied: too many requests received", reqOp)
+					resultMsg = fmt.Sprintf("%s denied: too many requests received", reqOp)
 				} else {
 					ctx := r.Context()
 					select {
