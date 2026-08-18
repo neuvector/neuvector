@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         id: app-token
         with:
@@ -49,8 +51,9 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-registry/credentials password | PRIME_REGISTRY_PASSWORD
       - name: Parse target tag
         id: parse_tag_step
+        env:
+          TARGET: ${{ github.ref_name }}
         run: |
-          TARGET=${{ github.ref_name }}
           echo "TAG=${TARGET#v}" >> $GITHUB_ENV
 
           PARSED_TAG="" # Initialize as empty
@@ -66,11 +69,12 @@ jobs:
       - name: Get controller
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET: ${{ github.ref_name }}
         run: |
-          gh release download ${{ github.ref_name }} -D controller/ -p controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
-          gh release download ${{ github.ref_name }} -D controller/ -p controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
-          gh release download ${{ github.ref_name }} -D controller/ -p sha256sum-controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
-          gh release download ${{ github.ref_name }} -D controller/ -p sha256sum-controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
+          gh release download $TARGET -D controller/ -p controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
+          gh release download $TARGET -D controller/ -p controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
+          gh release download $TARGET -D controller/ -p sha256sum-controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
+          gh release download $TARGET -D controller/ -p sha256sum-controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
           cd controller
           cat sha256sum-controller-amd64 | sha256sum --check
           cat sha256sum-controller-arm64 | sha256sum --check
