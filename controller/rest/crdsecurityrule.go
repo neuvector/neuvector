@@ -4805,6 +4805,21 @@ func (h *nvCrdHandler) calcCrdSecRuleHash(ruleJsonValue []byte) string {
 	return hex.EncodeToString(crdHashTemp[:])
 }
 
+func isForNvFedCR(kind, name string) bool {
+	switch kind {
+	case resource.NvGroupDefKind, resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind,
+		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind, resource.NvResponseSecurityRuleKind:
+		if strings.HasPrefix(name, api.FederalGroupPrefix) {
+			return true
+		}
+	case resource.NvAdmCtrlSecurityRuleKind:
+		if name != share.ScopeLocal {
+			return true
+		}
+	}
+	return false
+}
+
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
 func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error {
 	if clusHelper == nil {
@@ -4891,7 +4906,15 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
 		}
-		if crdHash, skip, _ = crdHandler.getCrInfo(obj); skip {
+		var getCrErr error
+		if crdHash, skip, getCrErr = crdHandler.getCrInfo(obj); getCrErr != nil {
+			log.WithError(getCrErr).Warn("Failed to get CRD info")
+		}
+		if isForNvFedCR(kind, metaData.GetName()) {
+			log.WithFields(log.Fields{"kind": kind, "name": mdNameDisplay}).Warn("it is not supported to import federated policies through CRD")
+			skip = true
+		}
+		if skip {
 			continue
 		}
 		if !crdHandler.AcquireLock(clusterLockWait) {
