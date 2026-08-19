@@ -4906,13 +4906,14 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
 		}
+		if isForNvFedCR(kind, metaData.GetName()) {
+			log.WithFields(log.Fields{"kind": kind, "name": mdNameDisplay}).Warn("it is not supported to import federated policies through CRD")
+			continue
+		}
+
 		var getCrErr error
 		if crdHash, skip, getCrErr = crdHandler.getCrInfo(obj); getCrErr != nil {
 			log.WithError(getCrErr).Warn("Failed to get CRD info")
-		}
-		if isForNvFedCR(kind, metaData.GetName()) {
-			log.WithFields(log.Fields{"kind": kind, "name": mdNameDisplay}).Warn("it is not supported to import federated policies through CRD")
-			skip = true
 		}
 		if skip {
 			continue
