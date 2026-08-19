@@ -56,10 +56,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/kubeproxy.kubeconfig"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -e "$file" ]; then
-            permissions=$(stat -c %a $file)
+          file=$(resolve_argument_path "$CIS_PROXY_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            permissions=$(stat -c %a "$file")
             if [ "$permissions" -le 600 ]; then
               pass "$check"
             else
@@ -86,8 +85,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -e "$file" ]; then
-            ownership=$(stat -c %u%g $file)
+          file=$(resolve_argument_path "$CIS_PROXY_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            ownership=$(stat -c %u%g "$file")
             if [ "$ownership" = "00" ]; then
               pass "$check"
             else
@@ -114,11 +114,10 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--kubeconfig')
 
-          if [ -e "$file" ]; then
-            permissions=$(stat -c %a $file)
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            permissions=$(stat -c %a "$file")
             if [ "$permissions" -le 600 ]; then
               pass "$check"
             else
@@ -145,8 +144,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -e "$file" ]; then
-            ownership=$(stat -c %u%g $file)
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            ownership=$(stat -c %u%g "$file")
             if [ "$ownership" = "00" ]; then
               pass "$check"
             else
@@ -173,10 +173,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/client-ca.crt"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -e "$file" ]; then
-            permissions=$(stat -c %a $file)
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--client-ca-file')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            permissions=$(stat -c %a "$file")
             if [ "$permissions" -le 600 ]; then
               pass "$check"
               pass "      * client-ca-file: $file"
@@ -204,10 +203,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/client-ca.crt"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -e "$file" ]; then
-            ownership=$(stat -c %u%g $file)
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--client-ca-file')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            ownership=$(stat -c %u%g "$file")
             if [ "$ownership" = "00" ]; then
               pass "$check"
               pass "      * client-ca-file: $file"
@@ -536,14 +534,18 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=false/p' $file)
-          if [ "$found" ]; then
-              warn "$check"
-              warn "      * RotateKubeletServerCertificate should be: true, but is: false"
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+              found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=false/p' "$file")
+              if [ "$found" ]; then
+                  warn "$check"
+                  warn "      * RotateKubeletServerCertificate should be: true, but is: false"
+              else
+                  pass "$check"
+              fi
           else
-              pass "$check"
+              warn "$check"
+              warn "      * kubeconfig file not found, $file"
           fi
         remediation: |
           By default, RKE2 does not set the RotateKubeletServerCertificate feature gate.
