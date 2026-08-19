@@ -402,10 +402,10 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=true' >/dev/null 2>&1; then
-              pass "$check"
-          else
+          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=false' >/dev/null 2>&1; then
               warn "$check"
+          else
+              pass "$check"
           fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter.
