@@ -319,10 +319,14 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 			cdTypeValue := fmt.Sprintf("%s:%s", cd.CondType, cd.CondValue)
 			valid := false
 			switch cd.CondType {
-			case "name":
+			case share.EventCondTypeName:
 				valid = allowedNameValues.Contains(cdTypeValue)
-			case "level":
+			case share.EventCondTypeLevel:
 				valid = allowedLevelValues.Contains(cdTypeValue)
+			case share.EventCondTypeProc:
+				if r.Event == share.EventRuntime {
+					valid = true
+				}
 			default:
 				if r.Event == share.EventCVEReport {
 					valid = true

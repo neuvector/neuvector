@@ -1784,34 +1784,6 @@ func (h *nvCrdHandler) crdHandleGroupResponseRules(scope string, grpResponseCfg 
 	return newIDs, err
 }
 
-func (h *nvCrdHandler) deleteExistingResponseRules(policyName string, ids []uint32) {
-	dels := utils.NewSet()
-	for _, id := range ids {
-		dels.Add(id)
-	}
-
-	txn := cluster.Transact()
-	defer txn.Close()
-
-	crhs := clusHelper.GetResponseRuleList(policyName)
-	crhsNew := make([]*share.CLUSRuleHead, 0, len(crhs))
-	for _, crh := range crhs {
-		if !dels.Contains(crh.ID) {
-			crhsNew = append(crhsNew, crh)
-		}
-	}
-
-	if len(crhsNew) != len(crhs) {
-		if err := clusHelper.PutResponseRuleListTxn(policyName, txn, crhsNew); err != nil {
-			log.WithFields(log.Fields{"error": err}).Error()
-		}
-		deleteResponseRules(policyName, txn, dels)
-		if _, err := txn.Apply(); err != nil {
-			log.WithFields(log.Fields{"err": err, "dels": dels}).Error()
-		}
-	}
-}
-
 // caller must own CLUSLockPolicyKey lock
 // This function is for handling the response rules that are for all groups only.
 // Every such response rule is a CR
@@ -1819,14 +1791,12 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 	cacheRecord *share.CLUSCrdSecurityRule, reviewType share.TReviewType) error {
 	var err error
 	scope := share.ScopeLocal
-	policyName := share.DefaultPolicyName
 	if cfgType == share.FederalCfg {
 		scope = share.ScopeFed
-		policyName = share.ScopeFed
 	}
 
 	if reviewType == share.ReviewTypeCRD {
-		h.deleteExistingResponseRules(policyName, cacheRecord.ResponseRules.IDs)
+		h.crdDeleteResponseRules(cacheRecord.ResponseRules)
 	}
 
 	responseCfgs := []*v1.NvCrdResponseRule{crdResponseCfg}
@@ -3790,6 +3760,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 			crdCfgRet.TargetName: crdCfgRet.GroupResponseCfg,
 		}
+		h.crdDeleteResponseRules(crdRecord.ResponseRules)
 		ruleIDs, err := h.crdHandleGroupResponseRules(share.ScopeLocal, grpResponseCfg, crdCfgRet.CfgType)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("crdHandleGroupResponseRules")
