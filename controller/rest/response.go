@@ -307,18 +307,32 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 	if option, ok := options[r.Event]; !ok {
 		return fmt.Errorf("Unsupported event for response rule")
 	} else if len(r.Conditions) > 0 {
+		allowedCondTypes := utils.NewSetFromStringSlice(option.Types)   // ex: {name, level}
+		allowedNameValues := utils.NewSetFromStringSlice(option.Name)   // ex: {name:Admission.Control.Allowed, name:Admission.Control.Violation, name:Admission.Control.Denied}
+		allowedLevelValues := utils.NewSetFromStringSlice(option.Level) // ex: {level:Info, level:Critical, level:Warning}
 		cds := utils.NewSet()
 		for i, cd := range r.Conditions {
-			var found = false
-			for _, a := range option.Types {
-				if a == cd.CondType {
-					found = true
-					break
+			// ex: cd={CondType:name CondValue:Admission.Control.Denied}
+			if !allowedCondTypes.Contains(cd.CondType) {
+				return fmt.Errorf("Unsupported condition type for event %s", r.Event)
+			}
+			cdTypeValue := fmt.Sprintf("%s:%s", cd.CondType, cd.CondValue)
+			valid := false
+			switch cd.CondType {
+			case "name":
+				valid = allowedNameValues.Contains(cdTypeValue)
+			case "level":
+				valid = allowedLevelValues.Contains(cdTypeValue)
+			default:
+				if r.Event == share.EventCVEReport {
+					valid = true
 				}
 			}
-			if !found {
-				return fmt.Errorf("Unsupported condition type for event %s", r.Event)
-			} else if r.Event == share.EventCVEReport {
+			if !valid {
+				return fmt.Errorf("Unsupported condition type/value %s for event %s", cdTypeValue, r.Event)
+			}
+
+			if r.Event == share.EventCVEReport {
 				// value validation
 				switch cd.CondType {
 				case share.EventCondTypeCVECritical, share.EventCondTypeCVEHighOnly, share.EventCondTypeCVEHigh, share.EventCondTypeCVEMedium:
@@ -341,9 +355,7 @@ func validateResponseRule(r *api.RESTResponseRule, grpMustExist bool, acc *acces
 				case share.EventCondTypeCVEName:
 					r.Conditions[i].CondValue = strings.ToUpper(cd.CondValue)
 				}
-			} //else if r.Event == share.EventCompliance {
-			// value validation
-			// }
+			}
 			if !cds.Contains(cd.CondType) {
 				cds.Add(cd.CondType)
 			} else {
