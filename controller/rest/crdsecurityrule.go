@@ -1771,15 +1771,11 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 		scope = share.ScopeFed
 	}
 
-<<<<<<< HEAD
-	responseCfgs := []*resource.NvCrdResponseRule{crdResponseCfg}
-=======
 	if reviewType == share.ReviewTypeCRD {
 		h.crdDeleteResponseRules(cacheRecord.ResponseRules)
 	}
 
-	responseCfgs := []*v1.NvCrdResponseRule{crdResponseCfg}
->>>>>>> 20bb3281 (issue-2686: Duplicate response rules are created when importing(thru CRD) same-name response rules with changes (#2743))
+	responseCfgs := []*resource.NvCrdResponseRule{crdResponseCfg}
 	cacheRecord.ResponseRules.PolicyName = crdResponseCfg.PolicyName
 	grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
 		"": responseCfgs,
