@@ -1771,6 +1771,10 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 		scope = share.ScopeFed
 	}
 
+	if reviewType == share.ReviewTypeCRD {
+		h.crdDeleteResponseRules(cacheRecord.ResponseRules)
+	}
+
 	responseCfgs := []*resource.NvCrdResponseRule{crdResponseCfg}
 	cacheRecord.ResponseRules.PolicyName = crdResponseCfg.PolicyName
 	grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
@@ -3706,6 +3710,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		grpResponseCfg := map[string][]*resource.NvCrdResponseRule{
 			crdCfgRet.TargetName: crdCfgRet.GroupResponseCfg,
 		}
+		h.crdDeleteResponseRules(crdRecord.ResponseRules)
 		ruleIDs, err := h.crdHandleGroupResponseRules(share.ScopeLocal, grpResponseCfg, crdCfgRet.CfgType)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("crdHandleGroupResponseRules")
@@ -4910,7 +4915,6 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 			log.WithFields(log.Fields{"kind": kind, "name": mdNameDisplay}).Warn("it is not supported to import federated policies through CRD")
 			continue
 		}
-
 		var getCrErr error
 		if crdHash, skip, getCrErr = crdHandler.getCrInfo(obj); getCrErr != nil {
 			log.WithError(getCrErr).Warn("Failed to get CRD info")
