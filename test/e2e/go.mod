@@ -1,6 +1,6 @@
 module github.com/neuvector/neuvector/test/e2e
 
-go 1.26.6
+go 1.27.0
 
 require (
 	github.com/neuvector/neuvector v0.0.0-20260617142055-f7a14b852b0a
