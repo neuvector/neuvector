@@ -44,16 +44,12 @@ func profileConfigUpdate(nType cluster.ClusterNotifyType, key string, value []by
 		cacheMutexLock()
 		profileGroups[group] = &profile
 		cacheMutexUnlock()
-		if procRuleHelper != nil {
-			procRuleHelper.AddProcesProfile(&profile)
-		}
+		procRuleHelper.AddProcesProfile(&profile)
 
 	case cluster.ClusterNotifyDelete:
 		cacheMutexLock()
 		if profile, ok := profileGroups[group]; ok {
-			if procRuleHelper != nil {
-				procRuleHelper.DeleteProcesProfile(profile)
-			}
+			procRuleHelper.DeleteProcesProfile(profile)
 			delete(profileGroups, group)
 		}
 		cacheMutexUnlock()
