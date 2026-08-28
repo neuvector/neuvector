@@ -109,7 +109,7 @@ func dockerConnect(endpoint string, sys *system.SystemTools) (Runtime, error) {
 
 	driver := dockerDriver{sys: sys, endpoint: endpoint, endpointHost: sockPath, client: client,
 		sysVerionResult: ver, sysInfoResult: info, selfID: id}
-	driver.rtProcMap = utils.NewSet("runc", "docker-runc", "docker", "docker-runc-current",
+	driver.rtProcMap = utils.NewSet("runc", "crun", "docker-runc", "docker", "docker-runc-current",
 		"docker-containerd-shim-current", "containerd-shim-runc-v1", "containerd-shim-runc-v2", "containerd", "containerd-shim")
 	driver.pidHost = IsPidHost()
 	return &driver, nil
