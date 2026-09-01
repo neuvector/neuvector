@@ -56,6 +56,9 @@ func (ea *EncryptedAssertion) DecryptBytes(cert *tls.Certificate) ([]byte, error
 			return nil, fmt.Errorf("cannot create AES-GCM: %s", err)
 		}
 
+		if len(data) < c.NonceSize() {
+			return nil, fmt.Errorf("encrypted data is smaller than the AES-GCM nonce size %d: actual size %d", c.NonceSize(), len(data))
+		}
 		nonce, data := data[:c.NonceSize()], data[c.NonceSize():]
 		plainText, err := c.Open(nil, nonce, data, nil)
 		if err != nil {
@@ -65,6 +68,9 @@ func (ea *EncryptedAssertion) DecryptBytes(cert *tls.Certificate) ([]byte, error
 	case MethodAES128CBC, MethodAES256CBC, MethodTripleDESCBC:
 		if len(data)%k.BlockSize() != 0 {
 			return nil, fmt.Errorf("encrypted data is not a multiple of the expected CBC block size %d: actual size %d", k.BlockSize(), len(data))
+		}
+		if len(data) < k.BlockSize() {
+			return nil, fmt.Errorf("encrypted data is smaller than the expected CBC block size %d: actual size %d", k.BlockSize(), len(data))
 		}
 		nonce, data := data[:k.BlockSize()], data[k.BlockSize():]
 		c := cipher.NewCBCDecrypter(k, nonce)
