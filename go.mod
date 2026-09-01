@@ -15,7 +15,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 	github.com/containerd/containerd/api v1.10.0
-	github.com/containerd/containerd/v2 v2.2.5
+	github.com/containerd/containerd/v2 v2.3.4
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/dmachard/go-clientsyslog v1.0.4
 	github.com/docker/distribution v2.8.3+incompatible
