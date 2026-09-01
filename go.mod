@@ -11,7 +11,7 @@ replace (
 require (
 	github.com/alitto/pond v1.9.2
 	github.com/aws/aws-sdk-go v1.55.7
-	github.com/beevik/etree v1.6.0
+	github.com/beevik/etree v1.7.1
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 	github.com/containerd/containerd/api v1.10.0
