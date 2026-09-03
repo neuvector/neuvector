@@ -318,8 +318,8 @@ github.com/fsnotify/fsnotify/internal
 # github.com/fxamacker/cbor/v2 v2.9.0
 ## explicit; go 1.20
 github.com/fxamacker/cbor/v2
-# github.com/glebarez/go-sqlite v1.22.0
-## explicit; go 1.17
+# github.com/glebarez/go-sqlite v1.23.0
+## explicit; go 1.25.0
 github.com/glebarez/go-sqlite
 # github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
 ## explicit
@@ -550,6 +550,9 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
+# github.com/ncruces/go-strftime v1.0.0
+## explicit; go 1.17
+github.com/ncruces/go-strftime
 # github.com/neuvector/k8s v1.4.1-0.20240927235747-43bcf20a80a3
 ## explicit; go 1.20
 github.com/neuvector/k8s
@@ -1380,8 +1383,8 @@ k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# modernc.org/libc v1.37.6
-## explicit; go 1.20
+# modernc.org/libc v1.74.1
+## explicit; go 1.25.0
 modernc.org/libc
 modernc.org/libc/errno
 modernc.org/libc/fcntl
@@ -1408,14 +1411,14 @@ modernc.org/libc/utime
 modernc.org/libc/uuid
 modernc.org/libc/uuid/uuid
 modernc.org/libc/wctype
-# modernc.org/mathutil v1.6.0
-## explicit; go 1.18
+# modernc.org/mathutil v1.7.1
+## explicit; go 1.21
 modernc.org/mathutil
-# modernc.org/memory v1.7.2
-## explicit; go 1.18
+# modernc.org/memory v1.11.0
+## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.28.0
-## explicit; go 1.19
+# modernc.org/sqlite v1.55.0
+## explicit; go 1.25.0
 modernc.org/sqlite/lib
 # sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8
 ## explicit; go 1.23
