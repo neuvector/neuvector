@@ -11,7 +11,7 @@ replace (
 require (
 	github.com/alitto/pond v1.9.2
 	github.com/aws/aws-sdk-go v1.55.7
-	github.com/beevik/etree v1.6.0
+	github.com/beevik/etree v1.7.0
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 	github.com/containerd/containerd/api v1.10.0
@@ -46,8 +46,8 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/quay/clair/v2 v2.1.8
-	github.com/russellhaering/gosaml2 v0.11.0
-	github.com/russellhaering/goxmldsig v1.6.0
+	github.com/russellhaering/gosaml2 v0.12.0
+	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spaolacci/murmur3 v1.1.0
