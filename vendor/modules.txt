@@ -101,7 +101,7 @@ github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/ssooidc
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/beevik/etree v1.6.0
+# github.com/beevik/etree v1.7.0
 ## explicit; go 1.23.0
 github.com/beevik/etree
 # github.com/blang/semver/v4 v4.0.0
@@ -597,7 +597,7 @@ github.com/remyoudompheng/bigfft
 github.com/russellhaering/gosaml2
 github.com/russellhaering/gosaml2/types
 github.com/russellhaering/gosaml2/uuid
-# github.com/russellhaering/goxmldsig v1.6.0
+# github.com/russellhaering/goxmldsig v1.6.1
 ## explicit; go 1.23.0
 github.com/russellhaering/goxmldsig
 github.com/russellhaering/goxmldsig/etreeutils
