@@ -5,7 +5,7 @@ go 1.27.0
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
 	github.com/neuvector/neuvector/controller/k8sapi => ./controller/k8sapi
-	k8s.io/cri-api => k8s.io/cri-api v0.25.16
+	k8s.io/cri-api => k8s.io/cri-api v0.37.0
 )
 
 require (
@@ -63,12 +63,12 @@ require (
 	google.golang.org/grpc v1.83.1
 	google.golang.org/grpc/security/advancedtls v1.0.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.1
-	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.34.1
-	k8s.io/client-go v0.34.1
-	k8s.io/cri-api v0.34.1
-	k8s.io/kubectl v0.32.3
+	k8s.io/api v0.37.0
+	k8s.io/apiextensions-apiserver v0.37.0
+	k8s.io/apimachinery v0.37.0
+	k8s.io/client-go v0.37.0
+	k8s.io/cri-api v0.37.0
+	k8s.io/kubectl v0.37.0
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/yaml v1.6.0
 )
