@@ -525,7 +525,7 @@ func handlerPostIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httprout
 	var err error
 
 	action := ps.ByName("action")
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -986,7 +986,7 @@ func handlerTestOccurrences(w http.ResponseWriter, r *http.Request, ps httproute
 
 	//accountID := ps.ByName("accountID")
 	//providerID := ps.ByName("providerID")
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

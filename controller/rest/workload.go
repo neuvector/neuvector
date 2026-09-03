@@ -275,7 +275,7 @@ func handlerWorkloadListBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	idlist := utils.NewSet()
 	if r.Method == http.MethodPost {
 		var idListData api.RESTAssetIDList
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(getDefaultReader(r.Body))
 		if err != nil {
 			log.WithError(err).Warn("failed to read request body")
 		}
@@ -502,7 +502,7 @@ func handlerWorkloadConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -743,7 +743,7 @@ func handlerWorkloadRequest(w http.ResponseWriter, r *http.Request, ps httproute
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
