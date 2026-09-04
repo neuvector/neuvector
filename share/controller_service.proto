@@ -45,8 +45,38 @@ message ScannerDeregisterData {
 }
 
 message ControllerCaps {
+<<<<<<< HEAD
     bool CriticalVul = 1;
     bool ScannerSettings = 2;
+=======
+    bool CriticalVul              = 1;
+    bool ScannerSettings          = 2;
+    bool SupportScannerRegisterV3 = 3;
+    ParsingCaps ParsingCaps       = 4;
+}
+
+message ScannerRegisterV3Request {
+    string CVEDBVersion    = 1;
+    string CVEDBCreateTime = 2;
+    string RPCServer       = 3;
+    uint32 RPCServerPort   = 4;
+    string ID              = 5;
+    map<string, ScanVulnerability> CVEDB = 6;
+    bool   CVEDBLast       = 7;  // true on the last message of the entire DB upload
+    bool   CVEDBPageDone   = 8;  // true on the last message of the current page; controller should send next SEND_CVEDB
+    uint32 CVEDBTotal      = 9;  // total CVE entries in scanner's DB; sent in the initial metadata message so controller can size Consul slots
+}
+
+message ScannerRegisterV3Response {
+    enum Action {
+        REGISTERED = 0;
+        SEND_CVEDB = 1;
+        ERROR      = 2;
+    }
+    Action action        = 1;
+    string message       = 2;
+    uint32 CVEDBPageSize = 3;  // entries per page;  must be non-zero.
+>>>>>>> 96bf58c (fix: support automate module name with parsing cap (#2574))
 }
 
 message ScannerAvailable {

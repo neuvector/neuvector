@@ -100,6 +100,7 @@ It has these top-level messages:
 	ScanSetIdPermLog
 	ScanResult
 	ScanSignatureInfo
+	ParsingCaps
 	ScanRunningRequest
 	ScanData
 	ScanAppPackage

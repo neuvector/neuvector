@@ -28,6 +28,7 @@ type WalkGetPackageRequest struct {
 	ObjType      share.ScanObjectType `json:"objType"`
 	PidHost      bool                 `json:"pidHost"`
 	K8sAppString string               `json:"K8sAppString"`
+	ParsingCaps  *share.ParsingCaps   `json:"parsingCaps,omitempty"`
 }
 
 type WalkSecretRequest struct {

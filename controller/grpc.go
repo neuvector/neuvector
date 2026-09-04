@@ -343,8 +343,17 @@ func (ss *ScanService) SubmitScanResult(ctx context.Context, result *share.ScanR
 
 func (s *ScanService) GetCaps(ctx context.Context, v *share.RPCVoid) (*share.ControllerCaps, error) {
 	return &share.ControllerCaps{
+<<<<<<< HEAD
 		CriticalVul:     false,
 		ScannerSettings: true,
+=======
+		CriticalVul:              true,
+		ScannerSettings:          true,
+		SupportScannerRegisterV3: true,
+		ParsingCaps: &share.ParsingCaps{
+			JarAutoModuleName: true,
+		},
+>>>>>>> 96bf58c (fix: support automate module name with parsing cap (#2574))
 	}, nil
 }
 
