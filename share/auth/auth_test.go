@@ -73,7 +73,7 @@ func TestOktaSAMLUnsignedAuthnRequest(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Verify if it's consistent with Authn request for Okta.
-	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBbxMxEIX%2FijX3XW%2B2CVlZ2UihESJSgagJHLhEU%2B%2BEWF3bi2ccwr9HWYqohKjqq%2BfN9%2FTeLBh9P5hVllO4p%2B%2BZWNTF94HN%2BNFCTsFEZMcmoCc2Ys1u9eHO1GVlhhQl2tjDM8nLCmSmJC4GUJt1Cwey0znZeVPg%2FDgtprOmK5o32BXHhmadbWb00CCoL5TYxdBCXVagtk%2FUty50Lnx7Gfjwe4jN%2B%2F1%2BW2w%2F7fagVn9M3MbA2VPaUTo7S5%2Fv71o4iQxstKYL%2BqGn0kavJT5SOGCW04EpnSmB2jBn2gQWDNJCXdU3xaQqqum%2BnpiqMTfVV1BrYnEBr6S%2Fezs6l%2FFRcFyMw6A7OuvL9WnmqK%2Bpw3JsxYyMtHyVo4V%2BLnlq9SN62qy3sXf2p1r1ffxxmwiFWpCUCdS7mDzK%2FwOclJOxddcVx3HU5MADWXd01IFeLvS%2F17P8NQA%3D", url)
 }
 
 // This test verifies signed Authn request.
@@ -166,7 +166,7 @@ ma7nkie3ORja96UTROAZ77o=
 	assert.Nil(t, err)
 
 	// Verify if it's consistent with Authn request for Okta.
-	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBb9swDIX%2FisC7LcdNFkOoA2QNhgXotqDJdtglYGVmEWpJnkhl2b8f4rZAd1gwHSk%2Bfg98vGX0%2FWCWWY7hgX5mYlFn3wc240cLOQUTkR2bgJ7YiDXb5ad7U5eVGVKUaGMPbyTXFchMSVwMoNarFvZkp3Oy86bA%2BWFaTGdNVzTvsCsODc0628zosUFQ3yixi6GFuqxAbV6o713oXPhxHfj43MTm4263KTZftjtQy1cTdzFw9pS2lE7O0teH%2BxaOIgMbremMfuiptNFriU8U9pjluGdKJ0qg1syZ1oEFg7RQV%2FVNMamKarqrJ6ZqzE31HdSKWFxAGa2%2Fzu3oVMYnwXEwDsOloM%2BXp5mjvqwQFmMqZmSkxX85utVvJS%2BpfkZP69Um9s7%2BVsu%2Bj7%2FuEqFQC5IygfoQk0f59wIn5WSsuK44jK0mBx7IuoOjDvTiGfr39Sz%2BBAAA%2F%2F8%3D", url)
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/sso/saml?SAMLRequest=jJJBbxMxEIX%2FijX3XW%2B2CVlZ2UihESJSgagJHLhEU%2B%2BEWF3bi2ccwr9HWYqohKjqq%2BfN9%2FTeLBh9P5hVllO4p%2B%2BZWNTF94HN%2BNFCTsFEZMcmoCc2Ys1u9eHO1GVlhhQl2tjDM8nLCmSmJC4GUJt1Cwey0znZeVPg%2FDgtprOmK5o32BXHhmadbWb00CCoL5TYxdBCXVagtk%2FUty50Lnx7Gfjwe4jN%2B%2F1%2BW2w%2F7fagVn9M3MbA2VPaUTo7S5%2Fv71o4iQxstKYL%2BqGn0kavJT5SOGCW04EpnSmB2jBn2gQWDNJCXdU3xaQqqum%2BnpiqMTfVV1BrYnEBr6S%2Fezs6l%2FFRcFyMw6A7OuvL9WnmqK%2Bpw3JsxYyMtHyVo4V%2BLnlq9SN62qy3sXf2p1r1ffxxmwiFWpCUCdS7mDzK%2FwOclJOxddcVx3HU5MADWXd01IFeLvS%2F17P8NQA%3D", url)
 }
 
 // Verify NV can accept Okta Authn response.
@@ -323,7 +323,7 @@ ma7nkie3ORja96UTROAZ77o=
 	assert.Nil(t, err)
 
 	// Verify if it's consistent with logout request for Okta.
-	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/slo/saml?SAMLRequest=fJLf65swFMX%2FFcl7NP6o%2Bg1fZYMyELo9rGMPe5Frcl2lmrjcWPzzh7aFbrDl8SSfc8K5951gGmd5sj%2Ft4r%2FirwXJB%2Bs0GpL7TcUWZ6QFGkgamJCkV%2FL88fNJJqGQs7PeKjuyF%2BT%2FBBCh84M1LGiOFWtRZQWqouRQ9BnPDqXmZQ6a9yUetCoP2JXAgu%2FoaLCmYkkoWNAQLdgY8mB8xRKRpDwWXOTfhJAil6n4wYIjkh8M%2BJ26eD%2BTjCKNt9BePYTKThHM8yZE63YiGm20%2FZ7VeyNyz3D1k8QVpnnEHfT2iqaFxV9aQndD9x69Inf%2BC0zYHINP1k3g%2F11JHMa7Mmje70%2FlYmhGNfQDalYDfOi6UKlHwt20fszsjLSV0hiNa93muojT%2FC3leS6AZ0UmePeGgqsYVJImcQ8d3m3%2BIp%2FiHytQ%2Fw4AAP%2F%2F&SigAlg=http%3A%2F%2Fwww.w3.org%2F2001%2F04%2Fxmldsig-more%23rsa-sha256&Signature=IAXj56i9MlhULmRq9v0LNTeFmmuce4PK%2B41jiEM%2BYX5HFgdav7u6%2B8zlNk5PQB%2FGqYsXpT4CbhB%2BwVDj4DaL87OFDAk5urz2Af3CK209ktL0YO1MT3D%2BitwP8nzmxdfQ1LIxQp%2B8MMk6vVlLzosY3M0wtxMnQ3QOO229BT13FTt%2BNtTxzY4TiUtgPaa7xzAVdgKLZFabPG8U%2FvKZkttaifjMRK1V1px42KiRB6WoD1bWRRdAZecfUg4AcUH%2BOs21OwmL4LVQiLkCzuXNL4dOlqqbxz5P9AjXZS5XTfog1fMvxhqM2Rk0pOnUxTyrlctJVigzENhmvn1MuJPjSCt3JA%3D%3D", url)
+	assert.Equal(t, "https://dev.okta.com/app/dev/xxxxx/slo/saml?SAMLRequest=fJLPbpwwEIdfBflubP4sEAtQK60qIaU9NFUPvaDBHhoUsKnHRDx%2BBUmlPWzjo%2B1vfppvpiZY5lU9ut9uC9%2Fxz4YUon2ZLanzpWGbt8oBTaQsLEgqaPX0%2BeujSmOpVu%2BC025mN8jHBBChD5OzLOquDetR5yXqsuJQjjnPL5XhVQGGjxVejK4uOFTAop%2FoaXK2YWksWdQRbdhZCmBDw1KZZjyRXBY%2FpFSyUJn8xaIrUpgsHEkNew5hJSWEwdfYvQSItVsErOtxIfbjCJqdOBpm7WlEnRm%2B%2FUfiDss64wkG94K2hy0894T%2BFX0tbpE3%2Fhss2F2jL84vEP6vJImTU%2Btk%2BHh%2BVZulFfU0TmhYC%2FBpGGKt3xPeirbvM3tCOqR01uDe9oUpk6x4yHhRSOB5mUs%2BPKDkOgGdZmkywoC1uEPW4s4KtH8HAA%3D%3D&SigAlg=http%3A%2F%2Fwww.w3.org%2F2001%2F04%2Fxmldsig-more%23rsa-sha256&Signature=nEzjH0boa9MgxPbH2zhBPPu3yNZ%2B9NP%2Ft2URXPPkP10DXHWPbV0MYOUkZGVDF3XVlEnIjQRsi6QNr8Ub5rT0va7lpj6GIySzkBUIhxYBoI3ik00PyJxRpPI5Sf%2FbqsCM%2FPJsQw%2FtTRerep9jHkbaI67Vx3wtEdNYHjl4F9PuNshk%2Bzswtg%2FVSdLQ7nd2QvIUkh0%2BAs%2BawQ%2BbrpMOM29DYUL%2FX6Q2fekmD7ngw5z4H2MZYXGhCPL4asbjqjFEOEqZ2KbPfjP3gTzNTuGhGVuEolOcsR9ahX9vItOCizzdxKjtU8vy9w0LhhQc9oAx4vKv9AXHh%2BbnBhNGJ3m18yTkGA%3D%3D", url)
 }
 
 func TestOktaSAMLSLOResponse(t *testing.T) {
