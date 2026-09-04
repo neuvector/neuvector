@@ -3,13 +3,18 @@ package probe
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/global"
+	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/scan/secrets"
+	"github.com/neuvector/neuvector/share/system"
 	"github.com/neuvector/neuvector/share/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // a fake runtime driver
@@ -234,6 +239,91 @@ func TestAzureCniCmd(t *testing.T) {
 				t.Errorf("Error[%v]: negative: %v\n", k, v)
 			}
 		}
+	}
+}
+
+// TestHandleProcForkSidInheritance verifies the session-id assignment in
+// handleProcFork:
+//   - an already-exited child (GetSessionId returns 0/ESRCH) inherits its
+//     parent's session, keeping sid valid for tool-process recognition of the
+//     short-lived CIS-benchmark descendants;
+//   - a still-live child keeps its own /proc session and is NEVER overwritten by
+//     the parent's - so a user workload that called setsid() reports the correct
+//     new session;
+//   - with no parent in the map, the child's own /proc session is used.
+func TestHandleProcForkSidInheritance(t *testing.T) {
+	global.RT = &dummyRTDriver{cmd: "runc"}
+	global.SYS = system.NewSystemTools()
+
+	// bogus parent session, deliberately not equal to any live process's real
+	// session id so the "live child" case can prove no inheritance happened.
+	const parentSid = 4242
+	selfSid := osutil.GetSessionId(os.Getpid())
+	require.NotEqual(t, parentSid, selfSid, "test precondition: parentSid must differ from the live session")
+
+	cases := []struct {
+		name        string
+		parentInMap bool
+		childLive   bool
+		wantSid     int
+	}{
+		{
+			// exited child: /proc read yields 0, so it inherits the parent's sid.
+			name:        "exited child inherits parent sid",
+			parentInMap: true,
+			childLive:   false,
+			wantSid:     parentSid,
+		},
+		{
+			// live child (e.g. one that called setsid): keeps its own session,
+			// must not be overwritten by the parent's sid.
+			name:        "live child keeps its own sid",
+			parentInMap: true,
+			childLive:   true,
+			wantSid:     selfSid,
+		},
+		{
+			// no parent to inherit from: fall back to the child's /proc session.
+			name:        "no parent falls back to proc",
+			parentInMap: false,
+			childLive:   true,
+			wantSid:     selfSid,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := &Probe{
+				pidProcMap:      make(map[int]*procInternal),
+				pidContainerMap: make(map[int]*procContainer),
+				containerMap:    make(map[string]*procContainer),
+				inspectProcess:  utils.NewSet(),
+			}
+
+			parentPid := 5000
+			childPid := 5001 // non-existent -> GetSessionId returns 0
+			if c.childLive {
+				childPid = os.Getpid() // live -> GetSessionId returns selfSid
+			}
+			if !c.parentInMap {
+				parentPid = 999999 // absent from pidProcMap
+			} else {
+				p.pidProcMap[parentPid] = &procInternal{
+					pid:  parentPid,
+					ppid: 1,
+					sid:  parentSid,
+					name: "sh",
+					path: "/bin/sh",
+					user: "root",
+				}
+			}
+
+			p.handleProcFork(childPid, parentPid, "grep")
+
+			child, ok := p.pidProcMap[childPid]
+			require.True(t, ok, "forked child should be recorded in pidProcMap")
+			assert.Equal(t, c.wantSid, child.sid)
+		})
 	}
 }
 
