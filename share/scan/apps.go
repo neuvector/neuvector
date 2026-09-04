@@ -240,16 +240,6 @@ func (s *ScanApps) DerivePkg(data map[string][]byte) []AppPackage {
 	return pkgs
 }
 
-// cutLast cuts s at the last occurrence of sep.
-// This function will be replaced by strings.CutLast once it's available in Go stdlib.
-// See: https://github.com/golang/go/issues/46336
-func cutLast(s, sep string) (first, last string, ok bool) {
-	if i := strings.LastIndex(s, sep); i > 0 {
-		return s[:i], s[i+len(sep):], true
-	}
-	return "", "", false
-}
-
 func isExe(info os.FileInfo) bool {
 	return info.Mode().IsRegular() && (info.Mode()&0111) != 0
 }
@@ -430,7 +420,7 @@ func parseJarManifestFile(path string, rc io.Reader, parsingCaps *share.ParsingC
 			vendorId = "org.postgresql"
 			title = "postgresql"
 		} else if isUnresolvedField(vendorId) || isUnresolvedField(title) {
-			if first, last, ok := cutLast(symName, "."); ok {
+			if first, last, ok := strings.CutLast(symName, "."); ok {
 				vendorId = first
 				title = last
 			}
