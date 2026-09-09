@@ -8,6 +8,13 @@ linters:
     - staticcheck
     - unused
     - nolintlint # reports ill-formed or insufficient nolint directives
+  settings:
+    govet:
+      disable:
+        - inline
+    staticcheck:
+      checks:
+        - "-QF1012" # Explicitly disables the QF1012 rule
   exclusions:
     generated: lax
     presets:
@@ -24,6 +31,14 @@ linters:
           - staticcheck
         path: controller/
         text: 'SA5008: unknown JSON option ("cloak"|"overflow")'
+      - linters:
+          - staticcheck
+        path: share/
+        text: 'SA5008: invalid appearance of unknown `cloak` tag option'
+      - linters:
+          - staticcheck
+        path: controller/
+        text: 'SA5008: invalid appearance of unknown `cloak` tag option'
       - path: (.+)\.go$
         text: 'SA1019: grpc.RPCCompressor is deprecated: use encoding.RegisterCompressor'
       - path: (.+)\.go$
