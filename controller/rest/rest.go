@@ -1991,7 +1991,7 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
-		MinVersion:   tls.VersionTLS11,
+		MinVersion:   tls.VersionTLS12,
 		CipherSuites: utils.GetSupportedTLSCipherSuites(),
 	}
 
