@@ -1048,7 +1048,6 @@ func dpKeepAlive() {
 }
 
 func monitorDP() {
-	//nolint:staticcheck // SA1015
 	dpTicker := time.Tick(dpKeepAliveInterval)
 	dpConnJamRetry := 0
 

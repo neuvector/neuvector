@@ -151,7 +151,6 @@ func checkAggrLogsCache(alwaysFlush bool) {
 func CleanupSessCfgCache() {
 	cSig := make(chan os.Signal, 1)
 	signal.Notify(cSig, os.Interrupt, syscall.SIGTERM)
-	//nolint:staticcheck // SA1015
 	ticker := time.Tick(time.Minute)
 Loop:
 	for {
@@ -1578,9 +1577,8 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 		server: &http.Server{
 			Addr: listenPortTLS,
 			TLSConfig: &tls.Config{
-				Certificates:             []tls.Certificate{pair},
-				PreferServerCipherSuites: true,
-				MinVersion:               tls.VersionTLS12,
+				Certificates: []tls.Certificate{pair},
+				MinVersion:   tls.VersionTLS12,
 				CurvePreferences: []tls.CurveID{
 					tls.CurveP256,
 					tls.X25519,

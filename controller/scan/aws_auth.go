@@ -111,9 +111,7 @@ func getAwsEcrAuthTokenById(sess *session.Session, registryID, region string) (*
 	svc := ecr.New(sess, aws.NewConfig().WithRegion(region))
 
 	// this lets us handle multiple registries
-	params := &ecr.GetAuthorizationTokenInput{
-		RegistryIds: []*string{aws.String(registryID)},
-	}
+	params := &ecr.GetAuthorizationTokenInput{}
 
 	// request the token
 	resp, err := svc.GetAuthorizationToken(params)
