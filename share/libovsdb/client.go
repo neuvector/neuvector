@@ -3,9 +3,9 @@ package libovsdb
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net"
+	"strconv"
 
 	"github.com/cenkalti/rpc2"
 	"github.com/cenkalti/rpc2/jsonrpc"
@@ -42,7 +42,8 @@ func Connect(ipAddr string, port int) (*OvsdbClient, error) {
 		port = DEFAULT_PORT
 	}
 
-	target := fmt.Sprintf("%s:%d", ipAddr, port)
+	portStr := strconv.Itoa(port)
+	target := net.JoinHostPort(ipAddr, portStr)
 	conn, err := net.Dial("tcp", target)
 
 	if err != nil {
