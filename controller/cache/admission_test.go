@@ -543,12 +543,12 @@ func TestNormalizeImageValue(t *testing.T) {
 		"https://localhost:8080": "https://localhost:8080/",
 		"10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http":        "https://10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http",
 		"10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http:latest": "https://10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http:latest",
-		"docker.io/nvlab/iperf":                                       "https://docker.io/nvlab/iperf",
-		"docker.io/nvlab/iperf:RELEASE":                               "https://docker.io/nvlab/iperf:RELEASE",
-		"docker.io":                                                   "https://docker.io/",
-		"nvlab/iperf":                                                 "nvlab/iperf",
-		"iperfserver:latest":                                          "iperfserver:latest",
-		":latest":                                                     ":latest",
+		"docker.io/nvlab/iperf":         "https://docker.io/nvlab/iperf",
+		"docker.io/nvlab/iperf:RELEASE": "https://docker.io/nvlab/iperf:RELEASE",
+		"docker.io":                     "https://docker.io/",
+		"nvlab/iperf":                   "nvlab/iperf",
+		"iperfserver:latest":            "iperfserver:latest",
+		":latest":                       ":latest",
 	}
 	var output string
 	for k, v := range input {
@@ -565,12 +565,12 @@ func TestNormalizeImageValue(t *testing.T) {
 		"https://localhost:8080": "https://localhost:8080/",
 		"10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http":        "https://10.1.127.3:5000/",
 		"10.1.127.3:5000/neuvector/toolbox/selvam_coreos_http:latest": "https://10.1.127.3:5000/",
-		"docker.io/nvlab/iperf":                                       "https://docker.io/",
-		"docker.io/nvlab/iperf:RELEASE":                               "https://docker.io/",
-		"docker.io":                                                   "https://docker.io/",
-		"nvlab/iperf":                                                 "",
-		"iperfserver:latest":                                          "",
-		":latest":                                                     "",
+		"docker.io/nvlab/iperf":         "https://docker.io/",
+		"docker.io/nvlab/iperf:RELEASE": "https://docker.io/",
+		"docker.io":                     "https://docker.io/",
+		"nvlab/iperf":                   "",
+		"iperfserver:latest":            "",
+		":latest":                       "",
 	}
 	for k, v := range input {
 		output = normalizeImageValue(k, true)

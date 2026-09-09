@@ -1991,9 +1991,8 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
-		MinVersion:               tls.VersionTLS11,
-		PreferServerCipherSuites: true,
-		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
+		MinVersion:   tls.VersionTLS12,
+		CipherSuites: utils.GetSupportedTLSCipherSuites(),
 	}
 
 	// tlsCertificate is only generated when default location has no files

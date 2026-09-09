@@ -96,7 +96,6 @@ func NewGRPCServerTCP(endpoint string) (*GRPCServer, error) {
 		return nil, fmt.Errorf("failed to create new server credentials: %w", err)
 	}
 
-	//nolint:staticcheck // SA1019
 	opts := []grpc.ServerOption{
 		grpc.Creds(ct),
 		grpc.UnaryInterceptor(middlefunc),
@@ -167,7 +166,6 @@ func ReloadInternalCert() error {
 }
 
 func NewGRPCServerUnix(socket string) (*GRPCServer, error) {
-	//nolint:staticcheck // SA1019
 	opts := []grpc.ServerOption{
 		grpc.RPCCompressor(grpc.NewGZIPCompressor()),
 		grpc.RPCDecompressor(grpc.NewGZIPDecompressor()),
@@ -317,7 +315,6 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 	// This is to be compatible with pre-3.2 grpc server that doesn't install decompressor.
 	var opts []grpc.DialOption
 	if compress {
-		//nolint:staticcheck // SA1019
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -328,7 +325,6 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 				grpc.MaxCallSendMsgSize(GRPCMaxMsgSize)),
 		}
 	} else {
-		//nolint:staticcheck // SA1019
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(ct),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -339,7 +335,6 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 		}
 	}
 
-	//nolint:staticcheck // SA1019
 	conn, err := grpc.DialContext(ctx, endpoint, opts...)
 	if err != nil {
 		return nil, err
@@ -355,7 +350,6 @@ func newGRPCClientTCP(ctx context.Context, key, endpoint string, cb GRPCCallback
 func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback, compress bool) (*GRPCClient, error) {
 	var opts []grpc.DialOption
 	if compress {
-		//nolint:staticcheck // SA1019
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -369,7 +363,6 @@ func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback,
 			}),
 		}
 	} else {
-		//nolint:staticcheck // SA1019
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
@@ -383,7 +376,6 @@ func newGRPCClientUnix(ctx context.Context, key, socket string, cb GRPCCallback,
 		}
 	}
 
-	//nolint:staticcheck // SA1019
 	conn, err := grpc.DialContext(ctx, socket, opts...)
 	if err != nil {
 		return nil, err
