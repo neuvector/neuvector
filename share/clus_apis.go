@@ -1003,6 +1003,7 @@ type CLUSServerSAML struct {
 	SigningKey          string   `json:"signing_key,cloak,omitempty"`
 	SLOEnabled          bool     `json:"slo_enabled,omitempty"`
 	SLOURL              string   `json:"slo_url,omitempty"`
+	AudienceURI         string   `json:"audience_uri,omitempty"`
 }
 
 type CLUSServerOIDC struct {
