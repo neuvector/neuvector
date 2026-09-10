@@ -400,18 +400,34 @@ const connectionMapMax int = 2048 * 16
 
 // connsCache is the unbounded ingestion queue between dp (dpMsgConnection) and
 // updateConnection(). Cap it so a burst of new connections (e.g. a DNS flood)
-// cannot grow it without limit while the drain is slow. Low-priority (allow/open)
-// connections are dropped first once connsCacheMax is reached; high-priority ones
-// (LEARN/VIOLATE/DENY) are kept up to a hard ceiling so they still get reported.
+// cannot grow it without limit while the drain is slow. Low-priority connections
+// are dropped first once connsCacheMax is reached; high-priority ones (see
+// connIsHighPriority) are kept up to a hard ceiling so they still get reported.
 const connsCacheMax int = connectionMapMax * 8
 const connsCacheHardMax int = connsCacheMax * 2
 
 // connIsHighPriority reports whether a connection must be reported even under
-// load (LEARN so it can be learned into policy; VIOLATE/DENY so violations are
-// not lost). Low-priority (OPEN/ALLOW/CHECK_*) connections are dropped first.
+// load. Low-priority (OPEN/ALLOW/CHECK_*) connections are dropped first; a
+// connection is kept when it is:
+//   - LEARN so it can be learned into policy, or VIOLATE/DENY so violations
+//     are not lost;
+//   - a DNS-tunnel candidate: dp sets ClientPort only for large DNS/UDP
+//     sessions (ClientBytes > threshold), the ones fed to CheckDNSTunneling,
+//     so dropping them would defeat tunnel detection under load;
+//   - already carrying a dp-detected threat (Severity/ThreatID set), which
+//     must not be silently dropped regardless of its policy action.
 func connIsHighPriority(conn *dp.Connection) bool {
-	return conn.PolicyAction > C.DP_POLICY_ACTION_CHECK_APP ||
-		conn.PolicyAction == C.DP_POLICY_ACTION_LEARN
+	if conn.PolicyAction > C.DP_POLICY_ACTION_CHECK_APP ||
+		conn.PolicyAction == C.DP_POLICY_ACTION_LEARN {
+		return true
+	}
+	if conn.ClientPort != 0 {
+		return true
+	}
+	if conn.Severity > 0 || conn.ThreatID != 0 {
+		return true
+	}
+	return false
 }
 
 // cacheConnections appends dp connection reports to connsCache with a bound.
