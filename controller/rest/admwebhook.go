@@ -82,11 +82,6 @@ type WebhookServer struct {
 	reloadChan     chan int
 }
 
-type ContainerImage struct {
-	registry  string
-	imageRepo string
-}
-
 var admResCache = make(map[string]*nvsysadmission.AdmResObject) // key is the resource object id (object.metadata.uid)
 var admResCacheMutex sync.RWMutex
 
@@ -117,12 +112,6 @@ const (
 	K8sKindClusterRoleBinding    = "ClusterRoleBinding"
 	k8sKindPersistentVolumeClaim = "PersistentVolumeClaim"
 )
-
-var sidecarImages = []*ContainerImage{
-	{registry: "https://gcr.io/", imageRepo: "istio-release/proxyv2"},
-	{registry: "https://gcr.io/", imageRepo: "linkerd-io/proxy"},
-	{registry: "https://docker.io/", imageRepo: "istio/proxyv2"},
-}
 
 func checkAggrLogsCache(alwaysFlush bool) {
 	var err error
@@ -533,21 +522,7 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([3][]*nv
 			if err := parseReqImageName(admContainerInfo); err != nil {
 				log.WithFields(log.Fields{"error": err}).Error("parseReqImageName")
 			}
-			isSidecar := false
-			for imageRegistry := range admContainerInfo.ImageRegistry.Iter() {
-				for _, sidecar := range sidecarImages {
-					if sidecar.registry == imageRegistry && sidecar.imageRepo == admContainerInfo.ImageRepo {
-						isSidecar = true
-						break
-					}
-				}
-				if isSidecar {
-					break
-				}
-			}
-			if !isSidecar {
-				allContainers[i] = append(allContainers[i], admContainerInfo)
-			}
+			allContainers[i] = append(allContainers[i], admContainerInfo)
 		}
 	}
 

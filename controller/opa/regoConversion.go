@@ -277,7 +277,6 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 	// all ValueType (key, string, number, boolean) has "exist" and "notExist"
 	if c.Op == "exist" {
 		upPath, key := splitPathKey(path)
-		rego = append(rego, addSidecarContainerCheck(path)...)
 		upPath = replacePerContainerPath(upPath)
 
 		rego = append(rego, fmt.Sprintf("	has_key(%s, %q)", upPath, strings.TrimSuffix(key, "[_]")))
@@ -295,8 +294,6 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		quotedString := parseQuotedSimpleRegexString(c.Value)
 		line := fmt.Sprintf("	user_provided_data := [%s]\n", strings.Join(quotedString, ","))
 		rego = append(rego, line)
-
-		rego = append(rego, addSidecarContainerCheck(path)...)
 		path = replacePerContainerPath(path)
 
 		rego = append(rego, fmt.Sprintf("	value = %s", strings.TrimSuffix(path, "[_]")))
@@ -315,7 +312,6 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		rego = append(rego, "\n")
 	} else if c.ValueType == "number" {
 		rego = append(rego, fmt.Sprintf("	user_provided_data := %s", c.Value))
-		rego = append(rego, addSidecarContainerCheck(path)...)
 		path = replacePerContainerPath(path)
 
 		opStr := "=="
@@ -337,7 +333,6 @@ func convertGenericCriteria(idx int, c *share.CLUSAdmRuleCriterion) []string {
 		rego = append(rego, "\n")
 	} else if c.ValueType == "boolean" {
 		rego = append(rego, fmt.Sprintf("	user_provided_data := %s", c.Value))
-		rego = append(rego, addSidecarContainerCheck(path)...)
 		path = replacePerContainerPath(path)
 
 		rego = append(rego, fmt.Sprintf("	value = %s", path))
@@ -384,24 +379,6 @@ func splitPathKey(path string) (string, string) {
 	return path, ""
 }
 
-func addSidecarContainerCheck(path string) []string {
-	rego := []string{}
-
-	rego = append(rego, fmt.Sprintf("	# parameter path = %s", path))
-
-	if strings.Contains(path, "containers[_]") {
-		rego = append(rego, "	image := request.spec.containers[i].image")
-		rego = append(rego, "	not inSidecarContainerList(image)\n")
-	} else if strings.Contains(path, "initContainers[_]") {
-		rego = append(rego, "	image := request.spec.initContainers[i].image")
-		rego = append(rego, "	not inSidecarContainerList(image)\n")
-	} else if strings.Contains(path, "ephemeralContainers[_]") {
-		rego = append(rego, "	image := request.spec.ephemeralContainers[i].image")
-		rego = append(rego, "	not inSidecarContainerList(image)\n")
-	}
-	return rego
-}
-
 func replacePerContainerPath(path string) string {
 	if strings.Contains(path, "containers[_]") {
 		return strings.Replace(path, "containers[_]", "containers[i]", 1)
@@ -437,9 +414,6 @@ func generateNotExitFunctions(criteria_index int, path string) []string {
 				rego = append(rego, fmt.Sprintf("criteria_%d(request)", criteria_index))
 				rego = append(rego, "{")
 				if idx > 0 {
-					rego = append(rego, fmt.Sprintf("	image := %s.image", containerKey))
-					rego = append(rego, "	not inSidecarContainerList(image)\n")
-
 					itemsForKey := items[0:idx]
 					key := fmt.Sprintf("%s.%s", containerKey, strings.Join(itemsForKey, "."))
 
