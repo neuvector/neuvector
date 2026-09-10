@@ -151,7 +151,7 @@ github.com/containerd/containerd/api/types
 github.com/containerd/containerd/api/types/runc/options
 github.com/containerd/containerd/api/types/task
 github.com/containerd/containerd/api/types/transfer
-# github.com/containerd/containerd/v2 v2.2.5
+# github.com/containerd/containerd/v2 v2.2.8
 ## explicit; go 1.25.0
 github.com/containerd/containerd/v2/client
 github.com/containerd/containerd/v2/core/containers
@@ -837,7 +837,7 @@ google.golang.org/grpc/tap
 # google.golang.org/grpc/security/advancedtls v1.0.0
 ## explicit; go 1.21
 google.golang.org/grpc/security/advancedtls
-# google.golang.org/protobuf v1.36.11
+# google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
@@ -887,7 +887,7 @@ gopkg.in/inf.v0
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.34.1
+# k8s.io/api v0.34.10
 ## explicit; go 1.24.0
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -954,7 +954,7 @@ k8s.io/api/storagemigration/v1alpha1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
-# k8s.io/apimachinery v0.34.1
+# k8s.io/apimachinery v0.34.10
 ## explicit; go 1.24.0
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -1028,7 +1028,7 @@ k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
-# k8s.io/client-go v0.34.1
+# k8s.io/client-go v0.34.10
 ## explicit; go 1.24.0
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1
@@ -1321,7 +1321,7 @@ k8s.io/client-go/util/workqueue
 # k8s.io/component-base v0.32.3
 ## explicit; go 1.23.0
 k8s.io/component-base/version
-# k8s.io/cri-api v0.34.1 => k8s.io/cri-api v0.25.16
+# k8s.io/cri-api v0.34.10 => k8s.io/cri-api v0.25.16
 ## explicit; go 1.19
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
