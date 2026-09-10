@@ -114,8 +114,9 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 			AuthnSigningEnabled: cs.SAML.AuthnSigningEnabled,
 			SigningCert:         cs.SAML.SigningCert,
 			//SigningKey:          cs.SAML.SigningKey,
-			SLOEnabled: cs.SAML.SLOEnabled,
-			SLOURL:     cs.SAML.SLOURL,
+			SLOEnabled:  cs.SAML.SLOEnabled,
+			SLOURL:      cs.SAML.SLOURL,
+			AudienceURI: cs.SAML.AudienceURI,
 		}
 		rs.SAML.X509Certs = parseX509CertInfo(cs.SAML)
 
@@ -838,6 +839,10 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 	}
 	if saml.SLOURL != nil {
 		csaml.SLOURL = *saml.SLOURL
+	}
+
+	if saml.AudienceURI != nil {
+		csaml.AudienceURI = *saml.AudienceURI
 	}
 
 	var err error
