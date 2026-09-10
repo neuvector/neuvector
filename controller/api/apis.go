@@ -373,8 +373,9 @@ type RESTServerSAML struct {
 	AuthnSigningEnabled bool   `json:"authn_signing_enabled,omitempty"` // Optional. Enable signing AuthnRequest.  Default off.
 	SigningCert         string `json:"signing_cert,omitempty"`          // Optional.
 	//SigningKey          string `json:"signing_key,omitempty"`           // Optional.
-	SLOEnabled bool   `json:"slo_enabled,omitempty"` // Optional.
-	SLOURL     string `json:"slo_url,omitempty"`     // Optional.
+	SLOEnabled  bool   `json:"slo_enabled,omitempty"`  // Optional.
+	SLOURL      string `json:"slo_url,omitempty"`      // Optional.
+	AudienceURI string `json:"audience_uri,omitempty"` // Optional.
 }
 
 type RESTServerOIDC struct {
@@ -457,6 +458,7 @@ type RESTServerSAMLConfig struct {
 	SigningKey          *string `json:"signing_key,omitempty"`           // Optional.
 	SLOEnabled          *bool   `json:"slo_enabled,omitempty"`           // Optional.
 	SLOURL              *string `json:"slo_url,omitempty"`               // Optional.
+	AudienceURI         *string `json:"audience_uri,omitempty"`          // Optional.
 }
 
 type RESTServerSAMLConfigCfgMap struct {
