@@ -1394,7 +1394,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 			return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtPublicKeyNotAfter)
 		}
 		return publicKey, nil
-	})
+	}, jwt.WithStrictDecoding())
 
 	// Try with old cert if it's available.
 	// Note: Ideally we should use extra info stored in claims to do a lookup below.
@@ -1408,7 +1408,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 				return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtOldPublicKeyNotAfter)
 			}
 			return alternativeKey, nil
-		})
+		}, jwt.WithStrictDecoding())
 	}
 
 	if err != nil {
