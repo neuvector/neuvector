@@ -1,6 +1,6 @@
 module github.com/neuvector/neuvector
 
-go 1.27.0
+go 1.27.1
 
 replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.10.1
@@ -15,7 +15,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/codeskyblue/go-sh v0.0.0-20250509230738-c29da582b0f5
 	github.com/containerd/containerd/api v1.10.0
-	github.com/containerd/containerd/v2 v2.2.5
+	github.com/containerd/containerd/v2 v2.2.8
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/dmachard/go-clientsyslog v1.0.4
 	github.com/docker/distribution v2.8.3+incompatible
@@ -63,11 +63,11 @@ require (
 	google.golang.org/grpc v1.83.2
 	google.golang.org/grpc/security/advancedtls v1.0.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.1
+	k8s.io/api v0.34.10
 	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.34.1
-	k8s.io/client-go v0.34.1
-	k8s.io/cri-api v0.34.1
+	k8s.io/apimachinery v0.34.10
+	k8s.io/client-go v0.34.10
+	k8s.io/cri-api v0.34.10
 	k8s.io/kubectl v0.32.3
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/yaml v1.6.0
@@ -172,7 +172,7 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/cli-runtime v0.32.3 // indirect
