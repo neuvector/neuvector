@@ -292,6 +292,14 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	}
 
 	for _, u := range paths {
+		// falling back to /blobs endpoint should happen in extreme cases - those to
+		// support legacy registries. we want to limit the fallback to when /manifests endpoint
+		// returned 404. Falling back on transient errors could do more harm, like polluting
+		// the local content store with incorrectly typed descriptors as /blobs endpoint tends
+		// always return with application/octet-stream.
+		if firstErrPriority > 2 {
+			break
+		}
 		for i, host := range hosts {
 			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
 
@@ -551,27 +559,31 @@ func (r *request) authorize(ctx context.Context, req *http.Request) error {
 	return nil
 }
 
-func (r *request) addNamespace(ns string) (err error) {
-	if !r.host.isProxy(ns) {
-		return nil
-	}
+func (r *request) addQuery(key, value string) (err error) {
 	var q url.Values
 	// Parse query
-	if i := strings.IndexByte(r.path, '?'); i > 0 {
-		r.path = r.path[:i+1]
-		q, err = url.ParseQuery(r.path[i+1:])
+	if p, query, ok := strings.Cut(r.path, "?"); ok {
+		q, err = url.ParseQuery(query)
 		if err != nil {
 			return
 		}
+		r.path = p + "?"
 	} else {
 		r.path = r.path + "?"
 		q = url.Values{}
 	}
-	q.Add("ns", ns)
+	q.Add(key, value)
 
 	r.path = r.path + q.Encode()
 
 	return
+}
+
+func (r *request) addNamespace(ns string) error {
+	if !r.host.isProxy(ns) {
+		return nil
+	}
+	return r.addQuery("ns", ns)
 }
 
 type request struct {
