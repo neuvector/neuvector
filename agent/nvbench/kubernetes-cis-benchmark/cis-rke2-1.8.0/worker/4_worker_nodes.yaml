@@ -402,10 +402,18 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=true' >/dev/null 2>&1; then
+          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=false' >/dev/null 2>&1; then
+              warn "$check"
+          elif check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains' >/dev/null 2>&1; then
               pass "$check"
           else
-              warn "$check"
+              config_file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
+              config_file=$(append_prefix "$CONFIG_PREFIX" "$config_file")
+              if [ "$(yq e '.makeIPTablesUtilChains' "$config_file" 2>/dev/null)" = "false" ]; then
+                  warn "$check"
+              else
+                  pass "$check"
+              fi
           fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter.
