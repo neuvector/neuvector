@@ -273,7 +273,11 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
+          file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
+          if grep -A2 '^authentication:' "$file" 2>/dev/null |
+              grep -qE '^[[:space:]]+enabled:[[:space:]]+false[[:space:]]*$'; then
               pass "$check"
           else
               warn "$check"
