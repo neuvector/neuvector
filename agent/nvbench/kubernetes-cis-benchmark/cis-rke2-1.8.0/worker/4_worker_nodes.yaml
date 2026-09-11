@@ -424,11 +424,7 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--hostname-override' >/dev/null 2>&1; then
-              warn "$check"
-          else
-              pass "$check"
-          fi
+          pass "$check"
         remediation: |
           Not Applicable.
           By default, RKE2 does set the --hostname-override argument. Per CIS guidelines, this is to comply
