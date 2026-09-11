@@ -639,7 +639,7 @@ github.com/streadway/simpleuuid
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
-# github.com/urfave/cli/v3 v3.9.0
+# github.com/urfave/cli/v3 v3.11.0
 ## explicit; go 1.22
 github.com/urfave/cli/v3
 # github.com/vishvananda/netlink v1.3.1
