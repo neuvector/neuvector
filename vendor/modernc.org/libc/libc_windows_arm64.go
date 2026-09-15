@@ -5,11 +5,11 @@
 package libc // import "modernc.org/libc"
 
 import (
+	"golang.org/x/sys/windows"
 	"modernc.org/libc/errno"
 	"modernc.org/libc/sys/types"
 	"os"
 	"strings"
-	"syscall"
 	"unsafe"
 )
 
@@ -231,7 +231,7 @@ func Xlseek64(t *TLS, fd int32, offset types.Off_t, whence int32) types.Off_t {
 		return -1
 	}
 
-	n, err := syscall.Seek(f.Handle, offset, int(whence))
+	n, err := windows.Seek(f.Handle, offset, int(whence))
 	if err != nil {
 		if dmesgs {
 			dmesg("%v: fd %v, off %#x, whence %v: %v", origin(1), f._fd, offset, whenceStr(whence), n)
@@ -363,7 +363,7 @@ func Xunlink(t *TLS, pathname uintptr) int32 {
 		trc("t=%v pathname=%v, (%v:)", t, pathname, origin(2))
 	}
 
-	err := syscall.DeleteFile((*uint16)(unsafe.Pointer(pathname)))
+	err := windows.DeleteFile((*uint16)(unsafe.Pointer(pathname)))
 	if err != nil {
 		t.setErrno(err)
 		return -1
@@ -374,26 +374,6 @@ func Xunlink(t *TLS, pathname uintptr) int32 {
 	}
 
 	return 0
-}
-
-// int access(const char *pathname, int mode);
-func Xaccess(t *TLS, pathname uintptr, mode int32) int32 {
-	if __ccgo_strace {
-		trc("t=%v pathname=%v mode=%v, (%v:)", t, pathname, mode, origin(2))
-	}
-	panic(todo(""))
-	// if _, _, err := unix.Syscall(unix.SYS_ACCESS, pathname, uintptr(mode), 0); err != 0 {
-	// 	if dmesgs {
-	// 		dmesg("%v: %q: %v", origin(1), GoString(pathname), err)
-	// 	}
-	// 	t.setErrno(err)
-	// 	return -1
-	// }
-
-	// if dmesgs {
-	// 	dmesg("%v: %q %#o: ok", origin(1), GoString(pathname), mode)
-	// }
-	// return 0
 }
 
 // int rmdir(const char *pathname);
@@ -521,7 +501,7 @@ func Xfopen64(t *TLS, pathname, mode uintptr) uintptr {
 		panic(m)
 	}
 	//TODO- flags |= fcntl.O_LARGEFILE
-	h, err := syscall.Open(GoString(pathname), int(flags), uint32(0666))
+	h, err := windows.Open(GoString(pathname), int(flags), uint32(0666))
 	if err != nil {
 		t.setErrno(err)
 		return 0
@@ -531,7 +511,7 @@ func Xfopen64(t *TLS, pathname, mode uintptr) uintptr {
 	if p != 0 {
 		return p
 	}
-	_ = syscall.Close(h)
+	_ = windows.Close(h)
 	t.setErrno(errno.ENOMEM)
 	return 0
 }
@@ -620,4 +600,40 @@ func XDefWindowProcW(t *TLS, _ ...interface{}) int64 {
 
 func XSendMessageTimeoutW(t *TLS, _ ...interface{}) int64 {
 	panic(todo(""))
+}
+
+func Xstrspn(tls *TLS, s uintptr, c uintptr) size_t { /* strspn.c:6:8: */
+	if __ccgo_strace {
+		trc("tls=%v s=%v c=%v, (%v:)", tls, s, c, origin(2))
+	}
+	bp := tls.Alloc(32)
+	defer tls.Free(32)
+
+	var a uintptr = s
+	*(*[4]size_t)(unsafe.Pointer(bp /* byteset */)) = [4]size_t{0: uint64(0)}
+
+	if !(int32(*(*int8)(unsafe.Pointer(c))) != 0) {
+		return uint64(0)
+	}
+	if !(int32(*(*int8)(unsafe.Pointer(c + 1))) != 0) {
+		for ; int32(*(*int8)(unsafe.Pointer(s))) == int32(*(*int8)(unsafe.Pointer(c))); s++ {
+		}
+		return size_t((int64(s) - int64(a)) / 1)
+	}
+
+	for ; *(*int8)(unsafe.Pointer(c)) != 0 && AssignOrPtrUint64(bp+uintptr(size_t(*(*uint8)(unsafe.Pointer(c)))/(uint64(8)*uint64(unsafe.Sizeof(size_t(0)))))*8, size_t(uint64(1))<<(size_t(*(*uint8)(unsafe.Pointer(c)))%(uint64(8)*uint64(unsafe.Sizeof(size_t(0)))))) != 0; c++ {
+	}
+	for ; *(*int8)(unsafe.Pointer(s)) != 0 && *(*size_t)(unsafe.Pointer(bp + uintptr(size_t(*(*uint8)(unsafe.Pointer(s)))/(uint64(8)*uint64(unsafe.Sizeof(size_t(0)))))*8))&(size_t(uint64(1))<<(size_t(*(*uint8)(unsafe.Pointer(s)))%(uint64(8)*uint64(unsafe.Sizeof(size_t(0)))))) != 0; s++ {
+	}
+	return size_t((int64(s) - int64(a)) / 1)
+}
+
+// Defined in libc_windows_arm64.s
+func callStrtod(fn uintptr, s uintptr, p uintptr) float64
+
+func Xstrtod(t *TLS, s uintptr, p uintptr) float64 {
+	if __ccgo_strace {
+		trc("tls=%v s=%v p=%v, (%v:)", t, s, p, origin(2))
+	}
+	return callStrtod(procStrtod.Addr(), s, p)
 }

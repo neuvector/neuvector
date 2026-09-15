@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build unix
-// +build unix
+//go:build unix && !(linux && (amd64 || arm64 || loong64 || ppc64le || s390x || riscv64 || 386 || arm))
 
 package libc // import "modernc.org/libc"
 
 import (
 	"bufio"
 	// "encoding/hex"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -20,14 +18,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
 	guuid "github.com/google/uuid"
+	"github.com/ncruces/go-strftime"
 	"golang.org/x/sys/unix"
 	"modernc.org/libc/errno"
 	"modernc.org/libc/grp"
+	"modernc.org/libc/limits"
 	"modernc.org/libc/poll"
 	"modernc.org/libc/pwd"
 	"modernc.org/libc/signal"
@@ -43,49 +42,51 @@ func init() {
 	atExit = append(atExit, func() { closePasswd(&staticGetpwnam) })
 }
 
+var (
+	signalCh   chan os.Signal
+	signalTls  *TLS
+	signalInit sync.Once
+)
+
+func startSignalHandler() {
+	signalCh = make(chan os.Signal, 10)
+	signalTls = NewTLS()
+	go func() {
+		for sig := range signalCh {
+			if s, ok := sig.(unix.Signal); ok {
+				signum := int32(s)
+				signalsMu.Lock()
+				handler := signals[signum]
+				signalsMu.Unlock()
+				if handler != 0 && handler != signal.SIG_DFL && handler != signal.SIG_IGN {
+					var f func(*TLS, int32)
+					*(*uintptr)(unsafe.Pointer(&f)) = handler
+					f(signalTls, signum)
+				}
+			}
+		}
+	}()
+}
+
 // sighandler_t signal(int signum, sighandler_t handler);
 func Xsignal(t *TLS, signum int32, handler uintptr) uintptr { //TODO use sigaction?
 	if __ccgo_strace {
 		trc("t=%v signum=%v handler=%v, (%v:)", t, signum, handler, origin(2))
 	}
-	signalsMu.Lock()
+	signalInit.Do(startSignalHandler)
 
+	signalsMu.Lock()
 	defer signalsMu.Unlock()
 
 	r := signals[signum]
 	signals[signum] = handler
 	switch handler {
 	case signal.SIG_DFL:
-		panic(todo("%v %#x", syscall.Signal(signum), handler))
+		gosignal.Reset(unix.Signal(signum))
 	case signal.SIG_IGN:
-		switch r {
-		case signal.SIG_DFL:
-			gosignal.Ignore(syscall.Signal(signum)) //TODO
-		case signal.SIG_IGN:
-			gosignal.Ignore(syscall.Signal(signum))
-		default:
-			panic(todo("%v %#x", syscall.Signal(signum), handler))
-		}
+		gosignal.Ignore(unix.Signal(signum))
 	default:
-		switch r {
-		case signal.SIG_DFL:
-			c := make(chan os.Signal, 1)
-			gosignal.Notify(c, syscall.Signal(signum))
-			go func() { //TODO mechanism to stop/cancel
-				for {
-					<-c
-					var f func(*TLS, int32)
-					*(*uintptr)(unsafe.Pointer(&f)) = handler
-					tls := NewTLS()
-					f(tls, signum)
-					tls.Close()
-				}
-			}()
-		case signal.SIG_IGN:
-			panic(todo("%v %#x", syscall.Signal(signum), handler))
-		default:
-			panic(todo("%v %#x", syscall.Signal(signum), handler))
-		}
+		gosignal.Notify(signalCh, unix.Signal(signum))
 	}
 	return r
 }
@@ -115,10 +116,6 @@ func Xgethostname(t *TLS, name uintptr, slen types.Size_t) int32 {
 	if __ccgo_strace {
 		trc("t=%v name=%v slen=%v, (%v:)", t, name, slen, origin(2))
 	}
-	if slen < 0 {
-		t.setErrno(errno.EINVAL)
-		return -1
-	}
 
 	if slen == 0 {
 		return 0
@@ -144,7 +141,11 @@ func Xremove(t *TLS, pathname uintptr) int32 {
 	if __ccgo_strace {
 		trc("t=%v pathname=%v, (%v:)", t, pathname, origin(2))
 	}
-	panic(todo(""))
+	if err := os.Remove(GoString(pathname)); err != nil {
+		t.setErrno(err)
+		return -1
+	}
+	return 0
 }
 
 // long pathconf(const char *path, int name);
@@ -217,20 +218,6 @@ func Xpoll(t *TLS, fds uintptr, nfds poll.Nfds_t, timeout int32) int32 {
 	}
 
 	return int32(n)
-}
-
-// ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-func Xrecvmsg(t *TLS, sockfd int32, msg uintptr, flags int32) types.Ssize_t {
-	if __ccgo_strace {
-		trc("t=%v sockfd=%v msg=%v flags=%v, (%v:)", t, sockfd, msg, flags, origin(2))
-	}
-	n, _, err := unix.Syscall(unix.SYS_RECVMSG, uintptr(sockfd), msg, uintptr(flags))
-	if err != 0 {
-		t.setErrno(err)
-		return -1
-	}
-
-	return types.Ssize_t(n)
 }
 
 // struct cmsghdr *CMSG_NXTHDR(struct msghdr *msgh, struct cmsghdr *cmsg);
@@ -310,7 +297,7 @@ func Xtmpfile(t *TLS) uintptr {
 	if __ccgo_strace {
 		trc("t=%v, (%v:)", t, origin(2))
 	}
-	f, err := ioutil.TempFile("", "tmpfile-")
+	f, err := os.CreateTemp("", "tmpfile-")
 	if err != nil {
 		t.setErrno(err)
 		return 0
@@ -329,7 +316,7 @@ func Xtmpfile(t *TLS) uintptr {
 // FILE *fdopen(int fd, const char *mode);
 func Xfdopen(t *TLS, fd int32, mode uintptr) uintptr {
 	if __ccgo_strace {
-		trc("t=%v fd=%v mode=%v, (%v:)", t, fd, mode, origin(2))
+		trc("t=%v fd=%v mode=%v, (%v:)", t, fd, GoString(mode), origin(2))
 	}
 	m := strings.ReplaceAll(GoString(mode), "b", "")
 	switch m {
@@ -345,12 +332,12 @@ func Xfdopen(t *TLS, fd int32, mode uintptr) uintptr {
 		return 0
 	}
 
-	if p := newFile(t, fd); p != 0 {
-		return p
+	p := newFile(t, fd)
+	if p == 0 {
+		t.setErrno(errno.EINVAL)
+		return 0
 	}
-
-	t.setErrno(errno.EINVAL)
-	return 0
+	return p
 }
 
 // struct passwd *getpwnam(const char *name);
@@ -599,11 +586,7 @@ func initPasswd2(t *TLS, buf uintptr, buflen types.Size_t, p *pwd.Passwd, name, 
 	}
 
 	p.Fpw_shell, buf, buflen = bufString(buf, buflen, shell)
-	if buf == 0 {
-		return false
-	}
-
-	return true
+	return buf != 0
 }
 
 func bufString(buf uintptr, buflen types.Size_t, s string) (uintptr, uintptr, types.Size_t) {
@@ -983,14 +966,19 @@ func Xuuid_unparse(t *TLS, uu, out uintptr) {
 	*(*byte)(unsafe.Pointer(out + uintptr(len(s)))) = 0
 }
 
-var staticRandomData = &rand.Rand{}
-
 // char *initstate(unsigned seed, char *state, size_t size);
 func Xinitstate(t *TLS, seed uint32, statebuf uintptr, statelen types.Size_t) uintptr {
 	if __ccgo_strace {
 		trc("t=%v seed=%v statebuf=%v statelen=%v, (%v:)", t, seed, statebuf, statelen, origin(2))
 	}
-	staticRandomData = rand.New(rand.NewSource(int64(seed)))
+	// random(3) is modeled here by a single global math/rand generator (see
+	// randomGen / Xrandom), so the caller-supplied state buffer cannot be
+	// honored. Mirror musl's primary effect by (re)seeding that generator,
+	// matching Xsrandomdev. NULL is returned as there is no previous state
+	// buffer to hand back.
+	randomMu.Lock()
+	randomGen.Seed(int64(seed))
+	randomMu.Unlock()
 	return 0
 }
 
@@ -999,8 +987,11 @@ func Xsetstate(t *TLS, state uintptr) uintptr {
 	if __ccgo_strace {
 		trc("t=%v state=%v, (%v:)", t, state, origin(2))
 	}
-	t.setErrno(errno.EINVAL) //TODO
-	return 0
+	// random(3) is modeled by a single global generator (see randomGen /
+	// Xrandom), so there is no independent saved stream to switch to. Treat
+	// setstate as a no-op rather than failing the caller; return the passed
+	// pointer (non-NULL) to signal success.
+	return state
 }
 
 // The initstate_r() function is like initstate(3) except that it initializes
@@ -1254,3 +1245,137 @@ func Xsysctlbyname(t *TLS, name, oldp, oldlenp, newp uintptr, newlen types.Size_
 // func init() {
 // 	defaultZone = addObject(newMallocZone(true))
 // }
+
+// /tmp/libc/musl-master/src/time/gmtime.c:6:19:
+var _tm ctime.Tm
+
+// /tmp/libc/musl-master/src/time/gmtime.c:4:11:
+func Xgmtime(tls *TLS, t uintptr) (r uintptr) { // /tmp/libc/musl-master/src/time/gmtime.c:7:2:
+	if __ccgo_strace {
+		trc("tls=%v t=%v, (%v:)", tls, t, origin(2))
+		defer func() { trc("-> %v", r) }()
+	}
+	return Xgmtime_r(tls, t, uintptr(unsafe.Pointer(&_tm)))
+}
+
+var _days_in_month = [12]int8{
+	0:  int8(31),
+	1:  int8(30),
+	2:  int8(31),
+	3:  int8(30),
+	4:  int8(31),
+	5:  int8(31),
+	6:  int8(30),
+	7:  int8(31),
+	8:  int8(30),
+	9:  int8(31),
+	10: int8(31),
+	11: int8(29),
+}
+
+var x___utc = [4]int8{'U', 'T', 'C'}
+
+func Xstrftime(tls *TLS, s uintptr, n size_t, f uintptr, tm uintptr) (r size_t) {
+	if __ccgo_strace {
+		trc("tls=%v s=%v n=%v f=%v tm=%v, (%v:)", tls, s, n, f, tm, origin(2))
+		defer func() { trc("-> %v", r) }()
+	}
+	tt := time.Date(
+		int((*ctime.Tm)(unsafe.Pointer(tm)).Ftm_year+1900),
+		time.Month((*ctime.Tm)(unsafe.Pointer(tm)).Ftm_mon+1),
+		int((*ctime.Tm)(unsafe.Pointer(tm)).Ftm_mday),
+		int((*ctime.Tm)(unsafe.Pointer(tm)).Ftm_hour),
+		int((*ctime.Tm)(unsafe.Pointer(tm)).Ftm_min),
+		int((*ctime.Tm)(unsafe.Pointer(tm)).Ftm_sec),
+		0,
+		time.UTC,
+	)
+	fmt := GoString(f)
+	var result string
+	if fmt != "" {
+		result = strftime.Format(fmt, tt)
+	}
+	switch r = size_t(len(result)); {
+	case r > n:
+		r = 0
+	default:
+		copy((*RawMem)(unsafe.Pointer(s))[:r:r], result)
+		*(*byte)(unsafe.Pointer(s + uintptr(r))) = 0
+	}
+	return r
+
+}
+
+func x___secs_to_tm(tls *TLS, t int64, tm uintptr) (r int32) {
+	var c_cycles, leap, months, q_cycles, qc_cycles, remdays, remsecs, remyears, wday, yday int32
+	var days, secs, years int64
+	_, _, _, _, _, _, _, _, _, _, _, _, _ = c_cycles, days, leap, months, q_cycles, qc_cycles, remdays, remsecs, remyears, secs, wday, yday, years
+	/* Reject time_t values whose year would overflow int */
+	if t < int64(-Int32FromInt32(1)-Int32FromInt32(0x7fffffff))*Int64FromInt64(31622400) || t > Int64FromInt32(limits.INT_MAX)*Int64FromInt64(31622400) {
+		return -int32(1)
+	}
+	secs = t - (Int64FromInt64(946684800) + int64(Int32FromInt32(86400)*(Int32FromInt32(31)+Int32FromInt32(29))))
+	days = secs / int64(86400)
+	remsecs = int32(secs % int64(86400))
+	if remsecs < 0 {
+		remsecs += int32(86400)
+		days--
+	}
+	wday = int32((int64(3) + days) % int64(7))
+	if wday < 0 {
+		wday += int32(7)
+	}
+	qc_cycles = int32(days / int64(Int32FromInt32(365)*Int32FromInt32(400)+Int32FromInt32(97)))
+	remdays = int32(days % int64(Int32FromInt32(365)*Int32FromInt32(400)+Int32FromInt32(97)))
+	if remdays < 0 {
+		remdays += Int32FromInt32(365)*Int32FromInt32(400) + Int32FromInt32(97)
+		qc_cycles--
+	}
+	c_cycles = remdays / (Int32FromInt32(365)*Int32FromInt32(100) + Int32FromInt32(24))
+	if c_cycles == int32(4) {
+		c_cycles--
+	}
+	remdays -= c_cycles * (Int32FromInt32(365)*Int32FromInt32(100) + Int32FromInt32(24))
+	q_cycles = remdays / (Int32FromInt32(365)*Int32FromInt32(4) + Int32FromInt32(1))
+	if q_cycles == int32(25) {
+		q_cycles--
+	}
+	remdays -= q_cycles * (Int32FromInt32(365)*Int32FromInt32(4) + Int32FromInt32(1))
+	remyears = remdays / int32(365)
+	if remyears == int32(4) {
+		remyears--
+	}
+	remdays -= remyears * int32(365)
+	leap = BoolInt32(!(remyears != 0) && (q_cycles != 0 || !(c_cycles != 0)))
+	yday = remdays + int32(31) + int32(28) + leap
+	if yday >= int32(365)+leap {
+		yday -= int32(365) + leap
+	}
+	years = int64(remyears+int32(4)*q_cycles+int32(100)*c_cycles) + int64(400)*int64(int64(qc_cycles))
+	months = 0
+	for {
+		if !(int32(_days_in_month[months]) <= remdays) {
+			break
+		}
+		remdays -= int32(_days_in_month[months])
+		goto _1
+	_1:
+		months++
+	}
+	if months >= int32(10) {
+		months -= int32(12)
+		years++
+	}
+	if years+int64(100) > int64(limits.INT_MAX) || years+int64(100) < int64(-Int32FromInt32(1)-Int32FromInt32(0x7fffffff)) {
+		return -int32(1)
+	}
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_year = int32(years + int64(100))
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_mon = months + int32(2)
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_mday = remdays + int32(1)
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_wday = wday
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_yday = yday
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_hour = remsecs / int32(3600)
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_min = remsecs / int32(60) % int32(60)
+	(*ctime.Tm)(unsafe.Pointer(tm)).Ftm_sec = remsecs % int32(60)
+	return 0
+}

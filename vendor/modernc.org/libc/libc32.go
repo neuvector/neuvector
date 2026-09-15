@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build 386 || arm
-// +build 386 arm
+//go:build !linux && (arm || 386)
 
 package libc // import "modernc.org/libc"
 
@@ -30,11 +29,11 @@ type (
 	}
 )
 
-type bits []int
+type bitz []int // was bits but that is now an import qaulifier in use by mem.go
 
-func newBits(n int) (r bits)  { return make(bits, (n+31)>>5) }
-func (b bits) has(n int) bool { return b != nil && b[n>>5]&(1<<uint(n&31)) != 0 }
-func (b bits) set(n int)      { b[n>>5] |= 1 << uint(n&31) }
+func newBits(n int) (r bitz)  { return make(bitz, (n+31)>>5) }
+func (b bitz) has(n int) bool { return b != nil && b[n>>5]&(1<<uint(n&31)) != 0 }
+func (b bitz) set(n int)      { b[n>>5] |= 1 << uint(n&31) }
 
 func Xstrchrnul(tls *TLS, s uintptr, c int32) (r uintptr) {
 	return x___strchrnul(tls, s, c)
