@@ -2433,7 +2433,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		mainSessionUser = user.Fullname
 	} else {
 		// Read body
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(getDefaultReader(r.Body))
 		if err != nil {
 			log.WithError(err).Warn("failed to read request body")
 		}
@@ -2696,7 +2696,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Read body
 	var auth api.RESTFedAuthData
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("Failed to read request body")
 	}
@@ -2760,7 +2760,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	defer r.Body.Close()
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("Failed to read request body")
 	}
