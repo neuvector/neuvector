@@ -109,8 +109,11 @@ type AuthnContextClassRef struct {
 }
 
 type NameID struct {
-	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion NameID"`
-	Value   string   `xml:",chardata"`
+	XMLName         xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion NameID"`
+	Format          string   `xml:"Format,attr,omitempty"`
+	NameQualifier   string   `xml:"NameQualifier,attr,omitempty"`
+	SPNameQualifier string   `xml:"SPNameQualifier,attr,omitempty"`
+	Value           string   `xml:",chardata"`
 }
 
 type SubjectConfirmation struct {
@@ -172,6 +175,10 @@ type AttributeValue struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion AttributeValue"`
 	Type    string   `xml:"xsi:type,attr"`
 	Value   string   `xml:",chardata"`
+	// NameID is set when the attribute value is a NameID element rather than
+	// text content, as with eduPersonTargetedID. In that case Value holds only
+	// surrounding whitespace, if anything.
+	NameID *NameID `xml:"NameID"`
 }
 
 type AuthnStatement struct {
