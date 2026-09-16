@@ -1084,3 +1084,21 @@ func TestGroupMapping(t *testing.T) {
 
 	postTest()
 }
+
+func TestRemoteHost(t *testing.T) {
+	cases := map[string]string{
+		"1.2.3.4:5678":         "1.2.3.4",
+		"[::1]:5678":           "::1",
+		"[2001:db8::17]:443":   "2001:db8::17",
+		"1.2.3.4":              "1.2.3.4",
+		"::1":                  "::1",
+		"2001:db8::17":         "2001:db8::17",
+		"proxy.example.com:80": "proxy.example.com",
+		"":                     "",
+	}
+	for in, expected := range cases {
+		if out := remoteHost(in); out != expected {
+			t.Errorf("remoteHost(%q) = %q, expected %q", in, out, expected)
+		}
+	}
+}
