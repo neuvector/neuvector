@@ -734,6 +734,9 @@ func (s *ScanService) GetCaps(ctx context.Context, v *share.RPCVoid) (*share.Con
 		CriticalVul:              true,
 		ScannerSettings:          true,
 		SupportScannerRegisterV3: true,
+		ParsingCaps: &share.ParsingCaps{
+			JarAutoModuleName: true,
+		},
 	}, nil
 }
 

@@ -1795,6 +1795,10 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 		scope = share.ScopeFed
 	}
 
+	if reviewType == share.ReviewTypeCRD {
+		h.crdDeleteResponseRules(cacheRecord.ResponseRules)
+	}
+
 	responseCfgs := []*v1.NvCrdResponseRule{crdResponseCfg}
 	cacheRecord.ResponseRules.PolicyName = crdResponseCfg.PolicyName
 	grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
@@ -3756,6 +3760,7 @@ func (h *nvCrdHandler) crdGFwRuleProcessRecord(crdCfgRet *resource.NvSecurityPar
 		grpResponseCfg := map[string][]*v1.NvCrdResponseRule{
 			crdCfgRet.TargetName: crdCfgRet.GroupResponseCfg,
 		}
+		h.crdDeleteResponseRules(crdRecord.ResponseRules)
 		ruleIDs, err := h.crdHandleGroupResponseRules(share.ScopeLocal, grpResponseCfg, crdCfgRet.CfgType)
 		if err != nil {
 			log.WithFields(log.Fields{"error": err}).Error("crdHandleGroupResponseRules")
@@ -4852,6 +4857,21 @@ func (h *nvCrdHandler) getCrInfo(crdSecRule interface{}) (string, bool, error) {
 	return crdHash, false, nil
 }
 
+func isForNvFedCR(kind, name string) bool {
+	switch kind {
+	case resource.NvGroupDefKind, resource.NvSecurityRuleKind, resource.NvClusterSecurityRuleKind,
+		resource.NvDlpSecurityRuleKind, resource.NvWafSecurityRuleKind, resource.NvResponseSecurityRuleKind:
+		if strings.HasPrefix(name, api.FederalGroupPrefix) {
+			return true
+		}
+	case resource.NvAdmCtrlSecurityRuleKind:
+		if name != share.ScopeLocal {
+			return true
+		}
+	}
+	return false
+}
+
 // kvOnly: true means the checking is triggered by kv change(ex: import). false means the check is triggered by k8s(ex: startup)
 func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error {
 	if clusHelper == nil {
@@ -4937,6 +4957,10 @@ func CrossCheckCrd(kind, rscType, kvCrdKind, lockKey string, kvOnly bool) error 
 		} else {
 			mdNameDisplay = metaData.GetName()
 			recordName = fmt.Sprintf("%s-default-%s", kind, mdNameDisplay)
+		}
+		if isForNvFedCR(kind, metaData.GetName()) {
+			log.WithFields(log.Fields{"kind": kind, "name": mdNameDisplay}).Warn("it is not supported to import federated policies through CRD")
+			continue
 		}
 		var getCrErr error
 		if crdHash, skip, getCrErr = crdHandler.getCrInfo(obj); getCrErr != nil {

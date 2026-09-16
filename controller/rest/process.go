@@ -434,10 +434,6 @@ func handlerProcRuleShow(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 	procRuleHelper := ruleid.GetProcessRuleIDHelper()
-	if procRuleHelper == nil {
-		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
-		return
-	}
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {

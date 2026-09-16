@@ -1597,9 +1597,8 @@ func k8sWebhookRestServer(svcName string, port uint, clientAuth, debug bool) {
 		server: &http.Server{
 			Addr: listenPortTLS,
 			TLSConfig: &tls.Config{
-				Certificates:             []tls.Certificate{pair},
-				PreferServerCipherSuites: true,
-				MinVersion:               tls.VersionTLS13,
+				Certificates: []tls.Certificate{pair},
+				MinVersion:   tls.VersionTLS13,
 				CurvePreferences: []tls.CurveID{
 					tls.CurveP256,
 					tls.X25519,
