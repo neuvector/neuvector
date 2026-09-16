@@ -1112,6 +1112,17 @@ func (p *Probe) handleProcFork(pid, ppid int, name string) (inContainer bool, pc
 	}
 
 	if parent, ok := p.pidProcMap[proc.ppid]; ok {
+		// GetSessionId returns 0 (ESRCH) when the child has already exited by the
+		// time this fork event is processed (common for the microsecond-lived
+		// CIS-benchmark subshells and grep/yq/cut/tr descendants). In that case
+		// fall back to the parent's session, which the child inherited at fork -
+		// keeping sid valid for tool-process recognition (IsToolProcess/
+		// isAgentChild). A still-live child keeps its own /proc value, so a
+		// process that called setsid() to start a new session is unaffected.
+		if proc.sid == 0 {
+			proc.sid = parent.sid
+		}
+
 		// Inherit parent's information
 		proc.pname = parent.name
 		proc.ppath = parent.path

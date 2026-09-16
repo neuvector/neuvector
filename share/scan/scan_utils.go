@@ -189,7 +189,7 @@ func (s *ScanUtil) readRunningPackages(pid int, prefix, kernel string, pidHost b
 }
 
 func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, pid int,
-	kernel, k8sAppResourceStr string, pidHost bool) ([]byte, share.ScanErrorCode) {
+	kernel, k8sAppResourceStr string, pidHost bool, parsingCaps *share.ParsingCaps) ([]byte, share.ScanErrorCode) {
 	files, hasPkgMgr := s.readRunningPackages(pid, "/", kernel, pidHost)
 	if len(files) == 0 && !hasPkgMgr && objType == share.ScanObjectType_HOST {
 		// In RancherOS, host os-release file is at /host/proc/1/root/usr/etc/os-release
@@ -199,7 +199,7 @@ func (s *ScanUtil) GetRunningPackages(id string, objType share.ScanObjectType, p
 
 	if objType == share.ScanObjectType_CONTAINER {
 		// We may still have data when there is an error, such as timeout
-		data, err := s.getContainerAppPkg(pid)
+		data, err := s.getContainerAppPkg(pid, parsingCaps)
 		if err != nil {
 			log.WithFields(log.Fields{"data": len(data), "error": err}).Error("Error when getting container app packages")
 		}
@@ -243,7 +243,7 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 		return nil, nil, share.ScanErrorCode_ScanErrNotSupport
 	}
 
-	apps := NewScanApps(true)
+	apps := NewScanApps(true, nil)
 	apps.ExtractAppPkg(path, path)
 	pkgs := apps.marshal()
 	files := make(tarutil.FilesMap)
@@ -257,8 +257,8 @@ func (s *ScanUtil) GetAppPackages(path string) ([]AppPackage, []byte, share.Scan
 	return appPkgs, buf.Bytes(), share.ScanErrorCode_ScanErrNone
 }
 
-func (s *ScanUtil) getContainerAppPkg(pid int) ([]byte, error) {
-	apps := NewScanApps(false) // no need to scan the same file twice
+func (s *ScanUtil) getContainerAppPkg(pid int, parsingCaps *share.ParsingCaps) ([]byte, error) {
+	apps := NewScanApps(false, parsingCaps) // no need to scan the same file twice
 	exclDirs := utils.NewSet("boot", "dev", "proc", "run", "sys")
 	rootPath := s.sys.ContainerFilePath(pid, "/")
 	rootLen := len(rootPath)
@@ -603,6 +603,7 @@ func DownloadFromUrl(url, fileName string) error {
 	return nil
 }
 
+// TODO: this function seems to be unused, consider removing it if not needed
 func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	r, err := zip.OpenReader(fileName)
 	if err != nil {
@@ -612,7 +613,7 @@ func GetAwsFuncPackages(fileName string) ([]*share.ScanAppPackage, error) {
 	defer r.Close()
 	defer os.Remove(fileName) // clean up
 
-	apps := NewScanApps(true)
+	apps := NewScanApps(true, nil)
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "scan_lambda")
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Create temp directory fail")
