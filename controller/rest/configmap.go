@@ -201,7 +201,7 @@ func handleoidccfg(yaml_data []byte, load bool, skip *bool, context *configMapHa
 	}
 
 	if remoteAuther == nil {
-		remoteAuther = auth.NewRemoteAuther(nil)
+		remoteAuther = auth.NewRemoteAuther(nil, common.AesGcmEncrypt, common.AesGcmDecrypt)
 	}
 
 	cs, _, err := clusHelper.GetServerRev(name, accAdmin)
