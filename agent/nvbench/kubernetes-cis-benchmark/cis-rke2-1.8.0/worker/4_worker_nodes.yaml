@@ -325,9 +325,13 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
+          config=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf")
           if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
               cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
               cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+              pass "$check"
+              pass "      * client-ca-file: $cafile"
+          elif cafile=$(yq e '.authentication.x509.clientCAFile // ""' "$config" 2>/dev/null); [ -n "$cafile" ]; then
               pass "$check"
               pass "      * client-ca-file: $cafile"
           else
