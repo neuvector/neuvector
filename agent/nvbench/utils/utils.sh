@@ -54,6 +54,24 @@ append_prefix() {
   echo "$prefix/$file"
 }
 
+#resolve a path from a process command line argument
+resolve_argument_path() {
+  local cmd="$1"
+  local option="$2"
+  local path
+
+  if ! check_argument "$cmd" "$option" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  path=$(get_argument_value "$cmd" "$option" | sed -n '1p')
+  if [ -z "$path" ]; then
+    return 1
+  fi
+
+  append_prefix "${CONFIG_PREFIX:-}" "$path"
+}
+
 #get an argument value from command line
 get_argument_value_from_journal() {
     CMD="$1"
