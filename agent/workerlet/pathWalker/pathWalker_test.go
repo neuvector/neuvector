@@ -116,3 +116,61 @@ func testWalkSecrets(t *testing.T) {
 	fmt.Printf("TestWalkSecrets: Done\n\n")
 }
 */
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestShouldSkipDir(t *testing.T) {
+	cases := []struct {
+		name      string
+		ldir      string
+		allowDirs []string
+		want      bool
+	}{
+		{
+			name:      "empty allowDirs walks everything",
+			ldir:      "/usr/bin",
+			allowDirs: nil,
+			want:      false,
+		},
+		{
+			name:      "empty (non-nil) allowDirs walks everything",
+			ldir:      "/usr/bin",
+			allowDirs: []string{},
+			want:      false,
+		},
+		{
+			name:      "matching prefix is not skipped",
+			ldir:      "/usr/bin",
+			allowDirs: []string{"/usr"},
+			want:      false,
+		},
+		{
+			name:      "exact match is not skipped",
+			ldir:      "/usr/local/bin",
+			allowDirs: []string{"/usr/local/bin"},
+			want:      false,
+		},
+		{
+			name:      "no matching prefix is skipped",
+			ldir:      "/opt/app",
+			allowDirs: []string{"/usr", "/bin"},
+			want:      true,
+		},
+		{
+			name:      "partial prefix still matches (documents HasPrefix boundary)",
+			ldir:      "/usrlocal",
+			allowDirs: []string{"/usr"},
+			want:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.want, shouldSkipDir(c.ldir, c.allowDirs))
+		})
+	}
+}
