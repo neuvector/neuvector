@@ -3,6 +3,11 @@
 
 #include "dpi/dpi_module.h"
 
+/* Kafka request API keys. Only the legacy block (0..16) is deep-parsed
+ * against a known v0/v1 body layout. Newer keys and any "flexible version"
+ * (KIP-482) of the legacy keys are accepted but not deep-parsed; session
+ * identification then falls back to correlation-ID matching in
+ * check_corr_id_valid(). See kafka_can_deep_parse() below. */
 #define    PRODUCE                  0
 #define    FETCH                    1
 #define    LIST_OFFSETS             2
@@ -13,13 +18,19 @@
 #define    CONTROLLED_SHUTDOWN_KEY  7
 #define    OFFSET_COMMIT            8
 #define    OFFSET_FETCH             9
-#define    GROUP_COORDINATOR        10
+#define    GROUP_COORDINATOR        10  /* a.k.a. FindCoordinator */
 #define    JOIN_GROUP               11
 #define    HEARTBEAT                12
 #define    LEAVE_GROUP              13
 #define    SYNC_GROUP               14
 #define    DESCRIBE_GROUPS          15
 #define    LIST_GROUPS              16
+
+/* Sanity caps for the request header. KAFKA_API_KEY_MAX must be bumped when
+ * upstream Kafka adds new API keys (see org.apache.kafka.common.protocol.ApiKeys);
+ * KAFKA_API_VERSION_MAX is a generous upper bound across all APIs. */
+#define     KAFKA_API_KEY_MAX       90
+#define     KAFKA_API_VERSION_MAX   32
 
 #define     MAX_TOPIC_LEN           256
 #define     MAX_TOPIC_NUM           256
@@ -725,8 +736,44 @@ static int check_controlled_shutdown_request(dpi_packet_t *p, kafka_data_t * dat
     return 1;
 }
 
+/* Highest api_version of each legacy API key whose request body the deep
+ * handlers below correctly understand. Versions above this (and all keys
+ * not listed) use either layout extensions (e.g. Produce v3 added
+ * transactional_id, Fetch v4 added isolation_level, v7 added session_id) or
+ * KIP-482 flexible encoding (compact strings/arrays + tagged fields), neither
+ * of which the deep handlers parse. Bumping a value here requires extending
+ * the corresponding check_*_request() handler. */
+static const int16_t kafka_max_parsed_version[] = {
+    [PRODUCE]                 = 2,
+    [FETCH]                   = 3,
+    [LIST_OFFSETS]            = 1,
+    [METADATA]                = 3,
+    [LEADER_AND_ISR]          = 0,
+    [STOP_REPLICA]            = 0,
+    [UPDATE_METADATA_KEY]     = 0,
+    [CONTROLLED_SHUTDOWN_KEY] = 1,
+    [OFFSET_COMMIT]           = 2,
+    [OFFSET_FETCH]            = 1,
+    [GROUP_COORDINATOR]       = 0,
+};
+
+static bool kafka_can_deep_parse(uint16_t api_key, uint16_t version_id)
+{
+    if (api_key >= sizeof(kafka_max_parsed_version) / sizeof(kafka_max_parsed_version[0])) {
+        return false;
+    }
+    return version_id <= (uint16_t)kafka_max_parsed_version[api_key];
+}
+
 static int check_api_key(dpi_packet_t *p, kafka_data_t * data, uint16_t api_key, uint16_t version_id, uint8_t *ptr, int * pleft, int size_left)
 {
+    if (!kafka_can_deep_parse(api_key, version_id)) {
+        DEBUG_LOG(DBG_PARSER, p, "Kafka api_key=%u version=%u accepted without deep parse\n",
+                  api_key, version_id);
+        data->checked_request = false;
+        return 1;
+    }
+
     switch (api_key) {
     case PRODUCE                  :
         return check_produce_request(p, data, ptr, pleft, size_left);
@@ -887,15 +934,15 @@ static void kafka_parser(dpi_packet_t *p)
         }
 
         api_key  = GET_BIG_INT16(ptr);
-        if (api_key > 16) {
-            DEBUG_LOG(DBG_PARSER, p, "Wrong Kafka api key\n");
+        if (api_key < 0 || api_key > KAFKA_API_KEY_MAX) {
+            DEBUG_LOG(DBG_PARSER, p, "Wrong Kafka api key: %d\n", api_key);
             dpi_fire_parser(p);
             return;
         }
         ptr += 2;left -= 2;
         api_version     = GET_BIG_INT16(ptr);
-        if (api_version > 4) {
-            DEBUG_LOG(DBG_PARSER, p, "Wrong Kafka api version\n");
+        if (api_version < 0 || api_version > KAFKA_API_VERSION_MAX) {
+            DEBUG_LOG(DBG_PARSER, p, "Wrong Kafka api version: %d\n", api_version);
             dpi_fire_parser(p);
             return;
         }
@@ -971,6 +1018,39 @@ static void kafka_parser(dpi_packet_t *p)
     }
 }
 
+/* Best-effort validation of a Kafka request header (v1 or v2) seen mid-stream.
+ * Confirms a sane size + api_key + api_version + a printable/nullable
+ * client_id. The client_id field has the same wire format in flexible (v2)
+ * and non-flexible (v1) headers (int16 length, optional -1 = null), so this
+ * works for modern KIP-482 requests too. */
+static bool kafka_request_header_plausible(uint8_t *ptr, int len)
+{
+    /* size(4) + api_key(2) + api_version(2) + corr_id(4) + client_id_len(2) */
+    if (len < 14) return false;
+
+    int32_t size = GET_BIG_INT32(ptr);
+    if (size <= 0 || size > MAX_KAFKA_PACKET) return false;
+
+    int16_t api_key = GET_BIG_INT16(ptr + 4);
+    if (api_key < 0 || api_key > KAFKA_API_KEY_MAX) return false;
+
+    int16_t api_version = GET_BIG_INT16(ptr + 6);
+    if (api_version < 0 || api_version > KAFKA_API_VERSION_MAX) return false;
+
+    int16_t cid_len = (int16_t)GET_BIG_INT16(ptr + 12);
+    if (cid_len == -1) {
+        /* nullable client_id */
+        return true;
+    }
+    if (cid_len < 0 || cid_len > MAX_TOPIC_LEN) return false;
+    int avail = len - 14;
+    int check = cid_len < avail ? cid_len : avail;
+    for (int i = 0; i < check; i++) {
+        if (!isprint(ptr[14 + i])) return false;
+    }
+    return true;
+}
+
 static void kafka_midstream(dpi_packet_t *p)
 {
     uint8_t *ptr;
@@ -981,35 +1061,48 @@ static void kafka_midstream(dpi_packet_t *p)
     ptr = dpi_pkt_ptr(p);
     len = dpi_pkt_len(p);
 
-    int32_t size;
-    int16_t api_key = 0;
-    int16_t api_version = 0;
-    kafka_data_t data;
+    if (len < 12) {
+        goto Exit;
+    }
 
-    if (len >= 12) {
-        size  = GET_BIG_INT32(ptr);
-        if (size > MAX_KAFKA_PACKET) {
-            goto Exit;
-        }
-        ptr += 4;len -= 4;
-        api_key  = GET_BIG_INT16(ptr);
-        if (api_key > 16) {
-            goto Exit;
-        }
-        ptr += 2;len -= 2;
-        api_version     = GET_BIG_INT16(ptr);
-        if (api_version > 4) {
-            goto Exit;
-        }
-        ptr += 2;len -= 2;
-        ptr += 4;len -= 4;
-        int res = check_api_key(p, &data, api_key, api_version, ptr, &len, size-8);
+    int32_t size = GET_BIG_INT32(ptr);
+    if (size <= 0 || size > MAX_KAFKA_PACKET) {
+        goto Exit;
+    }
+    int16_t api_key = GET_BIG_INT16(ptr + 4);
+    if (api_key < 0 || api_key > KAFKA_API_KEY_MAX) {
+        goto Exit;
+    }
+    int16_t api_version = GET_BIG_INT16(ptr + 6);
+    if (api_version < 0 || api_version > KAFKA_API_VERSION_MAX) {
+        goto Exit;
+    }
+
+    /* Legacy non-flexible APIs: try to deep-parse the body for stronger
+     * evidence (matches the original midstream behaviour). */
+    if (kafka_can_deep_parse(api_key, api_version)) {
+        kafka_data_t data;
+        memset(&data, 0, sizeof(data));
+        uint8_t *body = ptr + 12;
+        int body_left = len - 12;
+        int res = check_api_key(p, &data, api_key, api_version, body, &body_left, size - 8);
         if (res > 0 && data.checked_request) {
-            DEBUG_LOG(DBG_PARSER, p, "Kafka midstream\n");
+            DEBUG_LOG(DBG_PARSER, p, "Kafka midstream (deep parse)\n");
             dpi_finalize_parser(p);
             dpi_ignore_parser(p);
             return;
         }
+        goto Exit;
+    }
+
+    /* Flexible-version (KIP-482) or new API key: body format isn't deep-parsed.
+     * Accept on the strength of the header alone if the client_id is sane. */
+    if (kafka_request_header_plausible(ptr, len)) {
+        DEBUG_LOG(DBG_PARSER, p, "Kafka midstream (header sanity, api_key=%d v=%d)\n",
+                  api_key, api_version);
+        dpi_finalize_parser(p);
+        dpi_ignore_parser(p);
+        return;
     }
 
 Exit:
