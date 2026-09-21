@@ -1118,10 +1118,12 @@ func handlefedcfg(yaml_data []byte, isLead bool) (string, error) {
 			} else {
 				_fixedJoinToken = rconf.JoinToken
 				reqData := api.RESTFedPromoteReqData{
-					Name:               rconf.ClusterName,
-					MasterRestInfo:     &rconf.PrimaryRestInfo,
-					UseProxy:           &rconf.UseProxy,
-					DeployRepoScanData: rconf.DeployRepoScanData,
+					Name:                  rconf.ClusterName,
+					MasterRestInfo:        &rconf.PrimaryRestInfo,
+					UseProxy:              &rconf.UseProxy,
+					FixedJoinToken:        &rconf.JoinToken,
+					AllowSameK8sUidRejoin: &rconf.AllowSameK8sUidRejoin,
+					DeployRepoScanData:    rconf.DeployRepoScanData,
 				}
 				if _, _, _, err = promoteToMaster(nil, acc, &login, reqData); err != nil {
 					log.WithFields(log.Fields{"err": err}).Debug("promote")

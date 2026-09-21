@@ -1668,6 +1668,12 @@ func promoteToMaster(w http.ResponseWriter, acc *access.AccessControl, login *lo
 		},
 		UseProxy: useProxy,
 	}
+	if reqData.FixedJoinToken != nil {
+		membership.MasterCluster.FixedJoinToken = *reqData.FixedJoinToken
+	}
+	if reqData.AllowSameK8sUidRejoin != nil {
+		membership.MasterCluster.AllowSameK8sUidRejoin = *reqData.AllowSameK8sUidRejoin
+	}
 
 	if err = clusHelper.PutFedMembership(&membership); err != nil {
 		revertFedRoles(acc)
