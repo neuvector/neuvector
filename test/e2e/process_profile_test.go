@@ -34,9 +34,9 @@ const (
 var unapprovedProcPathKey contextKey
 
 var unapprovedProcPaths = []string{
-	"/usr/bin/curl",
-	"/bin/curl",
-	"/usr/local/bin/curl",
+	"/usr/bin/sleep",
+	"/bin/sleep",
+	"/usr/local/bin/sleep",
 }
 
 func getProcessProfileFeature() types.Feature {
@@ -58,8 +58,8 @@ func getProcessProfileFeature() types.Feature {
 			})).
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
-		Assess("exec unapproved curl in nginx pod", execUnapprovedProcessInNginxPod).
-		Assess("security event reports curl as incident", assessSecurityEventHasProcessIncident("")).
+		Assess("exec unapproved sleep in nginx pod", execUnapprovedProcessInNginxPod).
+		Assess("security event reports sleep as incident", assessSecurityEventHasProcessIncident("")).
 		Assess("PATCH service ProfileMode to Protect",
 			assessPatchServiceConfig(serviceBatchPatch{
 				Services:    []string{workloadServiceName},
@@ -68,8 +68,8 @@ func getProcessProfileFeature() types.Feature {
 		Assess("service ProfileMode is now Protect",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEnforce})).
 		Assess("wait for Protect mode to propagate to enforcer", assessSleep(10*time.Second)).
-		Assess("exec curl in nginx pod is blocked by protect mode", execUnapprovedProcessInNginxPod).
-		Assess("security event reports curl as denied in protect mode", assessSecurityEventHasProcessIncident(share.PolicyActionDeny)).
+		Assess("exec sleep in nginx pod is blocked by protect mode", execUnapprovedProcessInNginxPod).
+		Assess("security event reports sleep as denied in protect mode", assessSecurityEventHasProcessIncident(share.PolicyActionDeny)).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
@@ -190,7 +190,7 @@ func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envco
 	t.Helper()
 	procPath := getOptionalUnapprovedProcessPath(ctx)
 	if procPath == "" {
-		procPath = execFirstAvailableCommandInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcPaths, []string{"--version"})
+		procPath = execFirstAvailableCommandInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcPaths, []string{"5"})
 	} else {
 		// In Protect mode NeuVector may block the process while still producing the
 		// expected incident. Tolerate a non-zero exit in that case.
@@ -198,7 +198,7 @@ func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envco
 			workloadNamespace,
 			"app="+workloadDeployName,
 			"nginx",
-			[]string{procPath, "--version"},
+			[]string{procPath, "5"},
 		)
 	}
 	return context.WithValue(ctx, unapprovedProcPathKey, procPath)
