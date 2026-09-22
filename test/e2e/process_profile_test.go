@@ -50,9 +50,9 @@ func getProcessProfileFeature() types.Feature {
 			})).
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
-		Assess("wait for Monitor mode to propagate to enforcer", assessSleep(10*time.Second)).
 		Assess("exec unapproved bash in nginx pod", execBashInNginxPod).
-		Assess("security event reports bash as incident", assessSecurityEventHasProcessIncident("/usr/bin/bash", "")).
+		Assess("security event reports bash as incident",
+			assessSecurityEventHasProcessIncidentAfter(execBashInNginxPod, "/usr/bin/bash", "")).
 		Assess("PATCH service ProfileMode to Protect",
 			assessPatchServiceConfig(serviceBatchPatch{
 				Services:    []string{workloadServiceName},
@@ -197,6 +197,15 @@ func execBashInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) co
 // GET /v1/log/security until an incident matching procPath and workloadServiceName
 // is found. If action is non-empty, the incident's action field must also match.
 func assessSecurityEventHasProcessIncident(procPath, action string) func(context.Context, *testing.T, *envconf.Config) context.Context {
+	return assessSecurityEventHasProcessIncidentAfter(nil, procPath, action)
+}
+
+// assessSecurityEventHasProcessIncidentAfter optionally re-triggers a workload
+// action before polling /v1/log/security for the matching incident.
+func assessSecurityEventHasProcessIncidentAfter(
+	trigger func(context.Context, *testing.T, *envconf.Config) context.Context,
+	procPath, action string,
+) func(context.Context, *testing.T, *envconf.Config) context.Context {
 	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 		t.Helper()
 		endpoint := getAPIEndpoint(ctx)
@@ -204,6 +213,9 @@ func assessSecurityEventHasProcessIncident(procPath, action string) func(context
 		httpClient := newNVHTTPClient()
 
 		require.Eventually(t, func() bool {
+			if trigger != nil {
+				trigger(ctx, t, nil)
+			}
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
 			if err != nil {
 				return false
