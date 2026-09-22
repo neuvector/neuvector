@@ -65,11 +65,12 @@ var ArgsUsageCommandHelp = "[command]"
 
 func buildHelpCommand(withAction bool) *Command {
 	cmd := &Command{
-		Name:      helpName,
-		Aliases:   []string{helpAlias},
-		Usage:     UsageCommandHelp,
-		ArgsUsage: ArgsUsageCommandHelp,
-		HideHelp:  true,
+		Name:        helpName,
+		Aliases:     []string{helpAlias},
+		Usage:       UsageCommandHelp,
+		ArgsUsage:   ArgsUsageCommandHelp,
+		HideHelp:    true,
+		builtInHelp: true,
 	}
 
 	if withAction {
@@ -85,14 +86,22 @@ func helpCommandAction(ctx context.Context, cmd *Command) error {
 
 	tracef("doing help for cmd %[1]q with args %[2]q", cmd, args)
 
-	// This action can be triggered by a "default" action of a command
-	// or via cmd.Run when cmd == helpCmd. So we have following possibilities
+	// helpCommandAction is triggered in several ways:
 	//
-	// 1 $ app
-	// 2 $ app help
-	// 3 $ app foo
-	// 4 $ app help foo
-	// 5 $ app foo help
+	//   * the command has no user-defined Action (default action fallback)
+	//   * the --help / -h flag was parsed (via cmd.checkHelp())
+	//   * the "help" subcommand (or "h" alias) was dispatched
+	//
+	// Possible invocations:
+	//
+	//   $ app                  # default action; show root help
+	//   $ app --help / -h      # flag; show root help (ignores subsequent args)
+	//   $ app help / h         # subcommand; show root help
+	//   $ app help / h foo     # subcommand; show help for subcommand "foo"
+	//   $ app --help / -h foo  # flag; show help for subcommand "foo"
+	//   $ app foo --help / -h  # flag on subcommand; show help for "foo"
+	//   $ app foo help / h     # subcommand on subcommand; show help for "foo"
+	//   $ app foo (no action)  # default action on subcommand; show help for "foo"
 
 	// Case 4. when executing a help command set the context to parent
 	// to allow resolution of subsequent args. This will transform
@@ -100,7 +109,7 @@ func helpCommandAction(ctx context.Context, cmd *Command) error {
 	//     to
 	// $ app foo
 	// which will then be handled as case 3
-	if cmd.parent != nil && (cmd.HasName(helpName) || cmd.HasName(helpAlias)) {
+	if cmd.parent != nil && cmd.builtInHelp {
 		tracef("setting cmd to cmd.parent")
 		cmd = cmd.parent
 	}
@@ -207,7 +216,7 @@ func printFlagSuggestions(lastArg string, flags []Flag, writer io.Writer) {
 	// Trim to handle both "-short" and "--long" flags.
 	cur := strings.TrimLeft(lastArg, "-")
 	for _, flag := range flags {
-		if bflag, ok := flag.(*BoolFlag); ok && bflag.Hidden {
+		if vf, ok := flag.(VisibleFlag); ok && !vf.IsVisible() {
 			continue
 		}
 
@@ -248,12 +257,13 @@ func DefaultCompleteWithFlags(ctx context.Context, cmd *Command) {
 	}
 	argsLen := len(args)
 	lastArg := ""
-	// parent command will have --generate-shell-completion so we need
-	// to account for that
-	if argsLen > 1 {
-		lastArg = args[argsLen-2]
-	} else if argsLen > 0 {
+	// os.Args retains the completion marker, but a child's parsed arguments
+	// have already had it removed.
+	if argsLen > 0 {
 		lastArg = args[argsLen-1]
+		if lastArg == completionFlag && argsLen > 1 {
+			lastArg = args[argsLen-2]
+		}
 	}
 
 	if lastArg == completionFlag {
@@ -459,17 +469,15 @@ func DefaultPrintHelp(out io.Writer, templ string, data any) {
 }
 
 func checkVersion(cmd *Command) bool {
-	found := false
-	for _, name := range VersionFlag.Names() {
-		if cmd.Bool(name) {
-			found = true
-		}
-	}
-	return found
+	return cmd.versionFlag != nil && cmd.versionFlag.IsSet()
 }
 
 func checkShellCompleteFlag(c *Command, arguments []string) (bool, []string) {
 	if (c.parent == nil && !c.EnableShellCompletion) || (c.parent != nil && !c.Root().shellCompletion) {
+		return false, arguments
+	}
+
+	if len(arguments) == 0 {
 		return false, arguments
 	}
 
@@ -480,19 +488,22 @@ func checkShellCompleteFlag(c *Command, arguments []string) (bool, []string) {
 		return false, arguments
 	}
 
-	// If arguments include "--" before the token being completed, shell completion
-	// is disabled because after "--" only positional arguments are accepted.
+	// If the token being completed is preceded by a "--", only positional
+	// arguments are accepted after it, so nothing will be suggested.
 	// https://unix.stackexchange.com/a/11382
 	// Note: The token being completed is at position pos-1 (immediately before completionFlag).
-	// We only check arguments before that position, so completing "--" itself still works.
+	// A "--" at exactly that position is the token being completed, not a
+	// separator, so completing "--" itself still suggests flags.
+	// The request is still recognized as a completion so that the command
+	// action is never executed (https://github.com/urfave/cli/issues/1993).
 	if pos >= 1 && slices.Contains(arguments[:pos-1], "--") {
-		return false, arguments[:pos]
+		c.shellCompletionPastDoubleDash = true
 	}
 
 	return true, arguments[:pos]
 }
 
-func checkCompletions(ctx context.Context, cmd *Command) bool {
+func shouldRunCompletion(cmd *Command) bool {
 	tracef("checking completions on command %[1]q", cmd.Name)
 
 	if !cmd.Root().shellCompletion {
@@ -509,13 +520,21 @@ func checkCompletions(ctx context.Context, cmd *Command) bool {
 	}
 
 	tracef("no subcommand found for completion %[1]q", cmd.Name)
+	return true
+}
 
+func runCompletion(ctx context.Context, cmd *Command) {
+	// Nothing is suggested past a "--": after it, only positional arguments
+	// are accepted. The request is still treated as a completion so that the
+	// command action is never executed (https://github.com/urfave/cli/issues/1993).
+	if cmd.Root().shellCompletionPastDoubleDash {
+		tracef("completion requested past double dash; suggesting nothing (cmd=%[1]q)", cmd.Name)
+		return
+	}
 	if cmd.ShellComplete != nil {
 		tracef("running shell completion func for command %[1]q", cmd.Name)
 		cmd.ShellComplete(ctx, cmd)
 	}
-
-	return true
 }
 
 func subtract(a, b int) int {

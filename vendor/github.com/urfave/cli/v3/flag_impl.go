@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // Value represents a value as used by cli.
@@ -74,11 +75,12 @@ type FlagBase[T any, C any, VC ValueCreator[T, C]] struct {
 	ValidateDefaults bool                                     `json:"validateDefaults"` // whether to validate defaults or not
 
 	// unexported fields for internal use
-	count      int   // number of times the flag has been set
-	hasBeenSet bool  // whether the flag has been set from env or file
-	applied    bool  // whether the flag has been applied to a flag set already
-	creator    VC    // value creator for this flag type
-	value      Value // value representing this flag's value
+	count      int            // number of times the flag has been set
+	hasBeenSet bool           // whether the flag has been set from env or file
+	applied    bool           // whether the flag has been applied to a flag set already
+	creator    VC             // value creator for this flag type
+	value      Value          // value representing this flag's value
+	stringer   FlagStringFunc // optional per-flag override of FlagStringer
 }
 
 // GetValue returns the flags value as string representation and an empty
@@ -130,14 +132,22 @@ func (f *FlagBase[T, C, V]) PostParse() error {
 
 	if !f.hasBeenSet {
 		if val, source, found := f.Sources.LookupWithSource(); found {
-			if val != "" || reflect.TypeOf(f.Value).Kind() == reflect.String {
+			// reflect.TypeOf yields nil when T is an interface type (e.g.
+			// GenericFlag) and the value is nil, so the kind has to be
+			// derived defensively.
+			kind := reflect.Invalid
+			if ty := reflect.TypeOf(f.Value); ty != nil {
+				kind = ty.Kind()
+			}
+
+			if val != "" || kind == reflect.String {
 				if err := f.Set(f.Name, val); err != nil {
 					return fmt.Errorf(
 						"could not parse %[1]q as %[2]T value from %[3]s for flag %[4]s: %[5]s",
 						val, f.Value, source, f.Name, err,
 					)
 				}
-			} else if val == "" && reflect.TypeOf(f.Value).Kind() == reflect.Bool {
+			} else if val == "" && kind == reflect.Bool {
 				_ = f.Set(f.Name, "false")
 			}
 
@@ -193,7 +203,7 @@ func (f *FlagBase[T, C, V]) Set(_ string, val string) error {
 	}
 
 	if f.count == 1 && f.OnlyOnce {
-		return fmt.Errorf("cant duplicate this flag")
+		return fmt.Errorf("can't duplicate this flag")
 	}
 
 	f.count++
@@ -223,7 +233,18 @@ func (f *FlagBase[T, C, V]) IsDefaultVisible() bool {
 
 // String returns a readable representation of this value (for usage defaults)
 func (f *FlagBase[T, C, V]) String() string {
+	if f.stringer != nil {
+		return f.stringer(f)
+	}
 	return FlagStringer(f)
+}
+
+// SetStringer overrides the [FlagStringFunc] used by this flag's String
+// method. Passing nil restores the default behavior of using the
+// package-level [FlagStringer]. This is used e.g. by
+// [MutuallyExclusiveFlags.Stringer].
+func (f *FlagBase[T, C, V]) SetStringer(s FlagStringFunc) {
+	f.stringer = s
 }
 
 // IsSet returns whether or not the flag has been set through env or file
@@ -285,6 +306,53 @@ func (f *FlagBase[T, C, V]) RunAction(ctx context.Context, cmd *Command) error {
 	return nil
 }
 
+// SchemaType returns the JSON Schema type for the flag's value type.
+func (f *FlagBase[T, C, V]) SchemaType() string {
+	var zero T
+	switch any(zero).(type) {
+	case bool:
+		return "boolean"
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return "integer"
+	case float32, float64:
+		return "number"
+	case string:
+		return "string"
+	case time.Duration:
+		return "duration"
+	case time.Time:
+		return "date-time"
+	case []string, []int, []int8, []int16, []int32, []int64,
+		[]uint, []uint8, []uint16, []uint32, []uint64,
+		[]float32, []float64:
+		return "array"
+	case map[string]string:
+		return "object"
+	default:
+		return ""
+	}
+}
+
+// SchemaItemsType returns the JSON Schema element type for slice flags.
+func (f *FlagBase[T, C, V]) SchemaItemsType() string {
+	var zero T
+	// reflect.TypeOf yields nil when T is an interface type (e.g. GenericFlag),
+	// in which case there are no slice elements to describe.
+	t := reflect.TypeOf(zero)
+	if t != nil && t.Kind() == reflect.Slice {
+		switch t.Elem().Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return "integer"
+		case reflect.Float32, reflect.Float64:
+			return "number"
+		case reflect.String:
+			return "string"
+		}
+	}
+	return ""
+}
+
 // IsMultiValueFlag returns true if the value type T can take multiple
 // values from cmd line. This is true for slice and map type flags
 func (f *FlagBase[T, C, VC]) IsMultiValueFlag() bool {
@@ -301,7 +369,7 @@ func (f *FlagBase[T, C, VC]) IsLocal() bool {
 	return f.Local
 }
 
-// IsBoolFlag returns whether the flag doesnt need to accept args
+// IsBoolFlag returns whether the flag doesn't need to accept args
 func (f *FlagBase[T, C, VC]) IsBoolFlag() bool {
 	bf, ok := f.value.(boolFlag)
 	return ok && bf.IsBoolFlag()
