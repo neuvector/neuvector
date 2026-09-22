@@ -27,10 +27,12 @@ const (
 	workloadServiceGroup = "nv." + workloadDeployName + "." + workloadNamespace
 	// /v1/service and /v1/service/config expect the name without the "nv." prefix
 	workloadServiceName = workloadDeployName + "." + workloadNamespace
-	unapprovedProcPath  = "/usr/bin/curl"
+	unapprovedProcName  = "curl"
 
 	retryInterval = 10 * time.Second
 )
+
+var unapprovedProcPathKey contextKey
 
 func getProcessProfileFeature() types.Feature {
 	return features.New("NeuVector Process Profile - Workload Visibility").
@@ -38,6 +40,7 @@ func getProcessProfileFeature() types.Feature {
 		Setup(setupAPIEndpoint).
 		Setup(setupWorkloadNamespace).
 		Setup(deployTestWorkload).
+		Setup(setupUnapprovedProcessPath).
 		Setup(setupAuthToken).
 		Assess("workload is visible in NeuVector API with correct service group", assessWorkloadInNVAPI).
 		Assess("group is learned with nginx container member", assessGroupLearnedWithMember).
@@ -52,7 +55,7 @@ func getProcessProfileFeature() types.Feature {
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
 		Assess("exec unapproved curl in nginx pod", execUnapprovedProcessInNginxPod).
-		Assess("security event reports curl as incident", assessSecurityEventHasProcessIncident(unapprovedProcPath, "")).
+		Assess("security event reports curl as incident", assessSecurityEventHasProcessIncident("", getUnapprovedProcessPath)).
 		Assess("PATCH service ProfileMode to Protect",
 			assessPatchServiceConfig(serviceBatchPatch{
 				Services:    []string{workloadServiceName},
@@ -62,10 +65,20 @@ func getProcessProfileFeature() types.Feature {
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEnforce})).
 		Assess("wait for Protect mode to propagate to enforcer", assessSleep(10*time.Second)).
 		Assess("exec curl in nginx pod is blocked by protect mode", execUnapprovedProcessInNginxPod).
-		Assess("security event reports curl as denied in protect mode", assessSecurityEventHasProcessIncident(unapprovedProcPath, share.PolicyActionDeny)).
+		Assess("security event reports curl as denied in protect mode", assessSecurityEventHasProcessIncident(share.PolicyActionDeny, getUnapprovedProcessPath)).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
+}
+
+func setupUnapprovedProcessPath(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+	path := resolveCommandPathInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcName)
+	return context.WithValue(ctx, unapprovedProcPathKey, path)
+}
+
+func getUnapprovedProcessPath(ctx context.Context) string {
+	return ctx.Value(unapprovedProcPathKey).(string)
 }
 
 func setupWorkloadNamespace(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
@@ -188,7 +201,7 @@ func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envco
 		workloadNamespace,
 		"app="+workloadDeployName,
 		"nginx",
-		[]string{unapprovedProcPath, "--version"},
+		[]string{getUnapprovedProcessPath(ctx), "--version"},
 	)
 	return ctx
 }
@@ -196,12 +209,13 @@ func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envco
 // assessSecurityEventHasProcessIncident returns an assess function that polls
 // GET /v1/log/security until an incident matching procPath and workloadServiceName
 // is found. If action is non-empty, the incident's action field must also match.
-func assessSecurityEventHasProcessIncident(procPath, action string) func(context.Context, *testing.T, *envconf.Config) context.Context {
+func assessSecurityEventHasProcessIncident(action string, procPath func(context.Context) string) func(context.Context, *testing.T, *envconf.Config) context.Context {
 	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 		t.Helper()
 		endpoint := getAPIEndpoint(ctx)
 		token := getNVToken(ctx)
 		httpClient := newNVHTTPClient()
+		expectedProcPath := procPath(ctx)
 
 		require.Eventually(t, func() bool {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
@@ -219,7 +233,7 @@ func assessSecurityEventHasProcessIncident(procPath, action string) func(context
 				return false
 			}
 			for _, incident := range data.Incidents {
-				if incident.ProcPath == procPath &&
+				if incident.ProcPath == expectedProcPath &&
 					incident.WorkloadService == workloadServiceName &&
 					(action == "" || incident.Action == action) {
 					return true
@@ -228,7 +242,7 @@ func assessSecurityEventHasProcessIncident(procPath, action string) func(context
 			return false
 		}, assessTimeout, retryInterval,
 			"security incident proc_path=%q workload_service=%q action=%q not found in /v1/log/security",
-			procPath, workloadServiceName, action)
+			expectedProcPath, workloadServiceName, action)
 
 		return ctx
 	}

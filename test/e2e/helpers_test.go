@@ -1,10 +1,11 @@
 package e2e_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,6 +110,25 @@ func assessScannerDeployment(ctx context.Context, t *testing.T, _ *envconf.Confi
 // runtime (e.g. NeuVector FA enforcement in Protect mode). Errors are logged.
 func tryExecCommandInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, command []string) {
 	t.Helper()
+	stdout, stderr, err := streamCommandInPod(ctx, t, namespace, labelSelector, containerName, command)
+	if err != nil {
+		t.Logf("exec %v in pod %s exited with error (may be expected if blocked): %v (stdout=%q stderr=%q)",
+			command, namespace, err, stdout, stderr)
+	}
+}
+
+func resolveCommandPathInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName, commandName string) string {
+	t.Helper()
+	stdout, stderr, err := streamCommandInPod(ctx, t, namespace, labelSelector, containerName,
+		[]string{"/bin/sh", "-c", `command -v "$1"`, "sh", commandName})
+	require.NoError(t, err, "resolve command %q in %s", commandName, namespace)
+	path := strings.TrimSpace(stdout)
+	require.NotEmpty(t, path, "resolve command %q in %s returned empty path (stderr=%q)", commandName, namespace, stderr)
+	return path
+}
+
+func streamCommandInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, command []string) (string, string, error) {
+	t.Helper()
 	restConfig := getK8sClient(ctx).RESTConfig()
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	require.NoError(t, err, "build kubernetes clientset")
@@ -140,13 +160,12 @@ func tryExecCommandInPod(ctx context.Context, t *testing.T, namespace, labelSele
 	executor, err := remotecommand.NewSPDYExecutor(restConfig, http.MethodPost, req.URL())
 	require.NoError(t, err, "create SPDY executor for pod exec")
 
-	if err := executor.StreamWithContext(ctx, remotecommand.StreamOptions{
-		Stdout: io.Discard,
-		Stderr: io.Discard,
-	}); err != nil {
-		t.Logf("exec %v in pod %s/%s exited with error (may be expected if blocked): %v",
-			command, namespace, target.Name, err)
-	}
+	var stdout, stderr bytes.Buffer
+	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	return stdout.String(), stderr.String(), err
 }
 
 // findWorkloadInNVAPI polls /v2/workload until a workload matching namespace and
