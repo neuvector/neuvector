@@ -51,7 +51,7 @@ func getProcessProfileFeature() types.Feature {
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
 		Assess("unapproved bash in nginx pod is reported as incident",
-			assessSecurityEventHasProcessIncidentAfter(execBashInNginxPod, "/usr/bin/bash", "")).
+			assessSecurityEventHasProcessIncidentAfter(execBashInNginxPodDuringMonitorPropagation, "/usr/bin/bash", "")).
 		Assess("PATCH service ProfileMode to Protect",
 			assessPatchServiceConfig(serviceBatchPatch{
 				Services:    []string{workloadServiceName},
@@ -192,6 +192,20 @@ func execBashInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) co
 	return ctx
 }
 
+func execBashInNginxPodDuringMonitorPropagation(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+	tryExecCommandInPod(ctx, t,
+		workloadNamespace,
+		"app="+workloadDeployName,
+		"nginx",
+		[]string{
+			"/bin/sh", "-c",
+			"i=0; while [ \"$i\" -lt 30 ]; do /usr/bin/bash -c true || true; sleep 1; i=$((i+1)); done",
+		},
+	)
+	return ctx
+}
+
 // assessSecurityEventHasProcessIncident returns an assess function that polls
 // GET /v1/log/security until an incident matching procPath and workloadServiceName
 // is found. If action is non-empty, the incident's action field must also match.
@@ -211,10 +225,11 @@ func assessSecurityEventHasProcessIncidentAfter(
 		token := getNVToken(ctx)
 		httpClient := newNVHTTPClient()
 
+		if trigger != nil {
+			trigger(ctx, t, nil)
+		}
+
 		require.Eventually(t, func() bool {
-			if trigger != nil {
-				trigger(ctx, t, nil)
-			}
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
 			if err != nil {
 				return false
