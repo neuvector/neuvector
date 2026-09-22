@@ -50,6 +50,7 @@ func getProcessProfileFeature() types.Feature {
 			})).
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
+		Assess("wait for Monitor mode to propagate to enforcer", assessSleep(10*time.Second)).
 		Assess("exec unapproved bash in nginx pod", execBashInNginxPod).
 		Assess("security event reports bash as incident", assessSecurityEventHasProcessIncident("/usr/bin/bash", "")).
 		Assess("PATCH service ProfileMode to Protect",
