@@ -27,6 +27,7 @@ const (
 	workloadServiceGroup = "nv." + workloadDeployName + "." + workloadNamespace
 	// /v1/service and /v1/service/config expect the name without the "nv." prefix
 	workloadServiceName = workloadDeployName + "." + workloadNamespace
+	unapprovedProcPath  = "/usr/bin/curl"
 
 	retryInterval = 10 * time.Second
 )
@@ -50,8 +51,8 @@ func getProcessProfileFeature() types.Feature {
 			})).
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
-		Assess("exec unapproved bash in nginx pod", execBashInNginxPod).
-		Assess("security event reports bash as incident", assessSecurityEventHasProcessIncident("/usr/bin/bash", "")).
+		Assess("exec unapproved curl in nginx pod", execUnapprovedProcessInNginxPod).
+		Assess("security event reports curl as incident", assessSecurityEventHasProcessIncident(unapprovedProcPath, "")).
 		Assess("PATCH service ProfileMode to Protect",
 			assessPatchServiceConfig(serviceBatchPatch{
 				Services:    []string{workloadServiceName},
@@ -60,8 +61,8 @@ func getProcessProfileFeature() types.Feature {
 		Assess("service ProfileMode is now Protect",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEnforce})).
 		Assess("wait for Protect mode to propagate to enforcer", assessSleep(10*time.Second)).
-		Assess("exec bash in nginx pod is blocked by protect mode", execBashInNginxPod).
-		Assess("security event reports bash as denied in protect mode", assessSecurityEventHasProcessIncident("/usr/bin/bash", share.PolicyActionDeny)).
+		Assess("exec curl in nginx pod is blocked by protect mode", execUnapprovedProcessInNginxPod).
+		Assess("security event reports curl as denied in protect mode", assessSecurityEventHasProcessIncident(unapprovedProcPath, share.PolicyActionDeny)).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
@@ -178,16 +179,16 @@ func assessGroupLearnedWithMember(ctx context.Context, t *testing.T, _ *envconf.
 	return ctx
 }
 
-func execBashInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	// In Monitor mode NeuVector allows the process to run but generates an alert
-	// incident. Tolerate a non-zero exit in case the container lacks bash or
-	// the runtime returns an error for any other reason.
+	// incident. Tolerate a non-zero exit in case the runtime blocks the exec or
+	// returns an error for any other reason.
 	tryExecCommandInPod(ctx, t,
 		workloadNamespace,
 		"app="+workloadDeployName,
 		"nginx",
-		[]string{"/usr/bin/bash", "-c", "sleep 5"},
+		[]string{unapprovedProcPath, "--version"},
 	)
 	return ctx
 }
