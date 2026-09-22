@@ -75,10 +75,6 @@ func getProcessProfileFeature() types.Feature {
 		Feature()
 }
 
-func getUnapprovedProcessPath(ctx context.Context) string {
-	return ctx.Value(unapprovedProcPathKey).(string)
-}
-
 func setupWorkloadNamespace(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	client := getK8sClient(ctx)
@@ -194,17 +190,17 @@ func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envco
 	t.Helper()
 	procPath := getOptionalUnapprovedProcessPath(ctx)
 	if procPath == "" {
-		procPath = selectCommandPathInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcPaths, []string{"--version"})
+		procPath = execFirstAvailableCommandInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcPaths, []string{"--version"})
+	} else {
+		// In Protect mode NeuVector may block the process while still producing the
+		// expected incident. Tolerate a non-zero exit in that case.
+		tryExecCommandInPod(ctx, t,
+			workloadNamespace,
+			"app="+workloadDeployName,
+			"nginx",
+			[]string{procPath, "--version"},
+		)
 	}
-	// In Monitor mode NeuVector allows the process to run but generates an alert
-	// incident. Tolerate a non-zero exit in case the runtime blocks the exec or
-	// returns an error for any other reason.
-	tryExecCommandInPod(ctx, t,
-		workloadNamespace,
-		"app="+workloadDeployName,
-		"nginx",
-		[]string{procPath, "--version"},
-	)
 	return context.WithValue(ctx, unapprovedProcPathKey, procPath)
 }
 
@@ -217,7 +213,8 @@ func assessSecurityEventHasProcessIncident(action string) func(context.Context, 
 		endpoint := getAPIEndpoint(ctx)
 		token := getNVToken(ctx)
 		httpClient := newNVHTTPClient()
-		expectedProcPath := getUnapprovedProcessPath(ctx)
+		expectedProcPath := getOptionalUnapprovedProcessPath(ctx)
+		require.NotEmpty(t, expectedProcPath, "unapproved process path was not initialized before checking security incidents")
 
 		require.Eventually(t, func() bool {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)

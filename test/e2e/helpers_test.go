@@ -117,13 +117,18 @@ func tryExecCommandInPod(ctx context.Context, t *testing.T, namespace, labelSele
 	}
 }
 
-func selectCommandPathInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, candidatePaths []string, args []string) string {
+func execFirstAvailableCommandInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, candidatePaths []string, args []string) string {
 	t.Helper()
 	for _, path := range candidatePaths {
-		_, stderr, err := streamCommandInPod(ctx, t, namespace, labelSelector, containerName, append([]string{path}, args...))
-		if !isCommandNotFound(err, stderr) {
+		stdout, stderr, err := streamCommandInPod(ctx, t, namespace, labelSelector, containerName, append([]string{path}, args...))
+		if err == nil {
 			return path
 		}
+		if isCommandNotFound(err, stderr) {
+			continue
+		}
+		require.NoErrorf(t, err, "exec %v in pod %s failed while selecting command path (stdout=%q stderr=%q)",
+			append([]string{path}, args...), namespace, stdout, stderr)
 	}
 	require.FailNowf(t, "select command path", "none of %v are available in %s", candidatePaths, namespace)
 	return ""
