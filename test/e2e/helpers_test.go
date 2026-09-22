@@ -176,8 +176,7 @@ func isCommandNotFound(err error, stderr string) bool {
 	}
 	msg := strings.ToLower(err.Error() + " " + stderr)
 	return strings.Contains(msg, "no such file or directory") ||
-		strings.Contains(msg, "executable file not found") ||
-		strings.Contains(msg, "not found")
+		strings.Contains(msg, "executable file not found")
 }
 
 // findWorkloadInNVAPI polls /v2/workload until a workload matching namespace and
