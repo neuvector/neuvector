@@ -117,14 +117,16 @@ func tryExecCommandInPod(ctx context.Context, t *testing.T, namespace, labelSele
 	}
 }
 
-func resolveCommandPathInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName, commandName string) string {
+func selectCommandPathInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, candidatePaths []string, args []string) string {
 	t.Helper()
-	stdout, stderr, err := streamCommandInPod(ctx, t, namespace, labelSelector, containerName,
-		[]string{"/bin/sh", "-c", `command -v "$1"`, "sh", commandName})
-	require.NoError(t, err, "resolve command %q in %s", commandName, namespace)
-	path := strings.TrimSpace(stdout)
-	require.NotEmpty(t, path, "resolve command %q in %s returned empty path (stderr=%q)", commandName, namespace, stderr)
-	return path
+	for _, path := range candidatePaths {
+		_, stderr, err := streamCommandInPod(ctx, t, namespace, labelSelector, containerName, append([]string{path}, args...))
+		if !isCommandNotFound(err, stderr) {
+			return path
+		}
+	}
+	require.FailNowf(t, "select command path", "none of %v are available in %s", candidatePaths, namespace)
+	return ""
 }
 
 func streamCommandInPod(ctx context.Context, t *testing.T, namespace, labelSelector, containerName string, command []string) (string, string, error) {
@@ -166,6 +168,16 @@ func streamCommandInPod(ctx context.Context, t *testing.T, namespace, labelSelec
 		Stderr: &stderr,
 	})
 	return stdout.String(), stderr.String(), err
+}
+
+func isCommandNotFound(err error, stderr string) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error() + " " + stderr)
+	return strings.Contains(msg, "no such file or directory") ||
+		strings.Contains(msg, "executable file not found") ||
+		strings.Contains(msg, "not found")
 }
 
 // findWorkloadInNVAPI polls /v2/workload until a workload matching namespace and

@@ -27,12 +27,17 @@ const (
 	workloadServiceGroup = "nv." + workloadDeployName + "." + workloadNamespace
 	// /v1/service and /v1/service/config expect the name without the "nv." prefix
 	workloadServiceName = workloadDeployName + "." + workloadNamespace
-	unapprovedProcName  = "curl"
 
 	retryInterval = 10 * time.Second
 )
 
 var unapprovedProcPathKey contextKey
+
+var unapprovedProcPaths = []string{
+	"/usr/bin/curl",
+	"/bin/curl",
+	"/usr/local/bin/curl",
+}
 
 func getProcessProfileFeature() types.Feature {
 	return features.New("NeuVector Process Profile - Workload Visibility").
@@ -40,7 +45,6 @@ func getProcessProfileFeature() types.Feature {
 		Setup(setupAPIEndpoint).
 		Setup(setupWorkloadNamespace).
 		Setup(deployTestWorkload).
-		Setup(setupUnapprovedProcessPath).
 		Setup(setupAuthToken).
 		Assess("workload is visible in NeuVector API with correct service group", assessWorkloadInNVAPI).
 		Assess("group is learned with nginx container member", assessGroupLearnedWithMember).
@@ -55,7 +59,7 @@ func getProcessProfileFeature() types.Feature {
 		Assess("service ProfileMode is now Monitor",
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEvaluate})).
 		Assess("exec unapproved curl in nginx pod", execUnapprovedProcessInNginxPod).
-		Assess("security event reports curl as incident", assessSecurityEventHasProcessIncident("", getUnapprovedProcessPath)).
+		Assess("security event reports curl as incident", assessSecurityEventHasProcessIncident("")).
 		Assess("PATCH service ProfileMode to Protect",
 			assessPatchServiceConfig(serviceBatchPatch{
 				Services:    []string{workloadServiceName},
@@ -65,16 +69,10 @@ func getProcessProfileFeature() types.Feature {
 			assessServiceHasState(workloadServiceName, serviceStateExpectation{ProfileMode: share.PolicyModeEnforce})).
 		Assess("wait for Protect mode to propagate to enforcer", assessSleep(10*time.Second)).
 		Assess("exec curl in nginx pod is blocked by protect mode", execUnapprovedProcessInNginxPod).
-		Assess("security event reports curl as denied in protect mode", assessSecurityEventHasProcessIncident(share.PolicyActionDeny, getUnapprovedProcessPath)).
+		Assess("security event reports curl as denied in protect mode", assessSecurityEventHasProcessIncident(share.PolicyActionDeny)).
 		Teardown(teardownTestWorkload).
 		Teardown(teardownWorkloadNamespace).
 		Feature()
-}
-
-func setupUnapprovedProcessPath(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-	t.Helper()
-	path := resolveCommandPathInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcName)
-	return context.WithValue(ctx, unapprovedProcPathKey, path)
 }
 
 func getUnapprovedProcessPath(ctx context.Context) string {
@@ -194,6 +192,10 @@ func assessGroupLearnedWithMember(ctx context.Context, t *testing.T, _ *envconf.
 
 func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
+	procPath := getOptionalUnapprovedProcessPath(ctx)
+	if procPath == "" {
+		procPath = selectCommandPathInPod(ctx, t, workloadNamespace, "app="+workloadDeployName, "nginx", unapprovedProcPaths, []string{"--version"})
+	}
 	// In Monitor mode NeuVector allows the process to run but generates an alert
 	// incident. Tolerate a non-zero exit in case the runtime blocks the exec or
 	// returns an error for any other reason.
@@ -201,21 +203,21 @@ func execUnapprovedProcessInNginxPod(ctx context.Context, t *testing.T, _ *envco
 		workloadNamespace,
 		"app="+workloadDeployName,
 		"nginx",
-		[]string{getUnapprovedProcessPath(ctx), "--version"},
+		[]string{procPath, "--version"},
 	)
-	return ctx
+	return context.WithValue(ctx, unapprovedProcPathKey, procPath)
 }
 
 // assessSecurityEventHasProcessIncident returns an assess function that polls
 // GET /v1/log/security until an incident matching procPath and workloadServiceName
 // is found. If action is non-empty, the incident's action field must also match.
-func assessSecurityEventHasProcessIncident(action string, procPath func(context.Context) string) func(context.Context, *testing.T, *envconf.Config) context.Context {
+func assessSecurityEventHasProcessIncident(action string) func(context.Context, *testing.T, *envconf.Config) context.Context {
 	return func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 		t.Helper()
 		endpoint := getAPIEndpoint(ctx)
 		token := getNVToken(ctx)
 		httpClient := newNVHTTPClient()
-		expectedProcPath := procPath(ctx)
+		expectedProcPath := getUnapprovedProcessPath(ctx)
 
 		require.Eventually(t, func() bool {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/log/security", nil)
@@ -246,6 +248,11 @@ func assessSecurityEventHasProcessIncident(action string, procPath func(context.
 
 		return ctx
 	}
+}
+
+func getOptionalUnapprovedProcessPath(ctx context.Context) string {
+	path, _ := ctx.Value(unapprovedProcPathKey).(string)
+	return path
 }
 
 func assessProcessProfileHasNginx(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
