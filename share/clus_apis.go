@@ -2399,15 +2399,13 @@ func (restInfo CLUSRestServerInfo) IsValid() bool {
 }
 
 type CLUSFedMasterClusterInfo struct {
-	Disabled              bool               `json:"disabled"`
-	Name                  string             `json:"name"`
-	ID                    string             `json:"id"`
-	Secret                string             `json:"secret,cloak"`              // used for encryoting/decrypting join_ticket issued by the master cluster
-	CACert                string             `json:"ca_cert,cloak"`             // base64 encoded
-	User                  string             `json:"user,omitempty"`            // the user who promotes this cluster to master cluster in federation
-	FixedJoinToken        string             `json:"fixed_join_token"`          // set via configmap
-	AllowSameK8sUidRejoin bool               `json:"allow_same_k8s_uid_rejoin"` // set via configmap
-	RestInfo              CLUSRestServerInfo `json:"rest_info"`
+	Disabled bool               `json:"disabled"`
+	Name     string             `json:"name"`
+	ID       string             `json:"id"`
+	Secret   string             `json:"secret,cloak"`   // used for encryoting/decrypting join_ticket issued by the master cluster
+	CACert   string             `json:"ca_cert,cloak"`  // base64 encoded
+	User     string             `json:"user,omitempty"` // the user who promotes this cluster to master cluster in federation
+	RestInfo CLUSRestServerInfo `json:"rest_info"`
 }
 
 type CLUSFedJointClusterInfo struct {
