@@ -2039,8 +2039,6 @@ func startFedRestServer(fedPingInterval uint32) {
 		return
 	} else {
 		_masterClusterIP = m.MasterCluster.RestInfo.Server
-		_fixedJoinToken = m.MasterCluster.FixedJoinToken
-		_allowSameK8sUidRejoin = m.MasterCluster.AllowSameK8sUidRejoin
 	}
 
 	fedRestServerMutex.Lock()
