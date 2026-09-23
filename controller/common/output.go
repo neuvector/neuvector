@@ -260,14 +260,18 @@ const ctypeText = "text/plain; charset=us-ascii"
 const ctypeJSON = "application/json"
 
 type Webhook struct {
-	url    string
-	target string
+	url      string
+	target   string
+	userName string
+	password string
 }
 
-func NewWebHook(url, target string) *Webhook {
+func NewWebHook(url, target, userName, password string) *Webhook {
 	w := &Webhook{
-		url:    url,
-		target: target,
+		url:      url,
+		target:   target,
+		userName: userName,
+		password: password,
 	}
 	return w
 }
@@ -450,6 +454,9 @@ func (w *Webhook) httpRequest(data []byte, ctype string, proxy *share.CLUSProxy)
 		req, err = http.NewRequest("POST", w.url, bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("failed to create HTTP request: %w", err)
+		}
+		if w.userName != "" && w.password != "" {
+			req.SetBasicAuth(w.userName, w.password)
 		}
 		req.Header.Set("Content-Type", ctype)
 

@@ -1822,6 +1822,8 @@ func (h *nvCrdHandler) crdHandleFedConfig(cfgType share.TCfgType, fedConfig *api
 				Url:      wh.Url,
 				Enable:   wh.Enable,
 				UseProxy: wh.UseProxy,
+				Username: wh.Username,
+				Password: wh.Password,
 				Type:     wh.Type,
 				CfgType:  common.TCfgTypeToApi(cfgType),
 			}
