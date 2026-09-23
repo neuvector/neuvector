@@ -271,11 +271,7 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-
-          if grep -A2 '^authentication:' "$file" 2>/dev/null |
-              grep -qE '^[[:space:]]+enabled:[[:space:]]+false[[:space:]]*$'; then
+          if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
               pass "$check"
           else
               warn "$check"
@@ -430,7 +426,11 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          pass "$check"
+          if check_argument "$CIS_KUBELET_CMD" '--hostname-override' >/dev/null 2>&1; then
+              warn "$check"
+          else
+              pass "$check"
+          fi
         remediation: |
           Not Applicable.
           By default, RKE2 does set the --hostname-override argument. Per CIS guidelines, this is to comply
@@ -496,14 +496,7 @@ groups:
                 warn "$check"
               fi
           else
-              config_file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
-              config_file=$(append_prefix "$CONFIG_PREFIX" "$config_file")
-              if grep -qF 'tlsCertFile: /var/lib/rancher/rke2/agent/serving-kubelet.crt' "$config_file" 2>/dev/null &&
-                 grep -qF 'tlsPrivateKeyFile: /var/lib/rancher/rke2/agent/serving-kubelet.key' "$config_file" 2>/dev/null; then
-                  pass "$check"
-              else
-                warn "$check"
-              fi
+              warn "$check"
           fi
         remediation: |
           By default, RKE2 automatically provides the TLS certificate and private key for the Kubelet.
