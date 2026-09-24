@@ -344,7 +344,10 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 		user, _, _ = clusHelper.GetUserRev(common.ReservedUserNameIBMSA, acc)
 	}
 	if user != nil {
-		remote := remoteHost(r.RemoteAddr)
+		remote := r.RemoteAddr
+		if i := strings.Index(remote, ":"); i > 0 {
+			remote = remote[:i]
+		}
 		if s, rc := loginUser(user, nil, nil, remote, _interactiveSessionID, "", api.FedRoleNone, nil); rc == userOK {
 			resp := api.RESTIBMSASetupToken{
 				AccessToken: s.token,

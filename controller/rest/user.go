@@ -940,7 +940,10 @@ func handlerUserPwdConfig(w http.ResponseWriter, r *http.Request, ps httprouter.
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrFailWriteCluster, "Failed to write to the cluster")
 		return
 	} else {
-		remote := remoteHost(r.RemoteAddr)
+		remote := r.RemoteAddr
+		if i := strings.Index(remote, ":"); i > 0 {
+			remote = remote[:i]
+		}
 		if unblockUser {
 			msg := fmt.Sprintf("User %s is unblocked from login by %s", fullname, login.fullname)
 			authLog(share.CLUSEvAuthLoginUnblocked, fullname, remote, "", nil, msg)
