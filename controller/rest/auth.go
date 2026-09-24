@@ -10,7 +10,6 @@ import (
 	"io"
 	"math"
 	mathRand "math/rand"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -2300,16 +2299,6 @@ func isPasswordExpired(localAuthed bool, userName string, pwdResetTime time.Time
 	return pwdDaysUntilExpire, pwdHoursUntilExpire, false
 }
 
-// remoteHost returns the host part of an address that may carry a port, such
-// as "1.2.3.4:5678" or "[::1]:5678" from http.Request.RemoteAddr. A value
-// without a port, bare IPv6 addresses included, is returned unchanged.
-func remoteHost(remote string) string {
-	if host, _, err := net.SplitHostPort(remote); err == nil {
-		return host
-	}
-	return remote
-}
-
 func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -2402,7 +2391,9 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		if remote == "" {
 			remote = r.RemoteAddr
 		}
-		remote = remoteHost(remote)
+		if i := strings.Index(remote, ":"); i > 0 {
+			remote = remote[:i]
+		}
 
 		var errLocalAuth error
 		var localAuthEnabled bool
@@ -2643,7 +2634,9 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	if remote == "" {
 		remote = r.RemoteAddr
 	}
-	remote = remoteHost(remote)
+	if i := strings.Index(remote, ":"); i > 0 {
+		remote = remote[:i]
+	}
 
 	userName := auth.JointUsername
 	if auth.JointUsername == common.DefaultAdminUser {
@@ -2707,7 +2700,9 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	if remote == "" {
 		remote = r.RemoteAddr
 	}
-	remote = remoteHost(remote)
+	if i := strings.Index(remote, ":"); i > 0 {
+		remote = remote[:i]
+	}
 
 	accReadAll := access.NewReaderAccessControl()
 
