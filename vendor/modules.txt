@@ -634,12 +634,14 @@ github.com/spiffe/go-spiffe/v2/spiffeid
 # github.com/streadway/simpleuuid v0.0.0-20130420165545-6617b501e485
 ## explicit
 github.com/streadway/simpleuuid
-# github.com/stretchr/testify v1.11.1
+# github.com/stretchr/testify v1.12.1
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
+github.com/stretchr/testify/internal/difflib
+github.com/stretchr/testify/internal/spew
 github.com/stretchr/testify/require
-# github.com/urfave/cli/v3 v3.9.0
+# github.com/urfave/cli/v3 v3.12.0
 ## explicit; go 1.22
 github.com/urfave/cli/v3
 # github.com/vishvananda/netlink v1.3.1
@@ -702,7 +704,7 @@ go.opentelemetry.io/otel/trace/noop
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# go.yaml.in/yaml/v3 v3.0.4
+# go.yaml.in/yaml/v3 v3.0.5
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
 # golang.org/x/crypto v0.56.0

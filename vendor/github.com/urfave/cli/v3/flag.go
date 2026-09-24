@@ -151,6 +151,23 @@ type DocGenerationMultiValueFlag interface {
 	IsMultiValueFlag() bool
 }
 
+// SchemaTyper is an optional interface for flags that can report their
+// JSON Schema type for programmatic introspection.
+type SchemaTyper interface {
+	// SchemaType returns the JSON Schema type name for the value this
+	// flag accepts: "boolean", "integer", "number", "string", "array",
+	// "object". Returns "" if the flag does not map cleanly.
+	SchemaType() string
+}
+
+// SchemaItemsTyper is an optional interface for multi-value flags that
+// can report the JSON Schema type of their elements.
+type SchemaItemsTyper interface {
+	// SchemaItemsType returns the JSON Schema type of elements for
+	// array-type flags. Returns "" for single-value or object flags.
+	SchemaItemsType() string
+}
+
 // Countable is an interface to enable detection of flag values which support
 // repetitive flags
 type Countable interface {
@@ -171,6 +188,18 @@ type CategorizableFlag interface {
 
 	// Sets the category of the flag
 	SetCategory(string)
+}
+
+// StringerSetter is an optional interface that allows an individual
+// flag to be given a per-flag override of [FlagStringer]. FlagBase and
+// BoolWithInverseFlag implement this. It's used by
+// [MutuallyExclusiveFlags.Stringer] to customize how flags within a
+// mutually exclusive group are displayed in help output.
+type StringerSetter interface {
+	// SetStringer overrides the [FlagStringFunc] used by this flag's
+	// String method. Passing nil restores the default behavior of using
+	// the package-level [FlagStringer].
+	SetStringer(FlagStringFunc)
 }
 
 // LocalFlag is an interface to enable detection of flags which are local

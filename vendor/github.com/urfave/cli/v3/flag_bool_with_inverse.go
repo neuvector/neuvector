@@ -37,6 +37,21 @@ type BoolWithInverseFlag struct {
 	value      Value // value representing this flag's value
 	pset       bool
 	nset       bool
+	stringer   FlagStringFunc // optional per-flag override of FlagStringer
+}
+
+// SetStringer overrides the [FlagStringFunc] used by this flag's String
+// method. Passing nil restores the default behavior of using the
+// package-level [FlagStringer]. This is used e.g. by
+// [MutuallyExclusiveFlags.Stringer].
+//
+// Note: unlike [FlagBase], BoolWithInverseFlag.String only honors the
+// stringer partially. The names segment (the part before the first tab,
+// e.g. "--[no-]env, -e") is always recomputed from Name/Aliases/InversePrefix
+// and cannot be overridden; only the tab-delimited details after it come
+// from the stringer's output.
+func (bif *BoolWithInverseFlag) SetStringer(s FlagStringFunc) {
+	bif.stringer = s
 }
 
 func (bif *BoolWithInverseFlag) IsSet() bool {
@@ -116,7 +131,7 @@ func (bif *BoolWithInverseFlag) PostParse() error {
 
 func (bif *BoolWithInverseFlag) Set(name, val string) error {
 	if bif.count > 0 && bif.OnlyOnce {
-		return fmt.Errorf("cant duplicate this flag")
+		return fmt.Errorf("can't duplicate this flag")
 	}
 
 	bif.hasBeenSet = true
@@ -171,7 +186,11 @@ func (bif *BoolWithInverseFlag) IsVisible() bool {
 // Example for BoolFlag{Name: "env", Aliases: []string{"e"}}
 // --[no-]env, -e	(default: false)
 func (bif *BoolWithInverseFlag) String() string {
-	out := FlagStringer(bif)
+	fs := FlagStringer
+	if bif.stringer != nil {
+		fs = bif.stringer
+	}
+	out := fs(bif)
 
 	i := strings.Index(out, "\t")
 
@@ -207,7 +226,7 @@ func (bif *BoolWithInverseFlag) String() string {
 	return fmt.Sprintf("%s%s", names, out[i:])
 }
 
-// IsBoolFlag returns whether the flag doesnt need to accept args
+// IsBoolFlag returns whether the flag doesn't need to accept args
 func (bif *BoolWithInverseFlag) IsBoolFlag() bool {
 	return true
 }
@@ -219,7 +238,7 @@ func (bif *BoolWithInverseFlag) Count() int {
 
 // GetDefaultText returns the default text for this flag
 func (bif *BoolWithInverseFlag) GetDefaultText() string {
-	if bif.Required {
+	if bif.DefaultText != "" {
 		return bif.DefaultText
 	}
 	return boolValue{}.ToString(bif.Value)
@@ -262,4 +281,12 @@ func (bif *BoolWithInverseFlag) IsDefaultVisible() bool {
 // TypeName is used for stringify/docs. For bool its a no-op
 func (bif *BoolWithInverseFlag) TypeName() string {
 	return "bool"
+}
+
+func (bif *BoolWithInverseFlag) SchemaType() string {
+	return "boolean"
+}
+
+func (bif *BoolWithInverseFlag) SchemaItemsType() string {
+	return ""
 }

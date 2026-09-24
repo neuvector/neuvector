@@ -114,7 +114,9 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 				return &stringSliceArgs{posArgs}, nil
 			}
 
-			posArgs = append(posArgs, firstArg)
+			// firstArg is a trimmed copy that classifies the argument; the
+			// argument itself is what the action receives, byte for byte.
+			posArgs = append(posArgs, rargs[0])
 			continue
 		}
 
@@ -145,7 +147,9 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 		valFromEqual := false
 		tracef("flagName:1 (fName=%[1]q)", flagName)
 		if index := strings.Index(flagName, "="); index != -1 {
-			flagVal = flagName[index+1:]
+			// Classify the flag using the trimmed token, but leave value
+			// whitespace handling to the flag's value parser.
+			_, flagVal, _ = strings.Cut(rargs[0], "=")
 			flagName = flagName[:index]
 			valFromEqual = true
 		}
@@ -199,6 +203,12 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 				posArgs = append(posArgs, rargs...)
 				return &stringSliceArgs{posArgs}, nil
 			}
+			// When DefaultCommand is set, pass unknown flags through as positional args
+			// so the default command can handle them (fixes #2249)
+			if cmd.DefaultCommand != "" {
+				posArgs = append(posArgs, rargs...)
+				return &stringSliceArgs{posArgs}, nil
+			}
 			return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", providedButNotDefinedErrMsg, flagName)
 		}
 
@@ -206,6 +216,10 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 		for index, c := range flagName {
 			tracef("processing flag (fName=%[1]q)", string(c))
 			if sf := cmd.lookupFlag(string(c)); sf == nil {
+				if index == 0 && cmd.DefaultCommand != "" {
+					posArgs = append(posArgs, rargs...)
+					return &stringSliceArgs{posArgs}, nil
+				}
 				return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", providedButNotDefinedErrMsg, flagName)
 			} else if fb, ok := sf.(boolFlag); ok && fb.IsBoolFlag() {
 				fv := flagVal
