@@ -74,9 +74,23 @@ type ResourceDriver interface {
 
 var baseDriver *base
 
+// enableCustomSvcName controls whether the io.neuvector.service.name label is honored.
+// Disabled by default so a workload cannot force itself into an arbitrary (possibly
+// unprotected) group; set NV_ENABLE_CUSTOM_SVC_NAME to enable.
+var enableCustomSvcName bool
+
+// CustomServiceNameEnabled reports whether the io.neuvector.service.name label is honored.
+func CustomServiceNameEnabled() bool {
+	return enableCustomSvcName
+}
+
 func GetDriver(platform, flavor, network string, ver1, ver2 string,
 	sys *system.SystemTools, rt container.Runtime,
 ) Driver {
+	if os.Getenv("NV_ENABLE_CUSTOM_SVC_NAME") != "" {
+		enableCustomSvcName = true
+	}
+
 	baseDriver = &base{noop: noop{platform: platform, flavor: flavor, network: network}}
 
 	switch platform {
