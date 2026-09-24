@@ -46,6 +46,20 @@ func isPidValid(pid int) bool {
 	return err == nil
 }
 
+// shouldSkipDir reports whether a directory (relative path `ldir`) should be pruned.
+// An empty allowDirs means "no restriction": walk everything (restores pre-NVSHAS-9756 behavior).
+func shouldSkipDir(ldir string, allowDirs []string) bool {
+	if len(allowDirs) == 0 {
+		return false
+	}
+	for _, rdir := range allowDirs {
+		if strings.HasPrefix(ldir, rdir) {
+			return false
+		}
+	}
+	return true
+}
+
 // ///////////
 func InitTaskMain(workPath string, done chan error, sys *system.SystemTools) *taskMain {
 	tm := &taskMain{
@@ -226,15 +240,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 					return filepath.SkipDir
 				}
 
-				bSkip := true
-				ldir := path[rootPathLen:]
-				for _, rdir := range req.Dirs {
-					if strings.HasPrefix(ldir, rdir) {
-						bSkip = false
-						break
-					}
-				}
-				if bSkip {
+				if shouldSkipDir(path[rootPathLen:], req.Dirs) {
 					return filepath.SkipDir
 				}
 			}
