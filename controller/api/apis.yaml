@@ -12992,6 +12992,10 @@ definitions:
       use_proxy:
         type: boolean
         example: false
+      username:
+        type: string
+      password:
+        type: string
       type:
         type: string
         enum: ["", Slack, JSON, Teams]
