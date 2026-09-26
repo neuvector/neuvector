@@ -2,13 +2,7 @@
 #define __BASE_H__
 
 #include <inttypes.h>
-
-typedef unsigned char bool;
-
-#undef true
-#undef false
-#define true  1
-#define false 0
+#include "stdbool.h"
 
 #define max(x,y) (((x)>(y))?(x):(y))
 #define min(x,y) (((x)<(y))?(x):(y))
