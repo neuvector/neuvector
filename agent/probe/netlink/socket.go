@@ -88,10 +88,16 @@ func MessageError(msg syscall.NetlinkMessage) error {
 	return fmt.Errorf("netlink error %d: %w", int(errno), errno)
 }
 
+// Close is safe to call more than once. After it, Send and Receive fail
+// with EBADF rather than touching a descriptor number the process may have
+// reused.
 func (ns *NetlinkSocket) Close() {
 	//syscall.Shutdown(ns.fd, syscall.SHUT_RDWR)
 	//syscall.SetNonblock(ns.fd, true)
-	syscall.Close(ns.fd)
+	if ns.fd >= 0 {
+		syscall.Close(ns.fd)
+		ns.fd = -1
+	}
 }
 
 func (ns *NetlinkSocket) Send(request *NetlinkRequest) error {
@@ -142,9 +148,16 @@ func (ns *NetlinkSocket) SetTimeout(timeout time.Duration) error {
 }
 
 func (ns *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, error) {
-	nr, err := syscall.Read(ns.fd, ns.buf)
+	// With MSG_TRUNC the kernel returns the datagram's real length even when
+	// only part of it fit the buffer, so a datagram too large for the buffer
+	// is reported here instead of surfacing as a parse error a few bytes in,
+	// or, worse, as a dump that simply ends early.
+	nr, _, err := syscall.Recvfrom(ns.fd, ns.buf, unix.MSG_TRUNC)
 	if err != nil {
 		return nil, err
+	}
+	if nr > len(ns.buf) {
+		return nil, fmt.Errorf("netlink datagram of %d bytes truncated to the %d-byte buffer", nr, len(ns.buf))
 	}
 	if nr < syscall.NLMSG_HDRLEN {
 		return nil, fmt.Errorf("Got short response from netlink")
