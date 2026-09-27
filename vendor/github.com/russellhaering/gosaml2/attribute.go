@@ -20,6 +20,16 @@ import "github.com/russellhaering/gosaml2/types"
 // can be used for easy access to the string values of Attribute lists.
 type Values map[string]types.Attribute
 
+// valueString returns the string form of an AttributeValue: the value of a
+// nested NameID element if one is present (e.g. eduPersonTargetedID),
+// otherwise the text content.
+func valueString(v types.AttributeValue) string {
+	if v.NameID != nil && v.NameID.Value != "" {
+		return v.NameID.Value
+	}
+	return v.Value
+}
+
 // Get is a safe method (nil maps will not panic) for returning the first value
 // for an attribute at a key, or the empty string if none exists.
 func (vals Values) Get(k string) string {
@@ -27,7 +37,7 @@ func (vals Values) Get(k string) string {
 		return ""
 	}
 	if v, ok := vals[k]; ok && len(v.Values) > 0 {
-		return string(v.Values[0].Value)
+		return valueString(v.Values[0])
 	}
 	return ""
 }
@@ -58,7 +68,7 @@ func (vals Values) GetAll(k string) []string {
 
 	if v, ok := vals[k]; ok && len(v.Values) > 0 {
 		for i := 0; i < len(v.Values); i++ {
-			av = append(av, string(v.Values[i].Value))
+			av = append(av, valueString(v.Values[i]))
 		}
 	}
 
