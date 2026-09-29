@@ -3907,6 +3907,26 @@ paths:
           description: Success
           schema:
             $ref: "#/definitions/RESTScoreMetricsData"
+  /v1/system/score/exposure:
+    post:
+      tags:
+        - System
+      summary: Send the exposure report to syslog
+      description: Flattens ingress and egress exposure from the system score metrics into one syslog message. Optional f_domain limits the report to one namespace.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: query
+          name: f_domain
+          type: string
+          required: false
+          description: Namespace filter. When omitted, the report includes every namespace the caller can see.
+      responses:
+        "200":
+          description: Success
   /v1/user:
     get:
       tags:

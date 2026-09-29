@@ -14,6 +14,7 @@ import (
 
 type CacheInterface interface {
 	GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *api.RESTScoreMetricsData
+	SendExposureReport(acc, accCaller *access.AccessControl, domain string)
 
 	GetAllHosts(acc *access.AccessControl) []*api.RESTHost
 	GetAllHostsRisk(acc *access.AccessControl) []*common.WorkloadRisk

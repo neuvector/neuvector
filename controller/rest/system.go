@@ -407,6 +407,47 @@ func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps htt
 	restRespSuccess(w, r, resp, acc, login, nil, "Get system score metrics data")
 }
 
+func handlerSendExposureReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	// Read access matches GET /v1/system/score/metrics, so the report contains the
+	// same workloads the caller can already see.
+	acc, login := getAccessControl(w, r, access.AccessOPRead)
+	if acc == nil {
+		return
+	}
+
+	domain, err := exposureDomainFilter(restParseQuery(r))
+	if err != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+		return
+	}
+
+	accSysConfig := acc.BoostPermissions(share.PERM_SYSTEM_CONFIG)
+	cacher.SendExposureReport(accSysConfig, acc, domain)
+	restRespSuccess(w, r, nil, acc, login, nil, "Send exposure report to syslog")
+}
+
+func exposureDomainFilter(query *restQuery) (string, error) {
+	if query == nil {
+		return "", nil
+	}
+	var domain string
+	var found bool
+	for _, f := range query.filters {
+		if f.tag != api.FilterByDomain {
+			continue
+		}
+		if found || f.op != api.OPeq {
+			return "", fmt.Errorf("invalid f_domain filter")
+		}
+		domain = f.value
+		found = true
+	}
+	return domain, nil
+}
+
 func handlerPredictSystemScore(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()

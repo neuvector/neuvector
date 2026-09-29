@@ -1806,6 +1806,36 @@ type RESTScoreMetricsData struct {
 	SecurityScores *RESTSecurityScores    `json:"security_scores"`
 }
 
+// RESTExposureReportLog is one syslog message for an on-demand exposure report.
+// Entries match the exposure CSV rows exported by the manager, without geo location.
+type RESTExposureReportLog struct {
+	Name              string                  `json:"name"`
+	Level             string                  `json:"level"`
+	ReportedTimeStamp int64                   `json:"reported_timestamp"`
+	ReportedAt        string                  `json:"reported_at"`
+	ClusterName       string                  `json:"cluster_name"`
+	Entries           []*RESTExposureLogEntry `json:"entries"`
+}
+
+// RESTExposureLogEntry is one exposure conversation entry in an exposure report.
+type RESTExposureLogEntry struct {
+	Direction    string `json:"direction"`
+	Service      string `json:"service"`
+	Pod          string `json:"pod"`
+	Critical     int    `json:"critical"`
+	High         int    `json:"high"`
+	Medium       int    `json:"medium"`
+	PolicyMode   string `json:"policy_mode"`
+	ExternalIP   string `json:"external_ip"`
+	ExternalHost string `json:"external_host"`
+	Port         string `json:"port"`
+	Bytes        uint64 `json:"bytes"`
+	Application  string `json:"application"`
+	Sessions     uint32 `json:"sessions"`
+	Action       string `json:"action"`
+	SessionTime  string `json:"session_time"`
+}
+
 type RESTProxy struct {
 	URL      string `json:"url"`
 	Username string `json:"username"`
