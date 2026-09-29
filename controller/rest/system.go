@@ -478,6 +478,8 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						Url:      wh.Url,
 						Enable:   wh.Enable,
 						UseProxy: wh.UseProxy,
+						Username: wh.Username,
+						Password: wh.Password,
 						Type:     wh.Type,
 						CfgType:  common.TCfgTypeToApi(wh.CfgType),
 					}
@@ -856,7 +858,7 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 			newWebhookNames.Add(h.Name)
 			newWebhooks = append(newWebhooks, share.CLUSWebhook{
 				Name: h.Name, Url: h.Url, Enable: h.Enable, UseProxy: h.UseProxy,
-				Type: h.Type, CfgType: cfgType,
+				Username: h.Username, Password: h.Password, Type: h.Type, CfgType: cfgType,
 			})
 		}
 	}
@@ -929,6 +931,8 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		Url:      rwh.Url,
 		Enable:   rwh.Enable,
 		UseProxy: rwh.UseProxy,
+		Username: rwh.Username,
+		Password: rwh.Password,
 		Type:     rwh.Type,
 		CfgType:  share.UserCreated,
 	}
@@ -1102,6 +1106,8 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 					Url:      rwh.Url,
 					Enable:   rwh.Enable,
 					UseProxy: rwh.UseProxy,
+					Username: rwh.Username,
+					Password: rwh.Password,
 					Type:     rwh.Type,
 					CfgType:  wh.CfgType,
 				}

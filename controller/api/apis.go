@@ -1826,6 +1826,8 @@ type RESTWebhook struct {
 	Url      string `json:"url"`
 	Enable   bool   `json:"enable"`
 	UseProxy bool   `json:"use_proxy"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,cloak,omitempty"`
 	Type     string `json:"type"`
 	CfgType  string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
 }
@@ -3084,6 +3086,8 @@ type RESTCrdFedWebHook struct {
 	Url      string `json:"url"`
 	Enable   bool   `json:"enable"`
 	UseProxy bool   `json:"use_proxy"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,cloak,omitempty"`
 	Type     string `json:"type"`
 }
 

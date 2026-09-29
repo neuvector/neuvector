@@ -328,7 +328,7 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			for _, h := range cfg.Webhooks {
 				if h.Enable {
 					fedWebhookCacheTemp[h.Name] = &webhookCache{
-						c:        common.NewWebHook(h.Url, h.Type),
+						c:        common.NewWebHook(h.Url, h.Type, h.Username, h.Password),
 						url:      h.Url,
 						useProxy: h.UseProxy,
 					}
