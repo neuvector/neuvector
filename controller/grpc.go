@@ -438,6 +438,17 @@ func (ss *ScanService) ScannerRegisterV3(stream share.ControllerScanService_Scan
 		upToDate = s.CVEDBVersion == req.CVEDBVersion
 	}
 
+	// Even when the version matches, verify the store data is actually present.
+	// If the slots were lost (e.g. after a partial upgrade or cluster disruption)
+	// while the version marker survived, force a full re-upload to recover.
+	if upToDate {
+		storePrefix := fmt.Sprintf("%s%s/", share.CLUSScannerDBStore, req.CVEDBVersion)
+		if keys, _ := cluster.GetStoreKeys(storePrefix); len(keys) == 0 {
+			upToDate = false
+			log.WithFields(log.Fields{"scanner": req.ID, "version": req.CVEDBVersion}).Warn("CVEDB store data missing despite up-to-date version marker; forcing re-upload")
+		}
+	}
+
 	if upToDate {
 		log.WithFields(log.Fields{"scanner": req.ID, "version": req.CVEDBVersion}).Info("CVEDB up-to-date, registering scanner without upload")
 		totalEntries := int(s.CVEDBEntries)
