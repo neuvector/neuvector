@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"errors"
 	"sort"
 	"time"
 
@@ -8,17 +9,21 @@ import (
 	"github.com/neuvector/neuvector/controller/api"
 )
 
-func (m CacheMethod) SendExposureReport(acc, accCaller *access.AccessControl, domain string) {
+// ErrNoExposureData is returned when there is no exposure entry to send to syslog.
+var ErrNoExposureData = errors.New("no exposure data to report")
+
+func (m CacheMethod) SendExposureReport(acc, accCaller *access.AccessControl, domain string) error {
 	data := m.GetRiskScoreMetrics(acc, accCaller)
-	if data == nil {
-		return
+	if data == nil || len(data.Ingress)+len(data.Egress) == 0 {
+		return ErrNoExposureData
 	}
 
 	report := buildExposureReport(data.Ingress, data.Egress, domain)
 	if len(report.Entries) == 0 {
-		return
+		return ErrNoExposureData
 	}
 	sendSyslog(report, api.LogLevelINFO, api.CategoryAudit, api.ExposureReportHeader)
+	return nil
 }
 
 // buildExposureReport flattens ingress then egress into one report.

@@ -411,8 +411,7 @@ func handlerSendExposureReport(w http.ResponseWriter, r *http.Request, ps httpro
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
 
-	// Read access matches GET /v1/system/score/metrics, so the report contains the
-	// same workloads the caller can already see.
+	// Read access so the report contains only workloads the caller can already see.
 	acc, login := getAccessControl(w, r, access.AccessOPRead)
 	if acc == nil {
 		return
@@ -424,8 +423,10 @@ func handlerSendExposureReport(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	accSysConfig := acc.BoostPermissions(share.PERM_SYSTEM_CONFIG)
-	cacher.SendExposureReport(accSysConfig, acc, domain)
+	if err := cacher.SendExposureReport(acc, acc, domain); err != nil {
+		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
+		return
+	}
 	restRespSuccess(w, r, nil, acc, login, nil, "Send exposure report to syslog")
 }
 
