@@ -373,12 +373,16 @@ groups:
           check="$id  - $description"
 
           if [ -e "$file" ]; then
-            ownership=$(stat -c %U:%G $file)
-            if [ "$ownership" = "etcd:etcd" ]; then
+            file_uid=$(stat -c %u $file)
+            file_gid=$(stat -c %g $file)
+            etcd_uid=$(awk -F: '$1=="etcd"{print $3}' ${CONFIG_PREFIX}/etc/passwd 2>/dev/null)
+            etcd_gid=$(awk -F: '$1=="etcd"{print $3}' ${CONFIG_PREFIX}/etc/group 2>/dev/null)
+            if [ -n "$etcd_uid" ] && [ "$file_uid" = "$etcd_uid" ] && [ -n "$etcd_gid" ] && [ "$file_gid" = "$etcd_gid" ]; then
               pass "$check"
             else
+              ownership=$(stat -c %U:%G $file)
               warn "$check"
-              warn "      * Wrong ownership for $file, expected etcd:etcd, but is $ownership"
+              warn "      * Wrong ownership for $file, expected etcd:etcd (uid=$etcd_uid gid=$etcd_gid), but is $ownership (uid=$file_uid gid=$file_gid)"
             fi
           else
             warn "$check"
