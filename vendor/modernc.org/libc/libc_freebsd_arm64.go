@@ -6,7 +6,6 @@ package libc // import "modernc.org/libc"
 
 import (
 	"strings"
-	"syscall"
 	gotime "time"
 	"unsafe"
 
@@ -661,7 +660,7 @@ func Xgetrlimit64(t *TLS, resource int32, rlim uintptr) int32 {
 	return 0
 }
 
-func newFtsent(t *TLS, info int, path string, stat *unix.Stat_t, err syscall.Errno) (r *fts.FTSENT) {
+func newFtsent(t *TLS, info int, path string, stat *unix.Stat_t, err syscallErrno) (r *fts.FTSENT) {
 	var statp uintptr
 	if stat != nil {
 		statp = Xmalloc(t, types.Size_t(unsafe.Sizeof(unix.Stat_t{})))
@@ -896,4 +895,27 @@ func Xclock(t *TLS) time.Clock_t {
 		trc("t=%v, (%v:)", t, origin(2))
 	}
 	return time.Clock_t(gotime.Since(startTime) * gotime.Duration(time.CLOCKS_PER_SEC) / gotime.Second)
+}
+
+// setTmGmtoff stores off into tm.Ftm_gmtoff at the platform-native width.
+func setTmGmtoff(tm *time.Tm, off int) { tm.Ftm_gmtoff = int64(off) }
+
+// Xmmap — see libc_freebsd.go. 64-bit: off_t fits in one argument word.
+func Xmmap(t *TLS, addr uintptr, length types.Size_t, prot, flags, fd int32, offset types.Off_t) uintptr {
+	if __ccgo_strace {
+		trc("t=%v addr=%v length=%v fd=%v offset=%v, (%v:)", t, addr, length, fd, offset, origin(2))
+	}
+	data, _, err := unix.Syscall6(unix.SYS_MMAP, addr, uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), uintptr(offset))
+	if err != 0 {
+		if dmesgs {
+			dmesg("%v: %v FAIL", origin(1), err)
+		}
+		t.setErrno(err)
+		return ^uintptr(0) // (void*)-1
+	}
+
+	if dmesgs {
+		dmesg("%v: %#x", origin(1), data)
+	}
+	return data
 }
