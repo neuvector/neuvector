@@ -338,7 +338,7 @@ func handlerCustomCheckConfig(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("Failed to read request body")
 	}

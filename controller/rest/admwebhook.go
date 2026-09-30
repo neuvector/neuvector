@@ -1461,7 +1461,7 @@ func (whsvr *WebhookServer) serveWithTimeStamps(w http.ResponseWriter, r *http.R
 
 	var body []byte
 	if r.Body != nil {
-		if data, err := io.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(getDefaultReader(r.Body)); err == nil {
 			body = data
 		}
 	}
