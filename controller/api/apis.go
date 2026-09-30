@@ -1860,8 +1860,23 @@ type RESTWebhook struct {
 	CfgType  string `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
 }
 
-type RESTSystemWebhookConfigData struct {
+type RESTSystemWebhookData struct {
 	Config *RESTWebhook `json:"config"`
+}
+
+type RESTWebhookConfig struct {
+	Name     string  `json:"name"`
+	Url      string  `json:"url"`
+	Enable   bool    `json:"enable"`
+	UseProxy bool    `json:"use_proxy"`
+	Username string  `json:"username,omitempty"`
+	Password *string `json:"password,omitempty"`
+	Type     string  `json:"type"`
+	CfgType  string  `json:"cfg_type"` // CfgTypeUserCreated / CfgTypeFederal (see above)
+}
+
+type RESTSystemWebhookConfigData struct {
+	Config *RESTWebhookConfig `json:"config"`
 }
 
 const (
@@ -1892,7 +1907,7 @@ type RESTSystemConfigConfig struct {
 	RancherEP                  *string                          `json:"rancher_ep,omitempty"`
 	WebhookEnable              *bool                            `json:"webhook_status,omitempty"` // deprecated, kept for backward-compatibility, skip docs
 	WebhookUrl                 *string                          `json:"webhook_url,omitempty"`    // deprecated, kept for backward-compatibility, skip docs
-	Webhooks                   *[]*RESTWebhook                  `json:"webhooks,omitempty"`
+	Webhooks                   *[]*RESTWebhookConfig            `json:"webhooks,omitempty"`
 	ClusterName                *string                          `json:"cluster_name,omitempty"`
 	ControllerDebug            *[]string                        `json:"controller_debug,omitempty"`
 	MonitorServiceMesh         *bool                            `json:"monitor_service_mesh,omitempty"`
@@ -1915,7 +1930,7 @@ type RESTSystemConfigConfig struct {
 }
 
 type RESTFedSystemConfigConfig struct {
-	Webhooks *[]*RESTWebhook `json:"webhooks,omitempty"`
+	Webhooks *[]*RESTWebhookConfig `json:"webhooks,omitempty"`
 }
 
 type RESTSysNetConfigConfig struct {
@@ -2013,7 +2028,7 @@ type RESTSystemConfigConfigV2 struct {
 	AuthCfg            *RESTSystemConfigAuthCfgV2       `json:"auth_cfg,omitempty"`
 	ProxyCfg           *RESTSystemConfigProxyCfgV2      `json:"proxy_cfg,omitempty"`
 	TlsCfg             *RESTSystemConfigTlsCfg          `json:"tls_cfg,omitempty"`
-	Webhooks           *[]*RESTWebhook                  `json:"webhooks,omitempty"`
+	Webhooks           *[]*RESTWebhookConfig            `json:"webhooks,omitempty"`
 	IbmsaCfg           *RESTSystemConfigIBMSAVCfg2      `json:"ibmsa_cfg,omitempty"`
 	ScannerAutoscale   *RESTSystemConfigAutoscaleConfig `json:"scanner_autoscale_cfg,omitempty"`
 	MiscCfg            *RESTSystemConfigMiscCfgV2       `json:"misc_cfg,omitempty"`
@@ -3115,7 +3130,7 @@ type RESTCrdFedWebHook struct {
 	Enable   bool   `json:"enable"`
 	UseProxy bool   `json:"use_proxy"`
 	Username string `json:"username,omitempty"`
-	Password string `json:"password,cloak,omitempty"`
+	Password string `json:"password,omitempty"`
 	Type     string `json:"type"`
 }
 

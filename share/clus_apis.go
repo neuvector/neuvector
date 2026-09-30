@@ -796,8 +796,8 @@ type CLUSWebhook struct {
 	Url      string   `json:"url"`
 	Enable   bool     `json:"enable"`
 	UseProxy bool     `json:"use_proxy"`
-	Username string   `json:"username,omitempty"`
-	Password string   `json:"password,cloak,omitempty"`
+	Username string   `json:"username"`
+	Password string   `json:"password,cloak"`
 	Type     string   `json:"type"`
 	CfgType  TCfgType `json:"cfg_type"`
 }

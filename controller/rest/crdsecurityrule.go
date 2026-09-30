@@ -1813,20 +1813,24 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 // caller must own CLUSLockServerKey lock
 func (h *nvCrdHandler) crdHandleFedConfig(cfgType share.TCfgType, fedConfig *api.RESTCrdFedConfig,
 	cacheRecord *share.CLUSCrdSecurityRule, reviewType share.TReviewType) error {
-	var rcWebhooks []*api.RESTWebhook
+	var rcWebhooks []*api.RESTWebhookConfig
 	if len(fedConfig.Webhooks) > 0 {
-		rcWebhooks = make([]*api.RESTWebhook, 0, len(fedConfig.Webhooks))
-		for _, wh := range fedConfig.Webhooks {
-			fwh := &api.RESTWebhook{
+		rcWebhooks = make([]*api.RESTWebhookConfig, 0, len(fedConfig.Webhooks))
+		for i, wh := range fedConfig.Webhooks {
+			fwh := &api.RESTWebhookConfig{
 				Name:     wh.Name,
 				Url:      wh.Url,
 				Enable:   wh.Enable,
 				UseProxy: wh.UseProxy,
 				Username: wh.Username,
-				Password: wh.Password,
 				Type:     wh.Type,
 				CfgType:  common.TCfgTypeToApi(cfgType),
 			}
+			password, err := common.AesGcmDecrypt(fedConfig.Webhooks[i].Password)
+			if err != nil && fedConfig.Webhooks[i].Password != "" {
+				log.WithFields(log.Fields{"err": err, "wh": wh.Name}).Warn("failed to decrypt password")
+			}
+			fwh.Password = &password
 			rcWebhooks = append(rcWebhooks, fwh)
 		}
 	}
