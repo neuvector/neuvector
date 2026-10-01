@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
@@ -884,14 +885,15 @@ OUTER:
 
 // -- Logger
 
+// LOG_FORMAT controls pod stdout log format for controller and agent.
+// Set to "json" for JSON lines; unset or any other value keeps the default text format.
+const logFormatEnv = "LOG_FORMAT"
+
 type LogFormatter struct {
 	Module string
 }
 
-func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
-	// Skip 2, 0: callers(), 1: GetCaller, 2: LogFormatter()
-	fn := GetCaller(3, []string{"logrus"})
-
+func formatLogBody(entry *log.Entry, fn string) string {
 	var keys = make([]string, 0, len(entry.Data))
 	for k := range entry.Data {
 		keys = append(keys, k)
@@ -901,9 +903,7 @@ func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 
 	b := &bytes.Buffer{}
 
-	fmt.Fprintf(b, "%-23s", entry.Time.Format("2006-01-02T15:04:05.999"))
-	fmt.Fprintf(b, "|%s|%s|%s:",
-		strings.ToUpper(entry.Level.String())[0:4], f.Module, fn)
+	fmt.Fprintf(b, "%s:", fn)
 	if len(entry.Message) > 0 {
 		fmt.Fprintf(b, " %s", entry.Message)
 	}
@@ -919,7 +919,37 @@ func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 		}
 	}
 
-	b.WriteByte('\n')
+	return b.String()
+}
+
+func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
+	// Skip 2, 0: callers(), 1: GetCaller, 2: LogFormatter()
+	fn := GetCaller(3, []string{"logrus"})
+	level := strings.ToUpper(entry.Level.String())[0:4]
+	body := formatLogBody(entry, fn)
+
+	if strings.EqualFold(strings.TrimSpace(os.Getenv(logFormatEnv)), "json") {
+		rec := struct {
+			Time   string `json:"time"`
+			Level  string `json:"level"`
+			Module string `json:"module"`
+			Log    string `json:"log"`
+		}{
+			Time:   entry.Time.Format("2006-01-02T15:04:05.999"),
+			Level:  level,
+			Module: f.Module,
+			Log:    body,
+		}
+		b, err := json.Marshal(rec)
+		if err != nil {
+			return nil, err
+		}
+		return append(b, '\n'), nil
+	}
+
+	b := &bytes.Buffer{}
+	fmt.Fprintf(b, "%-23s|%s|%s|%s\n",
+		entry.Time.Format("2006-01-02T15:04:05.999"), level, f.Module, body)
 	return b.Bytes(), nil
 }
 
@@ -1355,12 +1385,12 @@ func replaceAtIndex(in string, r rune, i int) string {
 func Dns1123NameChg(name string) string {
 	if !regCrdName.MatchString(name) {
 		length := len(name)
-		fmt.Println("string:", name, "failed regex with len ", length)
+		log.WithFields(log.Fields{"name": name, "len": length}).Debug("failed regex")
 		for i, char := range name {
 			if (i == 0 || i == length-1) && !regDns1122start.MatchString(string(char)) {
 				name = replaceAtIndex(name, '0', i)
 			} else if !regDns1122.MatchString(string(char)) {
-				fmt.Println("char:", string(char), "failed regex")
+				log.WithFields(log.Fields{"char": string(char)}).Debug("failed regex")
 				name = strings.ReplaceAll(name, string(char), "-")
 			}
 		}

@@ -422,7 +422,7 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []v1.GroupConfig, targetGroup s
 				if cg.BaselineProfile == "" {
 					cg.BaselineProfile = cacher.GetNewServiceProfileBaseline()
 				}
-				fmt.Printf("New learned svc  %s set service as %s, %s\n", group.Name, cg.PolicyMode, cg.BaselineProfile)
+				log.WithFields(log.Fields{"group": group.Name, "policyMode": cg.PolicyMode, "baseline": cg.BaselineProfile}).Info("New learned svc set service")
 			}
 
 			cg.Criteria = make([]share.CLUSCriteriaEntry, 0, len(group.Criteria))

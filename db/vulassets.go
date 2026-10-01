@@ -302,7 +302,7 @@ func batchProcessVulAsset(pool *pond.WorkerPool, mu *sync.Mutex, dbVulAssets map
 }
 
 func catchMeViewType() {
-	fmt.Println()
+	log.Debug("catchMeViewType")
 }
 
 func applyViewTypeFilter(vulAsset *DbVulAsset, queryFilter *VulQueryFilter) {

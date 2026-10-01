@@ -2284,7 +2284,7 @@ func importGroup(scope, targetGroup string, groups []v1.GroupConfig) (utils.Set,
 			}
 			if utils.DoesGroupHavePolicyMode(group.Name) {
 				cg.PolicyMode, cg.ProfileMode = cacher.GetNewServicePolicyMode()
-				fmt.Println("New learned svc ", group.Name, "set service as ", cg.PolicyMode)
+				log.WithFields(log.Fields{"group": group.Name, "policyMode": cg.PolicyMode}).Info("New learned svc set service")
 			}
 			cg.CfgType = share.UserCreated
 			if utils.IsGroupLearned(group.Name) {
