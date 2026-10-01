@@ -1828,7 +1828,7 @@ func (h *nvCrdHandler) crdHandleFedConfig(cfgType share.TCfgType, fedConfig *api
 			}
 			password, err := common.AesGcmDecrypt(fedConfig.Webhooks[i].Password)
 			if err != nil && fedConfig.Webhooks[i].Password != "" {
-				log.WithFields(log.Fields{"err": err, "wh": wh.Name}).Warn("failed to decrypt password")
+				log.WithFields(log.Fields{"wh": wh.Name}).Warn("failed to decrypt password")
 			}
 			fwh.Password = &password
 			rcWebhooks = append(rcWebhooks, fwh)
