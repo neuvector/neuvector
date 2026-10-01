@@ -15,6 +15,9 @@ const (
 	CategoryAudit     = "audit"
 )
 
+// ExposureReportHeader is the syslog notification name for an on-demand exposure report.
+const ExposureReportHeader = "exposure"
+
 // syslog related
 const SyslogDefaultUDPPort uint16 = 514
 
@@ -165,6 +168,7 @@ const (
 	EventNameDEKSeedUnavailable          = "Security.DEK.Seed.Unavailable"
 	EventNameReEncryptWithDEK            = "Security.DEK.Encrypt"
 	EventNameEncryptionSecretSet         = "Security.Encryption.Secret.Set"
+	EventNameExposureReport              = "Exposure.Report"
 )
 
 // TODO: these are not events but incidents

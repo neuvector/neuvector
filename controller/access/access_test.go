@@ -1470,6 +1470,7 @@ func TestCompileApiUrisMappingMapping(t *testing.T) {
 			"v1/system/config/webhook",
 			"v1/system/config/remote_repository",
 			"v1/system/score/metrics",
+			"v1/system/score/exposure",
 		},
 		CONST_API_IBMSA: {
 			"v1/partner/ibm_sa/*/setup/*",
