@@ -885,6 +885,10 @@ OUTER:
 
 // -- Logger
 
+// LOG_FORMAT controls pod stdout log format for controller and agent.
+// Set to "json" for JSON lines; unset or any other value keeps the default text format.
+const logFormatEnv = "LOG_FORMAT"
+
 type LogFormatter struct {
 	Module string
 }
@@ -921,22 +925,32 @@ func formatLogBody(entry *log.Entry, fn string) string {
 func (f *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	// Skip 2, 0: callers(), 1: GetCaller, 2: LogFormatter()
 	fn := GetCaller(3, []string{"logrus"})
-	rec := struct {
-		Time   string `json:"time"`
-		Level  string `json:"level"`
-		Module string `json:"module"`
-		Log    string `json:"log"`
-	}{
-		Time:   entry.Time.Format("2006-01-02T15:04:05.999"),
-		Level:  strings.ToUpper(entry.Level.String())[0:4],
-		Module: f.Module,
-		Log:    formatLogBody(entry, fn),
+	level := strings.ToUpper(entry.Level.String())[0:4]
+	body := formatLogBody(entry, fn)
+
+	if strings.EqualFold(strings.TrimSpace(os.Getenv(logFormatEnv)), "json") {
+		rec := struct {
+			Time   string `json:"time"`
+			Level  string `json:"level"`
+			Module string `json:"module"`
+			Log    string `json:"log"`
+		}{
+			Time:   entry.Time.Format("2006-01-02T15:04:05.999"),
+			Level:  level,
+			Module: f.Module,
+			Log:    body,
+		}
+		b, err := json.Marshal(rec)
+		if err != nil {
+			return nil, err
+		}
+		return append(b, '\n'), nil
 	}
-	b, err := json.Marshal(rec)
-	if err != nil {
-		return nil, err
-	}
-	return append(b, '\n'), nil
+
+	b := &bytes.Buffer{}
+	fmt.Fprintf(b, "%-23s|%s|%s|%s\n",
+		entry.Time.Format("2006-01-02T15:04:05.999"), level, f.Module, body)
+	return b.Bytes(), nil
 }
 
 // encrypt/decrypt
