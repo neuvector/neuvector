@@ -3811,7 +3811,7 @@ paths:
           description: System configure data
           required: true
           schema:
-            $ref: "#/definitions/RESTSystemWebhookConfigData"
+            $ref: "#/definitions/RESTSystemWebhookData"
       responses:
         "200":
           description: Success
@@ -11703,7 +11703,7 @@ definitions:
       webhooks:
         type: array
         items:
-          $ref: "#/definitions/RESTWebhook"
+          $ref: "#/definitions/RESTWebhookConfig"
       cluster_name:
         type: string
         example: cluster1
@@ -11764,7 +11764,7 @@ definitions:
       webhooks:
         type: array
         items:
-          $ref: "#/definitions/RESTWebhook"
+          $ref: "#/definitions/RESTWebhookConfig"
       ibmsa_cfg:
         $ref: "#/definitions/RESTSystemConfigIBMSAVCfg2"
       scanner_autoscale_cfg:
@@ -11783,7 +11783,7 @@ definitions:
       webhooks:
         type: array
         items:
-          $ref: "#/definitions/RESTWebhook"
+          $ref: "#/definitions/RESTWebhookConfig"
   RESTSystemConfigConfigData:
     type: object
     description: it leverages RESTSystemConfigConfigData in apis.go
@@ -11904,13 +11904,20 @@ definitions:
     properties:
       request:
         $ref: "#/definitions/RESTSystemRequest"
-  RESTSystemWebhookConfigData:
+  RESTSystemWebhookData:
     type: object
     required:
       - config
     properties:
       config:
         $ref: "#/definitions/RESTWebhook"
+  RESTSystemWebhookConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: "#/definitions/RESTWebhookConfig"
   RESTThreatData:
     type: object
     required:
@@ -12971,6 +12978,38 @@ definitions:
         type: string
         enum: [user_created, ground]
   RESTWebhook:
+    type: object
+    required:
+      - name
+      - url
+      - enable
+      - use_proxy
+      - type
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example: slack-webhook
+      url:
+        type: string
+        example: https://neuvector.slack.com/archives/C8AU75GKE
+      enable:
+        type: boolean
+        example: true
+      use_proxy:
+        type: boolean
+        example: false
+      username:
+        type: string
+      password:
+        type: string
+      type:
+        type: string
+        enum: ["", Slack, JSON, Teams]
+      cfg_type:
+        type: string
+        enum: [user_created, ground, federal]
+  RESTWebhookConfig:
     type: object
     required:
       - name
