@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <ctype.h>
 #include <inttypes.h>
@@ -91,6 +92,8 @@
 
 #define ENV_MATCH_PROXYMESH_PARENT_POLICY "MATCH_PROXYMESH_PARENT_POLICY"
 
+#define ENV_LOG_FORMAT "LOG_FORMAT"
+
 #define DP_MISS_HB_MAX 60
 #define PROC_EXIT_LIMIT 10
 
@@ -172,8 +175,23 @@ static int g_pipe_driver = RC_CONFIG_TC;
 static volatile sig_atomic_t g_exit_signal = 0;
 static int g_exit_monitor_on_proc_exit = 0;
 static int g_debugOpa = 0;
+static int g_log_format_json = 0;
 
-static void debug_ts(FILE *logfp)
+static void init_log_format(void)
+{
+    const char *v = getenv(ENV_LOG_FORMAT);
+    if (v == NULL) {
+        return;
+    }
+    while (*v == ' ' || *v == '\t') {
+        v++;
+    }
+    if (strcasecmp(v, "json") == 0) {
+        g_log_format_json = 1;
+    }
+}
+
+static void format_debug_time(char *buf, size_t buflen)
 {
     struct timeval now;
     struct tm *tm;
@@ -181,9 +199,48 @@ static void debug_ts(FILE *logfp)
     gettimeofday(&now, NULL);
     tm = localtime(&now.tv_sec);
 
-    fprintf(logfp, "%04d-%02d-%02dT%02d:%02d:%02d|MON|",
-            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-            tm->tm_hour, tm->tm_min, tm->tm_sec);
+    snprintf(buf, buflen, "%04d-%02d-%02dT%02d:%02d:%02d",
+             tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+             tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
+static void json_escape_write(FILE *fp, const char *s)
+{
+    for (; *s != '\0'; s++) {
+        unsigned char c = (unsigned char)*s;
+        switch (c) {
+        case '"':
+            fputs("\\\"", fp);
+            break;
+        case '\\':
+            fputs("\\\\", fp);
+            break;
+        case '\n':
+            fputs("\\n", fp);
+            break;
+        case '\r':
+            fputs("\\r", fp);
+            break;
+        case '\t':
+            fputs("\\t", fp);
+            break;
+        default:
+            if (c < 0x20) {
+                fprintf(fp, "\\u%04x", c);
+            } else {
+                fputc(c, fp);
+            }
+            break;
+        }
+    }
+}
+
+static void debug_ts(FILE *logfp)
+{
+    char ts[80];
+
+    format_debug_time(ts, sizeof(ts));
+    fprintf(logfp, "%s|MON|", ts);
 }
 
 static void debug(const char *fmt, ...)
@@ -201,6 +258,28 @@ static void debug(const char *fmt, ...)
         }
     */
     logfp = stdout;
+
+    if (g_log_format_json) {
+        char ts[80];
+        char msg[4096];
+        size_t len;
+
+        format_debug_time(ts, sizeof(ts));
+        va_start(args, fmt);
+        vsnprintf(msg, sizeof(msg), fmt, args);
+        va_end(args);
+
+        len = strlen(msg);
+        while (len > 0 && (msg[len - 1] == '\n' || msg[len - 1] == '\r')) {
+            msg[--len] = '\0';
+        }
+
+        fprintf(logfp, "{\"time\":\"%s\",\"level\":\"INFO\",\"module\":\"MON\",\"log\":\"", ts);
+        json_escape_write(logfp, msg);
+        fputs("\"}\n", logfp);
+        fflush(logfp);
+        return;
+    }
 
     debug_ts(logfp);
     va_start(args, fmt);
@@ -323,6 +402,11 @@ static pid_t fork_exec(int i)
             {
                 args[a++] = "-m";
             }
+        }
+        if (g_log_format_json)
+        {
+            args[a++] = "-l";
+            args[a++] = "json";
         }
         args[a] = NULL;
         break;
@@ -1136,6 +1220,8 @@ int main(int argc, char **argv)
             exit(0);
         }
     }
+
+    init_log_format();
 
     signal(SIGTERM, exit_handler);
     signal(SIGBUS, exit_handler);
