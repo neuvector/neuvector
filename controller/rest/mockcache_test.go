@@ -522,8 +522,8 @@ func (m *MockCache) WaitUntilApiPathReady() bool {
 }
 
 func (m *MockCache) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
-	containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool) {
+	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) (
+	*nvsysadmission.AdmCtrlAssessResult, bool) {
 	return nil, false
 }
 

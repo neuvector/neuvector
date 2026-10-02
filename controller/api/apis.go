@@ -3739,7 +3739,7 @@ type RESTAdmissionRuleConfig struct {
 	CfgType    string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	RuleType   string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
 	RuleMode   *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Containers []string                `json:"containers"`          // empty for all containers, "containers" / "init_containers" / "ephemeral_containers"
+	Containers []string                `json:"containers"`          // obsolete
 }
 
 type RESTAdmissionRuleConfigData struct {
