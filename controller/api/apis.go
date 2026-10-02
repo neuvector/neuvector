@@ -3717,7 +3717,7 @@ type RESTAdmissionRule struct { // see type CLUSAdmissionRule
 	CfgType    string                  `json:"cfg_type" yaml:"cfg_type"`     // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	RuleType   string                  `json:"rule_type" yaml:"rule_type"`   // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
 	RuleMode   string                  `json:"rule_mode" yaml:"rule_mode"`   // "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Containers []string                `json:"containers" yaml:"containers"` // empty for all containers, "containers" / "init_containers" / "ephemeral_containers"
+	Containers []string                `json:"containers" yaml:"containers"` // obsolete. "containers" for all containers
 }
 
 type RESTAdmissionRuleData struct {
@@ -3739,7 +3739,7 @@ type RESTAdmissionRuleConfig struct {
 	CfgType    string                  `json:"cfg_type"`            // CfgTypeLearned / CfgTypeUserCreated / CfgTypeGround / CfgTypeFederal (see above)
 	RuleType   string                  `json:"rule_type"`           // ValidatingExceptRuleType / ValidatingDenyRuleType (see above)
 	RuleMode   *string                 `json:"rule_mode,omitempty"` // only for deny rules: "" / share.AdmCtrlModeMonitor / share.AdmCtrlModeProtect
-	Containers []string                `json:"containers"`          // obsolete
+	Containers []string                `json:"containers"`          // obsolete. "containers" for all containers
 }
 
 type RESTAdmissionRuleConfigData struct {

@@ -296,6 +296,14 @@ func applyTransact(w http.ResponseWriter, txn *cluster.ClusterTransact) error {
 	return nil
 }
 
+func checkAdmCtrlRuleContainers(targets []string) error {
+	tValues := utils.NewSetFromStringSlice(targets)
+	if len(targets) == 0 || tValues.Contains(share.AdmCtrlRuleContainers) {
+		return nil
+	}
+	return fmt.Errorf("Invalid containers value: {%s}", strings.Join(targets, ", "))
+}
+
 func handlerAdmissionStatistics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -997,6 +1005,13 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
+	if ruleCfg.Containers != nil {
+		if err := checkAdmCtrlRuleContainers(ruleCfg.Containers); err != nil {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+			return
+		}
+	}
+
 	if !acc.Authorize(&share.CLUSAdmissionRule{CfgType: cfgType}, nil) {
 		restRespAccessDenied(w, login)
 		return
@@ -1227,6 +1242,12 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 	if !clusConf.Critical && ruleCfg.RuleMode != nil {
 		clusConf.RuleMode = *ruleCfg.RuleMode
+	}
+	if !clusConf.Critical && ruleCfg.Containers != nil {
+		if err := checkAdmCtrlRuleContainers(ruleCfg.Containers); err != nil {
+			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+			return
+		}
 	}
 
 	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(ruleCfg.RuleType)
