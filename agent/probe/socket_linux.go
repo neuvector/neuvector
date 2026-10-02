@@ -1,7 +1,6 @@
 package probe
 
 import (
-	"fmt"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
@@ -57,7 +56,7 @@ func (p *Probe) inetGetSockets(family, proto uint8, state uint32) ([]*socket, []
 				return listenList, connectList, nil
 			}
 			if msg.Header.Type == syscall.NLMSG_ERROR {
-				return nil, nil, fmt.Errorf("Error in netlink message")
+				return nil, nil, netlink.MessageError(msg)
 			}
 
 			// IPv4 only for connected socket. Keep all listen ports on IPv4 and v6.
