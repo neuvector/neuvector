@@ -29,10 +29,6 @@ criteria_0(request)
 
 	user_provided_data := ["^localhost$"]
 
-	# parameter path = request.spec.initContainers[_].lifecycle.postStart.tcpSocket.host
-	image := request.spec.initContainers[i].image
-	not inSidecarContainerList(image)
-
 	value = request.spec.initContainers[i].lifecycle.postStart.tcpSocket.host
 	operator_contains_all(user_provided_data, value)
 }
@@ -46,10 +42,6 @@ criteria_1(request)
 	# path(orig) = item.spec.containers[_].image
 
 	user_provided_data := ["^redis:latest$","^nginx:latest$","^sbomscanner$"]
-
-	# parameter path = request.spec.containers[_].image
-	image := request.spec.containers[i].image
-	not inSidecarContainerList(image)
 
 	value = request.spec.containers[i].image
 	operator_contains_any(user_provided_data, value)
@@ -247,15 +239,6 @@ has_key(x, k) { _ = x[k] }
 
 check_contains(patterns, value) {
     regex.match(patterns[_], value)
-}
-
-inSidecarContainerList(image){
-	sidecarImages := ["docker.io/istio/proxyv2","https://docker.io/istio/proxyv2",
-						"linkerd-io/proxy","https://gcr.io/linkerd-io/proxy",
-						"istio-release/proxyv2", "https://gcr.io/istio-release/proxyv2"]
-    startswith(image, sidecarImages[_])
-}else = false{
-	true
 }
 
 get_serviceAccountName(request) := sa {
