@@ -208,7 +208,7 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 		clockOverride = dsig.NewFakeClock(clockwork.NewFakeClockAt(*timeOverride))
 	}
 
-	return &saml2.SAMLServiceProvider{
+	sp := &saml2.SAMLServiceProvider{
 		IdentityProviderSSOURL: csaml.SSOURL,
 		IdentityProviderSLOURL: csaml.SLOURL,
 
@@ -228,7 +228,12 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 		// 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified' for the app
 		NameIdFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
 		Clock:        clockOverride,
-	}, nil
+	}
+	if csaml.AudienceURI != "" {
+		sp.AudienceURI = csaml.AudienceURI
+	}
+
+	return sp, nil
 }
 
 func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, overrides map[string]string) (string, error) {
@@ -318,8 +323,15 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 		return "", "", map[string][]string{}, err
 	}
 
-	if assertionInfo.WarningInfo.InvalidTime {
-		return "", "", map[string][]string{}, errors.New("invalid time")
+	w := assertionInfo.WarningInfo
+	if w.InvalidTime || w.OneTimeUse {
+		return "", "", map[string][]string{}, errors.New("invalid time/one time use")
+	}
+	if w.NotInAudience {
+		if csaml.AudienceURI != "" {
+			return "", "", map[string][]string{}, errors.New("invalid audience")
+		}
+		log.Warn("AudienceURI not configured")
 	}
 
 	out := map[string][]string{}
