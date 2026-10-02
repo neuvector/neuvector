@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <ctype.h>
 #include <inttypes.h>
@@ -14,6 +15,8 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+
+#include "jansson.h"
 
 #define DEBUG_FILE "/var/log/ranger/monitor.log"
 
@@ -90,6 +93,8 @@
 #define ENV_THRT_SSL_TLS_1DOT1 "THRT_SSL_TLS_1DOT1"
 
 #define ENV_MATCH_PROXYMESH_PARENT_POLICY "MATCH_PROXYMESH_PARENT_POLICY"
+
+#define ENV_LOG_FORMAT "LOG_FORMAT"
 
 #define DP_MISS_HB_MAX 60
 #define PROC_EXIT_LIMIT 10
@@ -172,8 +177,29 @@ static int g_pipe_driver = RC_CONFIG_TC;
 static volatile sig_atomic_t g_exit_signal = 0;
 static int g_exit_monitor_on_proc_exit = 0;
 static int g_debugOpa = 0;
+static int g_log_format_json = 0;
 
-static void debug_ts(FILE *logfp)
+static void init_log_format(void)
+{
+    const char *v = getenv(ENV_LOG_FORMAT);
+    size_t len;
+
+    if (v == NULL) {
+        return;
+    }
+    while (isspace((unsigned char)*v)) {
+        v++;
+    }
+    len = strlen(v);
+    while (len > 0 && isspace((unsigned char)v[len - 1])) {
+        len--;
+    }
+    if (len == 4 && strncasecmp(v, "json", 4) == 0) {
+        g_log_format_json = 1;
+    }
+}
+
+static void format_debug_time(char *buf, size_t buflen)
 {
     struct timeval now;
     struct tm *tm;
@@ -181,9 +207,17 @@ static void debug_ts(FILE *logfp)
     gettimeofday(&now, NULL);
     tm = localtime(&now.tv_sec);
 
-    fprintf(logfp, "%04d-%02d-%02dT%02d:%02d:%02d|MON|",
-            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-            tm->tm_hour, tm->tm_min, tm->tm_sec);
+    snprintf(buf, buflen, "%04d-%02d-%02dT%02d:%02d:%02d",
+             tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+             tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
+static void debug_ts(FILE *logfp)
+{
+    char ts[80];
+
+    format_debug_time(ts, sizeof(ts));
+    fprintf(logfp, "%s|MON|", ts);
 }
 
 static void debug(const char *fmt, ...)
@@ -201,6 +235,47 @@ static void debug(const char *fmt, ...)
         }
     */
     logfp = stdout;
+
+    if (g_log_format_json) {
+        char ts[80];
+        char msg[4096];
+        size_t len;
+        json_t *root;
+        char *out;
+
+        format_debug_time(ts, sizeof(ts));
+        va_start(args, fmt);
+        vsnprintf(msg, sizeof(msg), fmt, args);
+        va_end(args);
+
+        len = strlen(msg);
+        while (len > 0 && (msg[len - 1] == '\n' || msg[len - 1] == '\r')) {
+            msg[--len] = '\0';
+        }
+
+        root = json_pack("{s:s,s:s,s:s,s:s}",
+                         "time", ts,
+                         "level", "INFO",
+                         "module", "MON",
+                         "log", msg);
+        if (root == NULL) {
+            // jansson rejects invalid UTF-8
+            fprintf(logfp, "{\"time\":\"%s\",\"level\":\"WARN\",\"module\":\"MON\","
+                           "\"log\":\"dropped a log line containing invalid UTF-8\"}\n", ts);
+        } else {
+            out = json_dumps(root, JSON_COMPACT);
+            json_decref(root);
+            if (out == NULL) {
+                fprintf(logfp, "{\"time\":\"%s\",\"level\":\"WARN\",\"module\":\"MON\","
+                               "\"log\":\"failed to dump json log\"}\n", ts);
+            } else {
+                fprintf(logfp, "%s\n", out);
+                free(out);
+            }
+        }
+        fflush(logfp);
+        return;
+    }
 
     debug_ts(logfp);
     va_start(args, fmt);
@@ -323,6 +398,11 @@ static pid_t fork_exec(int i)
             {
                 args[a++] = "-m";
             }
+        }
+        if (g_log_format_json)
+        {
+            args[a++] = "-l";
+            args[a++] = "json";
         }
         args[a] = NULL;
         break;
@@ -1136,6 +1216,8 @@ int main(int argc, char **argv)
             exit(0);
         }
     }
+
+    init_log_format();
 
     signal(SIGTERM, exit_handler);
     signal(SIGBUS, exit_handler);

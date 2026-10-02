@@ -1624,7 +1624,7 @@ void dpi_tcp_tracker(dpi_packet_t *p)
         if (clip != NULL) {
             if (clip->len == len) {
                 // Both seq# and length have to be same to be considered as retransmission
-                DEBUG_LOG(DBG_TCP, p, "TCP retransmission: seq=0x%x len=%u", seq, len);
+                DEBUG_LOG(DBG_TCP, p, "TCP retransmission: seq=0x%x len=%u\n", seq, len);
 
                 FLAGS_SET(p->flags, DPI_PKT_FLAG_CACHED |
                                     DPI_PKT_FLAG_SKIP_PARSER |
