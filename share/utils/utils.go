@@ -886,6 +886,7 @@ OUTER:
 // -- Logger
 
 // LOG_FORMAT controls pod stdout log format for controller and agent.
+// Monitor reads the same env for its own logs and passes --log_format to dp.
 // Set to "json" for JSON lines; unset or any other value keeps the default text format.
 const logFormatEnv = "LOG_FORMAT"
 
