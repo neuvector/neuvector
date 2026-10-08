@@ -103,7 +103,7 @@ type SsoSession struct {
 }
 
 var errTokenExpired error = errors.New("token expired")
-var errNoRoleMapped error = errors.New("Failed to map to a valid role")
+var errNoRoleMapped error = errors.New("No role assigned")
 var recordFedAuthSessions bool = false                                      // set to true for testing: handlerDumpAuthData
 var loginFedSessions map[string]utils.Set = make(map[string]utils.Set)      // for testing: key is mainSessionID, value is a set of regular tokens
 var loginSessions map[string]*loginSession = make(map[string]*loginSession) // key is the token
@@ -2534,7 +2534,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			if localAuthResult.newPwdWeak {
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, localAuthResult.newPwdError, localAuthResult.pwdProfileBasic)
 			} else if err == errNoRoleMapped {
-				restRespErrorMessage(w, http.StatusForbidden, code, err.Error())
+				restRespErrorMessage(w, http.StatusForbidden, api.RESTErrForbidden, err.Error())
 			} else {
 				restRespError(w, http.StatusUnauthorized, code)
 			}
@@ -2899,11 +2899,14 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				log.WithFields(log.Fields{"server": server, "user": username, "groups": groups, "error": err}).Error("Failed to get user from attribute")
 				fullname := utils.MakeUserFullname(cs.Name, username)
 				authLog(share.CLUSEvAuthLoginFailed, fullname, remote, "", nil, "")
+				// the returned 401/403 is redirtected to OKTA which swallows the error and makes NV UI know nothing about the error.
+				// so let controller tell OKTA to redirect to NV UI login url with error parameter in order to display the login failure message
+				status := http.StatusUnauthorized
 				if err == errNoRoleMapped {
-					restRespErrorMessage(w, http.StatusForbidden, api.RESTErrUnauthorized, err.Error())
-				} else {
-					restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+					status = http.StatusForbidden
 				}
+				url := fmt.Sprintf("/index.html#/login?error=%d", status)
+				http.Redirect(w, r, url, http.StatusTemporaryRedirect) // 307 Redirect
 				return
 			}
 			sso.SAMLNameID = nameid
@@ -2929,11 +2932,14 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				log.WithFields(log.Fields{"server": server, "user": username, "groups": groups, "error": err}).Error("Failed to get user from claims")
 				fullname := utils.MakeUserFullname(cs.Name, username)
 				authLog(share.CLUSEvAuthLoginFailed, fullname, remote, "", nil, "")
+				// the returned 401/403 is redirtected to OKTA which swallows the error and makes NV UI know nothing about the error.
+				// so let controller tell OKTA to redirect to NV UI login url with error parameter in order to display the login failure message
+				status := http.StatusUnauthorized
 				if err == errNoRoleMapped {
-					restRespErrorMessage(w, http.StatusForbidden, api.RESTErrUnauthorized, err.Error())
-				} else {
-					restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+					status = http.StatusForbidden
 				}
+				url := fmt.Sprintf("/index.html#/login?error=%d", status)
+				http.Redirect(w, r, url, http.StatusTemporaryRedirect) // 307 Redirect
 				return
 			}
 		} else {
