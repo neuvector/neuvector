@@ -73,6 +73,7 @@ const RESTErrRemoteExportFail int = 52
 const RESTErrInvalidQueryID int = 53
 const RESTErrPollJobNotFoundError int = 54
 const RESTErrServerError int = 55
+const RESTErrForbidden int = 56
 
 const FilterPrefix string = "f_"
 const SortPrefix string = "s_"
