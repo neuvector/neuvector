@@ -177,6 +177,7 @@ var restErrMessage = []string{
 	api.RESTErrInvalidQueryID:        "Invalid or expired query id",
 	api.RESTErrPollJobNotFoundError:  "Job not found in the Job Queue",
 	api.RESTErrServerError:           "Server Error",
+	api.RESTErrForbidden:             "Authorization failed",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
