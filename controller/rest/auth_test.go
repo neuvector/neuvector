@@ -547,7 +547,7 @@ func TestSAMLLogin(t *testing.T) {
 	// Enable saml server
 	saml.Enable = true
 	w = loginServerToken("token", "saml1")
-	if w.status != http.StatusForbidden {
+	if w.status != http.StatusTemporaryRedirect {
 		t.Errorf("Login should fail, no role or username: status=%v.", w.status)
 	}
 
@@ -616,7 +616,7 @@ func TestSAMLLoginShadowUser(t *testing.T) {
 	// Enable saml server
 	saml.Enable = true
 	w = loginServerToken("joe-token", "saml1")
-	if w.status != http.StatusForbidden {
+	if w.status != http.StatusTemporaryRedirect {
 		t.Errorf("Login should fail, no role or username: status=%v.", w.status)
 	}
 	if user, _, _ := clusHelper.GetUserRev(fullname, access.NewReaderAccessControl()); user != nil {
@@ -896,7 +896,7 @@ func TestOIDCLogin(t *testing.T) {
 	// Enable oidc server
 	oidc.Enable = true
 	w = loginServerToken("token", "oidc1")
-	if w.status != http.StatusForbidden {
+	if w.status != http.StatusTemporaryRedirect {
 		t.Errorf("Login should fail, no role or username: status=%v.", w.status)
 	}
 
