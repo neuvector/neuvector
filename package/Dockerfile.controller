@@ -9,7 +9,7 @@ ENV GOPATH=/go
 ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 
 # Setup build dependencies
-RUN zypper install -y pcre-devel
+RUN zypper install -y pcre-devel libjansson-devel
 
 # Build controller
 COPY agent/ /src/agent
@@ -45,7 +45,7 @@ RUN zypper --non-interactive install --no-recommends unzip
 
 # Runtime dependencies
 RUN zypper refresh && zypper --non-interactive --installroot /chroot install --no-recommends \
-    ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk pcre-devel && \
+    ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk pcre-devel libjansson-devel && \
     zypper --non-interactive --installroot /chroot clean -a && \
     rm -rf /chroot/var/log/
 

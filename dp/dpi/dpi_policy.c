@@ -222,7 +222,7 @@ static dpi_policy_hdl_t *dpi_policy_hdl_init(int def_action)
     dpi_policy_hdl_t *hdl;
     hdl = calloc(sizeof(dpi_policy_hdl_t), 1);
     if (!hdl) {
-        DEBUG_ERROR(DBG_POLICY, "Out of memory!");
+        DEBUG_ERROR(DBG_POLICY, "Out of memory!\n");
         return NULL;
 
     }
@@ -1675,14 +1675,14 @@ static dpi_fqdn_hdl_t *dpi_fqdn_hdl_init()
     dpi_fqdn_hdl_t *hdl;
     hdl = calloc(sizeof(dpi_fqdn_hdl_t), 1);
     if (!hdl) {
-        DEBUG_ERROR(DBG_POLICY, "Out of memory!");
+        DEBUG_ERROR(DBG_POLICY, "Out of memory!\n");
         return NULL;
     }
 
     DEBUG_POLICY("%p\n", hdl);
     hdl->bm = bitmap_allocate(DPI_FQDN_MAX_ENTRIES);
     if (!hdl->bm) {
-        DEBUG_ERROR(DBG_POLICY, "Out of memory!");
+        DEBUG_ERROR(DBG_POLICY, "Out of memory!\n");
         free(hdl);
         return NULL;
     }
