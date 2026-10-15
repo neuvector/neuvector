@@ -252,6 +252,88 @@ func HashPassword(password string, salt []byte) (string, error) {
 	return cipherBundle, nil
 }
 
+func EncryptSensitive(plaintext, key string) (string, error) {
+	salt := make([]byte, saltSize) // http://www.ietf.org/rfc/rfc2898.txt
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("failed to generate salt: %w", err)
+	}
+	dek, err := pbkdf2.Key(sha256.New, key, salt, 1, keyLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive DEK: %w", err)
+	}
+
+	nonce := make([]byte, nonceSize)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	additionalData := append(salt, nonce...)
+	cipherText := aesGCM.Seal(nil, nonce, []byte(plaintext), additionalData)
+	cipherBundle := fmt.Sprintf(cipherBundleFormat, cipherTypeA,
+		"0", hex.EncodeToString(salt), hex.EncodeToString(nonce), hex.EncodeToString(cipherText))
+
+	return cipherBundle, nil
+}
+
+func DecryptSensitive(cipherBundle, key string) (string, error) {
+	if cipherBundle == "" {
+		return "", ErrEmptyValue
+	}
+
+	ss := strings.Split(cipherBundle, "-")
+	if len(ss) != cipherBundleParts || ss[0] != cipherTypeA || (len(ss[2]) != saltHexSize || len(ss[3]) != nonceHexSize) {
+		return "", ErrUnsupported
+	}
+
+	salt, err := hex.DecodeString(ss[2])
+	if err != nil || len(salt) != saltSize {
+		return "", fmt.Errorf("invalid salt: %v(len=%d)", err, len(salt))
+	}
+
+	nonce, err := hex.DecodeString(ss[3])
+	if err != nil || len(nonce) != nonceSize {
+		return "", fmt.Errorf("invalid nonce: %v(len=%d)", err, len(nonce))
+	}
+
+	cipherText, err := hex.DecodeString(ss[4])
+	if err != nil {
+		return "", fmt.Errorf("invalid data: %w", err)
+	}
+
+	dek, err := pbkdf2.Key(sha256.New, string(key), salt, 1, keyLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive DEK: %w", err)
+	}
+
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	additionalData := append(salt, nonce...)
+	data, err := aesGCM.Open(nil, nonce, cipherText, additionalData)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt data: %w", err)
+	}
+
+	return string(data), nil
+}
+
 func AesGcmEncrypt(plaintext string) (string, error)    { return aesGcmEncrypt(plaintext) }
 func AesGcmDecrypt(cipherBundle string) (string, error) { return aesGcmDecrypt(cipherBundle) }
 

@@ -1376,7 +1376,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		tokenString = encryptedToken
 	} else {
 		var err error
-		tokenString, err = utils.DecryptSensitive(encryptedToken, []byte(secret))
+		tokenString, err = common.DecryptSensitive(encryptedToken, secret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt token: %w", err)
 		}
@@ -1446,7 +1446,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 }
 
 func validateEncryptedData(encryptedData, secret string, checkTime bool) error {
-	data, err := utils.DecryptSensitive(encryptedData, []byte(secret))
+	data, err := common.DecryptSensitive(encryptedData, secret)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt data: %w", err)
 	}
@@ -1560,7 +1560,7 @@ func jwtGenFedTicket(secret string, duration time.Duration) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return utils.EncryptSensitive(string(tokenBytes), []byte(secret))
+	return common.EncryptSensitive(string(tokenBytes), secret)
 }
 
 func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) (string, error) {
@@ -1588,7 +1588,7 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 			log.WithFields(log.Fields{"id": clusterID, "err": err}).Error("failed to sign token")
 			return "", err
 		}
-		return utils.EncryptSensitive(tokenString, []byte(secret))
+		return common.EncryptSensitive(tokenString, secret)
 	} else {
 		err = errors.New("empty private key")
 		log.WithFields(log.Fields{"id": clusterID, "err": err}).Error()

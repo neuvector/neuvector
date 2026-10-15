@@ -61,56 +61,6 @@ func EnsureBaseDir(fpath string) error {
 	return os.MkdirAll(baseDir, 0755)
 }
 
-func ExtractAllArchiveToFiles(path string, r io.Reader, maxFileSize int64, encryptKey []byte) error {
-	tr, err := tarutil.NewTarReadCloser(r)
-	if err != nil {
-		return tarutil.ErrCouldNotExtract
-	}
-	defer tr.Close()
-
-	// For each element in the archive
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return tarutil.ErrCouldNotExtract
-		}
-
-		// Get element filename
-		filename := hdr.Name
-		filename = strings.TrimPrefix(filename, "./")
-
-		// File size limit
-		if maxFileSize > 0 && hdr.Size > maxFileSize {
-			return tarutil.ErrExtractedFileTooBig
-		}
-
-		// Extract the element
-		if hdr.Typeflag == tar.TypeReg {
-			data, err := io.ReadAll(tr)
-			if err != nil {
-				return fmt.Errorf("failed to read archive entry %q: %w", filename, err)
-			}
-
-			if encryptKey != nil {
-				data, err = Encrypt(encryptKey, data)
-				if err != nil {
-					return fmt.Errorf("failed to encrypt file %q: %w", filename, err)
-				}
-			}
-
-			err = os.WriteFile(path+filename, data, 0400)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func ExtractAllArchive(dst string, r io.Reader, maxFileSize int64) (int64, error) {
 	var untarSize int64
 
