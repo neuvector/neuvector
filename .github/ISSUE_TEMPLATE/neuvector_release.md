@@ -28,9 +28,9 @@ follow the checklist below to ensure a smooth release process.
 - [ ] Helm charts branch created and tagged.
 - [ ] Add new supported apis in support log.
 - [ ] Load release build in long run setup.
-- [ ] OpenShift Operator. (Esther)
+- [ ] OpenShift Operator. (Selvam)
 - [ ] Rancher feature chart PR submitted and merged. (Leo)
-- [ ] Publish UBI. (Esther)
+- [ ] Publish UBI. (Selvam)
 - [ ] Announce neuvector-updates email list. (William)
 - [ ] CRD changes document.
 - [ ] Publish Documentation. (need to update support matrix and features.)
