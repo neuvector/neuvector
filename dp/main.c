@@ -105,7 +105,7 @@ static int emit_json_log(FILE *fp, const char *time_str, const char *thread,
     // log_body contains "thread|message", room for the full message,
     // the thread name, the '|' and the trailing NUL
     char log_body[DEBUG_JSON_BUF_SIZE + MAX_THREAD_NAME_LEN + 2];
-    size_t off = 0;
+    const char *sep = (thread != NULL && thread[0] != '\0') ? "|" : "";
     json_t *root;
     char *out;
     int len = 0;
@@ -114,21 +114,10 @@ static int emit_json_log(FILE *fp, const char *time_str, const char *thread,
         log_len--;
     }
 
-    if (thread != NULL && thread[0] != '\0') {
-        size_t tlen = strlen(thread);
-        if (tlen >= MAX_THREAD_NAME_LEN) {
-            tlen = MAX_THREAD_NAME_LEN - 1;
-        }
-        memcpy(log_body, thread, tlen);
-        off = tlen;
-        log_body[off++] = '|';
-    }
-    if (log_len > sizeof(log_body) - off - 1) {
-        log_len = sizeof(log_body) - off - 1;
-    }
-    memcpy(log_body + off, log, log_len);
-    off += log_len;
-    log_body[off] = '\0';
+    snprintf(log_body, sizeof(log_body), "%.*s%s%.*s",
+             MAX_THREAD_NAME_LEN - 1, thread ? thread : "",
+             sep,
+             (int)log_len, log);
 
     root = json_pack("{s:s,s:s,s:s,s:s}",
                      "time", time_str,
@@ -158,13 +147,13 @@ static int emit_json_log(FILE *fp, const char *time_str, const char *thread,
  *   print_ts=true  starts the line (timestamp/thread),
  *   print_ts=false appends more text without a new header.
  * Text mode streams those chunks as-is. JSON mode buffers them in
- * per-thread storage until a '\n' (or overflow / next print_ts) so we emit
- * one JSON object per logical line instead of one per chunk.
+ * per-thread storage until the buffered text ends with '\n'
+ * (or overflow / next print_ts) so we emit one JSON object
+ * per message instead of one per chunk.
  */
 static int debug_write(FILE *fp, bool print_ts, const char *fmt, va_list args)
 {
     static __thread char json_time[80];
-    static __thread char json_thread[MAX_THREAD_NAME_LEN];
     static __thread char json_body[DEBUG_JSON_BUF_SIZE];
     static __thread size_t json_body_len;
     static __thread int json_have_header;
@@ -180,7 +169,6 @@ static int debug_write(FILE *fp, bool print_ts, const char *fmt, va_list args)
 
     char msg[DEBUG_JSON_BUF_SIZE];
     int n = vsnprintf(msg, sizeof(msg), fmt, args);
-    char *nl;
 
     if (n < 0) {
         return 0;
@@ -193,18 +181,17 @@ static int debug_write(FILE *fp, bool print_ts, const char *fmt, va_list args)
 
     if (print_ts || !json_have_header) {
         if (json_body_len > 0 && json_have_header) {
-            len += emit_json_log(fp, json_time, json_thread, json_body, json_body_len);
+            len += emit_json_log(fp, json_time, THREAD_NAME, json_body, json_body_len);
             json_body_len = 0;
         }
         format_debug_time(json_time, sizeof(json_time));
-        snprintf(json_thread, sizeof(json_thread), "%s", THREAD_NAME);
         json_have_header = 1;
     }
 
     if (json_body_len + (size_t)n >= sizeof(json_body)) {
         /* Overflow: flush what we have, then keep the latest chunk. */
         if (json_body_len > 0) {
-            len += emit_json_log(fp, json_time, json_thread, json_body, json_body_len);
+            len += emit_json_log(fp, json_time, THREAD_NAME, json_body, json_body_len);
             json_body_len = 0;
         }
         if ((size_t)n >= sizeof(json_body)) {
@@ -214,16 +201,9 @@ static int debug_write(FILE *fp, bool print_ts, const char *fmt, va_list args)
     memcpy(json_body + json_body_len, msg, (size_t)n);
     json_body_len += (size_t)n;
 
-    while ((nl = memchr(json_body, '\n', json_body_len)) != NULL) {
-        size_t line_len = (size_t)(nl - json_body) + 1;
-        size_t remain;
-
-        len += emit_json_log(fp, json_time, json_thread, json_body, line_len);
-        remain = json_body_len - line_len;
-        if (remain > 0) {
-            memmove(json_body, json_body + line_len, remain);
-        }
-        json_body_len = remain;
+    if (json_body_len > 0 && json_body[json_body_len - 1] == '\n') {
+        len += emit_json_log(fp, json_time, THREAD_NAME, json_body, json_body_len);
+        json_body_len = 0;
     }
 
     if (json_body_len == 0) {
