@@ -248,7 +248,7 @@ static void debug(const char *fmt, ...)
         vsnprintf(msg, sizeof(msg), fmt, args);
         va_end(args);
 
-        len = strlen(msg);
+        len = strnlen(msg, sizeof(msg));
         while (len > 0 && (msg[len - 1] == '\n' || msg[len - 1] == '\r')) {
             msg[--len] = '\0';
         }
