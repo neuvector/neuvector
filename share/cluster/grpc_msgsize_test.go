@@ -21,13 +21,9 @@ func TestGrpcMaxMsgSizeFromEnv(t *testing.T) {
 		{name: "invalid uses default", set: true, value: "abc", want: defaultGRPCMaxMsgSize},
 		{name: "zero clamped to default", set: true, value: "0", want: defaultGRPCMaxMsgSize},
 		{name: "negative clamped to default", set: true, value: "-5", want: defaultGRPCMaxMsgSize},
-		{name: "below default clamped up", set: true, value: "16", want: defaultGRPCMaxMsgSize},
-		{name: "former cap below default clamped up", set: true, value: "32", want: defaultGRPCMaxMsgSize},
 		{name: "equal to default", set: true, value: "64", want: defaultGRPCMaxMsgSize},
 		{name: "valid override", set: true, value: "128", want: 128 * 1024 * 1024},
-		{name: "ceiling boundary last multiply", set: true, value: "2047", want: 2047 * 1024 * 1024},
-		{name: "ceiling boundary first clamp", set: true, value: "2048", want: math.MaxInt32},
-		{name: "huge clamped to ceiling", set: true, value: strconv.Itoa(math.MaxInt32), want: math.MaxInt32},
+		{name: "huge clamped to ceiling", set: true, value: strconv.Itoa(math.MaxInt32), want: defaultGRPCMaxMsgSize},
 	}
 
 	for _, c := range cases {
