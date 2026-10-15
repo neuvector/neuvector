@@ -6,9 +6,11 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +26,59 @@ import (
 	"google.golang.org/grpc/security/advancedtls"
 )
 
-const GRPCMaxMsgSize = 1024 * 1024 * 32
+// defaultGRPCMaxMsgSize is the default gRPC message size cap (64 MiB), applied
+// when EnvGRPCMaxMsgSizeMB is unset. It is also the floor: GRPCMaxMsgSize can be
+// raised but never configured below this (and never below the former 32 MiB
+// cap), so behavior is never weaker than before.
+const defaultGRPCMaxMsgSize = 1024 * 1024 * 64
+
+// EnvGRPCMaxMsgSizeMB, when set to a positive integer, raises the gRPC message
+// size limit (in MiB) applied to every cluster gRPC server and client. Values
+// below the 64 MiB default or above the gRPC hard ceiling (math.MaxInt32) are
+// clamped. Invalid values are ignored and logged.
+const EnvGRPCMaxMsgSizeMB = "CLUSTER_GRPC_MAX_MSG_SIZE_MB"
+
+// GRPCMaxMsgSize is the max send/receive message size (in bytes) for cluster
+// gRPC servers and clients. It defaults to 32 MiB and can be raised via
+// EnvGRPCMaxMsgSizeMB. See grpcMaxMsgSizeFromEnv for the parsing rules.
+var GRPCMaxMsgSize = grpcMaxMsgSizeFromEnv()
+
+// grpcMaxMsgSizeFromEnv reads EnvGRPCMaxMsgSizeMB and returns the resolved limit
+// in bytes, clamped to [defaultGRPCMaxMsgSize, math.MaxInt32]. When the variable
+// is unset it returns the default; invalid values are logged and the default is
+// used.
+func grpcMaxMsgSizeFromEnv() int {
+	v, ok := os.LookupEnv(EnvGRPCMaxMsgSizeMB)
+	if !ok || v == "" {
+		return defaultGRPCMaxMsgSize
+	}
+
+	mb, err := strconv.Atoi(v)
+	if err != nil {
+		log.WithFields(log.Fields{"env": EnvGRPCMaxMsgSizeMB, "value": v, "error": err}).
+			Warn("invalid gRPC max message size, using default")
+		return defaultGRPCMaxMsgSize
+	}
+
+	// Compute requested bytes, guarding against int overflow before comparing.
+	if mb <= 0 || mb > math.MaxInt32/(1024*1024) {
+		size := defaultGRPCMaxMsgSize
+		if mb > 0 {
+			size = math.MaxInt32
+		}
+		log.WithFields(log.Fields{"env": EnvGRPCMaxMsgSizeMB, "value": v, "clampedBytes": size}).
+			Warn("gRPC max message size out of range, clamped")
+		return size
+	}
+
+	size := mb * 1024 * 1024
+	if size < defaultGRPCMaxMsgSize {
+		log.WithFields(log.Fields{"env": EnvGRPCMaxMsgSizeMB, "value": v, "clampedBytes": defaultGRPCMaxMsgSize}).
+			Warn("gRPC max message size below default, clamped to default")
+		return defaultGRPCMaxMsgSize
+	}
+	return size
+}
 
 var subjectCN string
 
