@@ -1770,7 +1770,10 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 			conf.Profile.Mode = share.PolicyModeEvaluate
 		}
 		conf.Profile.Group = group
-		if info.Pid != 0 {
+		// Skip fanotify-based self-protection for our own container/pod. The enforcer's
+		// pathWalker would open our own perm-marked files and freeze awaiting an fsmon
+		// verdict, deadlocking fsnMux (held across the walker) and procMux against faccess.
+		if info.Pid != 0 && !isAgentContainer(id) {
 			prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, role, c.pid)
 			go prober.HandleNvProtectControl(true, c.id, role, share.GroupNVProtect, c.pid)
 			go fileWatcher.StartWatch(id, c.pid, conf, true, true)
