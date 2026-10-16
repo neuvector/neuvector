@@ -376,18 +376,28 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 	if (event.Op & fsnotify.Create) != 0 {
 		switch {
 		case fi.IsDir():
-			dirs, _ := fsn.enumFiles(path, root.id, false)
 			// sample: mkdir -p /tmp/test/bin, only "/tmp" was reported.
-			for d := range dirs.Iter() {
-				dir := d.(string)
-				if fsn.skipPathByRole(root.role, dir[root.cLayerLen:]) {
-					continue
+			// enumFiles runs the pathWalker child (blocking); release ctrlMux across the walk
+			// so it is never held during the wait (deadlock risk vs the fanotify permission
+			// handlers), then re-acquire and re-fetch root to register the new subtree.
+			id := root.id
+			fsn.unlockMux()
+			dirs, _ := fsn.enumFiles(path, id, false)
+			fsn.lockMux()
+			if r, ok := fsn.roots[index]; ok {
+				for d := range dirs.Iter() {
+					dir := d.(string)
+					if len(dir) < r.cLayerLen {
+						continue
+					}
+					if fsn.skipPathByRole(r.role, dir[r.cLayerLen:]) {
+						continue
+					}
+					if dbgError := fsn.addDir(dir); dbgError != nil {
+						log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+					}
+					r.dirs.Add(dir)
 				}
-				// mLog.WithFields(log.Fields{"rdir": dir[root.cLayerLen:]}).Debug("FSN: new dir")
-				if dbgError := fsn.addDir(dir); dbgError != nil {
-					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-				}
-				root.dirs.Add(dir)
 			}
 		case fi.Mode().IsRegular():
 			// mLog.WithFields(log.Fields{"file": file, "path": path}).Debug("FSN: new file")
@@ -479,6 +489,22 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath, role string, pid int) (b
 		return false, nil
 	}
 
+	// Enumerate the container's files BEFORE taking the lock. enumFiles/enumBtrfsInitFiles
+	// spawn the pathWalker child and block on it (walkerTask.Run -> cmd.Wait, no timeout).
+	// Holding ctrlMux across that wait can deadlock the fanotify permission handlers that
+	// also need it (fsmon/faccess -> procMux/ctrlMux). These enumerators only build local
+	// maps and read immutable config, so they are safe to run unlocked.
+	var dirs utils.Set
+	var fileMap map[string]*fileInfo
+	var imgLayer string
+	if fsn.storageDrv == drv_btrfs {
+		// It is composed of the image files and the new created files
+		// differentiate the "..._init" folder to filter out the image files
+		dirs, fileMap, imgLayer = fsn.enumBtrfsInitFiles(path, id)
+	} else {
+		dirs, fileMap = fsn.enumFiles(path, id, true)
+	}
+
 	fsn.lockMux()
 	defer fsn.unlockMux()
 
@@ -511,17 +537,9 @@ func (fsn *FileNotificationCtr) AddContainer(id, cPath, role string, pid int) (b
 		cLayer:    path,
 		cLayerLen: len(path),
 		pid:       pid,
-		dirs:      utils.NewSet(),             // temporary
-		files:     make(map[string]*fileInfo), // temporary
-	}
-
-	// construct the initial file map
-	if fsn.storageDrv == drv_btrfs {
-		// It is composed of the image files and the new created files
-		// differentiate the "..._init" folder to filter out the image files
-		root.dirs, root.files, root.imgLayer = fsn.enumBtrfsInitFiles(path, id)
-	} else {
-		root.dirs, root.files = fsn.enumFiles(path, id, true)
+		dirs:      dirs,
+		files:     fileMap,
+		imgLayer:  imgLayer,
 	}
 
 	for d := range root.dirs.Iter() {
