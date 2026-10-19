@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -2552,4 +2554,50 @@ func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
 		FeedRating:  cve.FeedRating,
 	}
 	return vul
+}
+
+func GetCustomSecretRules() {
+	obj, err := global.ORCH.GetResource(resource.RscTypeConfigMap, resource.NvAdmSvcNamespace, customRulesConfigmap)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error()
+		return
+	}
+	cm, ok := obj.(*corev1.ConfigMap)
+	if cm == nil || !ok {
+		log.WithFields(log.Fields{"err": "Error: Unknown type"}).Error()
+		return
+	}
+	if cm.Data == nil {
+		return
+	}
+	v, ok := cm.Data[secretPatternsKey]
+	if !ok {
+		return
+	}
+	json_data, err := yaml.YAMLToJSON([]byte(v))
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("yaml to json convert error")
+		return
+	}
+	var config secrets.SecretPatternConfig
+	err = yaml.Unmarshal(json_data, &config)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("unmarshal failed")
+		return
+	}
+	data, err := json.Marshal(&config)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("marshal failed")
+		return
+	}
+	oldData, err := cluster.Get(share.CLUSConfigSecretPatternsKey)
+	if err != cluster.ErrKeyNotFound {
+		log.WithFields(log.Fields{"error": err}).Error("Get failed")
+	}
+	if slices.Equal(data, oldData) {
+		return
+	}
+	if putErr := cluster.Put(share.CLUSConfigSecretPatternsKey, data); putErr != nil {
+		log.WithFields(log.Fields{"err": putErr}).Warn("failed to update secret patterns config")
+	}
 }
