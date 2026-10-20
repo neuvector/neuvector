@@ -6,9 +6,11 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +26,38 @@ import (
 	"google.golang.org/grpc/security/advancedtls"
 )
 
-const GRPCMaxMsgSize = 1024 * 1024 * 32
+// defaultGRPCMaxMsgSize is the default gRPC message size cap (64 MiB), applied
+// when EnvGRPCMaxMsgSizeMB is unset.
+const defaultGRPCMaxMsgSize = 1024 * 1024 * 64
+
+const EnvGRPCMaxMsgSizeMB = "CLUSTER_GRPC_MAX_MSG_SIZE_MB"
+
+// GRPCMaxMsgSize is the max send/receive message size (in bytes) for cluster
+// gRPC servers and clients. It defaults to 64 MiB and can be raised via
+// EnvGRPCMaxMsgSizeMB. See grpcMaxMsgSizeFromEnv for the parsing rules.
+var GRPCMaxMsgSize = grpcMaxMsgSizeFromEnv()
+
+func grpcMaxMsgSizeFromEnv() int {
+	v := os.Getenv(EnvGRPCMaxMsgSizeMB)
+	if v == "" {
+		return defaultGRPCMaxMsgSize
+	}
+
+	mb, err := strconv.Atoi(v)
+	if err != nil {
+		log.WithFields(log.Fields{"env": EnvGRPCMaxMsgSizeMB, "value": v, "error": err}).
+			Warn("invalid gRPC max message size, using default")
+		return defaultGRPCMaxMsgSize
+	}
+
+	if mb <= 0 || mb > math.MaxInt32/(1024*1024) {
+		log.WithFields(log.Fields{"env": EnvGRPCMaxMsgSizeMB, "value": v}).
+			Warn("gRPC max message size out of range, using default")
+		return defaultGRPCMaxMsgSize
+	}
+
+	return mb * 1024 * 1024
+}
 
 var subjectCN string
 
