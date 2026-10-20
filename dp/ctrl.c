@@ -2173,6 +2173,12 @@ static int dp_ctrl_bld_dlp(json_t *msg)
         dlpbld.dlp_rule_list[i].sigid = json_integer_value(json_object_get(rule_obj, "id"));
         pat_obj = json_object_get(rule_obj, "patterns");
         dlpbld.dlp_rule_list[i].num_dlp_rule_pats = json_array_size(pat_obj);
+        if (dlpbld.dlp_rule_list[i].num_dlp_rule_pats > MAX_DLP_RULE_PATTERN_NUM) {
+            DEBUG_ERROR(DBG_CTRL, "dlp rule(%s) has too many patterns(%d), capping at (%d)\n",
+                dlpbld.dlp_rule_list[i].rulename,
+                dlpbld.dlp_rule_list[i].num_dlp_rule_pats, MAX_DLP_RULE_PATTERN_NUM);
+            dlpbld.dlp_rule_list[i].num_dlp_rule_pats = MAX_DLP_RULE_PATTERN_NUM;
+        }
         if (dlpbld.dlp_rule_list[i].num_dlp_rule_pats) {
             dlpbld.dlp_rule_list[i].dlp_rule_pat_list = calloc(dlpbld.dlp_rule_list[i].num_dlp_rule_pats, sizeof(dpi_dlp_rule_pattern_t));
             if (!dlpbld.dlp_rule_list[i].dlp_rule_pat_list) {

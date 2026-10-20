@@ -229,6 +229,7 @@ typedef struct {
 #define MAX_SIG_NAME_LEN 512 + 10
 #define DP_DLP_RULE_NAME_MAX_LEN MAX_SIG_NAME_LEN
 #define DP_DLP_RULE_PATTERN_MAX_LEN 512
+#define DP_DLP_RULE_PATTERN_MAX_NUM 16
 
 typedef struct {
     uint32_t ID;
