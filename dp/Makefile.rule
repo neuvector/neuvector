@@ -9,6 +9,7 @@ ROOTDIR = $(TOPDIR)/..
 GCC_VERSION = $(shell gcc -dumpversion)
 
 CFLAGS = -Wall -Werror -Wno-unused-result -Wno-unused-function -fstrict-aliasing -Wstrict-aliasing -g
+CFLAGS += -fstack-protector-strong -fstack-clash-protection -fPIE
 CFLAGS += $(shell pkg-config --cflags libnfnetlink)
 CFLAGS += $(shell pkg-config --cflags libnetfilter_queue)
 CFLAGS += -I./ -I$(TOPDIR)/
@@ -16,6 +17,8 @@ ifdef DISABLE_OPT
 CFLAGS += -O0
 else
 CFLAGS += -Os
+# _FORTIFY_SOURCE requires optimization, so only enable it in the optimized build
+CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 endif
 
 CSRCS += $(wildcard *.c)

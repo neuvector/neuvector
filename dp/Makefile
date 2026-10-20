@@ -9,6 +9,6 @@ TARGET_PROG = dp
 SUBDIR_OBJS = utils/$(OBJDIR)/utils.o
 SUBDIR_OBJS += dpi/$(OBJDIR)/dpi.o
 
-EXTRA_LDFLAGS = -lpcap -lpcre2-8 -ljansson -ljemalloc -pthread -lurcu -lurcu-cds -lrt -lstdc++ -lm -lnetfilter_queue -lhs -Wl,-rpath,'$$ORIGIN' -Wl,--disable-new-dtags
+EXTRA_LDFLAGS = -lpcap -lpcre2-8 -ljansson -ljemalloc -pthread -lurcu -lurcu-cds -lrt -lstdc++ -lm -lnetfilter_queue -lhs -Wl,-rpath,'$$ORIGIN' -Wl,--disable-new-dtags -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 
 include $(TOPDIR)/Makefile.rule
