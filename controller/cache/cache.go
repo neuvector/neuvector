@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/neuvector/neuvector/controller/access"
@@ -2507,6 +2509,61 @@ func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
 	return vul
 }
 
+<<<<<<< HEAD
 func GetCVEDBRecordCount() int {
 	return scanUtils.GetCVEDBRecordCount()
+=======
+func GetCustomSecretRules() {
+	obj, err := global.ORCH.GetResource(resource.RscTypeConfigMap, resource.NvAdmSvcNamespace, customRulesConfigmap)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("get resource failed")
+		exist, err := cluster.Exist(share.CLUSConfigSecretPatternsKey)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("check key failed")
+		} else if exist {
+			if err := cluster.Delete(share.CLUSConfigSecretPatternsKey); err != nil {
+				log.WithFields(log.Fields{"err": err}).Error("delete key failed")
+			}
+		}
+		return
+	}
+	cm, ok := obj.(*corev1.ConfigMap)
+	if cm == nil || !ok {
+		log.WithFields(log.Fields{"err": "Error: Unknown type"}).Error()
+		return
+	}
+	if cm.Data == nil {
+		return
+	}
+	v, ok := cm.Data[secretPatternsKey]
+	if !ok {
+		return
+	}
+	json_data, err := yaml.YAMLToJSON([]byte(v))
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("yaml to json convert error")
+		return
+	}
+	var config secrets.SecretPatternConfig
+	err = yaml.Unmarshal(json_data, &config)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("unmarshal failed")
+		return
+	}
+	data, err := json.Marshal(&config)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("marshal failed")
+		return
+	}
+	oldData, err := cluster.Get(share.CLUSConfigSecretPatternsKey)
+	if err != nil && err != cluster.ErrKeyNotFound {
+		log.WithFields(log.Fields{"error": err}).Error("Get failed")
+	}
+	if slices.Equal(data, oldData) {
+		return
+	}
+	if putErr := cluster.Put(share.CLUSConfigSecretPatternsKey, data); putErr != nil {
+		log.WithFields(log.Fields{"err": putErr}).Warn("failed to update secret patterns config")
+	}
+>>>>>>> 5d72766 (issue-2989: NeuVector ConfigMap Watch Loop causing WAN Link Saturation (200 Mbps) & kube-apiserver Instability (#2990))
 }
