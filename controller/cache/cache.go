@@ -2559,7 +2559,15 @@ func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
 func GetCustomSecretRules() {
 	obj, err := global.ORCH.GetResource(resource.RscTypeConfigMap, resource.NvAdmSvcNamespace, customRulesConfigmap)
 	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Error()
+		log.WithFields(log.Fields{"err": err}).Error("get resource failed")
+		exist, err := cluster.Exist(share.CLUSConfigSecretPatternsKey)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err}).Error("check key failed")
+		} else if exist {
+			if err := cluster.Delete(share.CLUSConfigSecretPatternsKey); err != nil {
+				log.WithFields(log.Fields{"err": err}).Error("delete key failed")
+			}
+		}
 		return
 	}
 	cm, ok := obj.(*corev1.ConfigMap)
@@ -2591,7 +2599,7 @@ func GetCustomSecretRules() {
 		return
 	}
 	oldData, err := cluster.Get(share.CLUSConfigSecretPatternsKey)
-	if err != cluster.ErrKeyNotFound {
+	if err != nil && err != cluster.ErrKeyNotFound {
 		log.WithFields(log.Fields{"error": err}).Error("Get failed")
 	}
 	if slices.Equal(data, oldData) {
