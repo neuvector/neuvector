@@ -33,6 +33,6 @@ follow the checklist below to ensure a smooth release process.
 - [ ] Publish UBI. (Selvam)
 - [ ] Announce neuvector-updates email list. (William)
 - [ ] CRD changes document.
-- [ ] Publish Documentation. (need to update support matrix and features.)
+- [ ] Publish Documentation. (need to update support matrix and features.) [Link](https://www.suse.com/lifecycle/#suse-security)
 - [ ] Verify https://open-docs.neuvector.com/releasenotes/5x/ is up-to-date
 
