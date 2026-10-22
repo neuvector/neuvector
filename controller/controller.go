@@ -906,6 +906,12 @@ func main() {
 		kv.ValidateWebhookCert()
 	}
 
+	watchConfigmap := true
+	if s := os.Getenv("DISABLE_CONFIGMAP_WATCH"); s != "" {
+		cache.GetCustomSecretRules()
+		watchConfigmap = false
+	}
+
 	var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
 	var nvSemanticVersion string // in the format v{major}.{minor}.{patch}
 	{
@@ -1069,7 +1075,7 @@ func main() {
 
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start(ocImageRegistered, cspType)
+	orchConnector.Start(ocImageRegistered, cspType, watchConfigmap)
 
 	if platform == share.PlatformKubernetes {
 		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)
