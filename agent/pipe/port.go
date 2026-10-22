@@ -634,6 +634,14 @@ func pullAllContainerPorts(
 				pair.Addrs = nil
 				pair.tap = false
 			}
+		} else if existPair != nil && !existPair.tap &&
+			portExists(exLinks, existPair.exPort) && portExists(exLinks, existPair.inPort) {
+			// Pulled via another container of the same pod; port names carry that container's pid
+			log.WithFields(log.Fields{"port": attrs.Name, "pair": existPair}).Debug("Pulled by previous owner")
+
+			pair = *existPair
+			pair.MAC = attrs.HardwareAddr
+			pair.Addrs = nil
 		} else if existPair != nil && !existPair.tap {
 			// Ports are pulled but not able to be found, something is very wrong.
 			// NOTE: pair can exist if we are changing policy mode
