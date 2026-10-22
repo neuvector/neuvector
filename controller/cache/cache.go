@@ -2509,18 +2509,15 @@ func GetCVERecord(name, dbKey, baseOS string) *db.DbVulAsset {
 	return vul
 }
 
-<<<<<<< HEAD
 func GetCVEDBRecordCount() int {
 	return scanUtils.GetCVEDBRecordCount()
-=======
+}
+
 func GetCustomSecretRules() {
 	obj, err := global.ORCH.GetResource(resource.RscTypeConfigMap, resource.NvAdmSvcNamespace, customRulesConfigmap)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("get resource failed")
-		exist, err := cluster.Exist(share.CLUSConfigSecretPatternsKey)
-		if err != nil {
-			log.WithFields(log.Fields{"err": err}).Error("check key failed")
-		} else if exist {
+		if exist := cluster.Exist(share.CLUSConfigSecretPatternsKey); exist {
 			if err := cluster.Delete(share.CLUSConfigSecretPatternsKey); err != nil {
 				log.WithFields(log.Fields{"err": err}).Error("delete key failed")
 			}
@@ -2565,5 +2562,4 @@ func GetCustomSecretRules() {
 	if putErr := cluster.Put(share.CLUSConfigSecretPatternsKey, data); putErr != nil {
 		log.WithFields(log.Fields{"err": putErr}).Warn("failed to update secret patterns config")
 	}
->>>>>>> 5d72766 (issue-2989: NeuVector ConfigMap Watch Loop causing WAN Link Saturation (200 Mbps) & kube-apiserver Instability (#2990))
 }
