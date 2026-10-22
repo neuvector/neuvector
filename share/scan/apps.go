@@ -628,7 +628,7 @@ func (s *ScanApps) parsePhpVersionHeader(filename, fullpath string) {
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, phpVersionDefine) {
 			ver := strings.TrimPrefix(line, phpVersionDefine)
-			ver = strings.TrimSuffix(ver, "\"")
+			ver = strings.TrimSuffix(strings.TrimSpace(ver), "\"")
 			ver = strings.TrimSpace(ver)
 			if ver == "" {
 				return
