@@ -32,6 +32,8 @@ const (
 	WPVerFileSuffix  = "wp-includes/version.php"
 	wpVersionMaxSize = 4 * 1024
 	ComposerFile     = "/composer.lock"
+	phpVersionFile   = "usr/local/include/php/main/php_version.h"
+	phpVersionDefine = "#define PHP_VERSION \""
 
 	jar         = "jar"
 	jarMaxDepth = 2
@@ -141,7 +143,7 @@ func NewScanApps(v2 bool) *ScanApps {
 
 func IsAppsPkgFile(filename, fullpath string) bool {
 	if isNodejs(filename) || IsJava(filename) || isPython(filename) ||
-		isRuby(filename) || isDotNet(filename) || isWordpress(filename) || isPhpComposer(filename) || IsRlangPackage(filename) {
+		isRuby(filename) || isDotNet(filename) || isWordpress(filename) || isPhpComposer(filename) || isPhpVersionHeader(filename) || IsRlangPackage(filename) {
 		return true
 	}
 	// Keep golang check at last as it requires reading file data
@@ -206,6 +208,8 @@ func (s *ScanApps) ExtractAppPkg(filename, fullpath string) {
 		s.parseWordpressPackage(filename, fullpath)
 	} else if isPhpComposer(filename) {
 		s.parsePhpComposerJson(filename, fullpath)
+	} else if isPhpVersionHeader(filename) {
+		s.parsePhpVersionHeader(filename, fullpath)
 	} else if IsRlangPackage(filename) {
 		s.parseRLangPackage(filename, fullpath)
 	} else {
@@ -584,11 +588,35 @@ func isPhpComposer(filename string) bool {
 	return strings.HasSuffix(filename, ComposerFile)
 }
 
+func isPhpVersionHeader(filename string) bool {
+	return strings.HasSuffix(filename, phpVersionFile)
+}
+
 func IsRlangPackage(filename string) bool {
 	if filepath.Base(filename) != rDescFileName {
 		return false
 	}
 	return strings.HasPrefix(filename, rDefaultPath) || strings.HasPrefix(filename, rRepositoryPath) || strings.HasPrefix(filename, rDefaultPath2)
+}
+
+func (s *ScanApps) parsePhpVersionHeader(filename, fullpath string) {
+	data, err := os.ReadFile(fullpath)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, phpVersionDefine) {
+			ver := strings.TrimPrefix(line, phpVersionDefine)
+			ver = strings.TrimSuffix(strings.TrimSpace(ver), "\"")
+			ver = strings.TrimSpace(ver)
+			if ver == "" {
+				return
+			}
+			pkg := AppPackage{AppName: "php", ModuleName: "php:", Version: ver, FileName: filename}
+			s.pkgs[filename] = []AppPackage{pkg}
+			return
+		}
+	}
 }
 
 func (s *ScanApps) parsePhpComposerJson(filename string, filepath string) {
