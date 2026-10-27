@@ -366,7 +366,6 @@ typedef struct dpi_ip_fqdn_storage_entry_ {
 //dlp
 #define MAX_DLP_RULE_NAME_LEN DP_DLP_RULE_NAME_MAX_LEN
 #define MAX_DLP_RULE_PATTERN_LEN DP_DLP_RULE_PATTERN_MAX_LEN
-#define MAX_DLP_RULE_PATTERN_NUM DP_DLP_RULE_PATTERN_MAX_NUM
 #define MAX_DLPCFG_DELETE 256
 
 typedef struct dpi_dlp_rule_pattern_ {
