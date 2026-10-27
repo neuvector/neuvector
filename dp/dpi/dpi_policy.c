@@ -222,7 +222,7 @@ static dpi_policy_hdl_t *dpi_policy_hdl_init(int def_action)
     dpi_policy_hdl_t *hdl;
     hdl = calloc(sizeof(dpi_policy_hdl_t), 1);
     if (!hdl) {
-        DEBUG_ERROR(DBG_POLICY, "Out of memory!");
+        DEBUG_ERROR(DBG_POLICY, "Out of memory!\n");
         return NULL;
 
     }
@@ -282,7 +282,7 @@ static int get_range_key(dpi_rule_key_t *key_l, dpi_rule_key_t *key_h, int dir,
 {
     if (key_l->proto != key_h->proto) {
         DEBUG_ERROR(DBG_POLICY, "policy not valid! key_l "
-                    DP_RULE_STR "key_h " DP_RULE_STR "",
+                    DP_RULE_STR "key_h " DP_RULE_STR "\n",
                     DP_RULE_KEY(key_l), DP_RULE_KEY(key_h));
         return -1;
     }
@@ -303,7 +303,7 @@ static int get_range_key(dpi_rule_key_t *key_l, dpi_rule_key_t *key_h, int dir,
         break;
     default:
         DEBUG_ERROR(DBG_POLICY, "policy not valid! key_l "
-                    DP_RULE_STR "key_h " DP_RULE_STR "",
+                    DP_RULE_STR "key_h " DP_RULE_STR "\n",
                     DP_RULE_KEY(key_l), DP_RULE_KEY(key_h));
         return -1;
     }
@@ -326,7 +326,7 @@ static int dpi_range_rule_add(dpi_policy_hdl_t *hdl, dpi_rule_key_t *key_l,
     if (!r) {
         r = (dpi_range_rule_t *)calloc(1, sizeof(dpi_range_rule_t));
         if (!r) {
-            DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
             return -1;
         }
         range_rule_key_cpy(&r->key, &key);
@@ -335,7 +335,7 @@ static int dpi_range_rule_add(dpi_policy_hdl_t *hdl, dpi_rule_key_t *key_l,
 
     item = (dpi_range_rule_item_t *)calloc(1, sizeof(dpi_range_rule_item_t));
     if (!item) {
-        DEBUG_ERROR(DBG_POLICY, "OOM 2!!!");
+        DEBUG_ERROR(DBG_POLICY, "OOM 2!!!\n");
         return -1;
     } else {
         policy_desc_cpy(&item->desc, desc);
@@ -439,7 +439,7 @@ static int dpi_rule_add_one(dpi_policy_hdl_t *hdl, dpi_rule_key_t *key_l,
 
         r = (dpi_rule_t *)calloc(1, sizeof(dpi_rule_t));
         if (!r) {
-            DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
             return -1;
         }
         rule_key_cpy(&r->key, key_l);
@@ -1488,13 +1488,13 @@ int dpi_policy_cfg(int cmd, dpi_policy_t *p, int flag)
 
     if (flag & MSG_START) {
        if (hdl) {
-           DEBUG_ERROR(DBG_POLICY, "old policy hdl %p exists!", hdl);
+           DEBUG_ERROR(DBG_POLICY, "old policy hdl %p exists!\n", hdl);
            dpi_policy_hdl_destroy(hdl);
            hdl = NULL;
        }
     } else {
         if (!hdl) {
-            DEBUG_ERROR(DBG_POLICY, "missed msg start!");
+            DEBUG_ERROR(DBG_POLICY, "missed msg start!\n");
             return -1;
         }
     }
@@ -1675,14 +1675,14 @@ static dpi_fqdn_hdl_t *dpi_fqdn_hdl_init()
     dpi_fqdn_hdl_t *hdl;
     hdl = calloc(sizeof(dpi_fqdn_hdl_t), 1);
     if (!hdl) {
-        DEBUG_ERROR(DBG_POLICY, "Out of memory!");
+        DEBUG_ERROR(DBG_POLICY, "Out of memory!\n");
         return NULL;
     }
 
     DEBUG_POLICY("%p\n", hdl);
     hdl->bm = bitmap_allocate(DPI_FQDN_MAX_ENTRIES);
     if (!hdl->bm) {
-        DEBUG_ERROR(DBG_POLICY, "Out of memory!");
+        DEBUG_ERROR(DBG_POLICY, "Out of memory!\n");
         free(hdl);
         return NULL;
     }
@@ -1698,7 +1698,7 @@ static uint32_t alloc_fqdn_code(dpi_fqdn_hdl_t *hdl)
 {
     hdl->code_cnt = bitmap_get_next_zero(hdl->bm, hdl->code_cnt);
     if (hdl->code_cnt < 0) {
-        DEBUG_ERROR(DBG_POLICY, "used up fqdn code!!");
+        DEBUG_ERROR(DBG_POLICY, "used up fqdn code!!\n");
         return -1;
     }
     bitmap_set(hdl->bm, hdl->code_cnt);
@@ -1780,13 +1780,13 @@ static int config_record_ip_list(fqdn_ipv4_entry_t *entry, fqdn_record_t *r)
     //one ip can map to multiple fqdn record
     record_item = calloc(1, sizeof(fqdn_record_item_t));
     if (record_item == NULL) {
-        DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+        DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
         return -1;
     }
     //one fqdn record can map to multiple ip
     ipv4_item = calloc(1, sizeof(fqdn_ipv4_item_t));
     if (ipv4_item == NULL) {
-        DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+        DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
         free(record_item);
         return -1;
     }
@@ -1824,13 +1824,13 @@ uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, 
         fqdn_name_entry_t *entry;
         entry  = (fqdn_name_entry_t *)calloc(1, sizeof(fqdn_name_entry_t));
         if (!entry) {
-            DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
             return -1;
         }
 
         r = (fqdn_record_t *)calloc(1, sizeof(fqdn_record_t));
         if (!r) {
-            DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
             free(entry);
             return -1;
         }
@@ -1871,7 +1871,7 @@ uint32_t config_fqdn_ipv4_mapping(dpi_fqdn_hdl_t *hdl, char *name, uint32_t ip, 
         fqdn_ipv4_entry_t *entry;
         entry = (fqdn_ipv4_entry_t *)calloc(1, sizeof(fqdn_ipv4_entry_t));
         if (!entry) {
-            DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+            DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
         } else {
             entry->ip = ip;
             if (config_record_ip_list(entry, r) < 0){
@@ -1998,7 +1998,7 @@ static int associate_ip_record(dpi_fqdn_hdl_t *hdl, fqdn_name_entry_t *name_entr
         } else {
             ipv4_entry = (fqdn_ipv4_entry_t *)calloc(1, sizeof(fqdn_ipv4_entry_t));
             if (!ipv4_entry) {
-                DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+                DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
                 return -1;
             }
             ipv4_entry->ip = ip[i];
@@ -2228,7 +2228,7 @@ void dpi_fqdn_entry_delete_marked()
 int dpi_policy_init() {
     g_fqdn_hdl = dpi_fqdn_hdl_init();
     if (g_fqdn_hdl == NULL) {
-        DEBUG_ERROR(DBG_POLICY, "Fail to init fqdn hdl!!!");
+        DEBUG_ERROR(DBG_POLICY, "Fail to init fqdn hdl!!!\n");
         return -1;
     }
     return 0;
@@ -2269,13 +2269,13 @@ static void add_ip_fqdn_storage_entry(char *name, uint32_t ip)
 {
     dpi_ip_fqdn_storage_entry_t *entry = calloc(1, sizeof(*entry));
     if (!entry) {
-        DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+        DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
         return;
     }
 
     dpi_ip_fqdn_storage_record_t *r = calloc(1, sizeof(*r));
     if (!r) {
-        DEBUG_ERROR(DBG_POLICY, "OOM!!!");
+        DEBUG_ERROR(DBG_POLICY, "OOM!!!\n");
         free(entry);
         return;
     }

@@ -58,9 +58,8 @@ extern uint32_t g_debug_levels;
 
 #define DEBUG_LEVEL(level, format, args...) \
         IF_DEBUG(level) { debug_log_no_filter(true, "%s: "format, __FUNCTION__,  ##args); }
-// The trailing newline is appended automatically; do not end format with "\n".
 #define DEBUG_ERROR(level, format, args...) \
-        IF_DEBUG(level | DBG_ERROR) { debug_log_no_filter(true, "%s: "format "\n", __FUNCTION__,  ##args); }
+        IF_DEBUG(level | DBG_ERROR) { debug_log_no_filter(true, "%s: "format, __FUNCTION__,  ##args); }
 #define DEBUG_INIT(format, args...) \
         IF_DEBUG(DBG_INIT) { debug_log_no_filter(true, "%s: "format, __FUNCTION__, ##args); }
 #define DEBUG_CTRL(format, args...) \

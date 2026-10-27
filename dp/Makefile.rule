@@ -16,7 +16,6 @@ ifdef DISABLE_OPT
 CFLAGS += -O0
 else
 CFLAGS += -Os
-CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 endif
 
 CSRCS += $(wildcard *.c)

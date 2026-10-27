@@ -1192,7 +1192,7 @@ dpi_parser_t *dpi_http_tcp_parser(void)
         if (apache_struts_re == NULL) {
             PCRE2_UCHAR buffer[256];
             pcre2_get_error_message(pcre_errno, buffer, sizeof(buffer));
-            DEBUG_ERROR(DBG_PARSER, "ERROR: PCRE2 compilation for (%s) failed at offset %d: %s",
+            DEBUG_ERROR(DBG_PARSER, "ERROR: PCRE2 compilation for (%s) failed at offset %d: %s\n",
                                     APACHE_STRUTS_PCRE, pcre_errno, buffer);
         }
     }

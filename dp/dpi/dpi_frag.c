@@ -134,7 +134,7 @@ static void ipfrag_hold(ip4frag_trac_t *trac, dpi_packet_t *p)
 
     if (asm_insert(&trac->frags, clip) == ASM_FAILURE) {
         ipfrag_remove(clip);
-        DEBUG_ERROR(DBG_PACKET, "Fail to save ipv4 fragment, seq=%u len=%u", seq, len);
+        DEBUG_ERROR(DBG_PACKET, "Fail to save ipv4 fragment, seq=%u len=%u\n", seq, len);
     } else {
         DEBUG_LOG(DBG_PACKET, NULL, "Save ipv4 fragment, seq=%u len=%u\n", seq, len);
     }
@@ -303,7 +303,7 @@ static void ip6frag_hold(ip6frag_trac_t *trac, dpi_packet_t *p)
 
     if (asm_insert(&trac->frags, clip) == ASM_FAILURE) {
         ipfrag_remove(clip); 
-        DEBUG_ERROR(DBG_PACKET, "Fail to save ipv6 fragment, seq=%u len=%u", seq, len);
+        DEBUG_ERROR(DBG_PACKET, "Fail to save ipv6 fragment, seq=%u len=%u\n", seq, len);
     } else {
         DEBUG_LOG(DBG_PACKET, NULL, "Save ipv6 fragment, seq=%u len=%u\n", seq, len);
     }   

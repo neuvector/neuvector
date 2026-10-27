@@ -266,7 +266,7 @@ static int dp_ring_v1(int fd, const char *iface, dp_ring_t *ring, bool tap, bool
 
     if (setsockopt(fd, SOL_PACKET, PACKET_RX_RING, req, sizeof(*req)) < 0) {
         DEBUG_ERROR(DBG_CTRL, "fail to set rx ring: %s, block_size=%u frame_size=%u "
-                    "block_nr=%u frame_nr=%u page_size=%ld", strerror(errno),
+                    "block_nr=%u frame_nr=%u page_size=%ld\n", strerror(errno),
                     req->tp_block_size, req->tp_frame_size, req->tp_block_nr,
                     req->tp_frame_nr, sysconf(_SC_PAGESIZE));
         return -1;
@@ -274,7 +274,7 @@ static int dp_ring_v1(int fd, const char *iface, dp_ring_t *ring, bool tap, bool
     if (!tap) {
         if (setsockopt(fd, SOL_PACKET, PACKET_TX_RING, req, sizeof(*req)) < 0) {
             DEBUG_ERROR(DBG_CTRL, "fail to set tx ring: %s, block_size=%u frame_size=%u "
-                        "block_nr=%u frame_nr=%u page_size=%ld", strerror(errno),
+                        "block_nr=%u frame_nr=%u page_size=%ld\n", strerror(errno),
                         req->tp_block_size, req->tp_frame_size, req->tp_block_nr,
                         req->tp_frame_nr, sysconf(_SC_PAGESIZE));
             return -1;
@@ -283,7 +283,7 @@ static int dp_ring_v1(int fd, const char *iface, dp_ring_t *ring, bool tap, bool
 
     ring->rx_map = mmap(NULL, ring->map_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, fd, 0);
     if (ring->rx_map == MAP_FAILED) {
-        DEBUG_ERROR(DBG_CTRL, "fail to mmap (size=0x%x): %s.", ring->map_size, strerror(errno));
+        DEBUG_ERROR(DBG_CTRL, "fail to mmap (size=0x%x): %s.\n", ring->map_size, strerror(errno));
         return -1;
     }
 
@@ -363,7 +363,7 @@ static int dp_ring_v3(int fd, const char *iface, dp_ring_t *ring, bool tap, uint
 {
     int val = TPACKET_V3;
     if (setsockopt(fd, SOL_PACKET, PACKET_VERSION, &val, sizeof(val))) {
-        DEBUG_ERROR(DBG_CTRL, "fail to set TPACKET_V3.");
+        DEBUG_ERROR(DBG_CTRL, "fail to set TPACKET_V3.\n");
         return ERR_UNSUPPORT_v3;
     }
 
@@ -389,7 +389,7 @@ static int dp_ring_v3(int fd, const char *iface, dp_ring_t *ring, bool tap, uint
 
     ring->rx_map = mmap(NULL, ring->map_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, fd, 0);
     if (ring->rx_map == MAP_FAILED) {
-        DEBUG_ERROR(DBG_CTRL, "fail to mmap (size=0x%x).", ring->map_size);
+        DEBUG_ERROR(DBG_CTRL, "fail to mmap (size=0x%x).\n", ring->map_size);
         close(fd);
         return -1;
     }
@@ -423,7 +423,7 @@ int dp_open_socket(dp_context_t *ctx, const char *iface, bool tap, bool jumbofra
 {
     int fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (fd < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail to open socket.");
+        DEBUG_ERROR(DBG_CTRL, "fail to open socket.\n");
         return -1;
     }
 
@@ -444,7 +444,7 @@ int dp_open_socket(dp_context_t *ctx, const char *iface, bool tap, bool jumbofra
 
     err = dp_ring_bind(fd, iface);
     if (err < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail to bind socket.");
+        DEBUG_ERROR(DBG_CTRL, "fail to bind socket.\n");
         dp_close_socket(ctx);
         return -1;
     }

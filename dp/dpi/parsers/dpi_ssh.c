@@ -68,7 +68,7 @@ static int ssh_banner(dpi_packet_t *p, uint8_t *ptr, uint32_t len)
     }
 
     if (data->ver < 2) {
-        DEBUG_ERROR(DBG_PARSER, "SSH version 1");
+        DEBUG_ERROR(DBG_PARSER, "SSH version 1\n");
         dpi_threat_trigger(DPI_THRT_SSH_VER_1, p, NULL);
     }
 

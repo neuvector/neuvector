@@ -370,7 +370,7 @@ int ssl_parse_v3(dpi_packet_t *p, ssl_wing_t *w, uint8_t *ptr, ssl_record_t *rec
             uint16_t hbt_len = GET_BIG_INT16(ptr + 1);
             // 1024 is a min size to reduce false positive.
             if (hbt_len - (rec->len - 3) > 1024) {
-                DEBUG_ERROR(DBG_PARSER, "SSLv3: heartbleed, heartbeat=%u record=%u", hbt_len, rec->len);
+                DEBUG_ERROR(DBG_PARSER, "SSLv3: heartbleed, heartbeat=%u record=%u\n", hbt_len, rec->len);
                 dpi_threat_trigger(DPI_THRT_SSL_HEARTBLEED, p, "heartbeat=%u, record=%u", hbt_len, rec->len);
             }
         }
@@ -406,7 +406,7 @@ int ssl_parse_v2(dpi_packet_t *p, ssl_wing_t *w, uint8_t *ptr, int len, ssl_reco
                 return FORMAT_MATCH;
             } else if (cipher_len > expect) {
                 // sslv2 cipher length overflow
-                DEBUG_ERROR(DBG_PARSER, "SSLv2: cipher length overflow");
+                DEBUG_ERROR(DBG_PARSER, "SSLv2: cipher length overflow\n");
                 dpi_threat_trigger(DPI_THRT_SSL_CIPHER_OVF, p, "SSL version: SSLv2");
                 return FORMAT_IGNORE;
             } else {

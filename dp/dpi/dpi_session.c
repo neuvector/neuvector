@@ -329,7 +329,7 @@ int dpi_cache_packet(dpi_packet_t *p, dpi_wing_t *w, bool lookup)
     memcpy(clip->ptr, p->raw.ptr, p->raw.len);
 
     if (asm_insert(&w->asm_cache, clip) == ASM_FAILURE) {
-        // DEBUG_ERROR(DBG_TCP, "Fail to cache because packet duplication");
+        // DEBUG_ERROR(DBG_TCP, "Fail to cache because packet duplication\n");
         dpi_asm_remove(clip);
         return -1;
     } else {
@@ -936,7 +936,7 @@ void dpi_udp_tracker(dpi_packet_t *p)
         }
         s = dpi_session_create(p, to_server);
         if (unlikely(s == NULL)) {
-            DEBUG_ERROR(DBG_SESSION, "Unable to create UDP session");
+            DEBUG_ERROR(DBG_SESSION, "Unable to create UDP session\n");
             return;
         }
 
@@ -1035,7 +1035,7 @@ void dpi_icmp_tracker(dpi_packet_t *p)
     if (unlikely(s == NULL)) {
         s = dpi_session_create(p, dpi_is_client_pkt(p));
         if (unlikely(s == NULL)) {
-            DEBUG_ERROR(DBG_SESSION, "Unable to create ICMP session");
+            DEBUG_ERROR(DBG_SESSION, "Unable to create ICMP session\n");
             return;
         }
 
@@ -1078,7 +1078,7 @@ void dpi_ip_tracker(dpi_packet_t *p)
     if (unlikely(s == NULL)) {
         s = dpi_session_create(p, true);
         if (unlikely(s == NULL)) {
-            DEBUG_ERROR(DBG_SESSION, "Unable to create IP session");
+            DEBUG_ERROR(DBG_SESSION, "Unable to create IP session\n");
             return;
         }
 
@@ -1372,7 +1372,7 @@ static void tcp_update_wing(dpi_packet_t *p, dpi_session_t *s, int evt)
         break;
 
     case TCP_EVT_SPLIT:
-        DEBUG_ERROR(DBG_SESSION | DBG_TCP, "TCP split handshake");
+        DEBUG_ERROR(DBG_SESSION | DBG_TCP, "TCP split handshake\n");
         dpi_threat_trigger(DPI_THRT_TCP_SPLIT_HDSHK, p, NULL);
         // fall through
 
@@ -1540,7 +1540,7 @@ void dpi_tcp_tracker(dpi_packet_t *p)
             /*
             if (likely(th_snap.tick - p->ep->first_session_tick >
                        SESS_ALLOW_MID_STREAM_WINDOW)) {
-                DEBUG_ERROR(DBG_SESSION, "Late mid-stream packet");
+                DEBUG_ERROR(DBG_SESSION, "Late mid-stream packet\n");
                 return;
             }
             */

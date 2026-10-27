@@ -102,13 +102,13 @@ static int make_named_socket(const char *filename)
 int dp_ctrl_send_json(json_t *root)
 {
     if (root == NULL) {
-        DEBUG_ERROR(DBG_CTRL, "Fail to create json object.");
+        DEBUG_ERROR(DBG_CTRL, "Fail to create json object.\n");
         return -1;
     }
 
     char *data = json_dumps(root, 0);
     if (data == NULL) {
-        DEBUG_ERROR(DBG_CTRL, "Fail to dump json object.");
+        DEBUG_ERROR(DBG_CTRL, "Fail to dump json object.\n");
         json_decref(root);
         // 'root' steal all its children's reference. As it is released, return 0 so the caller
         // won't call free() again.
@@ -437,7 +437,7 @@ static int dp_ctrl_add_mac(json_t *msg)
         count = json_array_size(obj);
         pips = calloc(sizeof(io_internal_pip_t) + count * sizeof(io_pip_t), 1);
         if (!pips) {
-            DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
             return -1;
         }
         pips->count = count;
@@ -642,7 +642,7 @@ static int dp_ctrl_cfg_nbe(json_t *msg)
 
     len = json_array_size(obj);
     if (len == 0) {
-        DEBUG_ERROR(DBG_CTRL, "Missing mac address in mac cfg!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in mac cfg!!\n");
         return -1;
     }
 
@@ -654,7 +654,7 @@ static int dp_ctrl_cfg_nbe(json_t *msg)
 
         io_mac_t *mac = rcu_map_lookup(&g_ep_map, &mac_addr);
         if (mac == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.", mac_str);
+            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.\n", mac_str);
             continue;
         }
 
@@ -686,7 +686,7 @@ static int dp_ctrl_cfg_mac(json_t *msg)
 
     len = json_array_size(obj);
     if (len == 0) {
-        DEBUG_ERROR(DBG_CTRL, "Missing mac address in mac cfg!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in mac cfg!!\n");
         return -1;
     }
 
@@ -698,7 +698,7 @@ static int dp_ctrl_cfg_mac(json_t *msg)
 
         io_mac_t *mac = rcu_map_lookup(&g_ep_map, &mac_addr);
         if (mac == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.", mac_str);
+            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.\n", mac_str);
             continue;
         }
 
@@ -925,7 +925,7 @@ static int dp_ctrl_stats_macs(json_t *msg)
 
         io_mac_t *mac = rcu_map_lookup(&g_ep_map, &mac_addr);
         if (mac == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.", mac_str);
+            DEBUG_ERROR(DBG_CTRL, "mac %s not found in ep map.\n", mac_str);
             continue;
         }
 
@@ -1372,12 +1372,12 @@ static int dp_ctrl_cfg_policy(json_t *msg)
     obj = json_object_get(msg, "mac");
     policy.num_macs = json_array_size(obj);
     if (!policy.num_macs) {
-        DEBUG_ERROR(DBG_CTRL, "Missing mac address in policy cfg!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in policy cfg!!\n");
         return -1;
     }
     policy.mac_list = calloc(sizeof(struct ether_addr), policy.num_macs);
     if (!policy.mac_list) {
-        DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+        DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
         return -1;
     }
 
@@ -1391,7 +1391,7 @@ static int dp_ctrl_cfg_policy(json_t *msg)
     if (policy.num_rules) {
         policy.rule_list = calloc(policy.num_rules, sizeof(dpi_policy_rule_t));
         if (!policy.rule_list) {
-            DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
             free(policy.mac_list);
             return -1;
         }
@@ -1432,7 +1432,7 @@ static int dp_ctrl_cfg_policy(json_t *msg)
             int num_apps = json_array_size(app_obj);
             dpi_policy_app_rule_t *app_rule = calloc(num_apps, sizeof(dpi_policy_app_rule_t));
             if (!app_rule) {
-                DEBUG_ERROR(DBG_CTRL, "out of memory!!");
+                DEBUG_ERROR(DBG_CTRL, "out of memory!!\n");
                 ret = -1;
                 goto cleanup;
             }
@@ -1526,7 +1526,7 @@ static int dp_ctrl_cfg_internal_net(json_t *msg, bool internal)
 
     subnet4 = calloc(sizeof(io_internal_subnet4_t) + count * sizeof(io_subnet4_t), 1);
     if (!subnet4) {
-        DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+        DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
         return -1;
     }
 
@@ -1543,16 +1543,16 @@ static int dp_ctrl_cfg_internal_net(json_t *msg, bool internal)
     } else {
         if (!t_internal_subnet4) {
             if (internal) {
-                DEBUG_ERROR(DBG_CTRL, "missed internal ip msg start!");
+                DEBUG_ERROR(DBG_CTRL, "missed internal ip msg start!\n");
             } else {
-                DEBUG_ERROR(DBG_CTRL, "missed policy addr msg start!");
+                DEBUG_ERROR(DBG_CTRL, "missed policy addr msg start!\n");
             }
             free(subnet4);
             return -1;
         }
         tsubnet4 = calloc(sizeof(io_internal_subnet4_t) + (t_internal_subnet4->count + count) * sizeof(io_subnet4_t), 1);
         if (!tsubnet4) {
-            DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
             return -1;
         }
         memcpy(&tsubnet4->list[0], &t_internal_subnet4->list[0], sizeof(io_subnet4_t) * t_internal_subnet4->count);
@@ -1611,7 +1611,7 @@ static int dp_ctrl_cfg_specialip_net(json_t *msg)
 
     subnet4 = calloc(sizeof(io_spec_internal_subnet4_t) + count * sizeof(io_spec_subnet4_t), 1);
     if (!subnet4) {
-        DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+        DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
         return -1;
     }
 
@@ -1644,13 +1644,13 @@ static int dp_ctrl_cfg_specialip_net(json_t *msg)
         t_specialip_subnet4 = subnet4;
     } else {
         if (!t_specialip_subnet4) {
-            DEBUG_ERROR(DBG_CTRL, "missed special ip msg start!");
+            DEBUG_ERROR(DBG_CTRL, "missed special ip msg start!\n");
             free(subnet4);
             return -1;
         }
         tsubnet4 = calloc(sizeof(io_spec_internal_subnet4_t) + (t_specialip_subnet4->count + count) * sizeof(io_spec_subnet4_t), 1);
         if (!tsubnet4) {
-            DEBUG_ERROR(DBG_CTRL, "out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "out of memory!!\n")
             return -1;
         }
         memcpy(&tsubnet4->list[0], &t_specialip_subnet4->list[0], sizeof(io_spec_subnet4_t) * t_specialip_subnet4->count);
@@ -1699,7 +1699,7 @@ static int dp_ctrl_del_dlp(json_t *msg)
 
     len = json_array_size(obj);
     if (len == 0) {
-        DEBUG_ERROR(DBG_CTRL, "Missing mac address in dlp del mac!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in dlp del mac!!\n");
         return -1;
     }
 
@@ -1710,7 +1710,7 @@ static int dp_ctrl_del_dlp(json_t *msg)
         ether_aton_r(mac_str, &mac_addr);
         io_mac_t *mac = rcu_map_lookup(&g_ep_map, &mac_addr);
         if (mac == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "dlp del mac %s not found in ep map.", mac_str);
+            DEBUG_ERROR(DBG_CTRL, "dlp del mac %s not found in ep map.\n", mac_str);
             continue;
         }
 
@@ -1855,7 +1855,7 @@ static int dp_ctrl_cfg_dlp(json_t *msg)
 
     len = json_array_size(obj);
     if (len == 0) {
-        DEBUG_ERROR(DBG_CTRL, "Missing mac address in dlp cfg rulenames!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in dlp cfg rulenames!!\n");
         return -1;
     }
 
@@ -1866,7 +1866,7 @@ static int dp_ctrl_cfg_dlp(json_t *msg)
         ether_aton_r(mac_str, &mac_addr);
         io_mac_t *mac = rcu_map_lookup(&g_ep_map, &mac_addr);
         if (mac == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "dlp cfg mac %s not found in ep map.", mac_str);
+            DEBUG_ERROR(DBG_CTRL, "dlp cfg mac %s not found in ep map.\n", mac_str);
             continue;
         }
 
@@ -2114,7 +2114,7 @@ static int dp_ctrl_bld_dlp(json_t *msg)
     if (dlpbld.num_macs > 0) {
         dlpbld.mac_list = calloc(sizeof(struct ether_addr), dlpbld.num_macs);
         if (!dlpbld.mac_list) {
-            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's mac_list out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's mac_list out of memory!!\n")
             return -1;
         }
 
@@ -2132,7 +2132,7 @@ static int dp_ctrl_bld_dlp(json_t *msg)
     if (dlpbld.num_del_macs > 0) {
         dlpbld.del_mac_list = calloc(sizeof(struct ether_addr), dlpbld.num_del_macs);
         if (!dlpbld.del_mac_list) {
-            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's del_mac_list out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's del_mac_list out of memory!!\n")
             if (dlpbld.mac_list){
                 free(dlpbld.mac_list);
             }
@@ -2154,7 +2154,7 @@ static int dp_ctrl_bld_dlp(json_t *msg)
     if (dlpbld.num_dlp_rules) {
         dlpbld.dlp_rule_list = calloc(dlpbld.num_dlp_rules, sizeof(dpi_dlp_rule_entry_t));
         if (!dlpbld.dlp_rule_list) {
-            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's dlp_rule_list out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's dlp_rule_list out of memory!!\n")
             if (dlpbld.mac_list){
                 free(dlpbld.mac_list);
             }
@@ -2176,7 +2176,7 @@ static int dp_ctrl_bld_dlp(json_t *msg)
         if (dlpbld.dlp_rule_list[i].num_dlp_rule_pats) {
             dlpbld.dlp_rule_list[i].dlp_rule_pat_list = calloc(dlpbld.dlp_rule_list[i].num_dlp_rule_pats, sizeof(dpi_dlp_rule_pattern_t));
             if (!dlpbld.dlp_rule_list[i].dlp_rule_pat_list) {
-                DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's dlp_rule_list[%d]'s dlp_rule_pat_list out of memory!!", i)
+                DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's dlp_rule_list[%d]'s dlp_rule_pat_list out of memory!!\n", i)
                 ret = -1;
                 goto dlpcleanup;
             }
@@ -2220,12 +2220,12 @@ static int dp_ctrl_bld_dlp_update_ep(json_t *msg)
     DEBUG_CTRL("# of old macs(%d)\n", dlpbld_mac.num_old_macs);
 
     if (!dlpbld_mac.num_old_macs) {
-        DEBUG_ERROR(DBG_CTRL, "Missing mac address in bld dlp update ep!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing mac address in bld dlp update ep!!\n");
         return -1;
     }
     dlpbld_mac.old_mac_list = calloc(sizeof(struct ether_addr), dlpbld_mac.num_old_macs);
     if (!dlpbld_mac.old_mac_list) {
-        DEBUG_ERROR(DBG_CTRL, "allocate dlpbld_mac's old_mac_list out of memory!!")
+        DEBUG_ERROR(DBG_CTRL, "allocate dlpbld_mac's old_mac_list out of memory!!\n")
         return -1;
     }
 
@@ -2240,7 +2240,7 @@ static int dp_ctrl_bld_dlp_update_ep(json_t *msg)
     if (dlpbld_mac.num_del_macs > 0) {
         dlpbld_mac.del_mac_list = calloc(sizeof(struct ether_addr), dlpbld_mac.num_del_macs);
         if (!dlpbld_mac.del_mac_list) {
-            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's del_mac_list out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's del_mac_list out of memory!!\n")
             free(dlpbld_mac.old_mac_list);
             return -1;
         }
@@ -2260,7 +2260,7 @@ static int dp_ctrl_bld_dlp_update_ep(json_t *msg)
     if (dlpbld_mac.num_add_macs > 0) {
         dlpbld_mac.add_mac_list = calloc(sizeof(struct ether_addr), dlpbld_mac.num_add_macs);
         if (!dlpbld_mac.add_mac_list) {
-            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's add_mac_list out of memory!!")
+            DEBUG_ERROR(DBG_CTRL, "allocate dlpbld's add_mac_list out of memory!!\n")
             free(dlpbld_mac.old_mac_list);
             if (dlpbld_mac.del_mac_list)
             {
@@ -2395,7 +2395,7 @@ static int dp_ctrl_handler(int fd)
 
     root = json_loads(ctrl_msg_buf, 0, &error);
     if (root == NULL) {
-        DEBUG_ERROR(DBG_CTRL, "Invalid json format on line %d: %s", error.line, error.text);
+        DEBUG_ERROR(DBG_CTRL, "Invalid json format on line %d: %s\n", error.line, error.text);
         return -1;
     }
 
@@ -2524,7 +2524,7 @@ int dp_ctrl_threat_log(DPMsgThreatLog *log)
     dp_thread_data_t *th_data = &g_dp_thread_data[THREAD_ID];
 
     if (th_data->log_writer == th_data->log_reader) {
-        DEBUG_ERROR(DBG_LOG, "Log ring full!");
+        DEBUG_ERROR(DBG_LOG, "Log ring full!\n");
         return -1;
     }
 

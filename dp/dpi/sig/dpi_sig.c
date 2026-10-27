@@ -66,7 +66,7 @@ dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
         ret = dpi_dlp_parse_ruleopt(option, value, &parser->dlprulelist, sig);
 
         if (ret != DPI_SIGOPT_OK) {
-            DEBUG_ERROR(DBG_ERROR, "Dlp rule(%s):(%d) has invalid option(%s : %s)",sig->conf->name, sig->conf->id, option, value);
+            DEBUG_ERROR(DBG_ERROR, "Dlp rule(%s):(%d) has invalid option(%s : %s)\n",sig->conf->name, sig->conf->id, option, value);
             return ret;
         }
     }
@@ -74,12 +74,12 @@ dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
     conf = sig->conf;
 
     if (DlpRuleCount == MAX_USER_SIG_COUNT) {
-        DEBUG_ERROR(DBG_ERROR, "too many dlp rule (%d) created, max allowed is (%d)", DlpRuleCount, MAX_USER_SIG_COUNT);
+        DEBUG_ERROR(DBG_ERROR, "too many dlp rule (%d) created, max allowed is (%d)\n", DlpRuleCount, MAX_USER_SIG_COUNT);
         return DPI_SIGOPT_TOO_MANY_DLP_RULE;
     }
     //conf->text null terminated
     if (strlen(conf->text) >= MAX_USER_SIG_LEN) {
-        DEBUG_ERROR(DBG_ERROR, "dlp rule len(%d) too long, max allowed is (%d)", strlen(conf->text), MAX_USER_SIG_LEN);
+        DEBUG_ERROR(DBG_ERROR, "dlp rule len(%d) too long, max allowed is (%d)\n", strlen(conf->text), MAX_USER_SIG_LEN);
         return DPI_SIGOPT_VALUE_TOO_LONG;
     }
 
@@ -93,7 +93,7 @@ dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
         DEBUG_ERROR(DBG_ERROR,
         "rule id should be between (%d) and (%d) "
         "or predefined rule id between (%d) and (%d) "
-        "or predefined rule id between (%d) and (%d)",
+        "or predefined rule id between (%d) and (%d)\n",
         DPI_SIG_MIN_USER_SIG_ID, DPI_SIG_MAX_USER_SIG_ID,
         DPI_SIG_MIN_PRE_USER_SIG_ID, DPI_SIG_MAX_PRE_USER_SIG_ID,
         DPI_SIG_MIN_WAF_SIG_ID, DPI_SIG_MAX_WAF_SIG_ID);
@@ -410,7 +410,7 @@ static dpi_detector_t *dpi_dlp_detector_init(int apply_dir)
     dpi_detector_t *detector;
     detector = calloc(sizeof(dpi_detector_t), 1);
     if (!detector) {
-        DEBUG_ERROR(DBG_DETECT, "Out of memory!");
+        DEBUG_ERROR(DBG_DETECT, "Out of memory!\n");
         return NULL;
 
     }
@@ -627,13 +627,13 @@ int dpi_sig_bld(dpi_dlpbld_t *dlpsig, int flag)
 
     if (flag & MSG_START) {
        if (dlpDetector) {
-           DEBUG_ERROR(DBG_DETECT, "old DLP DETECTOR %p exists!", dlpDetector);
+           DEBUG_ERROR(DBG_DETECT, "old DLP DETECTOR %p exists!\n", dlpDetector);
            dpi_dlp_detector_destroy(dlpDetector);
            dlpDetector = NULL;
        }
     } else {
         if (!dlpDetector) {
-            DEBUG_ERROR(DBG_DETECT, "missed dlp msg start!");
+            DEBUG_ERROR(DBG_DETECT, "missed dlp msg start!\n");
             return -1;
         }
     }
@@ -715,7 +715,7 @@ int dpi_sig_bld_update_mac(dpi_dlpbld_mac_t *dlpbld_mac)
         }
     }
     if (dlp_detect_ptr == NULL) {
-        DEBUG_ERROR(DBG_CTRL, "Missing existing dlp detector!!");
+        DEBUG_ERROR(DBG_CTRL, "Missing existing dlp detector!!\n");
         return -1;
     }
     //add first before delete to avoid release detector tree prematurally

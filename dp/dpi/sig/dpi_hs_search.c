@@ -74,20 +74,20 @@ int dpi_dlp_hs_compile(dpi_hyperscan_pm_t *hspm, dpi_detector_t *detector) {
     num_patterns = hspm->hs_patterns_num;
     patterns = (char **)calloc(num_patterns, sizeof(char *));
     if (!patterns) {
-        DEBUG_ERROR(DBG_DETECT, "Out of memory, patterns cannot be allocated!");
+        DEBUG_ERROR(DBG_DETECT, "Out of memory, patterns cannot be allocated!\n");
         return -1;
     }
 
     flags = (uint32_t *)calloc(num_patterns, sizeof(uint32_t));
     if (!flags) {
-        DEBUG_ERROR(DBG_DETECT, "Out of memory, flags cannot be allocated!");
+        DEBUG_ERROR(DBG_DETECT, "Out of memory, flags cannot be allocated!\n");
         free(patterns);
         return -1;
     }
     
     ids = (uint32_t *)calloc(num_patterns, sizeof(uint32_t));
     if (!ids) {
-        DEBUG_ERROR(DBG_DETECT, "Out of memory, ids cannot be allocated!");
+        DEBUG_ERROR(DBG_DETECT, "Out of memory, ids cannot be allocated!\n");
         free(patterns);
         free(flags);
         return -1;
@@ -109,14 +109,14 @@ int dpi_dlp_hs_compile(dpi_hyperscan_pm_t *hspm, dpi_detector_t *detector) {
     free(ids);
 
     if (compile_error != NULL) {
-        DEBUG_ERROR(DBG_DETECT,"hs_compile_multi() failed: %s (expression: %d)",
+        DEBUG_ERROR(DBG_DETECT,"hs_compile_multi() failed: %s (expression: %d)\n",
                    compile_error->message, compile_error->expression);
         hs_free_compile_error(compile_error);
         return -1;
     }
 
     if (error != HS_SUCCESS) {
-        DEBUG_ERROR(DBG_DETECT,"hs_compile_multi() failed: error %d", error);
+        DEBUG_ERROR(DBG_DETECT,"hs_compile_multi() failed: error %d\n", error);
         return -1;
     }
 
@@ -124,21 +124,21 @@ int dpi_dlp_hs_compile(dpi_hyperscan_pm_t *hspm, dpi_detector_t *detector) {
     error = hs_alloc_scratch(hspm->db, &detector->dlp_hs_mpse_build_scratch);
 
     if (error != HS_SUCCESS) {
-        DEBUG_ERROR(DBG_DETECT,"hs_alloc_scratch() failed: error %d", error);
+        DEBUG_ERROR(DBG_DETECT,"hs_alloc_scratch() failed: error %d\n", error);
         return -1;
     }
 
     uint32_t scratch_size = 0;
     error = hs_scratch_size(detector->dlp_hs_mpse_build_scratch, (size_t *)&scratch_size);
     if (error != HS_SUCCESS) {
-        DEBUG_ERROR(DBG_DETECT,"hs_scratch_size() failed: error %d", error);
+        DEBUG_ERROR(DBG_DETECT,"hs_scratch_size() failed: error %d\n", error);
         return -1;
     }
 
     uint32_t db_size = 0;
     error = hs_database_size(hspm->db, (size_t *)&db_size);
     if (error != HS_SUCCESS) {
-        DEBUG_ERROR(DBG_DETECT,"hs_database_size() failed: error %d", error);
+        DEBUG_ERROR(DBG_DETECT,"hs_database_size() failed: error %d\n", error);
         return -1;
     }
 

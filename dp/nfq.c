@@ -124,7 +124,7 @@ static int dp_ring_nfq(int fd, struct nfq_handle *nfq_hdl, struct nfq_q_handle *
     opt = 1;
     if (setsockopt(fd, SOL_NETLINK,
                    NETLINK_NO_ENOBUFS, &opt, sizeof(int)) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "can't set netlink enobufs.");
+        DEBUG_ERROR(DBG_CTRL, "can't set netlink enobufs.\n");
     }
 #if 0
     //increase queue max length to resist to packets burst
@@ -133,7 +133,7 @@ static int dp_ring_nfq(int fd, struct nfq_handle *nfq_hdl, struct nfq_q_handle *
     if (nfq_ctx->blocks > 0) {
         if (nfq_set_queue_maxlen(nfq_q_hdl, nfq_ctx->blocks) < 0)
         {
-            DEBUG_ERROR(DBG_CTRL, "error during nfq_set_queue_maxlen().");
+            DEBUG_ERROR(DBG_CTRL, "error during nfq_set_queue_maxlen().\n");
         }
         socklen_t buffersize;
         if (jumboframe) {
@@ -142,7 +142,7 @@ static int dp_ring_nfq(int fd, struct nfq_handle *nfq_hdl, struct nfq_q_handle *
             buffersize = nfq_ctx->blocks * NFQ_PKT_SIZE; 
         }
         if (setsockopt(fd, SOL_SOCKET, SO_RCVBUFFORCE, &buffersize, sizeof(socklen_t)) == -1) {
-            DEBUG_ERROR(DBG_CTRL, "can't set netlink SO_RCVBUFFORCE");
+            DEBUG_ERROR(DBG_CTRL, "can't set netlink SO_RCVBUFFORCE\n");
             //if SO_RCVBUFFORCE didn't work, we try at least to get the system
             //wide maximum (or whatever the user requested)
             setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &buffersize, sizeof(socklen_t));
@@ -163,32 +163,32 @@ int dp_open_nfq_handle(dp_context_t *ctx, int qnum, bool jumboframe, uint blocks
     DEBUG_CTRL("opening nfq handle\n");
 	nfq_hdl = nfq_open();
 	if (!nfq_hdl) {
-        DEBUG_ERROR(DBG_CTRL, "fail to open nfq_hdl");
+        DEBUG_ERROR(DBG_CTRL, "fail to open nfq_hdl\n");
         return -1;
 	}
 
     DEBUG_CTRL("unbinding existing nf_queue handler for AF_INET (if any)\n");
 	if (nfq_unbind_pf(nfq_hdl, AF_INET) < 0) {
-        DEBUG_ERROR(DBG_CTRL, "error during nfq_unbind_pf()");
+        DEBUG_ERROR(DBG_CTRL, "error during nfq_unbind_pf()\n");
         return -1;
 	}
 
     DEBUG_CTRL("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(nfq_hdl, AF_INET) < 0) {
-        DEBUG_ERROR(DBG_CTRL, "error during nfq_bind_pf()");
+        DEBUG_ERROR(DBG_CTRL, "error during nfq_bind_pf()\n");
         return -1;
 	}
 
     DEBUG_CTRL("binding this socket to queue(%d)\n", nfq_queue_num);
 	nfq_q_hdl = nfq_create_queue(nfq_hdl, nfq_queue_num, &dp_nfq_rx_cb, (void *)ctx);
 	if (!nfq_q_hdl) {
-        DEBUG_ERROR(DBG_CTRL, "error during nfq_create_queue()");
+        DEBUG_ERROR(DBG_CTRL, "error during nfq_create_queue()\n");
         return -1;
 	}
 
     DEBUG_CTRL("setting nfq copy_packet mode\n");
 	if (nfq_set_mode(nfq_q_hdl, NFQNL_COPY_PACKET, 0xffff) < 0) {
-        DEBUG_ERROR(DBG_CTRL, "can't set packet_copy mode");
+        DEBUG_ERROR(DBG_CTRL, "can't set packet_copy mode\n");
         return -1;
 	}
 
@@ -197,7 +197,7 @@ int dp_open_nfq_handle(dp_context_t *ctx, int qnum, bool jumboframe, uint blocks
     // set, the default action in this case is to drop packets.
     DEBUG_CTRL("setting flags to fail open\n");
 	if (nfq_set_queue_flags(nfq_q_hdl, NFQA_CFG_F_FAIL_OPEN, NFQA_CFG_F_FAIL_OPEN)) {
-        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to set fail oepn.");
+        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to set fail oepn.\n");
         //return -1;
 	}
     // NFQA_CFG_F_GSO (requires Linux kernel >= 3.10): the kernel will
@@ -206,19 +206,19 @@ int dp_open_nfq_handle(dp_context_t *ctx, int qnum, bool jumboframe, uint blocks
     // Normalization is expensive, so this flag should always be set.
     DEBUG_CTRL("setting flags to gso\n");
 	if (nfq_set_queue_flags(nfq_q_hdl, NFQA_CFG_F_GSO, NFQA_CFG_F_GSO)) {
-        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to set gso.");
+        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to set gso.\n");
         //return -1;
 	}
 
     /*DEBUG_CTRL("setting flags to request UID and GID\n");
 	if (nfq_set_queue_flags(nfq_q_hdl, NFQA_CFG_F_UID_GID, NFQA_CFG_F_UID_GID)) {
-        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to retrieve process UID/GID.");
+        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to retrieve process UID/GID.\n");
         //return -1;
 	}
 
     DEBUG_CTRL("setting flags to request security context\n");
 	if (nfq_set_queue_flags(nfq_q_hdl, NFQA_CFG_F_SECCTX, NFQA_CFG_F_SECCTX)) {
-        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to retrieve security context.");
+        DEBUG_ERROR(DBG_CTRL, "This kernel version does not allow to retrieve security context.\n");
         //return -1;
 	}*/
 	fd = nfq_fd(nfq_hdl);

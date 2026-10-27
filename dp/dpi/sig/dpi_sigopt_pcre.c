@@ -381,14 +381,14 @@ static dpi_sigopt_status_t dpi_sigopt_hsbuild(dpi_sigopt_pcre_pattern_t *data, c
     uint32_t pcre_scratch_size = 0;
     err = hs_scratch_size(detector->dlp_hs_pcre_build_scratch, (size_t *)&pcre_scratch_size);
     if (err != HS_SUCCESS) {
-        DEBUG_ERROR(DBG_DETECT,"pcre hs_scratch_size() failed: error %d", err);
+        DEBUG_ERROR(DBG_DETECT,"pcre hs_scratch_size() failed: error %d\n", err);
         return DPI_SIGOPT_FAILED;
     }
 
     uint32_t pcre_db_size = 0;
     err = hs_database_size(data->pcre.hs_db, (size_t *)&pcre_db_size);
     if (err != HS_SUCCESS) {
-        DEBUG_ERROR(DBG_DETECT,"pcre hs_database_size() failed: error %d", err);
+        DEBUG_ERROR(DBG_DETECT,"pcre hs_database_size() failed: error %d\n", err);
         return DPI_SIGOPT_FAILED;
     }
     

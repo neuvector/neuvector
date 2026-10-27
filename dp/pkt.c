@@ -140,7 +140,7 @@ static dp_context_t *dp_alloc_context(const char *iface, int thr_id, bool tap, b
 
     fd = dp_open_socket(ctx, iface, tap, jumboframe, blocks, batch);
     if (fd < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail to open dp socket, iface=%s", iface);
+        DEBUG_ERROR(DBG_CTRL, "fail to open dp socket, iface=%s\n", iface);
         free(ctx);
         return NULL;
     }
@@ -170,7 +170,7 @@ static dp_context_t *dp_alloc_nfq_context(const char *iface, int qnum, int thr_i
 
     fd = dp_open_nfq_handle(ctx, qnum, jumboframe, blocks, batch);
     if (fd < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail to open dp nfq handle, iface=%s", iface);
+        DEBUG_ERROR(DBG_CTRL, "fail to open dp nfq handle, iface=%s\n", iface);
         if (ctx && ctx->nfq_ctx.nfq_q_hdl) {
             nfq_destroy_queue(ctx->nfq_ctx.nfq_q_hdl);
             ctx->nfq_ctx.nfq_q_hdl = NULL;
@@ -207,7 +207,7 @@ static int dp_epoll_add_ctx(dp_context_t *ctx, int thr_id)
     if (epoll_ctl(th_epoll_fd(thr_id), EPOLL_CTL_ADD, ctx->fd, &ctx->ee) == -1) {
         // If the fd already in the epoll, not return error.
         if (errno != EEXIST) {
-            DEBUG_ERROR(DBG_CTRL, "fail to add socket to epoll: %s", strerror(errno));
+            DEBUG_ERROR(DBG_CTRL, "fail to add socket to epoll: %s\n", strerror(errno));
             return -1;
         }
     }
@@ -224,7 +224,7 @@ static int dp_epoll_remove_ctx(dp_context_t *ctx)
 
     if (epoll_ctl(th_epoll_fd(ctx->thr_id), EPOLL_CTL_DEL, ctx->fd, &ctx->ee) == -1) {
         // Generate unnecessary error message when dp exits
-        // DEBUG_ERROR(DBG_CTRL, "fail to delete socket from epoll: %s", strerror(errno));
+        // DEBUG_ERROR(DBG_CTRL, "fail to delete socket from epoll: %s\n", strerror(errno));
         return -1;
     }
 
@@ -263,16 +263,16 @@ static int enter_netns(const char *netns)
     int curfd, netfd;
 
     if ((curfd = open("/proc/self/ns/net", O_RDONLY)) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "failed to open current network namespace");
+        DEBUG_ERROR(DBG_CTRL, "failed to open current network namespace\n");
         return -1;
     }
     if ((netfd = open(netns, O_RDONLY)) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "failed to open network namespace: netns=%s", netns);
+        DEBUG_ERROR(DBG_CTRL, "failed to open network namespace: netns=%s\n", netns);
         close(curfd);
         return -1;
     }
     if (setns(netfd, CLONE_NEWNET) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "failed to enter network namespace: netns=%s error=%s", netns, strerror(errno));
+        DEBUG_ERROR(DBG_CTRL, "failed to enter network namespace: netns=%s error=%s\n", netns, strerror(errno));
         close(netfd);
         close(curfd);
         return -1;
@@ -284,7 +284,7 @@ static int enter_netns(const char *netns)
 static int restore_netns(int fd)
 {
     if (setns(fd, CLONE_NEWNET) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "failed to restore network namespace: error=%s", strerror(errno));
+        DEBUG_ERROR(DBG_CTRL, "failed to restore network namespace: error=%s\n", strerror(errno));
         close(fd);
         return -1;
     }
@@ -307,7 +307,7 @@ int dp_data_add_tap(const char *netns, const char *iface, const char *ep_mac, in
 
     if (th_epoll_fd(thr_id) == 0) {
         // TODO: May need to wait a while for dp thread ready
-        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, netns=%s thr_id=%d", netns, thr_id);
+        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, netns=%s thr_id=%d\n", netns, thr_id);
         return -1;
     }
 
@@ -399,7 +399,7 @@ int dp_data_add_nfq(const char *netns, const char *iface, int qnum, const char *
 
     if (th_epoll_fd(thr_id) == 0) {
         // TODO: May need to wait a while for dp thread ready
-        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, netns=%s thr_id=%d", netns, thr_id);
+        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, netns=%s thr_id=%d\n", netns, thr_id);
         return -1;
     }
 
@@ -485,7 +485,7 @@ int dp_data_add_port(const char *iface, bool jumboframe, int thr_id)
 
     if (th_epoll_fd(thr_id) == 0) {
         // TODO: May need to wait a while for dp thread ready
-        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, iface=%s thr_id=%d", iface, thr_id);
+        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, iface=%s thr_id=%d\n", iface, thr_id);
         return -1;
     }
 
@@ -549,7 +549,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
     
     if (th_epoll_fd(thr_id) == 0) {
         // TODO: May need to wait a while for dp thread ready
-        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, iface=%s and iface=%s thr_id=%d", vin_iface,vex_iface, thr_id);
+        DEBUG_ERROR(DBG_CTRL, "epoll is not initiated, iface=%s and iface=%s thr_id=%d\n", vin_iface,vex_iface, thr_id);
         return -1;
     }
 
@@ -562,7 +562,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
         new_in = true;
         ctx_in = dp_alloc_context(vin_iface, thr_id, false, false, INLINE_BLOCK_NOTC, INLINE_BATCH_NOTC);   
         if (ctx_in == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "fail to alloc dp_context for %s", vin_iface);
+            DEBUG_ERROR(DBG_CTRL, "fail to alloc dp_context for %s\n", vin_iface);
             goto error;
         }
         strlcpy(ctx_in->name, vin_iface, sizeof(ctx_in->name));
@@ -576,7 +576,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
         new_ex = true;
         ctx_ex = dp_alloc_context(vex_iface, thr_id, false, false, INLINE_BLOCK_NOTC, INLINE_BATCH_NOTC);   
         if (ctx_ex == NULL) {
-            DEBUG_ERROR(DBG_CTRL, "fail to alloc dp_context for %s , free context for %s", vex_iface, vin_iface);
+            DEBUG_ERROR(DBG_CTRL, "fail to alloc dp_context for %s , free context for %s\n", vex_iface, vin_iface);
             goto error;
         } 
         strlcpy(ctx_ex->name, vex_iface, sizeof(ctx_ex->name));
@@ -589,7 +589,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
     if (new_in) {
         ctx_in->peer_ctx = ctx_ex;
         if (dp_epoll_add_ctx(ctx_in, thr_id) < 0) {
-            DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_in for %s",vin_iface);
+            DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_in for %s\n",vin_iface);
             goto error;
         }
         cds_hlist_add_head_rcu(&ctx_in->link, &th_notc_nfq_ctx_list(thr_id));
@@ -597,7 +597,7 @@ int dp_data_add_port_pair(const char *vin_iface, const char *vex_iface, const ch
     if (new_ex) {
         ctx_ex->peer_ctx = ctx_in;
         if (dp_epoll_add_ctx(ctx_ex, thr_id) < 0) {
-            DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_ex for %s",vex_iface);
+            DEBUG_ERROR(DBG_CTRL, "fail add epoll for ctx_ex for %s\n",vex_iface);
             goto error;
         }
         cds_hlist_add_head_rcu(&ctx_ex->link, &th_notc_nfq_ctx_list(thr_id));
@@ -773,7 +773,7 @@ static dp_context_t *dp_add_ctrl_req_event(int thr_id)
 
     fd = eventfd(0, 0);
     if (fd < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail to create dp_ctrl_req event fd.");
+        DEBUG_ERROR(DBG_CTRL, "fail to create dp_ctrl_req event fd.\n");
         free(ctx);
         return NULL;
     }
@@ -790,7 +790,7 @@ static dp_context_t *dp_add_ctrl_req_event(int thr_id)
     ctx->ee.data.ptr = ctx;
 
     if (epoll_ctl(th_epoll_fd(thr_id), EPOLL_CTL_ADD, ctx->fd, &ctx->ee) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "fail to add socket to epoll: %s", strerror(errno));
+        DEBUG_ERROR(DBG_CTRL, "fail to add socket to epoll: %s\n", strerror(errno));
         close(fd);
         free(ctx);
         return NULL;
@@ -815,7 +815,7 @@ static dp_bld_dlp_context_t *dp_add_dlp_ctrl_req_event()
 
     fd = eventfd(0, 0);
     if (fd < 0) {
-        DEBUG_ERROR(DBG_CTRL, "fail to create dp_dlp_ctrl_req event fd.");
+        DEBUG_ERROR(DBG_CTRL, "fail to create dp_dlp_ctrl_req event fd.\n");
         free(ctx);
         return NULL;
     }
@@ -831,7 +831,7 @@ static dp_bld_dlp_context_t *dp_add_dlp_ctrl_req_event()
     ctx->ee.data.ptr = ctx;
 
     if (epoll_ctl(bld_dlp_epoll_fd, EPOLL_CTL_ADD, ctx->fd, &ctx->ee) == -1) {
-        DEBUG_ERROR(DBG_CTRL, "fail to add bld_dlp socket to epoll: %s", strerror(errno));
+        DEBUG_ERROR(DBG_CTRL, "fail to add bld_dlp socket to epoll: %s\n", strerror(errno));
         close(fd);
         free(ctx);
         return NULL;
@@ -938,7 +938,7 @@ void *dp_data_thr(void *args)
                 if ((ee->events & EPOLLHUP) || (ee->events & EPOLLERR)) {
                     // When switch mode, port is pulled first, then epoll error happens first.
                     // ctx is more likely to be released here
-                    DEBUG_ERROR(DBG_CTRL, "epoll error: %s", ctx->name);
+                    DEBUG_ERROR(DBG_CTRL, "epoll error: %s\n", ctx->name);
 
                     if (ctx != polling_ctx) {
                         pthread_mutex_lock(&th_ctrl_dp_lock(thr_id));
