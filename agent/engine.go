@@ -88,7 +88,7 @@ type containerData struct {
 	scanCache      []byte
 	nvRole         string
 	healthCheck    []string        // docker: healthcheck commands
-	podNetns       *netns.NsHandle // pid-0 pod only: restores its ports when no child is running
+	podNetns       *netns.NsHandle // pod sandbox without infra container only: restores its ports when no child is running
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -1669,7 +1669,8 @@ func isNeuvectorContainerById(id string) (string, bool) {
 	return "", false
 }
 
-// oc49 and above: pod process is none on the cri-o
+// CRI-O pod sandbox without infra container (drop_infra_ctr),
+// CRI-O pins the pod namespaces, so the sandbox has no process (pid 0)
 func isEmptyProcessPod(info *container.ContainerMetaExtra) bool {
 	if global.RT.String() == container.RuntimeCriO {
 		return (info.Pid == 0) && info.ID == info.Sandbox
@@ -1854,7 +1855,7 @@ func stopNeuVectorMonitor(c *containerData) {
 	}
 }
 
-// Returns the running pid-0 pod whose intercepted (veth) ports are shared by child c.
+// Returns the running pod sandbox without infra container whose intercepted (veth) ports are shared by child c.
 func getSharedDatapathPod(c *containerData) *containerData {
 	if c.parentNS == "" || !c.hasDatapath || c.hostMode {
 		return nil
@@ -1869,7 +1870,7 @@ func getSharedDatapathPod(c *containerData) *containerData {
 	return nil
 }
 
-// For a pid-0 pod, prefer the child that owns the pod's network interfaces.
+// For a pod sandbox without infra container, prefer the child that owns the pod's network interfaces.
 func getPodDatapathChild(pod *containerData) *containerData {
 	var fallback *containerData
 	for podID := range pod.pods.Iter() {
@@ -1886,7 +1887,7 @@ func getPodDatapathChild(pod *containerData) *containerData {
 	return fallback
 }
 
-// A child of a running pid-0 pod exits: keep the pod's ports and pass ownership on.
+// A child of a running pod sandbox without infra container exits: keep the pod's ports and pass ownership on.
 func handoverPodDatapath(c, pod *containerData, oldNetns string) {
 	if !c.examIntface {
 		return
@@ -2034,7 +2035,9 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 				parent.examIntface = true // only monitor one child container
 				if parent.podNetns == nil && driver != pipe.PIPE_CLM {
 					if ns, err := netns.GetFromPath(global.SYS.GetNetNamespacePath(c.pid)); err == nil {
+						gInfoLock()
 						parent.podNetns = &ns
+						gInfoUnlock()
 					} else {
 						log.WithFields(log.Fields{"pod": parent.id, "error": err}).Error("Failed to open pod netns")
 					}
@@ -2333,6 +2336,7 @@ func taskStopContainer(id string, pid int) {
 			}
 		}
 	}
+	gInfoLock()
 	if c.podNetns != nil {
 		if dbgError := c.podNetns.Close(); dbgError != nil {
 			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
@@ -2340,7 +2344,6 @@ func taskStopContainer(id string, pid int) {
 		c.podNetns = nil
 	}
 
-	gInfoLock()
 	if !c.hostMode && ((c.parentNS == "" && (c.pid != 0 || !c.examIntface)) || (c.parentNS != "" && c.hasDatapath)) {
 		if sharedPod == nil {
 			for _, pair := range c.intcpPairs {
@@ -2599,13 +2602,17 @@ func containerTaskExit() {
 	}
 	gInfoRUnlock()
 	for _, c := range containers {
+		// Can run concurrently with the task worker; the read lock keeps podNetns from being closed
+		gInfoRLock()
 		if c.podNetns != nil && !c.examIntface && isPortsInline(c.intcpPairs) {
 			log.WithFields(log.Fields{"pod": c.id}).Debug("Restore ownerless pod")
 			if dbgError := pipe.RestoreContainerNs(c.pid, *c.podNetns, c.intcpPairs); dbgError != nil {
 				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 			}
+			gInfoRUnlock()
 			continue
 		}
+		gInfoRUnlock()
 		if c.hostMode || !c.hasDatapath {
 			continue
 		}

@@ -1200,7 +1200,7 @@ func RestoreContainer(pid int, pairs []*InterceptPair) error {
 	return RestoreContainerNs(pid, containerNs, pairs)
 }
 
-// For a pid-0 pod with no running child, the caller holds the pod netns handle.
+// For a pod sandbox without infra container and no running child, the caller holds the pod netns handle.
 func RestoreContainerNs(pid int, containerNs netns.NsHandle, pairs []*InterceptPair) error {
 	log.WithFields(log.Fields{"pid": pid, "ns": containerNs, "from": cfg.workingPid}).Debug("")
 
