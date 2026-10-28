@@ -1,9 +1,11 @@
 package rest
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -620,6 +622,20 @@ func TestApikeyCreateDelete(t *testing.T) {
 	if w.status != http.StatusOK {
 		t.Fatalf("Failed to create apikey: status=%v.", w.status)
 	}
+	var generatedResp api.RESTApikeyGeneratedData
+	unmarshalJSON(t, w.body, &generatedResp)
+	if generatedResp.Apikey == nil {
+		t.Fatalf("Missing generated apikey response")
+	}
+	if generatedResp.Apikey.Name != "token-12345" {
+		t.Errorf("Incorrect generated apikey name: %s", generatedResp.Apikey.Name)
+	}
+	if len(generatedResp.Apikey.SecretKey) != 64 {
+		t.Errorf("Incorrect generated secret length: length=%v expect=64", len(generatedResp.Apikey.SecretKey))
+	}
+	if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(generatedResp.Apikey.SecretKey) {
+		t.Errorf("Generated secret contains shell-unsafe characters")
+	}
 
 	// Check apikey in cluster
 	apikey, _, _ := clusHelper.GetApikeyRev("token-12345", accAdmin)
@@ -628,6 +644,14 @@ func TestApikeyCreateDelete(t *testing.T) {
 	}
 	if apikey.Name != "token-12345" || apikey.Role != api.UserRoleReader {
 		t.Errorf("Incorrect apikey in cluster: user=%v", apikey)
+	}
+
+	r, _ := http.NewRequest("GET", "/v1/selfapikey", bytes.NewBuffer([]byte{}))
+	r.Header.Add(api.RESTAPIKeyHeader, generatedResp.Apikey.Name+":"+generatedResp.Apikey.SecretKey)
+	w = new(mockResponseWriter)
+	router.ServeHTTP(w, r)
+	if w.status != http.StatusOK {
+		t.Fatalf("Failed to authenticate with generated apikey: status=%v.", w.status)
 	}
 
 	// Check get users by REST
