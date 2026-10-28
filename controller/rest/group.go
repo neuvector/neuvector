@@ -1597,9 +1597,11 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var rconf api.RESTServiceBatchConfigData
@@ -1698,9 +1700,11 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var rconf api.RESTServiceBatchConfigData

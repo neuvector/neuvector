@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -945,6 +946,17 @@ func main() {
 		*telemetryFreq = 0
 	}
 
+	maxRestReqBodySize := int64(16 * 1024 * 1024) // 16MB
+	if str := os.Getenv("MAX_REQUEST_BODY_SIZE"); str != "" {
+		num, err := strconv.Atoi(str)
+		if err != nil {
+			log.WithError(err).Error("error parsing MAX_REQUEST_BODY_SIZE string")
+		} else {
+			maxRestReqBodySize = int64(num)
+			log.WithFields(log.Fields{"maxRestReqBodySize": maxRestReqBodySize}).Info()
+		}
+	}
+
 	// Initialize cache
 	// - Start policy learning thread and build learnedPolicyRuleWrapper from KV
 	cctx := cache.Context{
@@ -1031,6 +1043,7 @@ func main() {
 		TeleSkipTlsVerification: *insecureSkipTeleTLSVerification,
 		SearchRegistries:        *searchRegistries,
 		TeleFreq:                *telemetryFreq,
+		MaxRestReqBodySize:      maxRestReqBodySize,
 		NvAppFullVersion:        nvAppFullVersion,
 		NvSemanticVersion:       nvSemanticVersion,
 		CspType:                 cspType,

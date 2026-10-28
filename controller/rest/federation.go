@@ -3469,9 +3469,11 @@ func handlerPollFedScanDataInternal(w http.ResponseWriter, r *http.Request, ps h
 	ce := r.Header.Get("Content-Encoding")
 
 	var req api.RESTPollFedScanDataReq
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 	if ce == "gzip" {
 		body = utils.GunzipBytes(body)
@@ -3805,9 +3807,11 @@ func handlerFedClusterForward(w http.ResponseWriter, r *http.Request, ps httprou
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrRemoteUnauthorized, "Unable to authenticate with the cluster")
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var user *share.CLUSUser
