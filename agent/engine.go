@@ -1889,16 +1889,15 @@ func getPodDatapathChild(pod *containerData) *containerData {
 
 // A child of a running pod sandbox without infra container exits: keep the pod's ports and pass ownership on.
 func handoverPodDatapath(c, pod *containerData, oldNetns string) {
-	if !c.examIntface {
-		return
-	}
-
-	// DP tap ports are keyed by the owner's netns path
+	// DP tap ports are keyed by each child's netns path.
 	tap := !isPortsInline(c.intcpPairs)
 	if tap {
 		for _, pair := range c.intcpPairs {
 			dp.DPCtrlDelTapPort(oldNetns, pair.Port)
 		}
+	}
+	if !c.examIntface {
+		return
 	}
 
 	var next *containerData

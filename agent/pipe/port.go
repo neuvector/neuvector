@@ -171,7 +171,7 @@ func getNetnsID(ns netns.NsHandle) (int, error) {
 }
 
 func getIntcpPortNames(nsID int, port string) (exPort, inPort string) {
-	suffix := fmt.Sprintf("%x-%s", nsID, port)
+	suffix := strconv.FormatInt(int64(nsID), 36) + "-" + port
 	return exPortPrefix + suffix, inPortPrefix + suffix
 }
 
