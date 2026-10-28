@@ -151,8 +151,27 @@ func createNVPorts(jumboframe bool) {
 	}
 }
 
-func getIntcpPortNames(pid int, port string) (exPort, inPort string) {
-	suffix := fmt.Sprintf("%x-%s", pid, port)
+// Must be called in the working ns. The nsid is unique while the container netns lives,
+// which outlives any single container of a pod.
+func getNetnsID(ns netns.NsHandle) (int, error) {
+	if id, err := netlink.GetNetNsIdByFd(int(ns)); err != nil || id >= 0 {
+		return id, err
+	}
+	// nsid -1 lets the kernel pick a free id.
+	// Please refer to idr_alloc(https://github.com/torvalds/linux/blob/master/lib/idr.c#L69)
+	// called by alloc_netid.
+	if dbgError := netlink.SetNetNsIdByFd(int(ns), -1); dbgError != nil {
+		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+	}
+	id, err := netlink.GetNetNsIdByFd(int(ns))
+	if err == nil && id < 0 {
+		err = errors.New("Failed to assign netns id")
+	}
+	return id, err
+}
+
+func getIntcpPortNames(nsID int, port string) (exPort, inPort string) {
+	suffix := fmt.Sprintf("%x-%s", nsID, port)
 	return exPortPrefix + suffix, inPortPrefix + suffix
 }
 
@@ -188,14 +207,13 @@ func getVethPeer(port string) int {
 // 2. Switch IP and MAC address between link and local port
 // 3. Move link and peer to service container
 func pullContainerPort(
-	link netlink.Link, addrs []netlink.Addr, pid, dstNs int, localPortIndex, inPortIndex int,
+	link netlink.Link, addrs []netlink.Addr, exPortName, inPortName string, dstNs int, localPortIndex, inPortIndex int,
 ) (int, error) {
 	var err error
 
 	attrs := link.Attrs()
-	exPortName, inPortName := getIntcpPortNames(pid, attrs.Name)
 
-	log.WithFields(log.Fields{"port": attrs.Name, "index": attrs.Index, "from": pid}).Debug("")
+	log.WithFields(log.Fields{"port": attrs.Name, "index": attrs.Index, "exPort": exPortName}).Debug("")
 
 	defer func() {
 		if err != nil {
@@ -351,14 +369,26 @@ func pullContainerPort(
 	return local.Attrs().Index, nil
 }
 
-func portExists(dstLinks []netlink.Link, portName string) bool {
+func findLink(dstLinks []netlink.Link, portName string) netlink.Link {
 	for _, link := range dstLinks {
-		attrs := link.Attrs()
-		if attrs.Name == portName {
-			return true
+		if link.Attrs().Name == portName {
+			return link
 		}
 	}
-	return false
+	return nil
+}
+
+func portExists(dstLinks []netlink.Link, portName string) bool {
+	return findLink(dstLinks, portName) != nil
+}
+
+// The inPort is the veth peer of the container's local port, so its IFLA_LINK must point back to it.
+func isOwnPortPair(dstLinks []netlink.Link, exPort, inPort string, localIndex int) bool {
+	if !portExists(dstLinks, exPort) {
+		return false
+	}
+	in := findLink(dstLinks, inPort)
+	return in != nil && in.Type() == "veth" && in.Attrs().ParentIndex == localIndex
 }
 
 /* removed by golint
@@ -568,9 +598,9 @@ func recoverRoutes(routes []netlink.Route, portIdxMap map[int]int) error {
 // 2. Move the data port to the service container;
 // 3. Create a port pair and move the peer to the service container;
 func pullAllContainerPorts(
-	pid, dstNs int, existPairs map[string]*InterceptPair, exLinks []netlink.Link,
+	pid, nsID, dstNs int, existPairs map[string]*InterceptPair, exLinks []netlink.Link,
 ) ([]*InterceptPair, bool, error) {
-	log.WithFields(log.Fields{"pid": pid}).Debug("")
+	log.WithFields(log.Fields{"pid": pid, "nsID": nsID}).Debug("")
 
 	links, linkMap, routes, neighs, err := readLinkIPRoute()
 	if err != nil {
@@ -612,9 +642,13 @@ func pullAllContainerPorts(
 		var pair InterceptPair
 		existPair := existPairs[attrs.Name]
 
-		exPortName, inPortName := getIntcpPortNames(pid, attrs.Name)
+		exPortName, inPortName := getIntcpPortNames(nsID, attrs.Name)
 		if portExists(exLinks, exPortName) || portExists(exLinks, inPortName) {
 			if existPair == nil {
+				if !isOwnPortPair(exLinks, exPortName, inPortName, attrs.Index) {
+					log.WithFields(log.Fields{"port": attrs.Name, "exPort": exPortName, "inPort": inPortName}).Error("Port names taken by a pair not owned by this netns")
+					continue
+				}
 				// Ports exist so it's already pulled. Maybe we are recovering from a crash.
 				// Index here is not the original port index, but it's not really used.
 				// TODO: recover peer name
@@ -634,14 +668,6 @@ func pullAllContainerPorts(
 				pair.Addrs = nil
 				pair.tap = false
 			}
-		} else if existPair != nil && !existPair.tap &&
-			portExists(exLinks, existPair.exPort) && portExists(exLinks, existPair.inPort) {
-			// Pulled via another container of the same pod; port names carry that container's pid
-			log.WithFields(log.Fields{"port": attrs.Name, "pair": existPair}).Debug("Pulled by previous owner")
-
-			pair = *existPair
-			pair.MAC = attrs.HardwareAddr
-			pair.Addrs = nil
 		} else if existPair != nil && !existPair.tap {
 			// Ports are pulled but not able to be found, something is very wrong.
 			// NOTE: pair can exist if we are changing policy mode
@@ -703,7 +729,7 @@ func pullAllContainerPorts(
 				localIfindex++
 			}
 
-			ctnrPortIdx, err := pullContainerPort(link, addrs, pid, dstNs, localIfindex, peerIndex)
+			ctnrPortIdx, err := pullContainerPort(link, addrs, exPortName, inPortName, dstNs, localIfindex, peerIndex)
 			if err != nil {
 				continue
 			}
@@ -796,6 +822,14 @@ func InterceptContainerPorts(pid int, existPairs []*InterceptPair) ([]*Intercept
 		return nil, err
 	}
 
+	nsID, err := getNetnsID(containerNs)
+	if err != nil {
+		if dbgError := netns.Set(curNs); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		return nil, err
+	}
+
 	// Read all links in our namespace
 	exLinks, err := netlink.LinkList()
 	if err != nil {
@@ -808,7 +842,7 @@ func InterceptContainerPorts(pid int, existPairs []*InterceptPair) ([]*Intercept
 		return nil, err
 	}
 
-	intcpPairs, pulled, err := pullAllContainerPorts(pid, int(dstNs), existPairMap, exLinks)
+	intcpPairs, pulled, err := pullAllContainerPorts(pid, nsID, int(dstNs), existPairMap, exLinks)
 	if err != nil {
 
 		if dbgError := netns.Set(curNs); dbgError != nil {
@@ -1157,7 +1191,18 @@ func pushAllContainerPorts(pid int, pairs []*InterceptPair) error {
 
 // Agent exiting, we need put ports back to container, and clean flows in our namespace
 func RestoreContainer(pid int, pairs []*InterceptPair) error {
-	log.WithFields(log.Fields{"pid": pid, "from": cfg.workingPid}).Debug("")
+	containerNs, err := netns.GetFromPath(global.SYS.GetNetNamespacePath(pid))
+	if err != nil {
+		return err
+	}
+	defer containerNs.Close()
+
+	return RestoreContainerNs(pid, containerNs, pairs)
+}
+
+// For a pid-0 pod with no running child, the caller holds the pod netns handle.
+func RestoreContainerNs(pid int, containerNs netns.NsHandle, pairs []*InterceptPair) error {
+	log.WithFields(log.Fields{"pid": pid, "ns": containerNs, "from": cfg.workingPid}).Debug("")
 
 	// Lock the OS Thread so we don't accidentally switch namespaces
 	runtime.LockOSThread()
@@ -1170,17 +1215,9 @@ func RestoreContainer(pid int, pairs []*InterceptPair) error {
 	}
 	defer curNs.Close()
 
-	// Get container NS
-	var containerNs netns.NsHandle
-	netns_path := global.SYS.GetNetNamespacePath(pid)
-	if containerNs, err = netns.GetFromPath(netns_path); err != nil {
-		return err
-	}
-	defer containerNs.Close()
-
 	// Get source NS
 	var srcNs netns.NsHandle
-	netns_path = global.SYS.GetNetNamespacePath(cfg.workingPid)
+	netns_path := global.SYS.GetNetNamespacePath(cfg.workingPid)
 	if srcNs, err = netns.GetFromPath(netns_path); err != nil {
 		return err
 	}

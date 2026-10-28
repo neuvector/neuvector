@@ -29,6 +29,7 @@ import (
 	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/utils"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 const containerWaitParentPeriod time.Duration = (time.Second * 1)
@@ -86,7 +87,8 @@ type containerData struct {
 	examIntface    bool
 	scanCache      []byte
 	nvRole         string
-	healthCheck    []string // docker: healthcheck commands
+	healthCheck    []string        // docker: healthcheck commands
+	podNetns       *netns.NsHandle // pid-0 pod only: restores its ports when no child is running
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -2030,6 +2032,13 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 		if !hostMode && parent.pid == 0 && !info.Sidecar {
 			if !parent.examIntface {
 				parent.examIntface = true // only monitor one child container
+				if parent.podNetns == nil && driver != pipe.PIPE_CLM {
+					if ns, err := netns.GetFromPath(global.SYS.GetNetNamespacePath(c.pid)); err == nil {
+						parent.podNetns = &ns
+					} else {
+						log.WithFields(log.Fields{"pod": parent.id, "error": err}).Error("Failed to open pod netns")
+					}
+				}
 				// A previous owner may have exited and left the pod ports behind
 				gInfoLock()
 				c.intcpPairs = parent.intcpPairs
@@ -2045,9 +2054,12 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 					if inherited {
 						if c.inline != inline || c.quar != quar {
 							changeContainerWire(c, inline, quar, nil)
-						} else if !c.inline {
-							programDP(c, false, nil)
+						} else {
+							programBridge(c)
 						}
+						// Datapath entries may have been lost while no child owned the ports,
+						// reprogram the datapath whenever ports are inherited.
+						programDP(c, false, nil)
 					}
 					notifyContainerChanges(c, parent, changeIntf)
 				} else {
@@ -2321,6 +2333,12 @@ func taskStopContainer(id string, pid int) {
 			}
 		}
 	}
+	if c.podNetns != nil {
+		if dbgError := c.podNetns.Close(); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		c.podNetns = nil
+	}
 
 	gInfoLock()
 	if !c.hostMode && ((c.parentNS == "" && (c.pid != 0 || !c.examIntface)) || (c.parentNS != "" && c.hasDatapath)) {
@@ -2581,6 +2599,13 @@ func containerTaskExit() {
 	}
 	gInfoRUnlock()
 	for _, c := range containers {
+		if c.podNetns != nil && !c.examIntface && isPortsInline(c.intcpPairs) {
+			log.WithFields(log.Fields{"pod": c.id}).Debug("Restore ownerless pod")
+			if dbgError := pipe.RestoreContainerNs(c.pid, *c.podNetns, c.intcpPairs); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
+			continue
+		}
 		if c.hostMode || !c.hasDatapath {
 			continue
 		}
