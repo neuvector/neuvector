@@ -430,21 +430,19 @@ func (fsn *FileNotificationCtr) handleEvent(event fsnotify.Event) {
 func (fsn *FileNotificationCtr) monitorEvents() {
 	defer fsn.Close()
 	defer log.Info("FSN: exit")
+	go fsn.monitorErrors(fsn.watcher.Errors)
 	for fsn.bEnabled {
-
-		select {
-		case event, ok := <-fsn.watcher.Events:
-			if !ok {
-				return
-			}
-			fsn.handleEvent(event)
-		case err, ok := <-fsn.watcher.Errors:
-			if !ok && err == nil {
-				// exited
-				return
-			}
-			log.WithFields(log.Fields{"error": err, "ok": ok}).Error("FSN: ")
+		event, ok := <-fsn.watcher.Events
+		if !ok {
+			return
 		}
+		fsn.handleEvent(event)
+	}
+}
+
+func (fsn *FileNotificationCtr) monitorErrors(errs <-chan error) {
+	for err := range errs {
+		log.WithFields(log.Fields{"error": err}).Error("FSN: ")
 	}
 }
 
