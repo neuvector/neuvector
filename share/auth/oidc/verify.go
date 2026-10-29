@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	jose "github.com/go-jose/go-jose/v3"
+	jose "github.com/go-jose/go-jose/v4"
 	"golang.org/x/oauth2"
 )
 
@@ -117,7 +117,7 @@ func contains(sli []string, ele string) bool {
 //
 //	token, err := verifier.Verify(ctx, rawIDToken)
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
-	jws, err := jose.ParseSigned(rawIDToken)
+	jws, err := jose.ParseSigned(rawIDToken, []jose.SignatureAlgorithm{jose.ES256, jose.PS256, jose.EdDSA, jose.HS256})
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
