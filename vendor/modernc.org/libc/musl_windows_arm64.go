@@ -281,13 +281,6 @@ func X__isdigit_l(tls *TLS, c int32, l locale_t) int32 { /* isdigit.c:9:5: */
 	return Xisdigit(tls, c)
 }
 
-func Xislower(tls *TLS, c int32) int32 { /* islower.c:4:5: */
-	if __ccgo_strace {
-		trc("tls=%v c=%v, (%v:)", tls, c, origin(2))
-	}
-	return Bool32(uint32(c)-uint32('a') < uint32(26))
-}
-
 func X__islower_l(tls *TLS, c int32, l locale_t) int32 { /* islower.c:9:5: */
 	if __ccgo_strace {
 		trc("tls=%v c=%v l=%v, (%v:)", tls, c, l, origin(2))
@@ -1204,29 +1197,6 @@ func Xwcstombs(tls *TLS, s uintptr, ws uintptr, n size_t) size_t { /* wcstombs.c
 
 	//TODO return wcsrtombs(s, &(const wchar_t *){ws}, n, 0);
 	return Xwcsrtombs(tls, s, bp, n, uintptr(0))
-}
-
-func Xbsearch(tls *TLS, key uintptr, base uintptr, nel size_t, width size_t, cmp uintptr) uintptr { /* bsearch.c:3:6: */
-	if __ccgo_strace {
-		trc("tls=%v key=%v base=%v nel=%v width=%v cmp=%v, (%v:)", tls, key, base, nel, width, cmp, origin(2))
-	}
-	var try uintptr
-	var sign int32
-	for nel > uint64(0) {
-		try = base + uintptr(width*(nel/uint64(2)))
-		sign = (*struct {
-			f func(*TLS, uintptr, uintptr) int32
-		})(unsafe.Pointer(&struct{ uintptr }{cmp})).f(tls, key, try)
-		if sign < 0 {
-			nel = nel / uint64(2)
-		} else if sign > 0 {
-			base = try + uintptr(width)
-			nel = nel - (nel/uint64(2) + uint64(1))
-		} else {
-			return try
-		}
-	}
-	return uintptr(0)
 }
 
 // Support signed or unsigned plain-char
