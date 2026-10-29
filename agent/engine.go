@@ -2617,6 +2617,9 @@ func containerTaskExit() {
 		}
 
 		prober.StopMonitorInterface(c.id)
+		if !c.examIntface && getSharedDatapathPod(c) != nil {
+			continue
+		}
 		if c.inline || c.quar {
 			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
 				log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")

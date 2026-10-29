@@ -154,8 +154,12 @@ func createNVPorts(jumboframe bool) {
 // Must be called in the working ns. The nsid is unique while the container netns lives,
 // which outlives any single container of a pod.
 func getNetnsID(ns netns.NsHandle) (int, error) {
-	if id, err := netlink.GetNetNsIdByFd(int(ns)); err != nil || id >= 0 {
+	id, err := netlink.GetNetNsIdByFd(int(ns))
+	if err != nil {
 		return id, err
+	}
+	if id >= 0 {
+		return id, nil
 	}
 	// nsid -1 lets the kernel pick a free id.
 	// Please refer to idr_alloc(https://github.com/torvalds/linux/blob/master/lib/idr.c#L69)
@@ -163,7 +167,7 @@ func getNetnsID(ns netns.NsHandle) (int, error) {
 	if dbgError := netlink.SetNetNsIdByFd(int(ns), -1); dbgError != nil {
 		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
 	}
-	id, err := netlink.GetNetNsIdByFd(int(ns))
+	id, err = netlink.GetNetNsIdByFd(int(ns))
 	if err == nil && id < 0 {
 		err = errors.New("Failed to assign netns id")
 	}
@@ -1059,6 +1063,11 @@ func InspectContainerPorts(pid int, existPairs []*InterceptPair) ([]*InterceptPa
 
 func pushContainerPort(pair *InterceptPair) (int, int, error) {
 	log.WithFields(log.Fields{"port": pair.Port}).Debug("")
+
+	if _, err := netlink.LinkByName(pair.exPort); err != nil {
+		log.WithFields(log.Fields{"port": pair.exPort, "error": err}).Error("Cannot find moved-in port")
+		return 0, 0, err
+	}
 
 	link, err := netlink.LinkByName(pair.Port)
 	if err != nil {
