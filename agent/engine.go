@@ -29,6 +29,7 @@ import (
 	"github.com/neuvector/neuvector/share/osutil"
 	"github.com/neuvector/neuvector/share/utils"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 const containerWaitParentPeriod time.Duration = (time.Second * 1)
@@ -86,7 +87,8 @@ type containerData struct {
 	examIntface    bool
 	scanCache      []byte
 	nvRole         string
-	healthCheck    []string // docker: healthcheck commands
+	healthCheck    []string        // docker: healthcheck commands
+	podNetns       *netns.NsHandle // pod sandbox without infra container only: restores its ports when no child is running
 }
 
 // All information inside localSystemInfo is protected by mutex,
@@ -1667,7 +1669,8 @@ func isNeuvectorContainerById(id string) (string, bool) {
 	return "", false
 }
 
-// oc49 and above: pod process is none on the cri-o
+// CRI-O pod sandbox without infra container (drop_infra_ctr),
+// CRI-O pins the pod namespaces, so the sandbox has no process (pid 0)
 func isEmptyProcessPod(info *container.ContainerMetaExtra) bool {
 	if global.RT.String() == container.RuntimeCriO {
 		return (info.Pid == 0) && info.ID == info.Sandbox
@@ -1852,6 +1855,99 @@ func stopNeuVectorMonitor(c *containerData) {
 	}
 }
 
+// Returns the running pod sandbox without infra container whose intercepted (veth) ports are shared by child c.
+func getSharedDatapathPod(c *containerData) *containerData {
+	if c.parentNS == "" || !c.hasDatapath || c.hostMode {
+		return nil
+	}
+	// The NFQ mode never pulls the pod's eth0.
+	if driver == pipe.PIPE_CLM || isMultiNetworkContainer(c) {
+		return nil
+	}
+	if p, ok := gInfoReadActiveContainer(c.parentNS); ok && p.pid == 0 {
+		return p
+	}
+	return nil
+}
+
+// For a pod sandbox without infra container, prefer the child that owns the pod's network interfaces.
+func getPodDatapathChild(pod *containerData) *containerData {
+	var fallback *containerData
+	for podID := range pod.pods.Iter() {
+		if ch, ok := gInfoReadActiveContainer(podID.(string)); ok && ch.pid != 0 && ch.hasDatapath {
+			if ch.examIntface {
+				return ch
+			}
+			// fallback holds the first acceptable non-owner child, in case no owner is found.
+			if fallback == nil {
+				fallback = ch
+			}
+		}
+	}
+	return fallback
+}
+
+// A child of a running pod sandbox without infra container exits: keep the pod's ports and pass ownership on.
+func handoverPodDatapath(c, pod *containerData, oldNetns string) {
+	// DP tap ports are keyed by each child's netns path.
+	tap := !isPortsInline(c.intcpPairs)
+	if tap {
+		for _, pair := range c.intcpPairs {
+			dp.DPCtrlDelTapPort(oldNetns, pair.Port)
+		}
+	}
+	if !c.examIntface {
+		return
+	}
+
+	var next *containerData
+	for podID := range pod.pods.Iter() {
+		if ch, ok := gInfoReadActiveContainer(podID.(string)); ok &&
+			ch.id != c.id && ch.pid != 0 && ch.hasDatapath && !ch.info.Sidecar {
+			next = ch
+			break
+		}
+	}
+
+	gInfoLock()
+	pod.intcpPairs = c.intcpPairs
+	if next != nil {
+		next.examIntface = true
+		next.intcpPairs = c.intcpPairs
+	} else {
+		pod.examIntface = false
+	}
+	gInfoUnlock()
+
+	if next != nil {
+		log.WithFields(log.Fields{"from": c.id, "to": next.id, "pod": pod.id}).Info("Handover pod datapath")
+		prober.StartMonitorInterface(next.id, next.pid, containerReexamIntfMax)
+		if tap {
+			programDP(next, false, nil)
+		}
+	} else {
+		log.WithFields(log.Fields{"from": c.id, "pod": pod.id}).Info("No running child, pod keeps datapath until next child or pod stop")
+	}
+}
+
+func isPortsInline(pairs []*pipe.InterceptPair) bool {
+	return len(pairs) > 0 && pairs[0].ExPort() != ""
+}
+
+func releaseInlineDatapath(c *containerData) {
+	if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
+		if dbgError := pipe.CleanupContainer(c.pid, c.intcpPairs); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+	}
+	for _, pair := range c.intcpPairs {
+		dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
+		if driver == pipe.PIPE_NOTC {
+			dp.DPCtrlDelPortPair(pair.ExPort(), pair.InPort())
+		}
+	}
+}
+
 func examNetworkInterface(c *containerData) bool {
 	if c.examIntface {
 		return false
@@ -1936,8 +2032,40 @@ func taskInterceptContainer(id string, info *container.ContainerMetaExtra) {
 		if !hostMode && parent.pid == 0 && !info.Sidecar {
 			if !parent.examIntface {
 				parent.examIntface = true // only monitor one child container
+				if parent.podNetns == nil && driver != pipe.PIPE_CLM {
+					if ns, err := netns.GetFromPath(global.SYS.GetNetNamespacePath(c.pid)); err == nil {
+						gInfoLock()
+						parent.podNetns = &ns
+						gInfoUnlock()
+					} else {
+						log.WithFields(log.Fields{"pod": parent.id, "error": err}).Error("Failed to open pod netns")
+					}
+				}
+				// A previous owner may have exited and left the pod ports behind
+				gInfoLock()
+				c.intcpPairs = parent.intcpPairs
+				gInfoUnlock()
+				inherited := len(c.intcpPairs) > 0
+				inline, quar := c.inline, c.quar
+				if inherited {
+					// Take over the ports in the state they were left, then switch if needed
+					c.inline = isPortsInline(c.intcpPairs)
+					c.quar = false
+				}
 				if examNetworkInterface(c) {
+					if inherited {
+						if c.inline != inline || c.quar != quar {
+							changeContainerWire(c, inline, quar, nil)
+						} else {
+							programBridge(c)
+						}
+						// Datapath entries may have been lost while no child owned the ports,
+						// reprogram the datapath whenever ports are inherited.
+						programDP(c, false, nil)
+					}
 					notifyContainerChanges(c, parent, changeIntf)
+				} else {
+					c.inline, c.quar = inline, quar
 				}
 			}
 		}
@@ -2174,22 +2302,15 @@ func taskStopContainer(id string, pid int) {
 	prober.HandleAnchorModeChange(false, id, c.upperDir, 0)
 
 	netns := global.SYS.GetNetNamespacePath(c.pid)
+	sharedPod := getSharedDatapathPod(c)
 	if !c.hostMode && c.hasDatapath {
 		// Stop monitor interface change before we reconnect the ports
 		prober.StopMonitorInterface(id)
 
-		if c.inline || c.quar {
-			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
-				if dbgError := pipe.CleanupContainer(c.pid, c.intcpPairs); dbgError != nil {
-					log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-				}
-			}
-			for _, pair := range c.intcpPairs {
-				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
-				if driver == pipe.PIPE_NOTC {
-					dp.DPCtrlDelPortPair(pair.ExPort(), pair.InPort())
-				}
-			}
+		if sharedPod != nil {
+			handoverPodDatapath(c, sharedPod, netns)
+		} else if c.inline || c.quar {
+			releaseInlineDatapath(c)
 		} else {
 			for _, pair := range c.intcpPairs {
 				dp.DPCtrlDelTapPort(netns, pair.Port)
@@ -2203,13 +2324,31 @@ func taskStopContainer(id string, pid int) {
 		if gInfo.tapProxymesh {
 			programDelProxyMeshDP(c, netns)
 		}
+	} else if !c.hostMode && c.parentNS == "" && c.pid == 0 && !c.examIntface && len(c.intcpPairs) > 0 {
+		log.WithFields(log.Fields{"pod": c.id}).Info("Release pod datapath")
+		if isPortsInline(c.intcpPairs) {
+			releaseInlineDatapath(c)
+		} else {
+			// tap port was removed at handover
+			for _, pair := range c.intcpPairs {
+				dp.DPCtrlDelMAC(nvSvcPort, pair.MAC)
+			}
+		}
+	}
+	gInfoLock()
+	if c.podNetns != nil {
+		if dbgError := c.podNetns.Close(); dbgError != nil {
+			log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+		}
+		c.podNetns = nil
 	}
 
-	gInfoLock()
-	if !c.hostMode && ((c.parentNS == "" && c.pid != 0) || (c.parentNS != "" && c.hasDatapath)) {
-		for _, pair := range c.intcpPairs {
-			delete(gInfo.macContainerMap, pair.MAC.String())
-			delete(gInfo.macPortPairMap, pair.MAC.String())
+	if !c.hostMode && ((c.parentNS == "" && (c.pid != 0 || !c.examIntface)) || (c.parentNS != "" && c.hasDatapath)) {
+		if sharedPod == nil {
+			for _, pair := range c.intcpPairs {
+				delete(gInfo.macContainerMap, pair.MAC.String())
+				delete(gInfo.macPortPairMap, pair.MAC.String())
+			}
 		}
 		//POD with proxy injection
 		if gInfo.tapProxymesh {
@@ -2462,11 +2601,25 @@ func containerTaskExit() {
 	}
 	gInfoRUnlock()
 	for _, c := range containers {
+		// Can run concurrently with the task worker; the read lock keeps podNetns from being closed
+		gInfoRLock()
+		if c.podNetns != nil && !c.examIntface && isPortsInline(c.intcpPairs) {
+			log.WithFields(log.Fields{"pod": c.id}).Debug("Restore ownerless pod")
+			if dbgError := pipe.RestoreContainerNs(c.pid, *c.podNetns, c.intcpPairs); dbgError != nil {
+				log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
+			}
+			gInfoRUnlock()
+			continue
+		}
+		gInfoRUnlock()
 		if c.hostMode || !c.hasDatapath {
 			continue
 		}
 
 		prober.StopMonitorInterface(c.id)
+		if !c.examIntface && getSharedDatapathPod(c) != nil {
+			continue
+		}
 		if c.inline || c.quar {
 			if driver != pipe.PIPE_CLM && !isMultiNetworkContainer(c) {
 				log.WithFields(log.Fields{"id": c.id}).Debug("Restore container")
