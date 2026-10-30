@@ -1020,19 +1020,6 @@ func DecryptFromBase64(encryptionKey []byte, b64 string) (string, error) {
 	}
 }
 
-func DecryptFromRawURLBase64(key []byte, b64 string) (string, error) {
-	text, err := base64.RawURLEncoding.DecodeString(b64)
-	if err != nil {
-		return "", err
-	}
-
-	if text, err = Decrypt(key, text); err == nil {
-		return string(text), nil
-	} else {
-		return "", err
-	}
-}
-
 func getPasswordSymKey() []byte {
 	return passwordSymKey
 }
@@ -1047,13 +1034,6 @@ func DecryptPassword(encrypted string) string {
 		log.WithError(err).Warn("failed to decrypt password")
 	}
 	return password
-}
-
-func DecryptURLSafe(encrypted string) (string, error) {
-	if encrypted == "" {
-		return "", nil
-	}
-	return DecryptFromRawURLBase64(getPasswordSymKey(), encrypted)
 }
 
 // Determine if a directory is a mountpoint, by comparing the device for the directory
