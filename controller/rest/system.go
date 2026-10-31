@@ -458,7 +458,7 @@ func handlerPredictSystemScore(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -690,7 +690,7 @@ func handlerSystemRequest(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	// Authz is done when action is taken, setting service policies.
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -987,7 +987,7 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1133,7 +1133,7 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 
 	name := ps.ByName("name")
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -2067,7 +2067,7 @@ func handlerSystemConfigBase(apiVer string, w http.ResponseWriter, r *http.Reque
 	scope := share.ScopeFed
 	dummy := share.CLUSSystemConfig{CfgType: share.FederalCfg}
 	var rconf api.RESTSystemConfigConfigData
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -3045,7 +3045,7 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 				lines, err = rawImportRead(r, tmpfile)
 			}
 		} else {
-			if body, err = io.ReadAll(r.Body); err == nil {
+			if body, err = io.ReadAll(getLargeBufferReader(r.Body)); err == nil {
 				body = _preprocessImportBody(body)
 				if importType != share.IMPORT_TYPE_GROUP_POLICY {
 					body, err = yaml.YAMLToJSON(body)
@@ -3056,6 +3056,15 @@ func _importHandler(w http.ResponseWriter, r *http.Request, tid, importType, tem
 					}
 				}
 				_, err = tmpfile.Write(body)
+			} else {
+				importTask.Status = err.Error()
+				if err := clusHelper.PutImportTask(&importTask); err != nil {
+					log.WithFields(log.Fields{"error": err}).Error("PutImportTask")
+				}
+				errMsg := "request body too large"
+				log.WithFields(log.Fields{"err": err, "importType": importType}).Error(errMsg)
+				restRespErrorMessage(w, http.StatusRequestEntityTooLarge, api.RESTErrFailImport, errMsg)
+				return
 			}
 		}
 		if err == nil {
@@ -3441,7 +3450,7 @@ func handlerFedConfigExport(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	var rconf api.RESTFedConfigExport
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

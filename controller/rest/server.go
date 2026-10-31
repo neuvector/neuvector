@@ -389,7 +389,7 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1032,7 +1032,7 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1326,7 +1326,7 @@ func handlerServerConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1447,7 +1447,7 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 	role := ps.ByName("role")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1595,7 +1595,7 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 	group := ps.ByName("group")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1803,7 +1803,7 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1968,7 +1968,7 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

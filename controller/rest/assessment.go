@@ -60,9 +60,11 @@ func handlerAssessAdmCtrlRules(w http.ResponseWriter, r *http.Request, ps httpro
 	var whsvr WebhookServer
 	var stamps api.AdmCtlTimeStamps
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 	body = _preprocessImportBody(body)
 	yamlParts := strings.Split(string(body), "\n---\n")

@@ -763,7 +763,7 @@ func handlerResponseRuleAction(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -826,7 +826,7 @@ func handlerResponseRuleConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1109,7 +1109,7 @@ func handlerResponseRuleExport(w http.ResponseWriter, r *http.Request, ps httpro
 	}
 
 	var rconf api.RESTResponseRulesExport
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1197,6 +1197,11 @@ func handlerResponseRuleImport(w http.ResponseWriter, r *http.Request, ps httpro
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
+		return
+	}
+
+	if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
 		return
 	}
 
