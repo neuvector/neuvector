@@ -47,7 +47,7 @@ func waitForAdmission() error {
 	maxRetry := 60
 	retry := 0
 
-	print := true
+	loggedOnce := true
 	for {
 		if val, err := cluster.Get(share.CLUSCtrlNodeAdmissionKey); err != nil || string(val) != share.CLUSCtrlEnabledValue {
 			time.Sleep(shortWait)
@@ -55,9 +55,9 @@ func waitForAdmission() error {
 		} else {
 			break
 		}
-		if print {
+		if loggedOnce {
 			log.Error("Node admission is not enabled yet")
-			print = false
+			loggedOnce = false
 		}
 		if retry > maxRetry {
 			// we can get here if the license is not loaded

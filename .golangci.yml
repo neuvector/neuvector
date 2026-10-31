@@ -9,9 +9,16 @@ linters:
     - unused
     - nolintlint # reports ill-formed or insufficient nolint directives
     - bodyclose
+    - forbidigo
   settings:
     errcheck:
       check-blank: true
+    forbidigo:
+      # Match actual fmt.Print*/print/println calls; avoid false positives on locals named print.
+      analyze-types: true
+      forbid:
+        - pattern: ^(fmt\.Print(|f|ln)|print|println)$
+          msg: use logrus instead of fmt.Print* / print / println
     govet:
       # Enable all analyzers.
       # Default: false
@@ -67,6 +74,7 @@ linters:
       - path: '_test\.go'
         linters:
           - errcheck
+          - forbidigo
     paths:
       - third_party$
       - builtin$

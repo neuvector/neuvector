@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -780,6 +781,33 @@ func main() {
 			log.WithFields(log.Fields{"err": err}).Error("Failed to read store passphrases")
 			os.Exit(-2)
 		}
+	} else {
+		if keyFile := os.Getenv("STORE_PASSPHRASE_FILE"); keyFile != "" {
+			passphrase, err := os.ReadFile(keyFile)
+			if err != nil {
+				log.WithFields(log.Fields{"err": err, "file": keyFile}).Error("STORE_PASSPHRASE_FILE: failed to read key file")
+				os.Exit(-2)
+			}
+			passphrase = bytes.TrimSpace(passphrase)
+			if len(passphrase) < common.DekSeedLength {
+				log.WithFields(log.Fields{
+					"file":     keyFile,
+					"got":      len(passphrase),
+					"required": common.DekSeedLength,
+				}).Errorf("STORE_PASSPHRASE_FILE: passphrase too short (%d bytes); must be at least %d bytes. Generate with: openssl rand -base64 48 > <path>",
+					len(passphrase), common.DekSeedLength)
+				os.Exit(-2)
+			}
+			encKeys := common.EncKeys{"1": passphrase}
+			if err := common.InitAesGcmKey(encKeys, "1"); err != nil {
+				log.WithFields(log.Fields{"err": err, "file": keyFile}).Error("STORE_PASSPHRASE_FILE: failed to initialize encryption key")
+				os.Exit(-2)
+			}
+			log.WithFields(log.Fields{"file": keyFile}).Info("store passphrase loaded from STORE_PASSPHRASE_FILE")
+		} else {
+			log.Warn("STORE_PASSPHRASE_FILE not set; DEK-backed state encryption unavailable on non-Kubernetes platform")
+			os.Exit(-2)
+		}
 	}
 
 	emptyKvFound := false
@@ -879,6 +907,12 @@ func main() {
 		// read from the KV, such as policy list, it knows the data is complete.
 		waitConfigLoaded(isNewCluster)
 		kv.ValidateWebhookCert()
+	}
+
+	watchConfigmap := true
+	if s := os.Getenv("DISABLE_CONFIGMAP_WATCH"); s != "" {
+		cache.GetCustomSecretRules()
+		watchConfigmap = false
 	}
 
 	var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
@@ -1056,7 +1090,7 @@ func main() {
 
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start(ocImageRegistered, cspType)
+	orchConnector.Start(ocImageRegistered, cspType, watchConfigmap)
 
 	if platform == share.PlatformKubernetes {
 		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)

@@ -56,10 +56,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/kubeproxy.kubeconfig"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -e "$file" ]; then
-            permissions=$(stat -c %a $file)
+          file=$(resolve_argument_path "$CIS_PROXY_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            permissions=$(stat -c %a "$file")
             if [ "$permissions" -le 600 ]; then
               pass "$check"
             else
@@ -86,8 +85,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -e "$file" ]; then
-            ownership=$(stat -c %u%g $file)
+          file=$(resolve_argument_path "$CIS_PROXY_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            ownership=$(stat -c %u%g "$file")
             if [ "$ownership" = "00" ]; then
               pass "$check"
             else
@@ -114,11 +114,10 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--kubeconfig')
 
-          if [ -e "$file" ]; then
-            permissions=$(stat -c %a $file)
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            permissions=$(stat -c %a "$file")
             if [ "$permissions" -le 600 ]; then
               pass "$check"
             else
@@ -145,8 +144,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if [ -e "$file" ]; then
-            ownership=$(stat -c %u%g $file)
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            ownership=$(stat -c %u%g "$file")
             if [ "$ownership" = "00" ]; then
               pass "$check"
             else
@@ -173,10 +173,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/client-ca.crt"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -e "$file" ]; then
-            permissions=$(stat -c %a $file)
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--client-ca-file')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            permissions=$(stat -c %a "$file")
             if [ "$permissions" -le 600 ]; then
               pass "$check"
               pass "      * client-ca-file: $file"
@@ -204,10 +203,9 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/client-ca.crt"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          if [ -e "$file" ]; then
-            ownership=$(stat -c %u%g $file)
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--client-ca-file')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+            ownership=$(stat -c %u%g "$file")
             if [ "$ownership" = "00" ]; then
               pass "$check"
               pass "      * client-ca-file: $file"
@@ -273,7 +271,11 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--anonymous-auth=false' >/dev/null 2>&1; then
+          file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
+          file=$(append_prefix "$CONFIG_PREFIX" "$file")
+
+          if grep -A2 '^authentication:' "$file" 2>/dev/null |
+              grep -qE '^[[:space:]]+enabled:[[:space:]]+false[[:space:]]*$'; then
               pass "$check"
           else
               warn "$check"
@@ -325,9 +327,13 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
+          config=$(append_prefix "$CONFIG_PREFIX" "/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf")
           if check_argument "$CIS_KUBELET_CMD" '--client-ca-file' >/dev/null 2>&1; then
               cafile=$(get_argument_value "$CIS_KUBELET_CMD" '--client-ca-file')
               cafile=$(append_prefix "$CONFIG_PREFIX" "$cafile")
+              pass "$check"
+              pass "      * client-ca-file: $cafile"
+          elif cafile=$(yq e '.authentication.x509.clientCAFile // ""' "$config" 2>/dev/null); [ -n "$cafile" ]; then
               pass "$check"
               pass "      * client-ca-file: $cafile"
           else
@@ -402,10 +408,18 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=true' >/dev/null 2>&1; then
+          if check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains=false' >/dev/null 2>&1; then
+              warn "$check"
+          elif check_argument "$CIS_KUBELET_CMD" '--make-iptables-util-chains' >/dev/null 2>&1; then
               pass "$check"
           else
-              warn "$check"
+              config_file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
+              config_file=$(append_prefix "$CONFIG_PREFIX" "$config_file")
+              if [ "$(yq e '.makeIPTablesUtilChains' "$config_file" 2>/dev/null)" = "false" ]; then
+                  warn "$check"
+              else
+                  pass "$check"
+              fi
           fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter.
@@ -424,11 +438,7 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
-          if check_argument "$CIS_KUBELET_CMD" '--hostname-override' >/dev/null 2>&1; then
-              warn "$check"
-          else
-              pass "$check"
-          fi
+          pass "$check"
         remediation: |
           Not Applicable.
           By default, RKE2 does set the --hostname-override argument. Per CIS guidelines, this is to comply
@@ -444,17 +454,22 @@ groups:
         tags: {}
         audit: |
           check="$id  - $description"
+
+          config_dir="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d"
+          config_dir=$(append_prefix "$CONFIG_PREFIX" "$config_dir")
+          qps=$(sed -n \
+              's/^[[:space:]]*eventRecordQPS:[[:space:]]*\([0-9][0-9]*\).*$/\1/p' \
+              "$config_dir"/*.conf 2>/dev/null | tail -n 1)
+
           if check_argument "$CIS_KUBELET_CMD" '--event-qps' >/dev/null 2>&1; then
               qps=$(get_argument_value "$CIS_KUBELET_CMD" '--event-qps' | cut -d " " -f 1)
-              if [ "$qps" -gt 0 ]; then
-                  pass "$check"
-              else
-                  warn "$check"
-                  warn "      * --event-qps: $qps is not set to a positive value"
-              fi
+          fi
+
+          if [ -n "$qps" ] && [ "$qps" -gt 0 ]; then
+              pass "$check"
           else
               warn "$check"
-              warn "      * --event-qps is not set"
+              warn "      * eventRecordQPS: ${qps:-not set} is not set to a positive value"
           fi
         remediation: |
           Edit the RKE2 config file /etc/rancher/rke2/config.yaml, set the following parameter to an appropriate value.
@@ -489,7 +504,14 @@ groups:
                 warn "$check"
               fi
           else
-              warn "$check"
+              config_file="/var/lib/rancher/rke2/agent/etc/kubelet.conf.d/00-rke2-defaults.conf"
+              config_file=$(append_prefix "$CONFIG_PREFIX" "$config_file")
+              if grep -qF 'tlsCertFile: /var/lib/rancher/rke2/agent/serving-kubelet.crt' "$config_file" 2>/dev/null &&
+                 grep -qF 'tlsPrivateKeyFile: /var/lib/rancher/rke2/agent/serving-kubelet.key' "$config_file" 2>/dev/null; then
+                  pass "$check"
+              else
+                warn "$check"
+              fi
           fi
         remediation: |
           By default, RKE2 automatically provides the TLS certificate and private key for the Kubelet.
@@ -536,14 +558,18 @@ groups:
           GDPR: []
         audit: |
           check="$id  - $description"
-          file="/var/lib/rancher/rke2/agent/kubelet.kubeconfig"
-          file=$(append_prefix "$CONFIG_PREFIX" "$file")
-          found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=false/p' $file)
-          if [ "$found" ]; then
-              warn "$check"
-              warn "      * RotateKubeletServerCertificate should be: true, but is: false"
+          file=$(resolve_argument_path "$CIS_KUBELET_CMD" '--kubeconfig')
+          if [ -n "$file" ] && [ -e "$file" ]; then
+              found=$(sed -rn '/--feature-gates=RotateKubeletServerCertificate=false/p' "$file")
+              if [ "$found" ]; then
+                  warn "$check"
+                  warn "      * RotateKubeletServerCertificate should be: true, but is: false"
+              else
+                  pass "$check"
+              fi
           else
-              pass "$check"
+              warn "$check"
+              warn "      * kubeconfig file not found, $file"
           fi
         remediation: |
           By default, RKE2 does not set the RotateKubeletServerCertificate feature gate.

@@ -127,9 +127,10 @@ func (fa *FileAccessCtrl) enumExecutables(rootpid int, id string) (map[string]in
 	// Thus, we can make partial protections here and leave other processes into process monitor
 	// The 4 sec timeout (by design) is commonly enough for 160,000 files and 4 GB container
 	req := workerlet.WalkPathRequest{
-		Pid:     rootpid,
-		Path:    "/",
-		Timeout: time.Duration(4 * time.Second),
+		Pid:      rootpid,
+		Path:     "/",
+		Timeout:  time.Duration(4 * time.Second),
+		ExecOnly: true,
 	}
 
 	bytesValue, _, err := fa.prober.walkerTask.RunWithTimeout(req, id, req.Timeout)

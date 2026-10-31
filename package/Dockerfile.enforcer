@@ -1,7 +1,7 @@
 #
 # Builder
 #
-FROM registry.suse.com/bci/golang:1.26.5 AS builder
+FROM registry.suse.com/bci/golang:1.27.3 AS builder
 
 ARG VERSION
 ARG TARGETOS
@@ -46,12 +46,11 @@ COPY --from=micro / /chroot/
 RUN zypper refresh && zypper --installroot /chroot -n in --no-recommends \
     ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk tcpdump sed kmod wget unzip \
     libnetfilter_queue-devel liburcu-devel libpcap-devel pcre2-devel libjansson-devel libmnl-devel jemalloc-devel
- 
-# Install yq from isv:Rancher:dependencies
-RUN zypper addrepo -n rancher-deps https://download.opensuse.org/repositories/isv:Rancher:dependencies/pkgs/isv:Rancher:dependencies.repo && \
-    rpm --import https://download.opensuse.org/repositories/isv:/Rancher:/dependencies/pkgs/repodata/repomd.xml.key && \
-    zypper -n --gpg-auto-import-keys refresh && \
-    zypper --installroot /chroot install -y --from rancher-deps yq
+
+# Instal yq from prime version because community version doesn't automatically rebuild when golang version upgrades
+RUN zypper refresh && zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
+    zypper --non-interactive --installroot /chroot in --no-recommends -r pkgs yq
 
 # Install vectorscan and consul from isv:SUSE:neuvector
 RUN zypper addrepo -n nv-deps https://download.opensuse.org/repositories/isv:SUSE:neuvector/15.7/isv:SUSE:neuvector.repo && \

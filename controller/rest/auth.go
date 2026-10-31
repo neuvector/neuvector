@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	mathRand "math/rand"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -102,6 +103,7 @@ type SsoSession struct {
 }
 
 var errTokenExpired error = errors.New("token expired")
+var errNoRoleMapped error = errors.New("No role assigned")
 var recordFedAuthSessions bool = false                                      // set to true for testing: handlerDumpAuthData
 var loginFedSessions map[string]utils.Set = make(map[string]utils.Set)      // for testing: key is mainSessionID, value is a set of regular tokens
 var loginSessions map[string]*loginSession = make(map[string]*loginSession) // key is the token
@@ -1410,7 +1412,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 			return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtPublicKeyNotAfter)
 		}
 		return publicKey, nil
-	})
+	}, jwt.WithStrictDecoding())
 
 	// Try with old cert if it's available.
 	// Note: Ideally we should use extra info stored in claims to do a lookup below.
@@ -1424,7 +1426,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 				return nil, fmt.Errorf("jwt certificate expired: %v", jwtCert.jwtOldPublicKeyNotAfter)
 			}
 			return alternativeKey, nil
-		})
+		}, jwt.WithStrictDecoding())
 	}
 
 	if err != nil {
@@ -1845,7 +1847,7 @@ func remotePasswordAuth(cs *share.CLUSServer, pw *api.RESTAuthPassword) (*share.
 			return user, nil
 		}
 
-		return nil, errors.New("LDAP/AD user failed to map to a valid role")
+		return nil, errNoRoleMapped
 	}
 
 	return nil, errors.New("Unknown server type")
@@ -1979,7 +1981,7 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 		return user, nil
 	}
 
-	return nil, errors.New("Failed to map to a valid role")
+	return nil, errNoRoleMapped
 }
 
 func platformPasswordAuth(pw *api.RESTAuthPassword) (*share.CLUSUser, error) {
@@ -2357,6 +2359,16 @@ func isPasswordExpired(localAuthed bool, userName string, pwdResetTime time.Time
 	return pwdDaysUntilExpire, pwdHoursUntilExpire, false
 }
 
+// remoteHost returns the host part of an address that may carry a port, such
+// as "1.2.3.4:5678" or "[::1]:5678" from http.Request.RemoteAddr. A value
+// without a port, bare IPv6 addresses included, is returned unchanged.
+func remoteHost(remote string) string {
+	if host, _, err := net.SplitHostPort(remote); err == nil {
+		return host
+	}
+	return remote
+}
+
 func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug()
 	defer r.Body.Close()
@@ -2455,9 +2467,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		if remote == "" {
 			remote = r.RemoteAddr
 		}
-		if i := strings.Index(remote, ":"); i > 0 {
-			remote = remote[:i]
-		}
+		remote = remoteHost(remote)
 
 		var errLocalAuth error
 		var localAuthEnabled bool
@@ -2523,6 +2533,8 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			authLog(ev, auth.Password.Username, remote, "", nil, msg) // when msg is empty, authLog() will compose the msg
 			if localAuthResult.newPwdWeak {
 				restRespErrorMessageEx(w, http.StatusBadRequest, api.RESTErrWeakPassword, localAuthResult.newPwdError, localAuthResult.pwdProfileBasic)
+			} else if err == errNoRoleMapped {
+				restRespErrorMessage(w, http.StatusForbidden, api.RESTErrForbidden, err.Error())
 			} else {
 				restRespError(w, http.StatusUnauthorized, code)
 			}
@@ -2711,9 +2723,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	if remote == "" {
 		remote = r.RemoteAddr
 	}
-	if i := strings.Index(remote, ":"); i > 0 {
-		remote = remote[:i]
-	}
+	remote = remoteHost(remote)
 
 	userName := auth.JointUsername
 	if auth.JointUsername == common.DefaultAdminUser {
@@ -2780,9 +2790,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	if remote == "" {
 		remote = r.RemoteAddr
 	}
-	if i := strings.Index(remote, ":"); i > 0 {
-		remote = remote[:i]
-	}
+	remote = remoteHost(remote)
 
 	accReadAll := access.NewReaderAccessControl()
 
@@ -2891,7 +2899,14 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				log.WithFields(log.Fields{"server": server, "user": username, "groups": groups, "error": err}).Error("Failed to get user from attribute")
 				fullname := utils.MakeUserFullname(cs.Name, username)
 				authLog(share.CLUSEvAuthLoginFailed, fullname, remote, "", nil, "")
-				restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+				// the returned 401/403 is redirtected to OKTA which swallows the error and makes NV UI know nothing about the error.
+				// so let controller tell OKTA to redirect to NV UI login url with error parameter in order to display the login failure message
+				status := http.StatusUnauthorized
+				if err == errNoRoleMapped {
+					status = http.StatusForbidden
+				}
+				url := fmt.Sprintf("/index.html#/login?error=%d", status)
+				http.Redirect(w, r, url, http.StatusTemporaryRedirect) // 307 Redirect
 				return
 			}
 			sso.SAMLNameID = nameid
@@ -2917,7 +2932,14 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 				log.WithFields(log.Fields{"server": server, "user": username, "groups": groups, "error": err}).Error("Failed to get user from claims")
 				fullname := utils.MakeUserFullname(cs.Name, username)
 				authLog(share.CLUSEvAuthLoginFailed, fullname, remote, "", nil, "")
-				restRespError(w, http.StatusUnauthorized, api.RESTErrUnauthorized)
+				// the returned 401/403 is redirtected to OKTA which swallows the error and makes NV UI know nothing about the error.
+				// so let controller tell OKTA to redirect to NV UI login url with error parameter in order to display the login failure message
+				status := http.StatusUnauthorized
+				if err == errNoRoleMapped {
+					status = http.StatusForbidden
+				}
+				url := fmt.Sprintf("/index.html#/login?error=%d", status)
+				http.Redirect(w, r, url, http.StatusTemporaryRedirect) // 307 Redirect
 				return
 			}
 		} else {

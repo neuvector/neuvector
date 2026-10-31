@@ -28,7 +28,7 @@ import (
 const procRootMountPoint = "/proc/%d/root"
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: pathWalker [OPTIONS]\n")
+	log.Error("usage: pathWalker [OPTIONS]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -44,6 +44,20 @@ type taskMain struct {
 func isPidValid(pid int) bool {
 	_, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
 	return err == nil
+}
+
+// shouldSkipDir reports whether a directory (relative path `ldir`) should be pruned.
+// An empty allowDirs means "no restriction": walk everything (restores pre-NVSHAS-9756 behavior).
+func shouldSkipDir(ldir string, allowDirs []string) bool {
+	if len(allowDirs) == 0 {
+		return false
+	}
+	for _, rdir := range allowDirs {
+		if strings.HasPrefix(ldir, rdir) {
+			return false
+		}
+	}
+	return true
 }
 
 // ///////////
@@ -102,7 +116,7 @@ func main() {
 	}
 
 	if !pass {
-		fmt.Fprintf(os.Stderr, "---")
+		log.Error("---")
 		usage() // exited as 2
 	}
 
@@ -226,15 +240,7 @@ func (tm *taskMain) WalkPathTask(req workerlet.WalkPathRequest) {
 					return filepath.SkipDir
 				}
 
-				bSkip := true
-				ldir := path[rootPathLen:]
-				for _, rdir := range req.Dirs {
-					if strings.HasPrefix(ldir, rdir) {
-						bSkip = false
-						break
-					}
-				}
-				if bSkip {
+				if shouldSkipDir(path[rootPathLen:], req.Dirs) {
 					return filepath.SkipDir
 				}
 			}
@@ -304,7 +310,7 @@ func (tm *taskMain) WalkPackageTask(req workerlet.WalkGetPackageRequest) {
 	var data share.ScanData
 	scanUtil := scan.NewScanUtil(tm.sys)
 	data.Buffer, data.Error = scanUtil.GetRunningPackages(req.Id, req.ObjType, req.Pid,
-		req.Kernel, req.K8sAppString, req.PidHost)
+		req.Kernel, req.K8sAppString, req.PidHost, req.ParsingCaps)
 
 	// outputs:
 	output, err := json.Marshal(data)

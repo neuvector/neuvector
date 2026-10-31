@@ -178,6 +178,7 @@ var restErrMessage = []string{
 	api.RESTErrInvalidQueryID:        "Invalid or expired query id",
 	api.RESTErrPollJobNotFoundError:  "Job not found in the Job Queue",
 	api.RESTErrServerError:           "Server Error",
+	api.RESTErrForbidden:             "Authorization failed",
 }
 
 func restRespForward(w http.ResponseWriter, r *http.Request, statusCode int, headers map[string]string, data []byte, remoteExport, remoteRegScanTest bool) {
@@ -1567,7 +1568,7 @@ func PreInitContext(ctx *Context) {
 	evqueue = ctx.EvQueue
 	auditQueue = ctx.AuditQueue
 
-	remoteAuther = auth.NewRemoteAuther(nil)
+	remoteAuther = auth.NewRemoteAuther(nil, common.AesGcmEncrypt, common.AesGcmDecrypt)
 	clusHelper = kv.GetClusterHelper()
 	cfgHelper = kv.GetConfigHelper()
 }
@@ -1714,7 +1715,8 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 	r.GET("/v2/system/config", handlerSystemGetConfigV2) // supported 'scope' query parameter values: ""(all, default)/"fed"/"local". no payload. starting from 5.0, rest client should call this api.
 	r.GET("/v1/system/alerts", handlerSystemGetAlerts)
 	r.GET("/v1/system/score/metrics", handlerGetSystemScoreMetrics)
-	r.POST("/v1/system/score/metrics", handlerPredictSystemScore) // skip API document
+	r.POST("/v1/system/score/metrics", handlerPredictSystemScore)  // skip API document
+	r.POST("/v1/system/score/exposure", handlerSendExposureReport) // skip API document
 	r.PATCH("/v1/system/config", handlerSystemConfig)
 	r.PATCH("/v2/system/config", handlerSystemConfigV2)
 	r.POST("/v1/system/config/webhook", handlerSystemWebhookCreate)
@@ -2021,9 +2023,8 @@ func StartRESTServer(isNewCluster, isLead bool, maxConcurrentRepoScanTasks, scan
 
 	addr := fmt.Sprintf(":%d", _restPort)
 	config := &tls.Config{
-		MinVersion:               tls.VersionTLS13,
-		PreferServerCipherSuites: true,
-		CipherSuites:             utils.GetSupportedTLSCipherSuites(),
+		MinVersion:   tls.VersionTLS13,
+		CipherSuites: utils.GetSupportedTLSCipherSuites(),
 	}
 
 	// tlsCertificate is only generated when default location has no files
@@ -2070,6 +2071,8 @@ func startFedRestServer(fedPingInterval uint32) {
 		return
 	} else {
 		_masterClusterIP = m.MasterCluster.RestInfo.Server
+		_fixedJoinToken = m.MasterCluster.FixedJoinToken
+		_allowSameK8sUidRejoin = m.MasterCluster.AllowSameK8sUidRejoin
 	}
 
 	fedRestServerMutex.Lock()

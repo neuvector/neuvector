@@ -159,11 +159,16 @@ message ScanSignatureInfo {
     ScanErrorCode VerificationError = 3;
 }
 
+message ParsingCaps {
+    bool JarAutoModuleName = 1;
+}
+
 message ScanRunningRequest {
     ScanObjectType Type = 1;
     string ID = 2;
     string AgentID = 3;
     string AgentRPCEndPoint = 4;
+    ParsingCaps ParsingCaps = 5;
 }
 
 message ScanData {

@@ -54,14 +54,21 @@ type RemoteAuthInterface interface {
 	OIDCAuth(coidc *share.CLUSServerOIDC, tokenData *api.RESTAuthToken) (map[string]interface{}, error)
 }
 
-func NewRemoteAuther(fakeTime *time.Time) RemoteAuthInterface {
+func NewRemoteAuther(fakeTime *time.Time, encryptState func(string) (string, error), decryptState func(string) (string, error)) RemoteAuthInterface {
+	if encryptState == nil || decryptState == nil {
+		panic("NewRemoteAuther: encryptState and decryptState must not be nil")
+	}
 	return &remoteAuth{
-		fakeTime: fakeTime,
+		fakeTime:     fakeTime,
+		encryptState: encryptState,
+		decryptState: decryptState,
 	}
 }
 
 type remoteAuth struct {
-	fakeTime *time.Time // For unit-tests
+	fakeTime     *time.Time
+	encryptState func(string) (string, error)
+	decryptState func(string) (string, error)
 }
 
 const defaultLDAPAuthTimeout = time.Second * 10
@@ -201,7 +208,7 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 		clockOverride = dsig.NewFakeClock(clockwork.NewFakeClockAt(*timeOverride))
 	}
 
-	return &saml2.SAMLServiceProvider{
+	sp := &saml2.SAMLServiceProvider{
 		IdentityProviderSSOURL: csaml.SSOURL,
 		IdentityProviderSLOURL: csaml.SLOURL,
 
@@ -221,7 +228,12 @@ func GenerateSamlSP(csaml *share.CLUSServerSAML, spissuer string, redirurl strin
 		// 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified' for the app
 		NameIdFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
 		Clock:        clockOverride,
-	}, nil
+	}
+	if csaml.AudienceURI != "" {
+		sp.AudienceURI = csaml.AudienceURI
+	}
+
+	return sp, nil
 }
 
 func (a *remoteAuth) SAMLSPGetRedirectURL(csaml *share.CLUSServerSAML, redir *api.RESTTokenRedirect, overrides map[string]string) (string, error) {
@@ -311,8 +323,15 @@ func (a *remoteAuth) SAMLSPAuth(csaml *share.CLUSServerSAML, tokenData *api.REST
 		return "", "", map[string][]string{}, err
 	}
 
-	if assertionInfo.WarningInfo.InvalidTime {
-		return "", "", map[string][]string{}, errors.New("invalid time")
+	w := assertionInfo.WarningInfo
+	if w.InvalidTime || w.OneTimeUse {
+		return "", "", map[string][]string{}, errors.New("invalid time/one time use")
+	}
+	if w.NotInAudience {
+		if csaml.AudienceURI != "" {
+			return "", "", map[string][]string{}, errors.New("invalid audience")
+		}
+		log.Warn("AudienceURI not configured")
 	}
 
 	out := map[string][]string{}
@@ -352,13 +371,17 @@ func (a *remoteAuth) OIDCDiscover(issuer string, proxy string) (string, string, 
 
 func (a *remoteAuth) generateState() (string, error) {
 	s := fmt.Sprintf("%d", time.Now().Unix())
-	return utils.EncryptURLSafe(s)
+	return a.encryptState(s)
 }
 
 func (a *remoteAuth) verifyState(state string) error {
-	tsStr, err := utils.DecryptURLSafe(state)
+	tsStr, err := a.decryptState(state)
 	if err != nil {
-		return fmt.Errorf("Invalid state: wrong encryption: %w", err)
+		// fall back to legacy decryption for states generated before this migration
+		tsStr, err = utils.DecryptURLSafe(state)
+		if err != nil {
+			return fmt.Errorf("Invalid state: wrong encryption: %w", err)
+		}
 	}
 	if tsStr == "" {
 		return errors.New("Invalid state: wrong encryption")

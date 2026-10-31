@@ -189,15 +189,6 @@ check_contains(patterns, value) {
     regex.match(patterns[_], value)
 }
 
-inSidecarContainerList(image){
-	sidecarImages := ["docker.io/istio/proxyv2","https://docker.io/istio/proxyv2",
-						"linkerd-io/proxy","https://gcr.io/linkerd-io/proxy",
-						"istio-release/proxyv2", "https://gcr.io/istio-release/proxyv2"]
-    startswith(image, sidecarImages[_])
-}else = false{
-	true
-}
-
 get_serviceAccountName(request) := sa {
     not has_key(request.spec, "serviceAccountName")
     sa = "default"

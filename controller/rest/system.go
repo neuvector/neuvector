@@ -407,6 +407,48 @@ func handlerGetSystemScoreMetrics(w http.ResponseWriter, r *http.Request, ps htt
 	restRespSuccess(w, r, resp, acc, login, nil, "Get system score metrics data")
 }
 
+func handlerSendExposureReport(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
+	defer r.Body.Close()
+
+	// Read access so the report contains only workloads the caller can already see.
+	acc, login := getAccessControl(w, r, access.AccessOPRead)
+	if acc == nil {
+		return
+	}
+
+	domain, err := exposureDomainFilter(restParseQuery(r))
+	if err != nil {
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+		return
+	}
+
+	if err := cacher.SendExposureReport(acc, acc, domain); err != nil {
+		restRespErrorMessage(w, http.StatusNotFound, api.RESTErrObjectNotFound, err.Error())
+		return
+	}
+	restRespSuccess(w, r, nil, acc, login, nil, "Send exposure report to syslog")
+}
+
+func exposureDomainFilter(query *restQuery) (string, error) {
+	if query == nil {
+		return "", nil
+	}
+	var domain string
+	var found bool
+	for _, f := range query.filters {
+		if f.tag != api.FilterByDomain {
+			continue
+		}
+		if found || f.op != api.OPeq {
+			return "", fmt.Errorf("invalid f_domain filter")
+		}
+		domain = f.value
+		found = true
+	}
+	return domain, nil
+}
+
 func handlerPredictSystemScore(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.WithFields(log.Fields{"URL": r.URL.String()}).Debug("")
 	defer r.Body.Close()
@@ -478,6 +520,8 @@ func handlerSystemGetConfigBase(apiVer string, w http.ResponseWriter, r *http.Re
 						Url:      wh.Url,
 						Enable:   wh.Enable,
 						UseProxy: wh.UseProxy,
+						Username: wh.Username,
+						Password: wh.Password,
 						Type:     wh.Type,
 						CfgType:  common.TCfgTypeToApi(wh.CfgType),
 					}
@@ -810,7 +854,7 @@ func validateWebhook(h *api.RESTWebhook) (int, error) {
 	return 0, nil
 }
 
-func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfWebhooks []share.CLUSWebhook,
+func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhookConfig, cconfWebhooks []share.CLUSWebhook,
 	cfgType share.TCfgType, acc *access.AccessControl) ([]share.CLUSWebhook, int, error) {
 	// WebhookUrl is kept for backward-compatibility, it will be written into the webhook list
 	newWebhooks := make([]share.CLUSWebhook, 0)
@@ -831,6 +875,12 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 		}
 		newWebhooks = append(newWebhooks, h)
 	}
+
+	oldWebhooks := make(map[string]share.CLUSWebhook, len(cconfWebhooks))
+	for _, h := range cconfWebhooks {
+		oldWebhooks[h.Name] = h
+	}
+
 	if rcWebhooks != nil {
 		for _, h := range *rcWebhooks {
 			/* shouldn't check this, as upgraded config can be sent in the list after the user modify the setting
@@ -849,15 +899,49 @@ func configWebhooks(rcWebhookUrl *string, rcWebhooks *[]*api.RESTWebhook, cconfW
 				log.WithFields(log.Fields{"name": h.Name}).Error("Duplicate webhook name")
 				return nil, api.RESTErrInvalidName, errors.New("Duplicate webhook name")
 			}
-			if code, err := validateWebhook(h); err != nil {
+			hTemp := api.RESTWebhook{
+				Name:    h.Name,
+				Url:     h.Url,
+				Type:    h.Type,
+				CfgType: h.CfgType,
+			}
+			if code, err := validateWebhook(&hTemp); err != nil {
 				return nil, code, err
 			}
 
 			newWebhookNames.Add(h.Name)
-			newWebhooks = append(newWebhooks, share.CLUSWebhook{
-				Name: h.Name, Url: h.Url, Enable: h.Enable, UseProxy: h.UseProxy,
-				Type: h.Type, CfgType: cfgType,
-			})
+			newWebhook := share.CLUSWebhook{
+				Name:     h.Name,
+				Url:      h.Url,
+				Enable:   h.Enable,
+				UseProxy: h.UseProxy,
+				Username: h.Username,
+				Type:     h.Type,
+				CfgType:  cfgType,
+			}
+			oldWH, found := oldWebhooks[h.Name]
+			if !found {
+				var err error
+				if h.Username != "" && (h.Password == nil || *h.Password == "") {
+					err = errors.New("No password for new webhook")
+				} else if h.Username == "" && h.Password != nil && *h.Password != "" {
+					err = errors.New("No user name for new webhook")
+				}
+				if err != nil {
+					log.WithFields(log.Fields{"name": h.Name, "error": err}).Error()
+					return nil, api.RESTErrInvalidRequest, errors.New(err.Error())
+				}
+				if h.Password != nil {
+					newWebhook.Password = *h.Password
+				}
+			} else {
+				if h.Password != nil {
+					newWebhook.Password = *h.Password
+				} else {
+					newWebhook.Password = oldWH.Password
+				}
+			}
+			newWebhooks = append(newWebhooks, newWebhook)
 		}
 	}
 
@@ -908,7 +992,7 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		log.WithError(err).Warn("failed to read request body")
 	}
 
-	var rconf api.RESTSystemWebhookConfigData
+	var rconf api.RESTSystemWebhookData
 	err = json.Unmarshal(body, &rconf)
 	if err != nil || rconf.Config == nil {
 		log.WithFields(log.Fields{"error": err}).Error("Request error")
@@ -929,6 +1013,8 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 		Url:      rwh.Url,
 		Enable:   rwh.Enable,
 		UseProxy: rwh.UseProxy,
+		Username: rwh.Username,
+		Password: rwh.Password,
 		Type:     rwh.Type,
 		CfgType:  share.UserCreated,
 	}
@@ -937,6 +1023,18 @@ func handlerSystemWebhookCreate(w http.ResponseWriter, r *http.Request, ps httpr
 	}
 	if !acc.Authorize(&cwh, nil) {
 		restRespAccessDenied(w, login)
+		return
+	}
+
+	err = nil
+	if rwh.Username != "" && rwh.Password == "" {
+		err = errors.New("No password for new webhook")
+	} else if rwh.Username == "" && rwh.Password != "" {
+		err = errors.New("No user name for new webhook")
+	}
+	if err != nil {
+		log.WithFields(log.Fields{"name": rwh.Name, "error": err}).Error()
+		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 		return
 	}
 
@@ -1061,7 +1159,13 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 		restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, "Empty webhook name or URL")
 		return
 	}
-	if code, err := validateWebhook(rwh); err != nil {
+	rwhTemp := api.RESTWebhook{
+		Name:    rwh.Name,
+		Url:     rwh.Url,
+		Type:    rwh.Type,
+		CfgType: rwh.CfgType,
+	}
+	if code, err := validateWebhook(&rwhTemp); err != nil {
 		restRespErrorMessage(w, http.StatusBadRequest, code, err.Error())
 		return
 	}
@@ -1102,8 +1206,24 @@ func handlerSystemWebhookConfig(w http.ResponseWriter, r *http.Request, ps httpr
 					Url:      rwh.Url,
 					Enable:   rwh.Enable,
 					UseProxy: rwh.UseProxy,
+					Username: rwh.Username,
+					Password: cconf.Webhooks[i].Password,
 					Type:     rwh.Type,
 					CfgType:  wh.CfgType,
+				}
+				if rwh.Password != nil {
+					cconf.Webhooks[i].Password = *rwh.Password
+				}
+				err = nil
+				if cconf.Webhooks[i].Username != "" && cconf.Webhooks[i].Password == "" {
+					err = errors.New("No password for new webhook")
+				} else if cconf.Webhooks[i].Username == "" && cconf.Webhooks[i].Password != "" {
+					err = errors.New("No user name for new webhook")
+				}
+				if err != nil {
+					log.WithFields(log.Fields{"name": rwh.Name, "error": err}).Error()
+					restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
+					return
 				}
 				found = true
 				break
@@ -3356,13 +3476,19 @@ func handlerFedConfigExport(w http.ResponseWriter, r *http.Request, ps httproute
 	if cconf := cacher.GetFedSystemConfig(access.NewFedAdminAccessControl()); cconf != nil {
 		webhooks = make([]api.RESTCrdFedWebHook, 0, len(cconf.Webhooks))
 		for _, wh := range cconf.Webhooks {
-			webhooks = append(webhooks, api.RESTCrdFedWebHook{
+			webhook := api.RESTCrdFedWebHook{
 				Name:     wh.Name,
 				Url:      wh.Url,
 				Enable:   wh.Enable,
 				UseProxy: wh.UseProxy,
+				Username: wh.Username,
 				Type:     wh.Type,
-			})
+			}
+			webhook.Password, err = common.AesGcmEncrypt(wh.Password)
+			if err != nil && wh.Password != "" {
+				log.WithFields(log.Fields{"err": err, "wh": wh.Name}).Warn("failed to encrypt password")
+			}
+			webhooks = append(webhooks, webhook)
 		}
 	}
 	resp.Spec = resource.NvCrdFedConfigSpec{

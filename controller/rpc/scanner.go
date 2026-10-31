@@ -300,6 +300,9 @@ func ScanRunning(scanner string, agentID, id string, objType share.ScanObjectTyp
 		ID:               id,
 		AgentID:          agentID,
 		AgentRPCEndPoint: ep,
+		ParsingCaps: &share.ParsingCaps{
+			JarAutoModuleName: true,
+		},
 	})
 
 	clusHelper := kv.GetClusterHelper()

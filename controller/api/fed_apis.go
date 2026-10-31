@@ -81,12 +81,14 @@ type RESTFedConfigData struct { // including all clusters in the federation
 }
 
 type RESTFedPromoteReqData struct {
-	Name               string                    `json:"name,omitempty"`             // cluster name
-	PingInterval       uint32                    `json:"ping_interval"`              // in minute
-	PollInterval       uint32                    `json:"poll_interval"`              // in minute
-	MasterRestInfo     *share.CLUSRestServerInfo `json:"master_rest_info,omitempty"` // rest info about this master cluster
-	UseProxy           *string                   `json:"use_proxy,omitempty"`        // "" / https
-	DeployRepoScanData *bool                     `json:"deploy_repo_scan_data"`      // whether fed repo scan data deployment is enabled
+	Name                  string                    `json:"name,omitempty"`                      // cluster name
+	PingInterval          uint32                    `json:"ping_interval"`                       // in minute
+	PollInterval          uint32                    `json:"poll_interval"`                       // in minute
+	MasterRestInfo        *share.CLUSRestServerInfo `json:"master_rest_info,omitempty"`          // rest info about this master cluster
+	UseProxy              *string                   `json:"use_proxy,omitempty"`                 // "" / https
+	FixedJoinToken        *string                   `json:"fixed_join_token,omitempty"`          // set via configmap
+	AllowSameK8sUidRejoin *bool                     `json:"allow_same_k8s_uid_rejoin,omitempty"` // set via configmap
+	DeployRepoScanData    *bool                     `json:"deploy_repo_scan_data"`               // whether fed repo scan data deployment is enabled
 }
 
 type RESTFedPromoteRespData struct {

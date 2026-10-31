@@ -274,8 +274,6 @@ func (q *tCrdRequestsMgr) crdQueueProc() {
 		switch record.Request.Kind.Kind {
 		case resource.NvAdmCtrlSecurityRuleKind:
 			lockKey = share.CLUSLockAdmCtrlKey
-		case resource.NvConfigSecurityRuleKind:
-			lockKey = share.CLUSLockServerKey
 		default:
 			lockKey = share.CLUSLockPolicyKey
 		}
@@ -500,9 +498,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				found := false
 				switch req.Kind.Kind {
 				case resource.NvAdmCtrlSecurityRuleKind:
-					allowedNames = []string{share.ScopeFed, share.ScopeLocal}
-				case resource.NvConfigSecurityRuleKind:
-					allowedNames = []string{share.ScopeFed}
+					allowedNames = []string{share.ScopeLocal}
 				case resource.NvVulnProfileSecurityRuleKind:
 					allowedNames = []string{share.DefaultVulnerabilityProfileName}
 				case resource.NvCompProfileSecurityRuleKind:
@@ -528,25 +524,44 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 		var skip bool
 		var allowed bool
 		var resultMsg string
+		var warnings []string
 		if len(sizeErrMsg) > 0 {
 			skip = true
-			resultMsg = fmt.Sprintf(" %s denied: %s", reqOp, sizeErrMsg)
+			resultMsg = fmt.Sprintf("%s denied: %s", reqOp, sizeErrMsg)
 		} else {
-			if ar.Request.DryRun != nil && *ar.Request.DryRun {
+			allowed = true
+			if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
+				log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name}).Debug("unsupported operation")
 				skip = true
-				resultMsg = fmt.Sprintf(" %s denied in dry-run", reqOp)
 			} else {
-				allowed = true
-				if reqOp != "DELETE" && reqOp != "CREATE" && reqOp != "UPDATE" {
-					log.WithFields(log.Fields{"op": reqOp, "name": ar.Request.Name}).Debug("unsupported operation")
-					skip = true
-				} else {
-					resultMsg = fmt.Sprintf(" %s done", reqOp)
-				}
-				if skipUpdateReqByK8sGC {
-					skip = true
-				}
+				resultMsg = fmt.Sprintf("%s done", reqOp)
 			}
+			if skipUpdateReqByK8sGC {
+				skip = true
+			}
+		}
+
+		if !skip && reqOp != admissionv1beta1.Delete {
+			if isForNvFedCR(ar.Request.Kind.Kind, ar.Request.Name) {
+				resultMsg = fmt.Sprintf("%s denied: it is not supported to import federated %s policy %s through CRD",
+					reqOp, ar.Request.Kind.Kind, ar.Request.Name)
+				skip = true
+				allowed = false
+			}
+		}
+
+		if !skip && ar.Request.DryRun != nil && *ar.Request.DryRun {
+			// The webhook is registered with sideEffects=NoneOnDryRun, so a
+			// dry-run request must not be processed. It must not be denied
+			// either: a real request that passed the synchronous checks above
+			// is always allowed, with validation happening asynchronously after
+			// admission. Answer what the real request would get and stop here.
+			// kubectl shows Result.Message only on a denial, so the message
+			// also goes out as a warning; otherwise "--dry-run=server" reports
+			// nothing at all.
+			skip = true
+			resultMsg = fmt.Sprintf("%s allowed in dry-run, not processed", reqOp)
+			warnings = []string{resultMsg}
 		}
 
 		if !skip {
@@ -557,7 +572,7 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				// Return the rest call early to prevent webhookvalidating timeout
 				if !crdReqMgr.scheduleKvEnqueue(&ar) {
 					allowed = false
-					resultMsg = fmt.Sprintf(" %s denied: too many requests received", reqOp)
+					resultMsg = fmt.Sprintf("%s denied: too many requests received", reqOp)
 				} else {
 					ctx := r.Context()
 					select {
@@ -577,9 +592,10 @@ func (whsvr *WebhookServer) crdserveK8s(w http.ResponseWriter, r *http.Request, 
 				APIVersion: resource.AdmissionK8sIoV1Beta1, // [2021/09/21] currently our webhook server only support k8s.io/api/admission/v1beta1
 			},
 			Response: &admissionv1beta1.AdmissionResponse{
-				Allowed: allowed,
-				Result:  &metav1.Status{Message: resultMsg},
-				UID:     ar.Request.UID,
+				Allowed:  allowed,
+				Result:   &metav1.Status{Message: resultMsg},
+				UID:      ar.Request.UID,
+				Warnings: warnings,
 			},
 		}
 		resp, err := json.Marshal(admissionReview)

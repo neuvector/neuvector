@@ -796,6 +796,8 @@ type CLUSWebhook struct {
 	Url      string   `json:"url"`
 	Enable   bool     `json:"enable"`
 	UseProxy bool     `json:"use_proxy"`
+	Username string   `json:"username"`
+	Password string   `json:"password,cloak"`
 	Type     string   `json:"type"`
 	CfgType  TCfgType `json:"cfg_type"`
 }
@@ -1003,6 +1005,7 @@ type CLUSServerSAML struct {
 	SigningKey          string   `json:"signing_key,cloak,omitempty"`
 	SLOEnabled          bool     `json:"slo_enabled,omitempty"`
 	SLOURL              string   `json:"slo_url,omitempty"`
+	AudienceURI         string   `json:"audience_uri,omitempty"`
 }
 
 type CLUSServerOIDC struct {
@@ -2396,13 +2399,15 @@ func (restInfo CLUSRestServerInfo) IsValid() bool {
 }
 
 type CLUSFedMasterClusterInfo struct {
-	Disabled bool               `json:"disabled"`
-	Name     string             `json:"name"`
-	ID       string             `json:"id"`
-	Secret   string             `json:"secret,cloak"`   // used for encryoting/decrypting join_ticket issued by the master cluster
-	CACert   string             `json:"ca_cert,cloak"`  // base64 encoded
-	User     string             `json:"user,omitempty"` // the user who promotes this cluster to master cluster in federation
-	RestInfo CLUSRestServerInfo `json:"rest_info"`
+	Disabled              bool               `json:"disabled"`
+	Name                  string             `json:"name"`
+	ID                    string             `json:"id"`
+	Secret                string             `json:"secret,cloak"`              // used for encryoting/decrypting join_ticket issued by the master cluster
+	CACert                string             `json:"ca_cert,cloak"`             // base64 encoded
+	User                  string             `json:"user,omitempty"`            // the user who promotes this cluster to master cluster in federation
+	FixedJoinToken        string             `json:"fixed_join_token"`          // set via configmap
+	AllowSameK8sUidRejoin bool               `json:"allow_same_k8s_uid_rejoin"` // set via configmap
+	RestInfo              CLUSRestServerInfo `json:"rest_info"`
 }
 
 type CLUSFedJointClusterInfo struct {

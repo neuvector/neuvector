@@ -17,7 +17,7 @@ import (
 
 type orchConnInterface interface {
 	LeadChangeNotify(leader bool)
-	Start(ocRegImage bool, cspType share.TCspType)
+	Start(ocRegImage bool, cspType share.TCspType, watchConfigmap bool)
 	Stop()
 	Close()
 }
@@ -171,7 +171,7 @@ func (c *orchConn) cbResourceWatcher(rt string, event string, res interface{}, o
 	k8sResLog.WithFields(log.Fields{"event": event, "type": rt}).Debug("Event done")
 }
 
-func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
+func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType, watchConfigmap bool) {
 	var r string
 
 	// Make sure register resource first, otherwise it may trigger a race condition in k8s client library
@@ -200,14 +200,18 @@ func (c *orchConn) Start(ocImageRegistered bool, cspType share.TCspType) {
 	}
 
 	rscTypes := []string{resource.RscTypeCrd, resource.RscTypeService, resource.RscTypePod, resource.RscTypeRBAC,
-		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim, resource.RscTypeConfigMap}
+		resource.RscTypeValidatingWebhookConfiguration, resource.RscTypePersistentVolumeClaim}
 	for _, r := range rscTypes {
 		if err := global.ORCH.StartWatchResource(r, k8s.AllNamespaces, c.cbResourceWatcher, nil); err != nil {
 			log.WithFields(log.Fields{"type": r, "error": err}).Error("StartWatchResource")
 		}
 	}
 
-	for _, r := range []string{resource.RscTypeDeployment, resource.RscTypeSecret} {
+	rscTypes = []string{resource.RscTypeDeployment, resource.RscTypeSecret}
+	if watchConfigmap {
+		rscTypes = append(rscTypes, resource.RscTypeConfigMap)
+	}
+	for _, r := range rscTypes {
 		if err := global.ORCH.StartWatchResource(r, Ctrler.Domain, c.cbResourceWatcher, nil); err != nil {
 			log.WithFields(log.Fields{"type": r, "error": err}).Error("StartWatchResource")
 		}
