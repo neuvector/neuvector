@@ -117,7 +117,9 @@ func contains(sli []string, ele string) bool {
 //
 //	token, err := verifier.Verify(ctx, rawIDToken)
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
-	jws, err := jose.ParseSigned(rawIDToken, []jose.SignatureAlgorithm{jose.ES256, jose.PS256, jose.EdDSA, jose.HS256})
+	algorithms := []jose.SignatureAlgorithm{jose.EdDSA, jose.RS256, jose.RS384, jose.RS512,
+		jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512}
+	jws, err := jose.ParseSigned(rawIDToken, algorithms)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
