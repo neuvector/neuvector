@@ -195,7 +195,7 @@ func handlerScanRepositoryReq(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -295,9 +295,11 @@ func handlerScanRepositorySubmit(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var data api.RESTScanRepoSubmitData

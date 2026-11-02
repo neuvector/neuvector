@@ -261,7 +261,7 @@ func handlerComplianceProfileConfig(w http.ResponseWriter, r *http.Request, ps h
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -348,7 +348,7 @@ func handlerComplianceProfileEntryConfig(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -478,7 +478,7 @@ func handlerCompProfileExport(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	var rconf api.RESTCompProfilesExport
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
