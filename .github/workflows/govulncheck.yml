@@ -1,0 +1,33 @@
+name: govulncheck
+on:
+  push:
+    paths:
+      - go.sum
+      - go.mod
+  schedule:
+    - cron: "0 0 * * *"
+permissions:
+  contents: read
+jobs:
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-24.04 # libpcre3-dev is not available on ubuntu 26.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "go.mod"
+          check-latest: true # Always check for the latest patch release
+      - name: Install dependencies
+        run: |
+          sudo apt update && sudo apt install -y libpcre3-dev
+      - name: Run govulncheck
+        env:
+          GOVULNCHECK_VERSION: d1f380186385b4f64e00313f31743df8e4b89a77 # v1.1.4
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
+          govulncheck -C . -format text ./...
