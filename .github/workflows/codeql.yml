@@ -16,7 +16,10 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-24.04 # libpcre3-dev is not available on ubuntu 26.04
+<<<<<<< HEAD
 
+=======
+>>>>>>> cdc5da2 (fix: allow upgrader to work with empty annotations (#3059))
     permissions:
       actions: read
       contents: read

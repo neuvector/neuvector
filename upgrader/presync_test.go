@@ -13,6 +13,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -162,46 +163,65 @@ func TestCreateJob(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme.Scheme))
 
-	for _, tc := range []struct {
+	cases := []struct {
+		name         string
+		CronJob      string
 		TestData     string
 		ExpectedData string
-		ExpectedErr  bool
 	}{
 		{
-			// A job exists
+			name:         "existing job",
+			CronJob:      "02-create-upgrader-job/00-cronjob.yaml",
 			TestData:     "02-create-upgrader-job/01-existing-upgrade-job.yaml",
 			ExpectedData: "02-create-upgrader-job/01-expected-job.yaml",
-			ExpectedErr:  false,
 		},
 		{
-			// No existing job.
-			TestData:     "",
+			name:         "no existing job",
+			CronJob:      "02-create-upgrader-job/00-cronjob.yaml",
 			ExpectedData: "02-create-upgrader-job/02-expected-job.yaml",
-			ExpectedErr:  false,
 		},
-	} {
-		var testdata []runtime.Object
-		if tc.TestData != "" {
-			testdata = loadObjectList(t, tc.TestData)
-		}
+		{
+			name:         "cronjob without annotations and existing job",
+			CronJob:      "02-create-upgrader-job/00-cronjob-no-annotations.yaml",
+			TestData:     "02-create-upgrader-job/01-existing-upgrade-job.yaml",
+			ExpectedData: "02-create-upgrader-job/01-expected-job.yaml",
+		},
+		{
+			name:         "cronjob without annotations and no existing job",
+			CronJob:      "02-create-upgrader-job/00-cronjob-no-annotations.yaml",
+			ExpectedData: "02-create-upgrader-job/02-expected-job.yaml",
+		},
+	}
 
-		testdata = append(testdata, loadObject(t, "02-create-upgrader-job/00-cronjob.yaml"))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var testdata []runtime.Object
+			if tc.TestData != "" {
+				testdata = loadObjectList(t, tc.TestData)
+			}
 
-		client := fake.NewSimpleDynamicClient(scheme.Scheme,
-			testdata...,
-		)
-		job, err := CreatePostSyncJob(t.Context(), client, "neuvector", "uid", false)
+			testdata = append(testdata, loadObject(t, tc.CronJob))
 
-		expectedJob := loadJob(t, tc.ExpectedData)
-		job.CreationTimestamp = v1.Time{}
-		expectedJob.CreationTimestamp = v1.Time{}
-
-		if tc.ExpectedErr {
-			require.Error(t, err)
-		} else {
+			client := fake.NewSimpleDynamicClient(scheme.Scheme,
+				testdata...,
+			)
+			job, err := CreatePostSyncJob(t.Context(), client, "neuvector", "uid", false)
 			require.NoError(t, err)
+			require.NotNil(t, job)
+
+			expectedJob := loadJob(t, tc.ExpectedData)
+			job.CreationTimestamp = v1.Time{}
+			expectedJob.CreationTimestamp = v1.Time{}
 			assert.Equal(t, expectedJob, job)
-		}
+
+			cronjob, err := client.Resource(schema.GroupVersionResource{
+				Group:    "batch",
+				Version:  "v1",
+				Resource: "cronjobs",
+			}).Namespace("neuvector").Get(t.Context(), UPGRADER_CRONJOB_NAME, v1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, "uid", cronjob.GetAnnotations()[UPGRADER_UID_ANNOTATION])
+		})
 	}
 }
 
