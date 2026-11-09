@@ -15,7 +15,7 @@ permissions: {}
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # libpcre3-dev is not available on ubuntu 26.04
 
     permissions:
       actions: read
