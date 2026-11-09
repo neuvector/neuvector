@@ -8,7 +8,7 @@ permissions: {}
 jobs:
   golangci:
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # libpcre3-dev is not available on ubuntu 26.04
     permissions:
       contents: read
     steps:
