@@ -63,7 +63,7 @@ const (
 	Unix                      = 1      // <predefined>:177:1:
 
 	// #define CLOCKS_PER_SEC  ((__clock_t) 1000000)
-	CLOCKS_PER_SEC  = 1000000
+	CLOCKS_PER_SEC = 1000000
 )
 
 type Ptrdiff_t = int64 /* <builtin>:3:26 */
