@@ -48,6 +48,7 @@ message ControllerCaps {
     bool CriticalVul              = 1;
     bool ScannerSettings          = 2;
     bool SupportScannerRegisterV3 = 3;
+    ParsingCaps ParsingCaps       = 4;
 }
 
 message ScannerRegisterV3Request {

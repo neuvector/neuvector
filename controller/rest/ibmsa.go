@@ -369,10 +369,7 @@ func handlerGetIBMSAEpSetupToken(w http.ResponseWriter, r *http.Request, ps http
 		}
 	}
 	if user != nil {
-		remote := r.RemoteAddr
-		if i := strings.Index(remote, ":"); i > 0 {
-			remote = remote[:i]
-		}
+		remote := remoteHost(r.RemoteAddr)
 		if s, rc := loginUser(user, nil, nil, remote, _interactiveSessionID, "", api.FedRoleNone, nil); rc == userOK {
 			resp := api.RESTIBMSASetupToken{
 				AccessToken: s.token,
@@ -525,7 +522,7 @@ func handlerPostIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httprout
 	var err error
 
 	action := ps.ByName("action")
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -986,7 +983,7 @@ func handlerTestOccurrences(w http.ResponseWriter, r *http.Request, ps httproute
 
 	//accountID := ps.ByName("accountID")
 	//providerID := ps.ByName("providerID")
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

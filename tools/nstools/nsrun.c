@@ -31,13 +31,12 @@ static int read_script(const char *path) {
     return 0;
 }
 
-int nsrun(const char *mntns, const char **nss, const char *script, int bin, int from_stdin)
+static int enter_nss(const char **nss)
 {
     int ret, i;
 
-    if (!from_stdin && script == NULL) {
-        fprintf(stderr, "Need to provide script either from sdtin or file\n");
-        return -1;
+    if (nss == NULL) {
+        return 0;
     }
 
     for (i=0; i<NS_COUNT; i++) {
@@ -59,6 +58,46 @@ int nsrun(const char *mntns, const char **nss, const char *script, int bin, int 
             }
             close(nsfd);
         }
+    }
+
+    return 0;
+}
+
+static int enter_mnt_namespace(const char *mntns)
+{
+    int ret;
+
+    if (mntns == NULL) {
+        return 0;
+    }
+
+    int fd = open(mntns, O_RDONLY);
+    if (fd == -1) {
+        perror("Failed to open MNT namespace\n");
+        return -1;
+    }
+
+    ret = setns(fd, 0);
+    if (ret == -1) {
+        fprintf(stderr, "Failed to set MNT namespace: %s\n", strerror(errno));
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    return 0;
+}
+
+int nsrun(const char *mntns, const char **nss, const char *script, int bin, int from_stdin)
+{
+    int ret;
+
+    if (!from_stdin && script == NULL) {
+        fprintf(stderr, "Need to provide script either from sdtin or file\n");
+        return -1;
+    }
+
+    if (enter_nss(nss) != 0) {
+        return -1;
     }
 
     if (from_stdin) {
@@ -100,20 +139,8 @@ int nsrun(const char *mntns, const char **nss, const char *script, int bin, int 
         }
     }
 
-    if (mntns != NULL) {
-        int fd = open(mntns, O_RDONLY);
-        if (fd == -1) {
-            perror("Failed to open host MNT namespace\n");
-            return -1;
-        }
-
-        ret = setns(fd, 0);
-        if (ret == -1) {
-            fprintf(stderr, "Failed to set MNT namespace: %s\n", strerror(errno));
-            close(fd);
-            return -1;
-        }
-        close(fd);
+    if (enter_mnt_namespace(mntns) != 0) {
+        return -1;
     }
 
 #define ERR_SCRIPT_NOT_RUN 2
@@ -131,20 +158,8 @@ int nsrun(const char *mntns, const char **nss, const char *script, int bin, int 
 int nsexist(const char *mntns, const char *file) {
     int ret;
 
-    if (mntns != NULL) {
-        int fd = open(mntns, O_RDONLY);
-        if (fd == -1) {
-            perror("Failed to open host MNT namespace\n");
-            return -1;
-        }
-
-        ret = setns(fd, 0);
-        if (ret == -1) {
-            fprintf(stderr, "Failed to set MNT namespace: %s\n", strerror(errno));
-            close(fd);
-            return -1;
-        }
-        close(fd);
+    if (enter_mnt_namespace(mntns) != 0) {
+        return -1;
     }
 
     int n = snprintf(script_buf, sizeof(script_buf), "which %s", file);
@@ -162,4 +177,23 @@ int nsexist(const char *mntns, const char *file) {
         return -1;
     }
     return 0;
+}
+
+int nsexec(const char *mntns, const char **nss, char *const *cmd)
+{
+    if (cmd == NULL || cmd[0] == NULL || cmd[0][0] == '\0') {
+        fprintf(stderr, "Need command to exec\n");
+        return -1;
+    }
+
+    if (enter_nss(nss) != 0) {
+        return -1;
+    }
+    if (enter_mnt_namespace(mntns) != 0) {
+        return -1;
+    }
+
+    execvp(cmd[0], cmd);
+    fprintf(stderr, "Failed to exec %s: %s\n", cmd[0], strerror(errno));
+    return -1;
 }

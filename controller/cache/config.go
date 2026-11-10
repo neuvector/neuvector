@@ -364,6 +364,8 @@ func (m CacheMethod) GetSystemConfig(acc *access.AccessControl) *api.RESTSystemC
 			Type:     wh.Type,
 			Enable:   wh.Enable,
 			UseProxy: wh.UseProxy,
+			Username: wh.Username,
+			Password: wh.Password,
 			CfgType:  api.CfgTypeUserCreated,
 		}
 	}
@@ -682,7 +684,7 @@ func systemConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byt
 	for _, h := range systemConfigCache.Webhooks {
 		if h.Enable {
 			webhookCachTemp[h.Name] = &webhookCache{
-				c:        common.NewWebHook(h.Url, h.Type),
+				c:        common.NewWebHook(h.Url, h.Type, h.Username, h.Password),
 				url:      h.Url,
 				useProxy: h.UseProxy,
 			}

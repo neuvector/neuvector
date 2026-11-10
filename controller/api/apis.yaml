@@ -5,7 +5,7 @@ swagger: "2.0"
 ################################################################################
 info:
   description: Secure Docker and Kubernetes based container deployments with the NeuVector run-time security solution.
-  version: "5.6.0"
+  version: "5.7.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -3811,7 +3811,7 @@ paths:
           description: System configure data
           required: true
           schema:
-            $ref: "#/definitions/RESTSystemWebhookConfigData"
+            $ref: "#/definitions/RESTSystemWebhookData"
       responses:
         "200":
           description: Success
@@ -3907,6 +3907,26 @@ paths:
           description: Success
           schema:
             $ref: "#/definitions/RESTScoreMetricsData"
+  /v1/system/score/exposure:
+    post:
+      tags:
+        - System
+      summary: Send the exposure report to syslog
+      description: Flattens ingress and egress exposure from the system score metrics into one syslog message. Optional f_domain limits the report to one namespace.
+      security:
+        - ApiKeyAuth: []
+        - TokenAuth: []
+      produces:
+        - application/json
+      parameters:
+        - in: query
+          name: f_domain
+          type: string
+          required: false
+          description: Namespace filter. When omitted, the report includes every namespace the caller can see.
+      responses:
+        "200":
+          description: Success
   /v1/user:
     get:
       tags:
@@ -10637,6 +10657,8 @@ definitions:
       signing_cert:
         type: string
         example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
+      audience_uri:
+        type: string
   RESTServer:
     type: object
     required:
@@ -10789,6 +10811,8 @@ definitions:
       signing_key:
         type: string
         example: E7B0OS/N3KMVCL6KNMZ2+LOV90S7854NSD84P0BF
+      audience_uri:
+        type: string
   RESTServerConfig:
     type: object
     required:
@@ -11699,7 +11723,7 @@ definitions:
       webhooks:
         type: array
         items:
-          $ref: "#/definitions/RESTWebhook"
+          $ref: "#/definitions/RESTWebhookConfig"
       cluster_name:
         type: string
         example: cluster1
@@ -11760,7 +11784,7 @@ definitions:
       webhooks:
         type: array
         items:
-          $ref: "#/definitions/RESTWebhook"
+          $ref: "#/definitions/RESTWebhookConfig"
       ibmsa_cfg:
         $ref: "#/definitions/RESTSystemConfigIBMSAVCfg2"
       scanner_autoscale_cfg:
@@ -11779,7 +11803,7 @@ definitions:
       webhooks:
         type: array
         items:
-          $ref: "#/definitions/RESTWebhook"
+          $ref: "#/definitions/RESTWebhookConfig"
   RESTSystemConfigConfigData:
     type: object
     description: it leverages RESTSystemConfigConfigData in apis.go
@@ -11900,13 +11924,20 @@ definitions:
     properties:
       request:
         $ref: "#/definitions/RESTSystemRequest"
-  RESTSystemWebhookConfigData:
+  RESTSystemWebhookData:
     type: object
     required:
       - config
     properties:
       config:
         $ref: "#/definitions/RESTWebhook"
+  RESTSystemWebhookConfigData:
+    type: object
+    required:
+      - config
+    properties:
+      config:
+        $ref: "#/definitions/RESTWebhookConfig"
   RESTThreatData:
     type: object
     required:
@@ -12988,6 +13019,42 @@ definitions:
       use_proxy:
         type: boolean
         example: false
+      username:
+        type: string
+      password:
+        type: string
+      type:
+        type: string
+        enum: ["", Slack, JSON, Teams]
+      cfg_type:
+        type: string
+        enum: [user_created, ground, federal]
+  RESTWebhookConfig:
+    type: object
+    required:
+      - name
+      - url
+      - enable
+      - use_proxy
+      - type
+      - cfg_type
+    properties:
+      name:
+        type: string
+        example: slack-webhook
+      url:
+        type: string
+        example: https://neuvector.slack.com/archives/C8AU75GKE
+      enable:
+        type: boolean
+        example: true
+      use_proxy:
+        type: boolean
+        example: false
+      username:
+        type: string
+      password:
+        type: string
       type:
         type: string
         enum: ["", Slack, JSON, Teams]

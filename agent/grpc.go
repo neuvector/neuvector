@@ -115,6 +115,7 @@ func (ss *ScanService) ScanGetFiles(ctx context.Context, req *share.ScanRunningR
 		ObjType:      req.Type,
 		PidHost:      pidHost,
 		K8sAppString: k8sAppString,
+		ParsingCaps:  req.ParsingCaps,
 	}
 
 	bytesValue, _, err := walkerTask.Run(taskReq, req.ID)

@@ -75,7 +75,7 @@ func (d *base) GetServiceFromPodLabels(namespace, pod, node string, labels map[s
 }
 
 func (d *base) GetService(meta *container.ContainerMeta, node string) *Service {
-	if seviceName, ok := meta.Labels[container.NeuvectorSetServiceName]; ok {
+	if seviceName, ok := meta.Labels[container.NeuvectorSetServiceName]; ok && CustomServiceNameEnabled() {
 		return &Service{Name: seviceName}
 	}
 
