@@ -34,6 +34,7 @@ import (
 
 const (
 	defaultMaxDecompressedResponseSize = 5 * 1024 * 1024
+	defaultMaxXMLTokens                = 50000
 )
 
 func (sp *SAMLServiceProvider) validationContext() *dsig.ValidationContext {
@@ -178,7 +179,7 @@ func (sp *SAMLServiceProvider) decryptAssertions(el *etree.Element) error {
 			return fmt.Errorf("unable to decrypt encrypted assertion: %v", derr)
 		}
 
-		doc, _, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
+		doc, _, err := parseResponse(raw, sp.MaximumDecompressedBodySize, sp.MaximumXMLTokens)
 		if err != nil {
 			return fmt.Errorf("unable to create element from decrypted assertion bytes: %v", err)
 		}
@@ -298,7 +299,7 @@ func (sp *SAMLServiceProvider) ValidateEncodedResponse(encodedResponse string) (
 	}
 
 	// Parse the raw response
-	doc, unverifiedResponse, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
+	doc, unverifiedResponse, err := parseResponse(raw, sp.MaximumDecompressedBodySize, sp.MaximumXMLTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -454,6 +455,10 @@ func DecodeUnverifiedBaseResponse(encodedResponse string) (*types.UnverifiedBase
 	var response *types.UnverifiedBaseResponse
 
 	err = maybeDeflate(raw, defaultMaxDecompressedResponseSize, func(maybeXML []byte) error {
+		if bound := 3*int64(bytes.Count(maybeXML, []byte("<"))) + 1; bound > defaultMaxXMLTokens {
+			return fmt.Errorf("document contains too many XML tokens: upper bound %d exceeds maximum of %d", bound, defaultMaxXMLTokens)
+		}
+
 		response = &types.UnverifiedBaseResponse{}
 		return xml.Unmarshal(maybeXML, response)
 	})
@@ -493,11 +498,19 @@ func maybeDeflate(data []byte, maxSize int64, decoder func([]byte) error) error 
 }
 
 // parseResponse is a helper function that was refactored out so that the XML parsing behavior can be isolated and unit tested
-func parseResponse(xml []byte, maxSize int64) (*etree.Document, *etree.Element, error) {
+func parseResponse(xml []byte, maxSize int64, maxTokens int64) (*etree.Document, *etree.Element, error) {
 	var doc *etree.Document
 	var rawXML []byte
 
+	if maxTokens == 0 {
+		maxTokens = defaultMaxXMLTokens
+	}
+
 	err := maybeDeflate(xml, maxSize, func(xml []byte) error {
+		if bound := 3*int64(bytes.Count(xml, []byte("<"))) + 1; bound > maxTokens {
+			return fmt.Errorf("document contains too many XML tokens: upper bound %d exceeds maximum of %d", bound, maxTokens)
+		}
+
 		doc = etree.NewDocument()
 		rawXML = xml
 		return doc.ReadFromBytes(xml)
@@ -530,6 +543,10 @@ func DecodeUnverifiedLogoutResponse(encodedResponse string) (*types.LogoutRespon
 	var response *types.LogoutResponse
 
 	err = maybeDeflate(raw, defaultMaxDecompressedResponseSize, func(maybeXML []byte) error {
+		if bound := 3*int64(bytes.Count(maybeXML, []byte("<"))) + 1; bound > defaultMaxXMLTokens {
+			return fmt.Errorf("document contains too many XML tokens: upper bound %d exceeds maximum of %d", bound, defaultMaxXMLTokens)
+		}
+
 		response = &types.LogoutResponse{}
 		return xml.Unmarshal(maybeXML, response)
 	})
@@ -547,7 +564,7 @@ func (sp *SAMLServiceProvider) ValidateEncodedLogoutResponsePOST(encodedResponse
 	}
 
 	// Parse the raw response
-	doc, el, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
+	_, el, err := parseResponse(raw, sp.MaximumDecompressedBodySize, sp.MaximumXMLTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -556,8 +573,7 @@ func (sp *SAMLServiceProvider) ValidateEncodedLogoutResponsePOST(encodedResponse
 	if !sp.SkipSignatureValidation {
 		el, err = sp.validateElementSignature(el)
 		if err == dsig.ErrMissingSignature {
-			// Unfortunately we just blew away our Response
-			el = doc.Root()
+			return nil, fmt.Errorf("logout response is not signed")
 		} else if err != nil {
 			return nil, err
 		} else if el == nil {
