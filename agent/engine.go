@@ -1773,12 +1773,11 @@ func startNeuVectorMonitors(id, role string, info *container.ContainerMetaExtra)
 			conf.Profile.Mode = share.PolicyModeEvaluate
 		}
 		conf.Profile.Group = group
-		// Skip fanotify-based self-protection for our own container/pod. The enforcer's
-		// pathWalker would open our own perm-marked files and freeze awaiting an fsmon
-		// verdict, deadlocking fsnMux (held across the walker) and procMux against faccess.
+		// NeuVector's own pods rely on the netlink process monitor (configured
+		// above) for process self-protection rather than fanotify exec control;
+		// file-integrity protection (anchor + fsmon watch) is still applied below.
 		if info.Pid != 0 && !isAgentContainer(id) {
 			prober.HandleAnchorNvProtectChange(true, c.id, c.upperDir, role, c.pid)
-			go prober.HandleNvProtectControl(true, c.id, role, share.GroupNVProtect, c.pid)
 			go fileWatcher.StartWatch(id, c.pid, conf, true, true)
 		}
 	}
