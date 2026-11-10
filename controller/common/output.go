@@ -108,7 +108,7 @@ func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
 		if len(data) > 2 {
 			logText := fmt.Sprintf("{\"%s\": \"%s\", %s", notificationHeader, header, string(data[1:][:]))
 			if s.stdin {
-				fmt.Println(logText)
+				log.Info(logText)
 			}
 			if s.syslog {
 				err = s.sendWithTimeout(logText, prio, syslogTimeout)
@@ -118,7 +118,7 @@ func (s *Syslogger) Send(elog interface{}, level, cat, header string) error {
 		if logText := struct2Text(elog); logText != "" {
 			logText = fmt.Sprintf("%s=%s,%s", notificationHeader, header, logText)
 			if s.stdin {
-				fmt.Println(logText)
+				log.Info(logText)
 			}
 			if s.syslog {
 				err = s.sendWithTimeout(logText, prio, syslogTimeout)

@@ -29,6 +29,10 @@ func (m *MockCache) GetRiskScoreMetrics(acc, accCaller *access.AccessControl) *a
 	return nil
 }
 
+func (m *MockCache) SendExposureReport(acc, accCaller *access.AccessControl, domain string) error {
+	return nil
+}
+
 func (m *MockCache) GetAllHosts(acc *access.AccessControl) []*api.RESTHost {
 	return nil
 }

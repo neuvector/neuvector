@@ -28,7 +28,7 @@ import (
 const procRootMountPoint = "/proc/%d/root"
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: pathWalker [OPTIONS]\n")
+	log.Error("usage: pathWalker [OPTIONS]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -116,7 +116,7 @@ func main() {
 	}
 
 	if !pass {
-		fmt.Fprintf(os.Stderr, "---")
+		log.Error("---")
 		usage() // exited as 2
 	}
 

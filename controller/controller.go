@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -908,6 +909,12 @@ func main() {
 		kv.ValidateWebhookCert()
 	}
 
+	watchConfigmap := true
+	if s := os.Getenv("DISABLE_CONFIGMAP_WATCH"); s != "" {
+		cache.GetCustomSecretRules()
+		watchConfigmap = false
+	}
+
 	var nvAppFullVersion string  // in the format  {major}.{minor}.{patch}[-s{#}]
 	var nvSemanticVersion string // in the format v{major}.{minor}.{patch}
 	{
@@ -971,6 +978,17 @@ func main() {
 	}
 	if *teleNeuvectorEP == "" {
 		*telemetryFreq = 0
+	}
+
+	maxRestReqBodySize := int64(16 * 1024 * 1024) // 16MB
+	if str := os.Getenv("MAX_REQUEST_BODY_SIZE"); str != "" {
+		num, err := strconv.Atoi(str)
+		if err != nil {
+			log.WithError(err).Error("error parsing MAX_REQUEST_BODY_SIZE string")
+		} else {
+			maxRestReqBodySize = int64(num)
+			log.WithFields(log.Fields{"maxRestReqBodySize": maxRestReqBodySize}).Info()
+		}
 	}
 
 	// Initialize cache
@@ -1059,6 +1077,7 @@ func main() {
 		TeleSkipTlsVerification: *insecureSkipTeleTLSVerification,
 		SearchRegistries:        *searchRegistries,
 		TeleFreq:                *telemetryFreq,
+		MaxRestReqBodySize:      maxRestReqBodySize,
 		NvAppFullVersion:        nvAppFullVersion,
 		NvSemanticVersion:       nvSemanticVersion,
 		CspType:                 cspType,
@@ -1071,7 +1090,7 @@ func main() {
 
 	// Orch connector should be started after cacher so the listeners are ready
 	orchConnector = newOrchConnector(orchObjChan, orchScanChan, Ctrler.Leader)
-	orchConnector.Start(ocImageRegistered, cspType)
+	orchConnector.Start(ocImageRegistered, cspType, watchConfigmap)
 
 	if platform == share.PlatformKubernetes {
 		nvcrd.Init(Ctrler.Leader, crossCheckCRD, cspType)

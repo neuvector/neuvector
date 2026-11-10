@@ -59,15 +59,21 @@ type inodeEntry struct {
 var sessionID uint32 = 0
 
 func (p *Probe) printSocket(k *socket) {
-	fmt.Printf("inode=%d %d src=%s:%d dst=%s:%d state=%s\n",
-		k.inode, k.protocol, k.src, k.srcPort, k.dst, k.dstPort,
-		netlink.TcpStatesMap[k.state])
+	log.WithFields(log.Fields{
+		"inode": k.inode, "protocol": k.protocol,
+		"src": k.src, "srcPort": k.srcPort, "dst": k.dst, "dstPort": k.dstPort,
+		"state": netlink.TcpStatesMap[k.state],
+	}).Debug("socket")
 }
 
 func (p *Probe) printSession(s *session) {
-	fmt.Printf("%d %s:%d -> %s:%d %s -> %s\n",
-		s.protocol, s.client, s.clientPort, s.server, s.serverPort,
-		container.ShortContainerId(s.clientID), container.ShortContainerId(s.serverID))
+	log.WithFields(log.Fields{
+		"protocol": s.protocol,
+		"client":   fmt.Sprintf("%s:%d", s.client, s.clientPort),
+		"server":   fmt.Sprintf("%s:%d", s.server, s.serverPort),
+		"clientID": container.ShortContainerId(s.clientID),
+		"serverID": container.ShortContainerId(s.serverID),
+	}).Debug("session")
 }
 
 /*
