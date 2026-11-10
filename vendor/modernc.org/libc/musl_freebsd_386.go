@@ -5133,7 +5133,7 @@ __3:
 	//TODO else UNLOCK(b->lock);
 }
 
-type time_t = int64 /* alltypes.h:108:16 */
+type time_t = int32 /* alltypes.h:108:16 */
 
 type clockid_t = int32 /* alltypes.h:237:13 */
 
