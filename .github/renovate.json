@@ -38,6 +38,17 @@
       "automerge": true
     }
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/govulncheck\\.yml$/"],
+      "matchStrings": [
+        "GOVULNCHECK_VERSION: (?<currentDigest>[a-f0-9]+) # (?<currentValue>v[^\\s]+)"
+      ],
+      "depNameTemplate": "golang/vuln",
+      "datasourceTemplate": "github-tags"
+    }
+  ],
   "vulnerabilityAlerts": {
     "enabled": true
   },
