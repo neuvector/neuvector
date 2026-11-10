@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -1349,6 +1350,7 @@ type Context struct {
 	TeleNeuvectorURL        string
 	TeleSkipTlsVerification bool // default value is false, meaning it is secure by default
 	TeleFreq                uint
+	MaxRestReqBodySize      int64
 	NvAppFullVersion        string
 	NvSemanticVersion       string
 	CspType                 share.TCspType
@@ -2388,6 +2390,17 @@ func getRequestApiVersion(r *http.Request) ApiVersion {
 		return ApiVersion2
 	}
 	return ApiVersion1
+}
+
+func getDefaultReader(r io.Reader) io.Reader {
+	return io.LimitReader(r, MAX_REQUEST_BODY_SIZE)
+}
+
+func getLargeBufferReader(r io.Reader) io.Reader {
+	if cctx.MaxRestReqBodySize > 0 {
+		return io.LimitReader(r, cctx.MaxRestReqBodySize)
+	}
+	return r
 }
 
 func IsCertNearExpired(certPath string, expireThresholdDay int) (bool, error) {
