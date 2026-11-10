@@ -422,7 +422,7 @@ func (h *nvCrdHandler) crdHandleGroupsAdd(groups []v1.GroupConfig, targetGroup s
 				if cg.BaselineProfile == "" {
 					cg.BaselineProfile = cacher.GetNewServiceProfileBaseline()
 				}
-				fmt.Printf("New learned svc  %s set service as %s, %s\n", group.Name, cg.PolicyMode, cg.BaselineProfile)
+				log.WithFields(log.Fields{"group": group.Name, "policyMode": cg.PolicyMode, "baseline": cg.BaselineProfile}).Info("New learned svc set service")
 			}
 
 			cg.Criteria = make([]share.CLUSCriteriaEntry, 0, len(group.Criteria))
@@ -1813,18 +1813,24 @@ func (h *nvCrdHandler) crdHandleResponseRule(cfgType share.TCfgType, crdResponse
 // caller must own CLUSLockServerKey lock
 func (h *nvCrdHandler) crdHandleFedConfig(cfgType share.TCfgType, fedConfig *api.RESTCrdFedConfig,
 	cacheRecord *share.CLUSCrdSecurityRule, reviewType share.TReviewType) error {
-	var rcWebhooks []*api.RESTWebhook
+	var rcWebhooks []*api.RESTWebhookConfig
 	if len(fedConfig.Webhooks) > 0 {
-		rcWebhooks = make([]*api.RESTWebhook, 0, len(fedConfig.Webhooks))
-		for _, wh := range fedConfig.Webhooks {
-			fwh := &api.RESTWebhook{
+		rcWebhooks = make([]*api.RESTWebhookConfig, 0, len(fedConfig.Webhooks))
+		for i, wh := range fedConfig.Webhooks {
+			fwh := &api.RESTWebhookConfig{
 				Name:     wh.Name,
 				Url:      wh.Url,
 				Enable:   wh.Enable,
 				UseProxy: wh.UseProxy,
+				Username: wh.Username,
 				Type:     wh.Type,
 				CfgType:  common.TCfgTypeToApi(cfgType),
 			}
+			password, err := common.AesGcmDecrypt(fedConfig.Webhooks[i].Password)
+			if err != nil && fedConfig.Webhooks[i].Password != "" {
+				log.WithFields(log.Fields{"wh": wh.Name}).Warn("failed to decrypt password")
+			}
+			fwh.Password = &password
 			rcWebhooks = append(rcWebhooks, fwh)
 		}
 	}
@@ -4212,7 +4218,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

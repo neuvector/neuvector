@@ -7,11 +7,6 @@
 
 #include "nstools.h"
 
-int nsget(const char *mntns, const char *filepath, int bin, int start, int len);
-int nsrun(const char *mntns, const char **nss, const char *script, int bin, int from_stdin);
-int nsexist(const char *mntns, const char *file);
-
-
 static void help(const char *prog)
 {
     printf("%s: {action} \n", prog);
@@ -138,6 +133,14 @@ int main(int argc, char *argv[]) {
         ret = nsrun(mntns, nss, filepath, bin, from_stdin);
     } else if (strcmp(act, "get") == 0) {
         ret = nsget(mntns, filepath, bin, start, len);
+    } else if (strcmp(act, "exec") == 0) {
+        // getopt() is invoked on argv+1, so leftover argv starts at optind+1.
+        if (optind + 1 >= argc || argv[optind + 1] == NULL || argv[optind + 1][0] == '\0') {
+            fprintf(stderr, "Need command to exec\n");
+            ret = -1;
+        } else {
+            ret = nsexec(mntns, nss, &argv[optind + 1]);
+        }
     }
 
     return ret;

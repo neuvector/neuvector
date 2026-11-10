@@ -6,14 +6,13 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
-
-	"errors"
 
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -114,8 +113,9 @@ func server2REST(cs *share.CLUSServer) *api.RESTServer {
 			AuthnSigningEnabled: cs.SAML.AuthnSigningEnabled,
 			SigningCert:         cs.SAML.SigningCert,
 			//SigningKey:          cs.SAML.SigningKey,
-			SLOEnabled: cs.SAML.SLOEnabled,
-			SLOURL:     cs.SAML.SLOURL,
+			SLOEnabled:  cs.SAML.SLOEnabled,
+			SLOURL:      cs.SAML.SLOURL,
+			AudienceURI: cs.SAML.AudienceURI,
 		}
 		rs.SAML.X509Certs = parseX509CertInfo(cs.SAML)
 
@@ -389,7 +389,7 @@ func handlerTokenAuthServerRequest(w http.ResponseWriter, r *http.Request, ps ht
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -476,7 +476,7 @@ func handlerGenerateSLORequest(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	remoteAuth := auth.NewRemoteAuther(nil)
+	remoteAuth := auth.NewRemoteAuther(nil, common.AesGcmEncrypt, common.AesGcmDecrypt)
 	if url, err = remoteAuth.SAMLSPGetLogoutURL(cs.SAML, &data, login.nameid, login.sessionIndex, nil); err != nil {
 		log.WithError(err).Warn("failed to generate saml logout url")
 		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
@@ -851,6 +851,10 @@ func updateSAMLServer(cs *share.CLUSServer, saml *api.RESTServerSAMLConfig, acc 
 		csaml.SLOURL = *saml.SLOURL
 	}
 
+	if saml.AudienceURI != nil {
+		csaml.AudienceURI = *saml.AudienceURI
+	}
+
 	var err error
 	var groupRoleMappings []*share.GroupRoleMapping
 	if saml.GroupMappedRoles != nil {
@@ -1028,7 +1032,7 @@ func handlerServerCreate(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1322,7 +1326,7 @@ func handlerServerConfig(w http.ResponseWriter, r *http.Request, ps httprouter.P
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1443,7 +1447,7 @@ func handlerServerRoleGroupsConfig(w http.ResponseWriter, r *http.Request, ps ht
 	role := ps.ByName("role")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1591,7 +1595,7 @@ func handlerServerGroupRoleDomainsConfig(w http.ResponseWriter, r *http.Request,
 	group := ps.ByName("group")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1799,7 +1803,7 @@ func handlerServerGroupsOrderConfig(w http.ResponseWriter, r *http.Request, ps h
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1964,7 +1968,7 @@ func handlerServerTest(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

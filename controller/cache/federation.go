@@ -321,14 +321,15 @@ func fedConfigUpdate(nType cluster.ClusterNotifyType, key string, value []byte) 
 			}
 		case share.CFGEndpointSystem:
 			var cfg share.CLUSSystemConfig
-			if err := json.Unmarshal(value, &cfg); err != nil {
+			var dec common.DecryptUnmarshaller
+			if err := dec.Unmarshal(value, &cfg); err != nil {
 				log.WithError(err).Warn("failed to unmarshal fed system config")
 			}
 			fedWebhookCacheTemp := make(map[string]*webhookCache, 0)
 			for _, h := range cfg.Webhooks {
 				if h.Enable {
 					fedWebhookCacheTemp[h.Name] = &webhookCache{
-						c:        common.NewWebHook(h.Url, h.Type),
+						c:        common.NewWebHook(h.Url, h.Type, h.Username, h.Password),
 						url:      h.Url,
 						useProxy: h.UseProxy,
 					}

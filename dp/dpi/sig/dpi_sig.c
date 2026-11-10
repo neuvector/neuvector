@@ -74,12 +74,12 @@ dpi_dlp_parse_opts_routine (dpi_dlp_parser_t *parser, char **opts, int count,
     conf = sig->conf;
 
     if (DlpRuleCount == MAX_USER_SIG_COUNT) {
-        DEBUG_ERROR(DBG_ERROR, "too many dlp rule (%d) created, max allowed is (%d) ", DlpRuleCount, MAX_USER_SIG_COUNT);
+        DEBUG_ERROR(DBG_ERROR, "too many dlp rule (%d) created, max allowed is (%d)\n", DlpRuleCount, MAX_USER_SIG_COUNT);
         return DPI_SIGOPT_TOO_MANY_DLP_RULE;
     }
     //conf->text null terminated
     if (strlen(conf->text) >= MAX_USER_SIG_LEN) {
-        DEBUG_ERROR(DBG_ERROR, "dlp rule len(%d) too long, max allowed is (%d) ", strlen(conf->text), MAX_USER_SIG_LEN);
+        DEBUG_ERROR(DBG_ERROR, "dlp rule len(%d) too long, max allowed is (%d)\n", strlen(conf->text), MAX_USER_SIG_LEN);
         return DPI_SIGOPT_VALUE_TOO_LONG;
     }
 
@@ -410,7 +410,7 @@ static dpi_detector_t *dpi_dlp_detector_init(int apply_dir)
     dpi_detector_t *detector;
     detector = calloc(sizeof(dpi_detector_t), 1);
     if (!detector) {
-        DEBUG_ERROR(DBG_DETECT, "Out of memory!");
+        DEBUG_ERROR(DBG_DETECT, "Out of memory!\n");
         return NULL;
 
     }

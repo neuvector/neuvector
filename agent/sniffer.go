@@ -394,22 +394,17 @@ func startSnifferProc(key string, proc *procInfo, pid int) (string, error) {
 		return "", err
 	}
 
-	var script string
+	nstoolArgs := []string{system.NSActExec, "-n", global.SYS.GetNetNamespacePath(pid), "--"}
 	if proc.duration > 0 {
-		script = fmt.Sprintf("timeout %d ", proc.duration)
+		nstoolArgs = append(nstoolArgs, "timeout", fmt.Sprintf("%d", proc.duration))
 	}
-	script += "tcpdump " + strings.Join(proc.args, " ")
-	log.WithFields(log.Fields{"key": key, "cmd": script}).Debug()
+	nstoolArgs = append(nstoolArgs, "tcpdump")
+	nstoolArgs = append(nstoolArgs, proc.args...)
+	log.WithFields(log.Fields{"key": key, "cmd": nstoolArgs}).Debug()
 
-	proc.cmd = exec.Command(system.ExecNSTool, system.NSActRun, "-i", "-n", global.SYS.GetNetNamespacePath(pid))
+	proc.cmd = exec.Command(system.ExecNSTool, nstoolArgs...)
 	proc.cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	proc.cmd.Stderr = &proc.errb
-	stdin, err := proc.cmd.StdinPipe()
-	if err != nil {
-		e := fmt.Errorf("Open nsrun stdin error")
-		log.WithFields(log.Fields{"error": err}).Error(e)
-		return "", e
-	}
 
 	err = proc.cmd.Start()
 	if err != nil {
@@ -419,11 +414,7 @@ func startSnifferProc(key string, proc *procInfo, pid int) (string, error) {
 	}
 
 	pgid := proc.cmd.Process.Pid
-	global.SYS.AddToolProcess(pgid, pid, "sniffer", script)
-	if _, dbgError := io.WriteString(stdin, script); dbgError != nil {
-		log.WithFields(log.Fields{"dbgError": dbgError}).Debug()
-	}
-	stdin.Close()
+	global.SYS.AddToolProcess(pgid, pid, "sniffer", proc.fileName)
 
 	time.Sleep(time.Millisecond * 300)
 	var status string
@@ -510,22 +501,15 @@ func stopSniffer(id string) error {
 }
 
 func parseArgs(info *share.CLUSSnifferRequest, keyname string) (string, []string) {
-	var cmdStr []string
-	var filename, filenumber, filesize string
-	var filter []string
+	filename := defaultPcapDir + keyname + "_"
+	filenumber := fmt.Sprintf("%d", info.FileNumber)
+	filesize := fmt.Sprintf("%d", info.FileSizeInMB)
 
-	filename = defaultPcapDir + keyname + "_"
-	filenumber = fmt.Sprintf("%d", info.FileNumber)
-	filesize = fmt.Sprintf("%d", info.FileSizeInMB)
-
+	cmdStr := []string{"-i", "any", "-Z", "root", "-U", "-C", filesize, "-w", filename, "-W", filenumber}
 	if info.Filter != "" {
-		filter = strings.Split(info.Filter, " ")
-	}
-
-	tcpdumpCmd := []string{"-i", "any", "-Z", "root", "-U", "-C"}
-	cmdStr = append(tcpdumpCmd, filesize, "-w", filename, "-W", filenumber)
-	if filter != nil {
-		cmdStr = append(cmdStr, filter...)
+		// Pass the BPF expression as a single argument after "--" so tcpdump
+		// cannot interpret it as extra options.
+		cmdStr = append(cmdStr, "--", info.Filter)
 	}
 	return filename, cmdStr
 }

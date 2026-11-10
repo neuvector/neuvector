@@ -42,6 +42,7 @@ const (
 	NSActGet   string = "get"
 	NSActRun   string = "run"
 	NSActExist string = "exist"
+	NSActExec  string = "exec"
 )
 
 const nanoSecondsPerSecond = 1e9

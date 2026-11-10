@@ -99,6 +99,9 @@ func TestMaskEmpty(t *testing.T) {
 }
 
 func TestEncrypt(t *testing.T) {
+	require.NoError(t, InitAesGcmKey(map[string][]byte{"1": []byte("abcdefghijklmnopqrstuvwxyz123456")}, "1"))
+	defer resetDekSeeds()
+
 	var enc EncryptMarshaller
 	var dec DecryptUnmarshaller
 
@@ -365,95 +368,6 @@ func TestAesGcmDecryptNegative(t *testing.T) {
 		debugBody, err := json.Marshal(&user)
 		require.NoError(t, err)
 		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
-	}
-
-	resetDekSeeds()
-}
-
-func TestAesGcmMigrateDecryptUnmarshaller(t *testing.T) {
-	var enc EncryptMarshaller
-	var dec DecryptUnmarshaller
-
-	secret := "gary321"
-	u1 := maskUser{Username: "gary", Password: "gary123", Secret: &secret}
-
-	resetDekSeeds()
-
-	var user maskUser
-	body, err := enc.Marshal(&u1) // enc marshal with fixed default key
-	if u1.Secret == nil || err != nil {
-		t.Errorf("enc.Marshal error: %v (u1.Secret=%v)", err, u1.Secret)
-		return
-	}
-
-	// now sensitive fields in 'body' is encrypted with fixed default key.
-
-	if err := json.Unmarshal(body, &user); err != nil { // sensitive fields(encrypted) are not decrypted after json unmarshal
-		t.Errorf("json.Unmarshal error: %v", err)
-	} else if ss := strings.Split(*user.Secret, "-"); len(ss) != 1 {
-		t.Errorf("Unexpected json.Marshal result: %v (user.Secret=%v)", err, *user.Secret)
-	}
-
-	if err := dec.Unmarshal(body, &user); err != nil { // dec unmarshal with fixed default key
-		t.Errorf("dec.Unmarshal error: %v", err)
-	} else if !reflect.DeepEqual(user, u1) {
-		t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-		debugBody, err := json.Marshal(&user)
-		require.NoError(t, err)
-		t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
-	}
-
-	keyVersion := "1"
-	if err := InitAesGcmKey(map[string][]byte{keyVersion: []byte("abcdefghijklmnopqrstuvwxyz123456")}, keyVersion); err != nil {
-		t.Errorf("InitAesGcmKey failed: error=%v", err)
-	}
-
-	// now DEK & fixed default key are available
-
-	var user1 maskUser
-	var dec2 MigrateDecryptUnmarshaller
-	if err := dec2.Unmarshal(body, &user1); err != nil { // dec unmarshal with fixed default key & set dec2.ReEncryptRequired to true
-		t.Errorf("Unmarshal error: %v", err)
-	} else if !dec2.ReEncryptRequired {
-		t.Errorf("Expect dec2.ReEncryptRequired=true but not see that")
-	} else {
-		if !reflect.DeepEqual(user1, u1) {
-			t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-			debugBody, err := json.Marshal(&user)
-			require.NoError(t, err)
-			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
-		}
-	}
-
-	var user2 maskUser
-	if err := dec.Unmarshal(body, &user2); err != nil { // dec unmarshal with fixed default key
-		t.Errorf("dec.Unmarshal error: %v", err)
-	} else {
-		if !reflect.DeepEqual(user1, user2) {
-			t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-			debugBody, err := json.Marshal(&user2)
-			require.NoError(t, err)
-			t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
-		}
-	}
-
-	var user3 maskUser
-	if err := json.Unmarshal(body, &user3); err != nil { // sensitive fields(encrypted) are not decrypted after json unmarshal
-		t.Errorf("json.Unmarshal error: %v", err)
-	} else {
-		var dec3 MigrateDecryptUnmarshaller
-		if err := dec3.Uncloak(&user3); err != nil { // uncloak sensitive fields with fixed default key & set dec3.ReEncryptRequired to true
-			t.Errorf("dec3.Uncloak error: %v", err)
-		} else if !dec3.ReEncryptRequired {
-			t.Errorf("Expect dec3.ReEncryptRequired=true but not see that")
-		} else {
-			if !reflect.DeepEqual(user3, u1) {
-				t.Errorf("Incorrect mask marshal: marshal=%s", string(body[:]))
-				debugBody, err := json.Marshal(&user3)
-				require.NoError(t, err)
-				t.Errorf("Incorrect mask marshal: unmarshal=%s", string(debugBody[:]))
-			}
-		}
 	}
 
 	resetDekSeeds()

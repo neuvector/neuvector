@@ -595,7 +595,7 @@ func handlerGroupCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -722,7 +722,7 @@ func handlerGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1036,7 +1036,7 @@ func handlerServiceCreate(w http.ResponseWriter, r *http.Request, ps httprouter.
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1130,7 +1130,7 @@ func handlerServiceBatchConfig(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1597,9 +1597,11 @@ func handlerServiceBatchConfigNetwork(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var rconf api.RESTServiceBatchConfigData
@@ -1698,9 +1700,11 @@ func handlerServiceBatchConfigProfile(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var rconf api.RESTServiceBatchConfigData
@@ -1815,6 +1819,11 @@ func handlerGroupCfgImport(w http.ResponseWriter, r *http.Request, ps httprouter
 
 	acc, login := getAccessControl(w, r, "")
 	if acc == nil {
+		return
+	}
+
+	if !acc.HasRequiredPermissions() {
+		restRespAccessDenied(w, login)
 		return
 	}
 
@@ -2284,7 +2293,7 @@ func importGroup(scope, targetGroup string, groups []v1.GroupConfig) (utils.Set,
 			}
 			if utils.DoesGroupHavePolicyMode(group.Name) {
 				cg.PolicyMode, cg.ProfileMode = cacher.GetNewServicePolicyMode()
-				fmt.Println("New learned svc ", group.Name, "set service as ", cg.PolicyMode)
+				log.WithFields(log.Fields{"group": group.Name, "policyMode": cg.PolicyMode}).Info("New learned svc set service")
 			}
 			cg.CfgType = share.UserCreated
 			if utils.IsGroupLearned(group.Name) {

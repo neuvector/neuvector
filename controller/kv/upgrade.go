@@ -922,7 +922,11 @@ var phases []kvVersions = []kvVersions{
 
 	{"G7B5S135", dummyFunc},
 
-	{"94444768", nil},
+	{"94444768", dummyFunc},
+
+	{"BB38FD65", dummyFunc},
+
+	{"05177208", nil},
 }
 
 func latestKVVersion() string {
@@ -1172,7 +1176,8 @@ func GetFedKvVer() string { // NV clusters with the same "fed kv version" means 
 	//return "28ea479c" // for 5.1 ~ 5.4.2
 	//return "G7B5S135" // for 5.4.3 ~ 5.4.4
 	//return "94444768" // for 5.4.5 ~ 5.5.x
-	return "BB38FD65" // for 5.6.0 ~
+	//return "BB38FD65" // for 5.6.0 ~ 5.6.2
+	return "05177208" // for 5.6.3 ~
 }
 
 func GetRestVer() string { // NV clusters with the same "rest version" means master cluster can switch UI view to them
@@ -1182,7 +1187,8 @@ func GetRestVer() string { // NV clusters with the same "rest version" means mas
 	// return "D6AD17D4" // for 5.4 ~ 5.4.2
 	// return "G7B5S135" // for 5.4.3 ~ 5.4.5
 	// return "94444768" // for 5.4.6 ~ 5.5.x
-	return "BB38FD65" // for 5.6.0 ~
+	//return "BB38FD65" // for 5.6.0 ~ 5.6.2
+	return "05177208" // for 5.6.3 ~
 }
 
 func genFileAccessRule() {
