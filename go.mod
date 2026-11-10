@@ -46,7 +46,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/quay/clair/v2 v2.1.8
-	github.com/russellhaering/gosaml2 v0.11.0
+	github.com/russellhaering/gosaml2 v0.12.0
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/s3rj1k/go-fanotify/fanotify v0.0.0-20240229202106-bca3154da60a
 	github.com/sirupsen/logrus v1.9.4

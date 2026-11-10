@@ -90,6 +90,12 @@ type SAMLServiceProvider struct {
 	// this size during decompression an error will be returned.
 	MaximumDecompressedBodySize int64
 
+	// MaximumXMLTokens bounds the number of XML tokens allowed in a decoded
+	// document. If 0, a default of 50000 is used. IdPs that emit very large
+	// attribute lists (e.g. group memberships with thousands of values) may
+	// need to raise this.
+	MaximumXMLTokens int64
+
 	signingContextMu sync.RWMutex
 	signingContext   *dsig.SigningContext
 }
@@ -378,6 +384,7 @@ type WarningInfo struct {
 
 type AssertionInfo struct {
 	NameID                     string
+	NameIDFormat               string
 	Values                     Values
 	WarningInfo                *WarningInfo
 	SessionIndex               string
