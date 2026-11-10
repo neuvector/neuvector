@@ -17,6 +17,7 @@
   "ignorePaths": [
     "vendor/**/Dockerfile",
     "vendor/**/requirements.txt",
+    "vendor/**/mkdocs-requirements.txt",
     "agent/nvbench/docker-bench-security/distros/**"
   ],
   "packageRules": [
