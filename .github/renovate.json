@@ -44,10 +44,12 @@
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/govulncheck\\.yml$/"],
       "matchStrings": [
-        "GOVULNCHECK_VERSION: (?<currentDigest>[a-f0-9]+) # (?<currentValue>v[^\\s]+)"
+        "GOVULNCHECK_VERSION: (?<currentDigest>[a-f0-9]{40}) # (?<currentValue>v[^\\s]+)"
       ],
       "depNameTemplate": "golang/vuln",
-      "datasourceTemplate": "github-tags"
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "github-actions",
+      "autoReplaceStringTemplate": "GOVULNCHECK_VERSION: {{{newDigest}}} # {{{newValue}}}"
     }
   ],
   "vulnerabilityAlerts": {
