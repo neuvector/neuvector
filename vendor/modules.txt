@@ -107,9 +107,9 @@ github.com/beevik/etree
 # github.com/blang/semver/v4 v4.0.0
 ## explicit; go 1.14
 github.com/blang/semver/v4
-# github.com/cenkalti/backoff/v5 v5.0.3
+# github.com/cenkalti/backoff/v7 v7.0.3
 ## explicit; go 1.23
-github.com/cenkalti/backoff/v5
+github.com/cenkalti/backoff/v7
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -330,7 +330,7 @@ github.com/go-asn1-ber/asn1-ber
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
 github.com/go-errors/errors
-# github.com/go-jose/go-jose/v4 v4.1.6
+# github.com/go-jose/go-jose/v4 v4.1.8
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
