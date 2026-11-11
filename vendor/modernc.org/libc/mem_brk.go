@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build libc.membrk && !libc.memgrind
-// +build libc.membrk,!libc.memgrind
+//go:build libc.membrk && !libc.memgrind && !(linux && (amd64 || arm64 || loong64 || ppc64le || s390x || riscv64 || 386 || arm))
 
 // This is a debug-only version of the memory handling functions. When a
 // program is built with -tags=libc.membrk a simple but safe version of malloc
@@ -13,6 +12,8 @@
 package libc // import "modernc.org/libc"
 
 import (
+	"math"
+	"math/bits"
 	"unsafe"
 
 	"modernc.org/libc/errno"
@@ -36,7 +37,9 @@ func Xmalloc(t *TLS, n types.Size_t) uintptr {
 		trc("t=%v n=%v, (%v:)", t, n, origin(2))
 	}
 	if n == 0 {
-		return 0
+		// malloc(0) should return unique pointers
+		// (often expected and gnulib replaces malloc if malloc(0) returns 0)
+		n = 1
 	}
 
 	allocMu.Lock()
@@ -58,9 +61,14 @@ func Xmalloc(t *TLS, n types.Size_t) uintptr {
 // void *calloc(size_t nmemb, size_t size);
 func Xcalloc(t *TLS, n, size types.Size_t) uintptr {
 	if __ccgo_strace {
-		trc("t=%v size=%v, (%v:)", t, size, origin(2))
+		trc("t=%v n=%v size=%v, (%v:)", t, n, size, origin(2))
 	}
-	return Xmalloc(t, n*size)
+	hi, rq := bits.Mul(uint(n), uint(size))
+	if hi != 0 || rq > math.MaxInt {
+		t.setErrno(errno.ENOMEM)
+		return 0
+	}
+	return Xmalloc(t, types.Size_t(rq))
 }
 
 // void *realloc(void *ptr, size_t size);
@@ -91,7 +99,21 @@ func Xfree(t *TLS, p uintptr) {
 }
 
 func UsableSize(p uintptr) types.Size_t {
+	if p == 0 {
+		return 0
+	}
 	return types.Size_t(*(*uintptr)(unsafe.Pointer(p - uintptrSize)))
+}
+
+type MemAllocatorStat struct {
+	Allocs int
+	Bytes  int
+	Mmaps  int
+}
+
+// MemStat no-op for this build tag
+func MemStat() MemAllocatorStat {
+	return MemAllocatorStat{}
 }
 
 // MemAuditStart locks the memory allocator, initializes and enables memory
