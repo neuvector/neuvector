@@ -1,6 +1,6 @@
 module github.com/neuvector/neuvector/controller/k8sapi
 
-go 1.26.4
+go 1.27.0
 
 require k8s.io/apimachinery v0.34.1
 
