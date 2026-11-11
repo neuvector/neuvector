@@ -119,7 +119,9 @@ func contains(sli []string, ele string) bool {
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
 	algorithms := []jose.SignatureAlgorithm{jose.EdDSA, jose.RS256, jose.RS384, jose.RS512,
 		jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512}
-	jws, err := jose.ParseSigned(rawIDToken, algorithms)
+	// ID tokens are JWTs, which use JWS Compact Serialization. Use ParseSignedCompact
+	// explicitly (ParseSigned is deprecated as of go-jose v4.1.7).
+	jws, err := jose.ParseSignedCompact(rawIDToken, algorithms)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
