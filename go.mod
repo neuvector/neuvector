@@ -24,7 +24,7 @@ require (
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
 	github.com/go-jose/go-jose/v4 v4.1.8
-	github.com/go-ldap/ldap/v3 v3.4.14
+	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
