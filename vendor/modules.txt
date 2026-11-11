@@ -335,8 +335,8 @@ github.com/go-errors/errors
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
 github.com/go-jose/go-jose/v4/json
-# github.com/go-ldap/ldap/v3 v3.4.14
-## explicit; go 1.25.0
+# github.com/go-ldap/ldap/v3 v3.4.15
+## explicit; go 1.26.0
 github.com/go-ldap/ldap/v3
 # github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
@@ -552,7 +552,7 @@ github.com/ncruces/go-strftime
 ## explicit; go 1.20
 github.com/neuvector/k8s
 # github.com/neuvector/neuvector/controller/k8sapi v0.0.0-00010101000000-000000000000 => ./controller/k8sapi
-## explicit; go 1.26.4
+## explicit; go 1.27.0
 github.com/neuvector/neuvector/controller/k8sapi/v1
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
