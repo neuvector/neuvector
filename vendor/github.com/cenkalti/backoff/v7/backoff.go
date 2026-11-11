@@ -4,6 +4,10 @@
 // If Retry does not meet your needs,
 // copy/paste the function into your project and modify as you wish.
 //
+// On failure Retry returns a *RetryError reporting the last operation error
+// and why it stopped; see RetryError, AsRetryError, and the ErrPermanent,
+// ErrExhausted, and ErrMaxElapsedTime causes.
+//
 // There is also Ticker type similar to time.Ticker.
 // You can use it if you need to work with channels.
 //
