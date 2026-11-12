@@ -1,7 +1,6 @@
 package probe
 
 import (
-	"fmt"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
@@ -32,7 +31,30 @@ func (p *Probe) isSocketIPv4(d *netlink.InetDiagMsg) bool {
 }
 */
 
+// A dump that stops before NLMSG_DONE, for whatever reason, is still running
+// on the kernel's side of the socket, and every later dump request on that
+// socket is answered with EBUSY. Nothing here can drain it (the datagrams it
+// would have to read are the ones it could not), so the socket is replaced
+// and the next tick starts clean.
 func (p *Probe) inetGetSockets(family, proto uint8, state uint32) ([]*socket, []*socket, error) {
+	listens, connects, err := p.inetDump(family, proto, state)
+	if err != nil {
+		p.resetSocketMonitor(err)
+	}
+	return listens, connects, err
+}
+
+func (p *Probe) resetSocketMonitor(cause error) {
+	log.WithFields(log.Fields{"error": cause}).Warn("inet_diag dump failed, reopening the socket")
+	p.nsInet.Close()
+	// On failure the closed socket stays in place: the next dump fails with
+	// EBADF and lands here again, so the open is retried every tick.
+	if ns, err := p.openSocketMonitor(); err == nil {
+		p.nsInet = ns
+	}
+}
+
+func (p *Probe) inetDump(family, proto uint8, state uint32) ([]*socket, []*socket, error) {
 	req := netlink.NewNetlinkRequest(netlink.SOCK_DIAG_BY_FAMILY, syscall.NLM_F_DUMP)
 	{
 		msg := netlink.NewInetDiagReqV2(family, proto, state)
@@ -57,7 +79,7 @@ func (p *Probe) inetGetSockets(family, proto uint8, state uint32) ([]*socket, []
 				return listenList, connectList, nil
 			}
 			if msg.Header.Type == syscall.NLMSG_ERROR {
-				return nil, nil, fmt.Errorf("Error in netlink message")
+				return nil, nil, netlink.MessageError(msg)
 			}
 
 			// IPv4 only for connected socket. Keep all listen ports on IPv4 and v6.

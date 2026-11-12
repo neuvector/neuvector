@@ -1,6 +1,8 @@
 package netlink
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -61,10 +63,41 @@ func NewNetlinkSocket(protocol NetlinkProtocol, bufSize uint, groups ...uint) (*
 	return ns, nil
 }
 
+// MessageError decodes an NLMSG_ERROR message. Its payload starts with
+// struct nlmsgerr, whose first field is the negated errno of the request
+// that failed, or 0 when the kernel is only acknowledging a request. The
+// returned error wraps the errno, so callers can match it with errors.Is.
+func MessageError(msg syscall.NetlinkMessage) error {
+	if msg.Header.Type != syscall.NLMSG_ERROR {
+		return nil
+	}
+	if len(msg.Data) < 4 {
+		return fmt.Errorf("netlink error message with a %d-byte payload", len(msg.Data))
+	}
+	code := int32(binary.NativeEndian.Uint32(msg.Data[:4]))
+	switch {
+	case code == 0:
+		return errors.New("netlink acknowledgement (errno 0)")
+	case code > 0:
+		return fmt.Errorf("netlink error message with a positive code %d", code)
+	}
+	errno := syscall.Errno(-code)
+	if name := unix.ErrnoName(errno); name != "" {
+		return fmt.Errorf("netlink error %s: %w", name, errno)
+	}
+	return fmt.Errorf("netlink error %d: %w", int(errno), errno)
+}
+
+// Close is safe to call more than once. After it, Send and Receive fail
+// with EBADF rather than touching a descriptor number the process may have
+// reused.
 func (ns *NetlinkSocket) Close() {
 	//syscall.Shutdown(ns.fd, syscall.SHUT_RDWR)
 	//syscall.SetNonblock(ns.fd, true)
-	syscall.Close(ns.fd)
+	if ns.fd >= 0 {
+		syscall.Close(ns.fd)
+		ns.fd = -1
+	}
 }
 
 func (ns *NetlinkSocket) Send(request *NetlinkRequest) error {
@@ -115,9 +148,16 @@ func (ns *NetlinkSocket) SetTimeout(timeout time.Duration) error {
 }
 
 func (ns *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, error) {
-	nr, err := syscall.Read(ns.fd, ns.buf)
+	// With MSG_TRUNC the kernel returns the datagram's real length even when
+	// only part of it fit the buffer, so a datagram too large for the buffer
+	// is reported here instead of surfacing as a parse error a few bytes in,
+	// or, worse, as a dump that simply ends early.
+	nr, _, err := syscall.Recvfrom(ns.fd, ns.buf, unix.MSG_TRUNC)
 	if err != nil {
 		return nil, err
+	}
+	if nr > len(ns.buf) {
+		return nil, fmt.Errorf("netlink datagram of %d bytes truncated to the %d-byte buffer", nr, len(ns.buf))
 	}
 	if nr < syscall.NLMSG_HDRLEN {
 		return nil, fmt.Errorf("Got short response from netlink")
