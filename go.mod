@@ -29,7 +29,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
-	github.com/hashicorp/go-rootcerts v1.0.2
+	github.com/hashicorp/go-rootcerts v1.1.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/jrhouston/k8slock v0.2.0
