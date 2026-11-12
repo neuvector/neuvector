@@ -30,7 +30,8 @@ func newColumnMap(t reflect.Type, fieldIndex []int, prefixes []string) ColumnMap
 		if f.Anonymous && (f.Type.Kind() == reflect.Struct || f.Type.Kind() == reflect.Ptr) {
 			goquTag := tag.New("db", f.Tag)
 			if !goquTag.Contains("-") {
-				subColMaps = append(subColMaps, getStructColumnMap(&f, fieldIndex, goquTag.Values(), prefixes))
+				subCm := getStructColumnMap(&f, fieldIndex, goquTag.Values(), prefixes)
+				subColMaps = append(subColMaps, subCm.inheritSkipTags(tag.New("goqu", f.Tag)))
 			}
 		} else if f.PkgPath == "" {
 			dbTag := tag.New("db", f.Tag)
@@ -40,7 +41,7 @@ func newColumnMap(t reflect.Type, fieldIndex []int, prefixes []string) ColumnMap
 				if !implementsScanner(f.Type) {
 					subCm := getStructColumnMap(&f, fieldIndex, []string{columnName}, prefixes)
 					if len(subCm) != 0 {
-						subColMaps = append(subColMaps, subCm)
+						subColMaps = append(subColMaps, subCm.inheritSkipTags(tag.New("goqu", f.Tag)))
 						continue
 					}
 				}
@@ -62,6 +63,25 @@ func (cm ColumnMap) Cols() []string {
 	return structCols
 }
 
+// inheritSkipTags applies the skipinsert and skipupdate options of a struct field to every column that was
+// flattened out of that field, so that e.g. `goqu:"skipinsert"` on a nested struct skips all of its columns.
+func (cm ColumnMap) inheritSkipTags(goquTag tag.Options) ColumnMap {
+	skipInsert, skipUpdate := goquTag.Contains(skipInsertTagName), goquTag.Contains(skipUpdateTagName)
+	if !skipInsert && !skipUpdate {
+		return cm
+	}
+	for key, val := range cm {
+		if skipInsert {
+			val.ShouldInsert = false
+		}
+		if skipUpdate {
+			val.ShouldUpdate = false
+		}
+		cm[key] = val
+	}
+	return cm
+}
+
 func (cm ColumnMap) Merge(colMaps []ColumnMap) ColumnMap {
 	for _, subCm := range colMaps {
 		for key, val := range subCm {
@@ -77,7 +97,7 @@ func implementsScanner(t reflect.Type) bool {
 	if IsPointer(t.Kind()) {
 		t = t.Elem()
 	}
-	if reflect.PtrTo(t).Implements(scannerType) {
+	if reflect.PointerTo(t).Implements(scannerType) {
 		return true
 	}
 	if !IsStruct(t.Kind()) {
@@ -102,7 +122,8 @@ func newColumnData(f *reflect.StructField, columnName string, fieldIndex []int, 
 
 func getStructColumnMap(f *reflect.StructField, fieldIndex []int, fieldNames, prefixes []string) ColumnMap {
 	subFieldIndexes := concatFieldIndexes(fieldIndex, f.Index)
-	subPrefixes := append(prefixes, fieldNames...)
+	subPrefixes := prefixes
+	subPrefixes = append(subPrefixes, fieldNames...)
 	if f.Type.Kind() == reflect.Ptr {
 		return newColumnMap(f.Type.Elem(), subFieldIndexes, subPrefixes)
 	}

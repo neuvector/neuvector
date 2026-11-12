@@ -19,7 +19,7 @@ require (
 	github.com/containerd/typeurl/v2 v2.3.0
 	github.com/dmachard/go-clientsyslog v1.0.4
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/doug-martin/goqu/v9 v9.19.0
+	github.com/doug-martin/goqu/v9 v9.24.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/glenn-brown/golang-pkg-pcre v0.0.0-20120522223659-48bb82a8b8ce
@@ -165,7 +165,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
