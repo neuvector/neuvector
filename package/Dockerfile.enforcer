@@ -1,11 +1,15 @@
+FROM registry.suse.com/rancher/appco-go:1.27.4 AS golang
+
 #
 # Builder
 #
-FROM registry.suse.com/bci/golang:1.27.4 AS builder
+FROM registry.suse.com/bci/bci-base:15.7 AS builder
 
 ARG VERSION
 ARG TARGETOS
 ARG TARGETARCH
+
+COPY --from=golang /usr/local/go /usr/local/go
 
 RUN zypper ref && \
     zypper install -y --no-recommends gcc14 gcc14-c++ make glibc-devel glibc-devel-static \
@@ -24,6 +28,8 @@ RUN zypper addrepo -n nv-deps https://download.opensuse.org/repositories/isv:SUS
 ENV GOPATH=/go
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+ENV GOROOT=/usr/local/go
+ENV GOTOOLCHAIN=local
 
 COPY . /src
 
