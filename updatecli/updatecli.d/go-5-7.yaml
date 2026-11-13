@@ -13,7 +13,7 @@ conditions:
     kind: dockerimage
     sourceid: go
     spec:
-      image: registry.suse.com/bci/golang
+      image: registry.suse.com/rancher/appco-go
 
 targets:
   gomod:
@@ -22,7 +22,15 @@ targets:
     kind: golang/gomod
     scmid: default
     spec:
-      file: go.mod
+      files: go.mod
+
+  e2e-gomod:
+    name: 'deps(go): update Go version to {{ source "go" }}'
+    sourceid: go
+    kind: golang/gomod
+    scmid: default
+    spec:
+      file: test/e2e/go.mod
 
   dockerfile:
     name: "deps(go): update Docker image tag"
@@ -35,7 +43,7 @@ targets:
         - package/Dockerfile.enforcer
       instruction:
         keyword: FROM
-        matcher: registry.suse.com/bci/golang
+        matcher: registry.suse.com/rancher/appco-go
 
 actions:
   default:
@@ -64,7 +72,7 @@ scms:
       repository: "neuvector"
       token: "{{ requiredEnv .github.token }}"
       username: "{{ requiredEnv .github.user }}"
-      branch: "release/v5.4"
+      branch: "release/v5.7"
       commitmessage:
         type: "chore"
         scope: deps
