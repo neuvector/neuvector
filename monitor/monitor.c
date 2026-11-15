@@ -1037,6 +1037,7 @@ static int exit_monitor(void)
     g_procs[PROC_DP].active = false;
     g_procs[PROC_AGENT].active = false;
     g_procs[PROC_SCANNER_STANDALONE].active = false;
+    g_procs[PROC_CTRL_OPA].active = false;
 
     signal(SIGCHLD, SIG_DFL);
 
@@ -1044,6 +1045,7 @@ static int exit_monitor(void)
     {
     case MODE_CTRL:
         stop_proc(PROC_CTRL, SIGTERM, true);
+        stop_proc(PROC_CTRL_OPA, SIGTERM, true);
         // disable scanner in controller
         // stop_proc(PROC_SCANNER, SIGTERM, true);
         ret = system(SCRIPT_TEARDOWN);
@@ -1057,6 +1059,7 @@ static int exit_monitor(void)
         stop_proc(PROC_AGENT, SIGTERM, true);
         stop_proc(PROC_DP, SIGTERM, false);
         stop_proc(PROC_CTRL, SIGTERM, true);
+        stop_proc(PROC_CTRL_OPA, SIGTERM, true);
         // disable scanner in controller
         // stop_proc(PROC_SCANNER, SIGTERM, true);
         ret = system(SCRIPT_TEARDOWN);
