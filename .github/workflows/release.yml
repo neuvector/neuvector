@@ -67,7 +67,6 @@ jobs:
           echo "Tag '$PARSED_TAG' does NOT match the required 'vX.Y.Z' format. Skipping."
         fi
 
-<<<<<<< HEAD
         echo "tag_value=$PARSED_TAG" >> $GITHUB_OUTPUT
 
     - name: Get controller
@@ -83,7 +82,7 @@ jobs:
         cat sha256sum-controller-arm64 | sha256sum --check
 
     - name: Publish neuvector manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@575bb831c67edd950bfedb59d41dd127bd0005d6 # v0.65.2
+      uses: rancher/ecm-distro-tools/actions/publish-image@9a6467d0d0f6ed00d45f11510eb8cba30292b3f3 # v0.78.4
       with:
         push-to-public: true
         push-to-prime: false
@@ -97,7 +96,7 @@ jobs:
         public-username: ${{ env.DOCKER_USERNAME }}
         public-password: ${{ env.DOCKER_PASSWORD }}
     - name: Publish rancher manifest
-      uses: rancher/ecm-distro-tools/actions/publish-image@575bb831c67edd950bfedb59d41dd127bd0005d6 # v0.65.2
+      uses: rancher/ecm-distro-tools/actions/publish-image@9a6467d0d0f6ed00d45f11510eb8cba30292b3f3 # v0.78.4
       env:
         IMAGE_PREFIX: neuvector-
       with:
@@ -115,50 +114,5 @@ jobs:
         prime-repo: rancher
         prime-username: ${{ env.PRIME_REGISTRY_USERNAME }}
         prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
-=======
-          echo "tag_value=$PARSED_TAG" >> $GITHUB_OUTPUT
-      - name: Get controller
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          TARGET: ${{ github.ref_name }}
-        run: |
-          gh release download $TARGET -D controller/ -p controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
-          gh release download $TARGET -D controller/ -p controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
-          gh release download $TARGET -D controller/ -p sha256sum-controller-amd64 -R ${{ github.repository_owner }}/neuvector-private
-          gh release download $TARGET -D controller/ -p sha256sum-controller-arm64 -R ${{ github.repository_owner }}/neuvector-private
-          cd controller
-          cat sha256sum-controller-amd64 | sha256sum --check
-          cat sha256sum-controller-arm64 | sha256sum --check
-      - name: Publish neuvector manifest
-        uses: rancher/ecm-distro-tools/actions/publish-image@9a6467d0d0f6ed00d45f11510eb8cba30292b3f3 # v0.78.4
-        with:
-          push-to-public: true
-          push-to-prime: false
-          image: ${{ matrix.target }}
-          tag: ${{ env.TAG }}
-          platforms: ${{ matrix.platforms }}
-          make-target: ${{ matrix.make-target }}
-          public-registry: docker.io
-          public-repo: neuvector
-          public-username: ${{ env.DOCKER_USERNAME }}
-          public-password: ${{ env.DOCKER_PASSWORD }}
-      - name: Publish rancher manifest
-        uses: rancher/ecm-distro-tools/actions/publish-image@9a6467d0d0f6ed00d45f11510eb8cba30292b3f3 # v0.78.4
-        env:
-          IMAGE_PREFIX: neuvector-
-        with:
-          image: ${{ matrix.rancher_target }}
-          tag: ${{ env.TAG }}
-          platforms: ${{ matrix.platforms }}
-          make-target: ${{ matrix.make-target }}
-          public-registry: docker.io
-          public-repo: rancher
-          public-username: ${{ env.RANCHER_DOCKER_USERNAME }}
-          public-password: ${{ env.RANCHER_DOCKER_PASSWORD }}
-          prime-registry: ${{ env.PRIME_REGISTRY }}
-          prime-repo: rancher
-          prime-username: ${{ env.PRIME_REGISTRY_USERNAME }}
-          prime-password: ${{ env.PRIME_REGISTRY_PASSWORD }}
->>>>>>> 6029170 (chore: bump publish-image action to v0.78.4 (#3104))
     outputs:
       parsed_tag: ${{ steps.parse_tag_step.outputs.tag_value }}
