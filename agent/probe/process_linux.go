@@ -127,7 +127,7 @@ func (p *Probe) checkProcessNetlinkSocket() error {
 					log.WithFields(log.Fields{"i": i, "hdr": fmt.Sprintf("0x%x", hdr.What)}).Info("netlink msgHdr: ignored")
 				}
 			case syscall.NLMSG_ERROR:
-				return errors.New("Error in netlink message")
+				return netlink.MessageError(msg)
 			default:
 				// NLMSG_OVERRUN: 1, NLMSG_NOOP: 2
 				log.WithFields(log.Fields{"i": i, "type": msg.Header.Type}).Info("netlink msgType")
