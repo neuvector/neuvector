@@ -24,6 +24,7 @@ message GetScannersResponse {
     uint32 IdleScanners = 3;
     string ScannerVersion = 4;
     string ScannerDBTime = 5;
+    uint32 AvailableScanCredits = 6;  // free scan slots across all scanners (MaxScanCredits - TaskCount)
 }
 
 service ControllerScanAdapterService {
