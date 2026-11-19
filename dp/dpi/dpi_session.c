@@ -32,13 +32,23 @@ extern bool cmp_mac_prefix(void *m1, void *prefix);
 static void dpi_session_tick_timeout(timer_entry_t *n);
 static void tcp_scan_detection_release(dpi_session_t *s);
 
+// The endpoint MAC is kept in the wing selected by the session's INGRESS flag.
+// Proxymesh lookup keys carry the packet's ep_mac in both wings, see dpi_session_lookup.
+static inline const uint8_t *sess_ep_mac(const dpi_session_t *s)
+{
+    return FLAGS_TEST(s->flags, DPI_SESS_FLAG_INGRESS) ? s->server.mac : s->client.mac;
+}
+
+// Every pod's 'lo' shares the per-thread proxymesh map and the sidecar uses the same
+// source IP (e.g. 127.0.0.6) in every pod, so the endpoint MAC must be part of the key.
 static int session4_proxymesh_match(struct cds_lfht_node *ht_node, const void *key)
 {
     dpi_session_t *s = STRUCT_OF(ht_node, dpi_session_t, node);
     const dpi_session_t *k = key;
     int matched = 0;
 
-    if (s->client.ip.ip4 == k->client.ip.ip4 &&
+    if (memcmp(sess_ep_mac(s), sess_ep_mac(k), ETH_ALEN) == 0 &&
+        s->client.ip.ip4 == k->client.ip.ip4 &&
         s->client.port == k->client.port && 
         s->ip_proto == k->ip_proto) {
         matched = 1;
@@ -80,7 +90,8 @@ static uint32_t session4_proxymesh_hash(const void *key)
     const dpi_session_t *k = key;
     uint32_t port = k->client.port;
 
-    return sdbm_hash((uint8_t *)&k->client.ip, 4) +
+    return sdbm_hash(sess_ep_mac(k), ETH_ALEN) +
+           sdbm_hash((uint8_t *)&k->client.ip, 4) +
            sdbm_hash((uint8_t *)&port, sizeof(port));
 }
 
@@ -100,7 +111,8 @@ static int session6_proxymesh_match(struct cds_lfht_node *ht_node, const void *k
     const dpi_session_t *k = key;
     int matched = 0;
 
-    if (memcmp(&s->client.ip, &k->client.ip, sizeof(k->client.ip)) == 0 &&
+    if (memcmp(sess_ep_mac(s), sess_ep_mac(k), ETH_ALEN) == 0 &&
+        memcmp(&s->client.ip, &k->client.ip, sizeof(k->client.ip)) == 0 &&
         s->client.port == k->client.port && s->ip_proto == k->ip_proto) {
         matched = 1;
         if (memcmp((uint8_t *)&s->server.ip, (uint8_t *)(in6addr_loopback.s6_addr), sizeof(s->server.ip)) == 0 &&
@@ -130,7 +142,8 @@ static uint32_t session6_proxymesh_hash(const void *key)
     const dpi_session_t *k = key;
     uint32_t port = k->client.port;
 
-    return sdbm_hash((uint8_t *)&k->client.ip, sizeof(k->client.ip)) +
+    return sdbm_hash(sess_ep_mac(k), ETH_ALEN) +
+           sdbm_hash((uint8_t *)&k->client.ip, sizeof(k->client.ip)) +
            sdbm_hash((uint8_t *)&port, sizeof(port));
 }
 
@@ -411,6 +424,12 @@ dpi_session_t *dpi_session_lookup(dpi_packet_t *p)
 
     memset(&key.client.ip, 0, sizeof(key.client.ip));
     memset(&key.server.ip, 0, sizeof(key.server.ip));
+    if (isproxymesh) {
+        // Set both wings so sess_ep_mac(&key) is the endpoint MAC whichever
+        // direction key.flags indicates for the client and server side lookups.
+        mac_cpy(key.client.mac, p->ep_mac);
+        mac_cpy(key.server.mac, p->ep_mac);
+    }
 
     key.ip_proto = p->ip_proto;
 
