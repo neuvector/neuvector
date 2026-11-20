@@ -288,15 +288,6 @@ type ClusterHelper interface {
 	PutCrdEventQueue(record *share.CLUSCrdEventRecord) error
 	GetCrdEventQueueCount() int
 
-	GetAwsCloudResource(projectName string) (*share.CLUSAwsResource, error)
-	PutAwsCloudResource(project *share.CLUSAwsResource) error
-	DeleteAwsCloudResource(projectName string) error
-	GetAwsLambda(project, region, funcName string) *share.CLUSAwsFuncScanOutputList
-	PutAwsLambda(project, region, funcName string, output *share.CLUSAwsFuncScanOutputList) error
-	DeleteAwsLambda(project, region, funcName string) error
-	DeleteAwsProjectCfg(projectName string) error
-	GetAwsProjectCfg(projectName string, acc *access.AccessControl) (*share.CLUSAwsProjectCfg, error)
-	PutAwsProjectCfg(projectName string, record *share.CLUSAwsProjectCfg) error
 	// custom roles
 	GetAllCustomRoles(acc *access.AccessControl) map[string]*share.CLUSUserRole
 	GetCustomRoleRev(name string, acc *access.AccessControl) (*share.CLUSUserRole, uint64, error)
@@ -3918,96 +3909,6 @@ func (m clusterHelper) GetCrdEventQueueCount() int {
 		return queueInfo.Count
 	}
 	return 0
-}
-
-func (m clusterHelper) DeleteAwsProjectCfg(projectName string) error {
-	key := share.CLUSCloudCfgKey(share.CloudAws, projectName)
-	return cluster.Delete(key)
-}
-
-func (m clusterHelper) GetAwsProjectCfg(projectName string, acc *access.AccessControl) (*share.CLUSAwsProjectCfg, error) {
-	key := share.CLUSCloudCfgKey(share.CloudAws, projectName)
-	value, _, err := m.get(key)
-	if err != nil {
-		log.WithError(err).Warn("failed to get cluster value")
-	}
-	if value != nil {
-		var state share.CLUSAwsProjectCfg
-		if err := nvJsonUnmarshal(key, value, &state); err != nil {
-			log.WithError(err).Warn("failed to unmarshal cluster value")
-		}
-		if acc != nil && !acc.Authorize(&state, nil) {
-			return nil, common.ErrObjectAccessDenied
-		}
-		return &state, nil
-	}
-	return nil, common.ErrObjectNotFound
-}
-
-func (m clusterHelper) PutAwsProjectCfg(projectName string, record *share.CLUSAwsProjectCfg) error {
-	key := share.CLUSCloudCfgKey(share.CloudAws, projectName)
-	value, err := enc.Marshal(record)
-	if err != nil {
-		return fmt.Errorf("failed to marshal project config: %w", err)
-	}
-	return cluster.Put(key, value)
-}
-
-func (m clusterHelper) GetAwsCloudResource(projectName string) (*share.CLUSAwsResource, error) {
-	key := share.CLUSCloudKey(share.CloudAws, projectName)
-	value, _, err := m.get(key)
-	if err != nil {
-		log.WithError(err).Warn("failed to get cluster value")
-	}
-	if value != nil {
-		var state share.CLUSAwsResource
-		if err := nvJsonUnmarshal(key, value, &state); err != nil {
-			log.WithError(err).Warn("failed to unmarshal cluster value")
-		}
-		return &state, nil
-	}
-	return nil, common.ErrObjectNotFound
-}
-
-func (m clusterHelper) PutAwsCloudResource(project *share.CLUSAwsResource) error {
-	key := share.CLUSCloudKey(share.CloudAws, project.ProjectName)
-	value, err := enc.Marshal(project)
-	if err != nil {
-		return fmt.Errorf("failed to marshal cloud resource: %w", err)
-	}
-	return cluster.Put(key, value)
-}
-
-func (m clusterHelper) DeleteAwsCloudResource(projectName string) error {
-	return cluster.Delete(share.CLUSCloudKey(share.CloudAws, projectName))
-}
-func (m clusterHelper) GetAwsLambda(project, region, funcName string) *share.CLUSAwsFuncScanOutputList {
-	key := share.CLUSCloudFuncKey(share.CloudAws, project, region, funcName)
-	value, _, err := m.get(key)
-	if err != nil {
-		log.WithError(err).Warn("failed to get cluster value")
-	}
-	if value != nil {
-		var state share.CLUSAwsFuncScanOutputList
-		if err := nvJsonUnmarshal(key, value, &state); err != nil {
-			log.WithError(err).Warn("failed to unmarshal cluster value")
-		}
-		return &state
-	}
-	return nil
-}
-
-func (m clusterHelper) PutAwsLambda(project, region, funcName string, output *share.CLUSAwsFuncScanOutputList) error {
-	key := share.CLUSCloudFuncKey(share.CloudAws, project, region, funcName)
-	value, err := json.Marshal(output)
-	if err != nil {
-		return err
-	}
-	return cluster.Put(key, value)
-}
-
-func (m clusterHelper) DeleteAwsLambda(project, region, funcName string) error {
-	return cluster.Delete(share.CLUSCloudFuncKey(share.CloudAws, project, region, funcName))
 }
 
 // custom roles

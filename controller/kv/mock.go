@@ -53,9 +53,6 @@ type MockCluster struct {
 
 	complianceProfiles map[string]*share.CLUSComplianceProfile
 
-	awsCloudResource map[string]*share.CLUSAwsResource
-	awsProjectCfg    map[string]*share.CLUSAwsProjectCfg
-
 	ScanSums map[string]*share.CLUSRegistryImageSummary
 	ScanRpts map[string]*share.CLUSScanReport
 
@@ -108,8 +105,6 @@ func (m *MockCluster) Init(rules []*share.CLUSPolicyRule, groups []*share.CLUSGr
 		},
 	}
 
-	m.awsCloudResource = make(map[string]*share.CLUSAwsResource)
-	m.awsProjectCfg = make(map[string]*share.CLUSAwsProjectCfg)
 	m.kv = make(map[string]string)
 	m.creditOwners = make(map[string]map[string]int)
 
@@ -625,25 +620,6 @@ func (m *MockCluster) RemoveScanner(scannerID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.scanners, scannerID)
-}
-
-func (m *MockCluster) GetAwsCloudResource(projectName string) (*share.CLUSAwsResource, error) {
-	if r, ok := m.awsCloudResource[projectName]; ok {
-		clone := *r
-		return &clone, nil
-	}
-	return nil, common.ErrObjectNotFound
-}
-
-func (m *MockCluster) GetAwsProjectCfg(projectName string, acc *access.AccessControl) (*share.CLUSAwsProjectCfg, error) {
-	if r, ok := m.awsProjectCfg[projectName]; ok {
-		clone := *r
-		if !acc.Authorize(&clone, nil) {
-			return nil, common.ErrObjectAccessDenied
-		}
-		return &clone, nil
-	}
-	return nil, common.ErrObjectNotFound
 }
 
 func (m *MockCluster) GetAllCustomCheckConfig() map[string]*share.CLUSCustomCheckGroup {
