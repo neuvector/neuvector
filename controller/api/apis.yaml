@@ -5637,9 +5637,10 @@ definitions:
         enum: ["", monitor, protect]
       containers:
         type: array
+        description: obsolete
         items:
           type: string
-          enum: [containers, init_containers, ephemeral_containers]
+          enum: [containers]
   RESTAdmissionRuleConfig:
     type: object
     required:
@@ -5682,9 +5683,10 @@ definitions:
         enum: ["", monitor, protect]
       containers:
         type: array
+        description: obsolete
         items:
           type: string
-          enum: [containers, init_containers, ephemeral_containers]
+          enum: [containers]
   RESTAdmissionRuleConfigData:
     type: object
     required:
