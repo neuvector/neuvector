@@ -296,26 +296,12 @@ func applyTransact(w http.ResponseWriter, txn *cluster.ClusterTransact) error {
 	return nil
 }
 
-func getAdmCtrlRuleContainers(targets []string) (uint8, error) {
-	var ruleContainers uint8
-
-	for _, t := range targets {
-		switch t {
-		case share.AdmCtrlRuleContainers:
-			ruleContainers = ruleContainers | share.AdmCtrlRuleContainersN
-		case share.AdmCtrlRuleInitContainers:
-			ruleContainers = ruleContainers | share.AdmCtrlRuleInitContainersN
-		case share.AdmCtrlRuleEphemeralContainers:
-			ruleContainers = ruleContainers | share.AdmCtrlRuleEphemeralContainersN
-		default:
-			return 0, fmt.Errorf("Invalid containers value")
-		}
+func checkAdmCtrlRuleContainers(targets []string) error {
+	tValues := utils.NewSetFromStringSlice(targets)
+	if len(targets) == 0 || tValues.Contains(share.AdmCtrlRuleContainers) {
+		return nil
 	}
-	if ruleContainers == 0 {
-		ruleContainers = share.AdmCtrlRuleContainersN
-	}
-
-	return ruleContainers, nil
+	return fmt.Errorf("Invalid containers value: {%s}", strings.Join(targets, ", "))
 }
 
 func handlerAdmissionStatistics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -1019,13 +1005,10 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 		return
 	}
 
-	var applyTarget uint8
 	if ruleCfg.Containers != nil {
-		if v, err := getAdmCtrlRuleContainers(ruleCfg.Containers); err != nil {
+		if err := checkAdmCtrlRuleContainers(ruleCfg.Containers); err != nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
-		} else {
-			applyTarget = v
 		}
 	}
 
@@ -1109,9 +1092,6 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	if ruleCfg.RuleMode != nil {
 		clusConf.RuleMode = *ruleCfg.RuleMode
 	}
-	if ruleCfg.Containers != nil {
-		clusConf.Containers = applyTarget
-	}
 	ruleOptions := nvsysadmission.GetAdmRuleTypeOptions(ruleCfg.RuleType)
 	if err := validateAdmCtrlCriteria(clusConf.Criteria, ruleOptions.K8sOptions.RuleOptions, ruleCfg.RuleType); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Admission rule validation failed")
@@ -1154,15 +1134,14 @@ func handlerAddAdmissionRule(w http.ResponseWriter, r *http.Request, ps httprout
 	// returns the final rule ID that is created in response payload
 	resp := api.RESTAdmissionRuleData{
 		Rule: &api.RESTAdmissionRule{
-			ID:         ruleCfg.ID,
-			Category:   clusConf.Category,
-			Comment:    clusConf.Comment,
-			Disable:    clusConf.Disable,
-			Critical:   clusConf.Critical,
-			CfgType:    ruleCfg.CfgType,
-			RuleType:   clusConf.RuleType,
-			RuleMode:   clusConf.RuleMode,
-			Containers: ruleCfg.Containers,
+			ID:       ruleCfg.ID,
+			Category: clusConf.Category,
+			Comment:  clusConf.Comment,
+			Disable:  clusConf.Disable,
+			Critical: clusConf.Critical,
+			CfgType:  ruleCfg.CfgType,
+			RuleType: clusConf.RuleType,
+			RuleMode: clusConf.RuleMode,
 		},
 	}
 	if ruleCfg.Criteria != nil {
@@ -1265,11 +1244,9 @@ func handlerPatchAdmissionRule(w http.ResponseWriter, r *http.Request, ps httpro
 		clusConf.RuleMode = *ruleCfg.RuleMode
 	}
 	if !clusConf.Critical && ruleCfg.Containers != nil {
-		if applyTarget, err := getAdmCtrlRuleContainers(ruleCfg.Containers); err != nil {
+		if err := checkAdmCtrlRuleContainers(ruleCfg.Containers); err != nil {
 			restRespErrorMessage(w, http.StatusBadRequest, api.RESTErrInvalidRequest, err.Error())
 			return
-		} else {
-			clusConf.Containers = applyTarget
 		}
 	}
 
@@ -1552,11 +1529,6 @@ func handlerAdmCtrlExport(w http.ResponseWriter, r *http.Request, ps httprouter.
 			}
 			if rule.Comment != "" {
 				ruleItem.Comment = &rule.Comment
-			}
-			if len(rule.Containers) > 0 {
-				ruleItem.Containers = rule.Containers
-			} else {
-				ruleItem.Containers = []string{share.AdmCtrlRuleContainers}
 			}
 			admissionRules = append(admissionRules, &ruleItem)
 			ids.Add(id)
