@@ -361,16 +361,18 @@ func validateDlpRuleConfig(list []api.RESTDlpRule) error {
 		}
 		total_len := 0
 		for i, pt := range rule.Patterns {
+			// bound pattern length for every operator: the datapath concatenates all
+			// pattern values into a fixed-size signature buffer regardless of op.
+			if len(pt.Value) > api.DlpRulePatternMaxLen {
+				log.WithFields(log.Fields{"pattern": pt.Value, "pattern_len": len(pt.Value)}).Error("Invalid pattern length")
+				return fmt.Errorf("dlp rule %s: invalid pattern length (%d)", rule.Name, len(pt.Value))
+			}
+			total_len += len(pt.Value)
+			if total_len > api.DlpRulePatternTotalMaxLen {
+				log.WithFields(log.Fields{"total": total_len, "max": api.DlpRulePatternTotalMaxLen}).Error("Exceed max total pattern length")
+				return fmt.Errorf("dlp rule %s: total pattern length %d exceed max allowed %d", rule.Name, total_len, api.DlpRulePatternTotalMaxLen)
+			}
 			if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
-				if len(pt.Value) > api.DlpRulePatternMaxLen {
-					log.WithFields(log.Fields{"pattern": pt.Value, "pattern_len": len(pt.Value)}).Error("Invalid pattern length")
-					return fmt.Errorf("dlp rule %s: invalid pattern length (%d)", rule.Name, len(pt.Value))
-				}
-				total_len += len(pt.Value)
-				if total_len > api.DlpRulePatternTotalMaxLen {
-					log.WithFields(log.Fields{"total": total_len, "max": api.DlpRulePatternTotalMaxLen}).Error("Exceed mac total pattern length")
-					return fmt.Errorf("dlp rule %s: total pattern length %d exceed max allowed %d", rule.Name, total_len, api.DlpRulePatternTotalMaxLen)
-				}
 				if pt.Context != "" &&
 					pt.Context != share.DlpPatternContextURI &&
 					pt.Context != share.DlpPatternContextHEAD &&
@@ -2134,6 +2136,11 @@ func deleteFedDlpGroupSensors() {
 }
 
 func fedCreateDlpSensor(conf *api.RESTDlpSensorConfig, cfgType share.TCfgType) error {
+	if conf.Rules != nil {
+		if err := validateDlpRuleConfig(*conf.Rules); err != nil {
+			return err
+		}
+	}
 	sensor := &share.CLUSDlpSensor{
 		Name:          conf.Name,
 		Groups:        make(map[string]string),
