@@ -683,28 +683,20 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	if podSpec != nil {
 		switch ps := podSpec.(type) {
 		case *corev1.PodTemplateSpec:
-<<<<<<< HEAD
-			allContainers, _ = parsePodSpec(objectMeta, &ps.Spec)
-=======
 			var err error
 			allContainers, err = parsePodSpec(objectMeta, &ps.Spec, isEphemeralRequest)
 			if err != nil {
 				log.WithError(err).Warn("failed to parse pod spec")
 			}
->>>>>>> 9e7ce50 (Port 29 (#3127))
 			specLabels = ps.Labels
 			specAnnotations = ps.Annotations
 			saName = ps.Spec.ServiceAccountName
 		case *corev1.PodSpec:
-<<<<<<< HEAD
-			allContainers, _ = parsePodSpec(objectMeta, ps)
-=======
 			var err error
 			allContainers, err = parsePodSpec(objectMeta, ps, isEphemeralRequest)
 			if err != nil {
 				log.WithError(err).Warn("failed to parse pod spec")
 			}
->>>>>>> 9e7ce50 (Port 29 (#3127))
 			saName = ps.ServiceAccountName
 		default:
 			return nil, errors.New("unsupported podSpec type")
@@ -1122,15 +1114,11 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 		if len(pod.OwnerReferences) != 0 && pod.Status.Phase == "Running" && !isEphemeralRequest {
 			return composeResponse(nil), nil, reqIgnored
 		}
-<<<<<<< HEAD
-		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
-=======
 		var err error
 		admResObject, err = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec, isEphemeralRequest)
 		if err != nil {
 			log.WithError(err).Warn("failed to parse admission request for pod")
 		}
->>>>>>> 9e7ce50 (Port 29 (#3127))
 	case k8sKindPersistentVolumeClaim:
 		var pvc corev1.PersistentVolumeClaim
 		if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {
@@ -1153,20 +1141,15 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 	}
 
 	// parse request meta object
+	var parseErr error
 	if objectMeta != nil {
 		if req.Kind.Kind == k8sKindPersistentVolumeClaim {
-<<<<<<< HEAD
-			admResObject, _ = parseAdmRequest(req, objectMeta, nil)
-		} else if podTemplateSpec != nil {
-			admResObject, _ = parseAdmRequest(req, objectMeta, podTemplateSpec)
-=======
 			admResObject, parseErr = parseAdmRequest(req, objectMeta, nil, false)
 		} else if podTemplateSpec != nil {
 			admResObject, parseErr = parseAdmRequest(req, objectMeta, podTemplateSpec, false)
 		}
 		if parseErr != nil {
 			log.WithError(parseErr).Warn("failed to parse admission request")
->>>>>>> 9e7ce50 (Port 29 (#3127))
 		}
 	}
 	stamps.Parsed = time.Now()
