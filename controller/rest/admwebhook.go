@@ -49,6 +49,12 @@ const (
 	tlsClientCA = "/var/neuvector/clientCA.cert.pem"
 )
 
+const (
+	idxInitContainers = iota
+	idxContainers
+	idxEphemeralContainers
+)
+
 // const (
 // 	admissionWebhookAnnotationStatusKey = "neuvector-mutating-admission-webhook/status"
 // 	admissionWebhookLabelKey            = "neuvector-mutating-admission-webhook/label"
@@ -266,13 +272,18 @@ func getAppArmorProfilesByContainer(specAnnotations map[string]string) map[strin
 	return profilesByContainer
 }
 
-func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([3][]*nvsysadmission.AdmContainerInfo, error) {
+func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec, isEphemeralRequest bool) ([3][]*nvsysadmission.AdmContainerInfo, error) {
 	var allContainers [3][]*nvsysadmission.AdmContainerInfo
+	reqContainers := [3][]corev1.Container{nil, nil, nil}
 	vols := make(map[string]string, len(spec.Volumes))
 	appArmorProfilesByContainer := getAppArmorProfilesByContainer(objectMeta.Annotations)
-	ephemeralContainers := make([]corev1.Container, len(spec.EphemeralContainers))
-	for i, ephemeralContainer := range spec.EphemeralContainers {
-		ephemeralContainers[i] = corev1.Container(ephemeralContainer.EphemeralContainerCommon)
+	if isEphemeralRequest {
+		if len(spec.EphemeralContainers) > 0 {
+			reqContainers[idxEphemeralContainers] = []corev1.Container{corev1.Container(spec.EphemeralContainers[len(spec.EphemeralContainers)-1].EphemeralContainerCommon)}
+		}
+	} else {
+		reqContainers[idxInitContainers] = spec.InitContainers
+		reqContainers[idxContainers] = spec.Containers
 	}
 
 	for _, vol := range spec.Volumes {
@@ -281,7 +292,7 @@ func parsePodSpec(objectMeta *metav1.ObjectMeta, spec *corev1.PodSpec) ([3][]*nv
 		}
 	}
 
-	for i, containers := range [3][]corev1.Container{spec.InitContainers, spec.Containers, ephemeralContainers} {
+	for i, containers := range reqContainers {
 		allContainers[i] = make([]*nvsysadmission.AdmContainerInfo, 0, len(containers))
 		for _, c := range containers {
 			volMounts := utils.NewSet()
@@ -663,7 +674,8 @@ func isRootOwnerCacheAvailable(ownerUIDs []string) bool {
 	return false // has owner but all their caches in admResCache are gone
 }
 
-func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.ObjectMeta, podSpec interface{}) (*nvsysadmission.AdmResObject, error) {
+func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.ObjectMeta, podSpec interface{}, isEphemeralRequest bool) (
+	*nvsysadmission.AdmResObject, error) {
 	var specLabels map[string]string
 	var specAnnotations map[string]string
 	var allContainers [3][]*nvsysadmission.AdmContainerInfo
@@ -671,12 +683,20 @@ func parseAdmRequest(req *admissionv1beta1.AdmissionRequest, objectMeta *metav1.
 	if podSpec != nil {
 		switch ps := podSpec.(type) {
 		case *corev1.PodTemplateSpec:
-			allContainers, _ = parsePodSpec(objectMeta, &ps.Spec)
+			var err error
+			allContainers, err = parsePodSpec(objectMeta, &ps.Spec, isEphemeralRequest)
+			if err != nil {
+				log.WithError(err).Warn("failed to parse pod spec")
+			}
 			specLabels = ps.Labels
 			specAnnotations = ps.Annotations
 			saName = ps.Spec.ServiceAccountName
 		case *corev1.PodSpec:
-			allContainers, _ = parsePodSpec(objectMeta, ps)
+			var err error
+			allContainers, err = parsePodSpec(objectMeta, ps, isEphemeralRequest)
+			if err != nil {
+				log.WithError(err).Warn("failed to parse pod spec")
+			}
 			saName = ps.ServiceAccountName
 		default:
 			return nil, errors.New("unsupported podSpec type")
@@ -770,11 +790,10 @@ func walkThruContainers(admResObject *nvsysadmission.AdmResObject, stamps *api.A
 	var allImages = make([]string, 0, evalContext.ContainersInReq)
 	var assessResults = make([]*nvsysadmission.AdmCtrlAssessResult, 0, evalContext.ContainersInReq)
 
-	containerTypes := []string{share.AdmCtrlRuleInitContainers, share.AdmCtrlRuleContainers, share.AdmCtrlRuleEphemeralContainers}
-	for i, containers := range admResObject.AllContainers { // range (initContainers, Containers, ephemeralContainers)
+	for _, containers := range admResObject.AllContainers { // range (initContainers, Containers, ephemeralContainers)
 		for _, c := range containers {
 			var thisStamp api.AdmCtlTimeStamps
-			result, _ := cacher.MatchK8sAdmissionRules(admResObject, c, evalContext, &thisStamp, ar, containerTypes[i])
+			result, _ := cacher.MatchK8sAdmissionRules(admResObject, c, evalContext, &thisStamp, ar)
 			// result is per-container-image's matching result, in type nvsysadmission.AdmCtrlAssessResult
 			if thisStamp.Fetched.Sub(thisStamp.GonnaFetch).Seconds() > stamps.Fetched.Sub(stamps.GonnaFetch).Seconds() {
 				stamps.GonnaFetch = thisStamp.GonnaFetch
@@ -1084,14 +1103,22 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 		podTemplateSpec = &statefulSet.Spec.Template
 	case k8sKindPod:
 		var pod corev1.Pod
+		var isEphemeralRequest bool
 		if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
 			return logUnmarshallError(&req.Kind.Kind, &req.UID, &err), nil, reqIgnored
 		}
+		if req.RequestSubResource == "ephemeralcontainers" && req.Operation == admissionv1beta1.Update {
+			isEphemeralRequest = true
+		}
 		// if pod is middle resource(i.e. has owner) & it's already at running phase(i.e. this is an UPDATE pod request), skip handling this request
-		if len(pod.OwnerReferences) != 0 && pod.Status.Phase == "Running" {
+		if len(pod.OwnerReferences) != 0 && pod.Status.Phase == "Running" && !isEphemeralRequest {
 			return composeResponse(nil), nil, reqIgnored
 		}
-		admResObject, _ = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec)
+		var err error
+		admResObject, err = parseAdmRequest(req, &pod.ObjectMeta, &pod.Spec, isEphemeralRequest)
+		if err != nil {
+			log.WithError(err).Warn("failed to parse admission request for pod")
+		}
 	case k8sKindPersistentVolumeClaim:
 		var pvc corev1.PersistentVolumeClaim
 		if err := json.Unmarshal(req.Object.Raw, &pvc); err != nil {
@@ -1114,11 +1141,15 @@ func (whsvr *WebhookServer) validate(ar *admissionv1beta1.AdmissionReview, globa
 	}
 
 	// parse request meta object
+	var parseErr error
 	if objectMeta != nil {
 		if req.Kind.Kind == k8sKindPersistentVolumeClaim {
-			admResObject, _ = parseAdmRequest(req, objectMeta, nil)
+			admResObject, parseErr = parseAdmRequest(req, objectMeta, nil, false)
 		} else if podTemplateSpec != nil {
-			admResObject, _ = parseAdmRequest(req, objectMeta, podTemplateSpec)
+			admResObject, parseErr = parseAdmRequest(req, objectMeta, podTemplateSpec, false)
+		}
+		if parseErr != nil {
+			log.WithError(parseErr).Warn("failed to parse admission request")
 		}
 	}
 	stamps.Parsed = time.Now()

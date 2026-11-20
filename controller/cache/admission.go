@@ -333,19 +333,6 @@ func AdmissionRule2REST(rule *share.CLUSAdmissionRule) *api.RESTAdmissionRule {
 			r.RuleType = api.ValidatingDenyRuleType
 		}
 	}
-	if rule.Containers&share.AdmCtrlRuleContainersN > 0 {
-		r.Containers = append(r.Containers, share.AdmCtrlRuleContainers)
-	}
-	if rule.Containers&share.AdmCtrlRuleInitContainersN > 0 {
-		r.Containers = append(r.Containers, share.AdmCtrlRuleInitContainers)
-	}
-	if rule.Containers&share.AdmCtrlRuleEphemeralContainersN > 0 {
-		r.Containers = append(r.Containers, share.AdmCtrlRuleEphemeralContainers)
-	}
-	if len(r.Containers) == 0 {
-		r.Containers = []string{share.AdmCtrlRuleContainers}
-	}
-
 	r.Criteria = MergeAdmRuleCriteriaREST(r.Criteria)
 
 	return &r
@@ -1848,7 +1835,7 @@ func collectMatchedResult(rule *share.CLUSAdmissionRule, evalContext *nvsysadmis
 // return true means an enabled rule is matched with allow/deny action
 func matchK8sAdmissionRules(ruleType string, matchCfgType int, admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
 	evalContext *nvsysadmission.AdmCtrlEvalContext, scannedImages []*nvsysadmission.ScannedImageSummary, result *nvsysadmission.AdmCtrlAssessResult,
-	ar *admissionv1beta1.AdmissionReview, containerType string) bool {
+	ar *admissionv1beta1.AdmissionReview) bool {
 
 	forTesting := evalContext.ForTesting
 	hasActionMatched := false
@@ -1860,32 +1847,6 @@ func matchK8sAdmissionRules(ruleType string, matchCfgType int, admResObject *nvs
 		for _, head := range admPolicyCache.RuleHeads {
 			if rule, ok := admPolicyCache.RuleMap[head.ID]; ok && (forTesting || !rule.Disable) && rule.Category == admission.AdmRuleCatK8s {
 				if ((matchCfgType == _criticalRulesOnly) && rule.Critical) || (!rule.Critical && (matchCfgType == int(rule.CfgType))) {
-					// check whether this rule should be evaluated for the container
-					var evaluate bool
-					if rule.Containers == 0 {
-						if containerType == share.AdmCtrlRuleContainers {
-							evaluate = true
-						}
-					} else {
-						switch containerType {
-						case share.AdmCtrlRuleContainers:
-							if (rule.Containers & share.AdmCtrlRuleContainersN) > 0 {
-								evaluate = true
-							}
-						case share.AdmCtrlRuleInitContainers:
-							if (rule.Containers & share.AdmCtrlRuleInitContainersN) > 0 {
-								evaluate = true
-							}
-						case share.AdmCtrlRuleEphemeralContainers:
-							if (rule.Containers & share.AdmCtrlRuleEphemeralContainersN) > 0 {
-								evaluate = true
-							}
-						}
-					}
-					if !evaluate {
-						continue
-					}
-
 					for _, scannedImage := range scannedImages {
 						if matched, matchedSource := isAdmissionRuleMet(admResObject, c, scannedImage, rule.Criteria, evalContext.RootAvail, ar, rule.ID); matched {
 							extraDenyRuleMsg := ""
@@ -2050,8 +2011,8 @@ func (m CacheMethod) IsImageScanned(c *nvsysadmission.AdmContainerInfo) (bool, i
 
 // it's for a container/image's evaluation only
 func (m CacheMethod) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResObject, c *nvsysadmission.AdmContainerInfo,
-	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview,
-	containerType string) (*nvsysadmission.AdmCtrlAssessResult, bool) {
+	evalContext *nvsysadmission.AdmCtrlEvalContext, stamps *api.AdmCtlTimeStamps, ar *admissionv1beta1.AdmissionReview) (
+	*nvsysadmission.AdmCtrlAssessResult, bool) {
 
 	forTesting := evalContext.ForTesting
 	result := &nvsysadmission.AdmCtrlAssessResult{} // match result for the container-image
@@ -2116,19 +2077,19 @@ func (m CacheMethod) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResO
 
 	// we compare with default allow rules first when this container doesn't match any rule yet
 	if isActionMatched := matchK8sAdmissionRules(api.ValidatingExceptRuleType, _criticalRulesOnly,
-		admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+		admResObject, c, evalContext, scannedImages, result, ar); isActionMatched && !forTesting {
 		return result, true
 	}
 
 	// if we are in federation, compare with fed admission rules(i.e. fed_admctrl_exception/fed_admctrl_deny rules) before crd/local user-defined rules
 	if fedRole := cacher.GetFedMembershipRoleNoAuth(); fedRole == api.FedRoleJoint || fedRole == api.FedRoleMaster {
 		if isActionMatched := matchK8sAdmissionRules(share.FedAdmCtrlExceptRulesType, share.FederalCfg,
-			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			admResObject, c, evalContext, scannedImages, result, ar); isActionMatched && !forTesting {
 			return result, true
 		}
 
 		if isActionMatched := matchK8sAdmissionRules(share.FedAdmCtrlDenyRulesType, share.FederalCfg,
-			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			admResObject, c, evalContext, scannedImages, result, ar); isActionMatched && !forTesting {
 			// it's not assessment. the matched deny rule will trigger protect-deny action
 			return result, true
 		}
@@ -2141,12 +2102,12 @@ func (m CacheMethod) MatchK8sAdmissionRules(admResObject *nvsysadmission.AdmResO
 	// 4. user-defined deny rules
 	for _, matchScope := range []int{share.GroundCfg, share.UserCreated} {
 		if isActionMatched := matchK8sAdmissionRules(api.ValidatingExceptRuleType, matchScope,
-			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			admResObject, c, evalContext, scannedImages, result, ar); isActionMatched && !forTesting {
 			return result, true
 		}
 
 		if isActionMatched := matchK8sAdmissionRules(api.ValidatingDenyRuleType, matchScope,
-			admResObject, c, evalContext, scannedImages, result, ar, containerType); isActionMatched && !forTesting {
+			admResObject, c, evalContext, scannedImages, result, ar); isActionMatched && !forTesting {
 			// it's not assessment. the matched deny rule will trigger protect-deny action
 			return result, true
 		}

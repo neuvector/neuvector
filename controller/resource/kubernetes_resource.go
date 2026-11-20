@@ -61,6 +61,7 @@ const (
 	K8sResDeploymentConfigs       = "deploymentconfigs"
 	K8sResJobs                    = "jobs"
 	K8sResPods                    = "pods"
+	K8sResPodsEphemeralContainers = "pods/ephemeralcontainers"
 	K8sResNodes                   = "nodes"
 	K8sResReplicationControllers  = "replicationcontrollers"
 	K8sResReplicasets             = "replicasets"
@@ -269,8 +270,9 @@ var rbacApiGroups = utils.NewSet(k8sRbacApiGroup)
 
 var opCreateDelete = utils.NewSet(Create, Update)
 
-var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResPersistentVolumeClaims)
-var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets, K8sResPods)
+var admResForCreateSet = utils.NewSet(K8sResCronjobs, K8sResDaemonsets, K8sResDeployments, K8sResJobs, K8sResPods, K8sResPodsEphemeralContainers,
+	K8sResReplicasets, K8sResReplicationControllers, K8sResStatefulSets, K8sResPersistentVolumeClaims)
+var admResForUpdateSet = utils.NewSet(K8sResDaemonsets, K8sResDeployments, K8sResReplicationControllers, K8sResStatefulSets, K8sResPods, K8sResPodsEphemeralContainers)
 var admRbacResForCreateUpdate1 = utils.NewSet(K8sResRoles, K8sResRolebindings)
 var admRbacResForCreateUpdate2 = utils.NewSet(K8sResClusterRoles, K8sResClusterRolebindings)
 var AdmResForOpsSettings = []*NvAdmRegRuleSetting{
