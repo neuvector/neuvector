@@ -61,6 +61,41 @@ func TestVersionCompare(t *testing.T) {
 			versionB:       "1.2.2-r0",
 			expectedResult: -1,
 		},
+		// apk treats alpha, beta, pre and rc as pre-release suffixes, with or without a
+		// trailing number, so all of these sort below the plain release. Checked against
+		// "apk version -t" from apk-tools 2.14.6.
+		{
+			versionA:       "1.6_alpha1-r0",
+			versionB:       "1.6-r1",
+			expectedResult: -1,
+		},
+		{
+			versionA:       "1.6_beta1-r0",
+			versionB:       "1.6-r1",
+			expectedResult: -1,
+		},
+		{
+			versionA:       "1.6_rc-r0",
+			versionB:       "1.6-r1",
+			expectedResult: -1,
+		},
+		{
+			versionA:       "1.6_pre-r0",
+			versionB:       "1.6-r1",
+			expectedResult: -1,
+		},
+		{
+			versionA:       "3.0.0_beta1-r0",
+			versionB:       "3.0.0-r0",
+			expectedResult: -1,
+		},
+		// 1.3.2.1 beats 1.3 on the second component, so the rc suffix further along the
+		// string must not be what decides this one.
+		{
+			versionA:       "1.3.2.1_rc20260921-r0",
+			versionB:       "1.3-r1",
+			expectedResult: 1,
+		},
 		{
 			versionA:       "2:svn28991.0-45.el7",
 			versionB:       "2:svn28991.1-45.el7",

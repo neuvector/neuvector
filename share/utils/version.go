@@ -248,7 +248,10 @@ func (v *Version) Value() (driver.Value, error) {
 	return v.String(), nil
 }
 
-var rcRegex = regexp.MustCompile("(rc[0-9]|pre[0-9])")
+// apk sorts the pre-release suffixes alpha, beta, pre and rc, with or without a
+// trailing number, below an unsuffixed release. The match is anchored so a suffix
+// later in the string cannot decide a comparison an earlier component settled.
+var rcRegex = regexp.MustCompile(`^(alpha|beta|pre|rc)([0-9]|$)`)
 
 func verrevcmp(t1, t2 string) int {
 	// fmt.Printf("t1=%v t2=%v\n", t1, t2)
