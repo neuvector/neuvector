@@ -410,7 +410,9 @@ static bool tds_normalize_response(dpi_packet_t *p, uint8_t* ptr, uint32_t len)
     uint16_t pos = 0;
     uint16_t start = pos;
     int cnt = 0;
-    uint8_t rsp[tds_resp_len];
+    // +1: every payload byte can be copied when none of them is NUL, and the
+    // loop below still needs room for the terminator at rsp[cnt].
+    uint8_t rsp[tds_resp_len + 1];
 
     tds_pkt_len = ntohs(tds_pkt_hdr->length);
     if (tds_pkt_len != len) {
