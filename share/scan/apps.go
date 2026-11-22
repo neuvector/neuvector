@@ -480,6 +480,7 @@ func (s *ScanApps) parseJarPackage(r *zip.Reader, origJar, filename, fullpath st
 		path = origJar + ":" + filename
 	}
 	pkgs := make(map[string][]AppPackage)
+	var mnfstPkgs []AppPackage
 	for _, f := range r.File {
 		if f.FileInfo().IsDir() {
 			continue
@@ -568,25 +569,54 @@ func (s *ScanApps) parseJarPackage(r *zip.Reader, origJar, filename, fullpath st
 				continue
 			}
 
+			// Defer adding the MANIFEST.MF entry until all pom.properties files
+			// of this jar have been read; see isManifestCoveredByPom.
 			if pkg, err := parseJarManifestFile(path, rc, s.parsingCaps); err == nil {
-				key := fmt.Sprintf("%s-%s-%s", pkg.FileName, pkg.ModuleName, pkg.Version)
-				if !dedup.Contains(key) {
-					dedup.Add(key)
-					if _, ok := pkgs[path]; !ok {
-						pkgs[path] = []AppPackage{*pkg}
-					} else {
-						pkgs[path] = append(pkgs[path], *pkg)
-					}
-				}
+				mnfstPkgs = append(mnfstPkgs, *pkg)
 			}
 
 			rc.Close()
 		}
 	}
 
+	pomPkgs := pkgs[path]
+	for _, pkg := range mnfstPkgs {
+		if isManifestCoveredByPom(&pkg, pomPkgs) {
+			continue
+		}
+		key := fmt.Sprintf("%s-%s-%s", pkg.FileName, pkg.ModuleName, pkg.Version)
+		if !dedup.Contains(key) {
+			dedup.Add(key)
+			pkgs[path] = append(pkgs[path], pkg)
+		}
+	}
+
 	for filename, pkg := range pkgs {
 		s.pkgs[filename] = pkg
 	}
+}
+
+// isManifestCoveredByPom reports whether a MANIFEST.MF package that fell back
+// to the generic "jar:<title>" name describes an artifact already identified by
+// a pom.properties file in the same jar (the title equals a pom artifactId).
+//
+// pom.properties gives the exact groupId:artifactId. The "jar:<title>" fallback
+// is ambiguous and can collide with the "jar:<artifactId>" keys the scanner adds
+// to the vulnerability DB for unrelated modules, including other ecosystems
+// (for example "python:mcp" also becomes "jar:mcp"). Such a manifest entry is
+// redundant when the pom.properties entry exists, so it is dropped. Manifest
+// entries with a resolved vendor are always kept.
+func isManifestCoveredByPom(mnfst *AppPackage, pomPkgs []AppPackage) bool {
+	title, found := strings.CutPrefix(mnfst.ModuleName, "jar:")
+	if !found || title == "" {
+		return false
+	}
+	for _, p := range pomPkgs {
+		if i := strings.LastIndex(p.ModuleName, ":"); i >= 0 && p.ModuleName[i+1:] == title {
+			return true
+		}
+	}
+	return false
 }
 
 func isPython(filename string) bool {
