@@ -53,6 +53,17 @@ linters:
           - staticcheck
         path: controller/
         text: 'SA5008: invalid appearance of unknown `cloak` tag option'
+      # Temporary: AWS SDK for Go v1 is required for ECR authentication.
+      # Remove after migrating controller/scan/aws_auth.go to aws-sdk-go-v2.
+      - linters:
+          - staticcheck
+        path: controller/scan/aws_auth\.go
+        text: 'SA1019: github\.com/aws/aws-sdk-go'
+      # Temporary: remove after replacing SDK v1 endpoint constants.
+      - linters:
+          - staticcheck
+        path: share/types\.go
+        text: 'SA1019: github\.com/aws/aws-sdk-go'
       - path: (.+)\.go$
         text: 'SA1019: grpc.RPCCompressor is deprecated: use encoding.RegisterCompressor'
       - path: (.+)\.go$
