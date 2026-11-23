@@ -184,14 +184,6 @@ func TestCreateJob(t *testing.T) {
 			CronJob:      "02-create-upgrader-job/00-cronjob.yaml",
 			ExpectedData: "02-create-upgrader-job/02-expected-job.yaml",
 		},
-<<<<<<< HEAD
-	} {
-		ctx := cli.NewContext(nil, nil, nil)
-		var testdata []runtime.Object
-		if tc.TestData != "" {
-			testdata = loadObjectList(t, tc.TestData)
-		}
-=======
 		{
 			name:         "cronjob without annotations and existing job",
 			CronJob:      "02-create-upgrader-job/00-cronjob-no-annotations.yaml",
@@ -204,7 +196,6 @@ func TestCreateJob(t *testing.T) {
 			ExpectedData: "02-create-upgrader-job/02-expected-job.yaml",
 		},
 	}
->>>>>>> cdc5da2 (fix: allow upgrader to work with empty annotations (#3059))
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -213,14 +204,7 @@ func TestCreateJob(t *testing.T) {
 				testdata = loadObjectList(t, tc.TestData)
 			}
 
-<<<<<<< HEAD
-		client := fake.NewSimpleDynamicClient(scheme.Scheme,
-			testdata...,
-		)
-		job, err := CreatePostSyncJob(ctx.Context, client, "neuvector", "uid", false)
-=======
 			testdata = append(testdata, loadObject(t, tc.CronJob))
->>>>>>> cdc5da2 (fix: allow upgrader to work with empty annotations (#3059))
 
 			client := fake.NewSimpleDynamicClient(scheme.Scheme,
 				testdata...,

@@ -265,19 +265,6 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 		return nil, fmt.Errorf("failed to convert to job: %w", err)
 	}
 
-<<<<<<< HEAD
-	// Update cronjob
-	payload := []struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value string `json:"value"`
-	}{{
-		Op:    "replace",
-		Path:  fmt.Sprintf("/metadata/annotations/%s", UPGRADER_UID_ANNOTATION),
-		Value: certUpgraderUID,
-	}}
-	patchBytes, _ := json.Marshal(payload)
-=======
 	// Use a merge patch so it works even when the cronjob has no annotations,
 	// e.g. when the helm chart doesn't render them.
 	payload := map[string]any{
@@ -291,7 +278,6 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal patch payload: %w", err)
 	}
->>>>>>> cdc5da2 (fix: allow upgrader to work with empty annotations (#3059))
 
 	if useBetav1 {
 		_, err = client.Resource(
