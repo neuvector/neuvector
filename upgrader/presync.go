@@ -265,17 +265,19 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 		return nil, fmt.Errorf("failed to convert to job: %w", err)
 	}
 
-	// Update cronjob
-	payload := []struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value string `json:"value"`
-	}{{
-		Op:    "replace",
-		Path:  fmt.Sprintf("/metadata/annotations/%s", UPGRADER_UID_ANNOTATION),
-		Value: certUpgraderUID,
-	}}
-	patchBytes, _ := json.Marshal(payload)
+	// Use a merge patch so it works even when the cronjob has no annotations,
+	// e.g. when the helm chart doesn't render them.
+	payload := map[string]any{
+		"metadata": map[string]any{
+			"annotations": map[string]string{
+				UPGRADER_UID_ANNOTATION: certUpgraderUID,
+			},
+		},
+	}
+	patchBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal patch payload: %w", err)
+	}
 
 	if useBetav1 {
 		_, err = client.Resource(
@@ -284,7 +286,7 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 				Version:  "v1beta1",
 				Group:    "batch",
 			},
-		).Namespace(namespace).Patch(ctx, UPGRADER_CRONJOB_NAME, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
+		).Namespace(namespace).Patch(ctx, UPGRADER_CRONJOB_NAME, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	} else {
 		_, err = client.Resource(
 			schema.GroupVersionResource{
@@ -292,10 +294,10 @@ func CreatePostSyncJob(ctx context.Context, client dynamic.Interface, namespace 
 				Version:  "v1",
 				Group:    "batch",
 			},
-		).Namespace(namespace).Patch(ctx, UPGRADER_CRONJOB_NAME, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
+		).Namespace(namespace).Patch(ctx, UPGRADER_CRONJOB_NAME, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to update cron job labels: %w", err)
+		return nil, fmt.Errorf("failed to patch cron job annotation: %w", err)
 	}
 
 	log.Info("Post upgrade job is created")
