@@ -565,7 +565,11 @@ func (fn *FaNotify) MonitorFileEvents() {
 // ////
 func (fn *FaNotify) handleEvents() error {
 	for {
-		ev, err := fn.fa.GetEvent(os.Getpid())
+		// Do not give a skip PID to GetEvent.
+		// GetEvent closes the events of a skip PID and does not send a response.
+		// Then an open by the agent on a file with a permission mark does not complete.
+		// calculateResponse allows the events of the agent.
+		ev, err := fn.fa.GetEvent()
 		if err != nil {
 			return err
 		}
