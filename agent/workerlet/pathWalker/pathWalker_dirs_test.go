@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/neuvector/neuvector/agent/workerlet"
 	"github.com/neuvector/neuvector/share/system"
 )
@@ -109,4 +112,20 @@ func TestWalkPathDirsLimitsScope(t *testing.T) {
 	if contains(found, "/prune/unwanted") {
 		t.Errorf("file outside the requested directories was reported, got %v", found)
 	}
+}
+
+// When Dirs is ["/usr/bin"], the walk must go through "/usr".
+// The walk must not go into the other directories in "/usr".
+func TestWalkPathDirsWalksAncestors(t *testing.T) {
+	root := t.TempDir()
+	for _, d := range []string{"usr/bin", "usr/lib"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(root, d), 0755))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(root, "usr", "bin", "wanted"), []byte("x"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "usr", "lib", "unwanted"), []byte("x"), 0644))
+
+	found := walkTree(t, root, []string{"/usr/bin"})
+
+	assert.Contains(t, found, "/usr/bin/wanted")
+	assert.NotContains(t, found, "/usr/lib/unwanted")
 }
