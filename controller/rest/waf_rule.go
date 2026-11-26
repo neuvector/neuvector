@@ -298,16 +298,18 @@ func validateWafRuleConfig(list []api.RESTWafRule) error {
 		}
 		total_len := 0
 		for _, pt := range rule.Patterns {
+			// bound pattern length for every operator: the datapath concatenates all
+			// pattern values into a fixed-size signature buffer regardless of op.
+			if len(pt.Value) > api.DlpRulePatternMaxLen || len(pt.Value) <= 0 {
+				log.WithFields(log.Fields{"pattern": pt.Value, "pattern_len": len(pt.Value)}).Error("Invalid pattern length")
+				return fmt.Errorf("waf rule %s: invalid pattern length (%d)", rule.Name, len(pt.Value))
+			}
+			total_len += len(pt.Value)
+			if total_len > api.DlpRulePatternTotalMaxLen {
+				log.WithFields(log.Fields{"total": total_len, "max": api.DlpRulePatternTotalMaxLen}).Error("Exceed max total pattern length")
+				return fmt.Errorf("waf rule %s: total pattern length %d exceed max allowed %d", rule.Name, total_len, api.DlpRulePatternTotalMaxLen)
+			}
 			if pt.Op == share.CriteriaOpRegex || pt.Op == share.CriteriaOpNotRegex {
-				if len(pt.Value) > api.DlpRulePatternMaxLen || len(pt.Value) <= 0 {
-					log.WithFields(log.Fields{"pattern": pt.Value, "pattern_len": len(pt.Value)}).Error("Invalid pattern length")
-					return fmt.Errorf("waf rule %s: invalid pattern length (%d)", rule.Name, len(pt.Value))
-				}
-				total_len += len(pt.Value)
-				if total_len > api.DlpRulePatternTotalMaxLen {
-					log.WithFields(log.Fields{"total": total_len, "max": api.DlpRulePatternTotalMaxLen}).Error("Exceed max total pattern length")
-					return fmt.Errorf("waf rule %s: total pattern length %d exceed max allowed %d", rule.Name, total_len, api.DlpRulePatternTotalMaxLen)
-				}
 				if pt.Context != "" &&
 					pt.Context != share.DlpPatternContextURI &&
 					pt.Context != share.DlpPatternContextHEAD &&
@@ -430,7 +432,7 @@ func handlerWafSensorCreate(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -787,7 +789,7 @@ func handlerWafSensorConfig(w http.ResponseWriter, r *http.Request, ps httproute
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -908,7 +910,7 @@ func handlerWafGroupConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 	name := ps.ByName("name")
 
 	// Read request
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1125,7 +1127,7 @@ func handlerWafExport(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	var rconf api.RESTWafSensorExport
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -1540,6 +1542,11 @@ func deleteFedWafGroupSensors() {
 
 func fedCreateWafSensor(conf *api.RESTWafSensorConfig, cfgType share.TCfgType) error {
 	log.Debug()
+	if conf.Rules != nil {
+		if err := validateWafRuleConfig(*conf.Rules); err != nil {
+			return err
+		}
+	}
 	sensor := &share.CLUSWafSensor{
 		Name:          conf.Name,
 		Groups:        make(map[string]string),

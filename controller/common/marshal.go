@@ -252,23 +252,43 @@ func HashPassword(password string, salt []byte) (string, error) {
 	return cipherBundle, nil
 }
 
-func AesGcmEncrypt(plaintext string) (string, error)    { return aesGcmEncrypt(plaintext) }
-func AesGcmDecrypt(cipherBundle string) (string, error) { return aesGcmDecrypt(cipherBundle) }
+func EncryptSensitive(plaintext, key string) (string, error) {
+	return aesGcmEncrypt(plaintext, key)
+}
+func DecryptSensitive(cipherBundle, key string) (string, error) {
+	return aesGcmDecrypt(cipherBundle, key)
+}
 
-func aesGcmEncrypt(plaintext string) (string, error) {
-	if plaintext == "" {
-		return "", ErrEmptyValue
-	}
-	dekSeed := getCurrentDekSeed()
-	if !dekSeed.isAvailable() {
-		return "", ErrDEKSeedUnavailable
+func AesGcmEncrypt(plaintext string) (string, error)    { return aesGcmEncrypt(plaintext, "") }
+func AesGcmDecrypt(cipherBundle string) (string, error) { return aesGcmDecrypt(cipherBundle, "") }
+
+func aesGcmEncrypt(plaintext, fixedSeed string) (string, error) {
+	var dekSeed nvDEK
+	if fixedSeed == "" {
+		if plaintext == "" {
+			return "", ErrEmptyValue
+		}
+		dekSeed = getCurrentDekSeed()
+		if !dekSeed.isAvailable() {
+			return "", ErrDEKSeedUnavailable
+		}
 	}
 
 	salt := make([]byte, saltSize) // http://www.ietf.org/rfc/rfc2898.txt
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("failed to generate salt: %w", err)
 	}
-	dek, err := pbkdf2.Key(sha256.New, currentDekSeed.dekSeed, salt, keyIter, keyLength)
+
+	password := fixedSeed
+	iter := 1
+	dekSeedVersion := "0"
+	if fixedSeed == "" {
+		password = currentDekSeed.dekSeed
+		iter = keyIter
+		dekSeedVersion = currentDekSeed.version
+	}
+
+	dek, err := pbkdf2.Key(sha256.New, password, salt, iter, keyLength)
 	if err != nil {
 		return "", fmt.Errorf("failed to derive DEK: %w", err)
 	}
@@ -291,12 +311,12 @@ func aesGcmEncrypt(plaintext string) (string, error) {
 	additionalData := append(salt, nonce...)
 	cipherText := aesGCM.Seal(nil, nonce, []byte(plaintext), additionalData)
 	cipherBundle := fmt.Sprintf(cipherBundleFormat, cipherTypeA,
-		currentDekSeed.version, hex.EncodeToString(salt), hex.EncodeToString(nonce), hex.EncodeToString(cipherText))
+		dekSeedVersion, hex.EncodeToString(salt), hex.EncodeToString(nonce), hex.EncodeToString(cipherText))
 
 	return cipherBundle, nil
 }
 
-func aesGcmDecrypt(cipherBundle string) (string, error) {
+func aesGcmDecrypt(cipherBundle, fixedSeed string) (string, error) {
 	if cipherBundle == "" {
 		return "", ErrEmptyValue
 	}
@@ -306,13 +326,20 @@ func aesGcmDecrypt(cipherBundle string) (string, error) {
 		return "", ErrUnsupported
 	}
 
-	if _, err := strconv.ParseUint(ss[1], 10, 64); err != nil {
-		return "", fmt.Errorf("invalid version: %s", ss[1])
-	}
+	password := fixedSeed
+	iter := 1
+	if fixedSeed == "" {
+		if _, err := strconv.ParseUint(ss[1], 10, 64); err != nil {
+			return "", fmt.Errorf("invalid version: %s", ss[1])
+		}
 
-	dekSeed := getVersionedDekSeed(ss[1])
-	if len(dekSeed) != keyLength {
-		return "", ErrDEKSeedUnavailable
+		dekSeed := getVersionedDekSeed(ss[1])
+		if len(dekSeed) != keyLength {
+			return "", ErrDEKSeedUnavailable
+		}
+
+		password = dekSeed
+		iter = keyIter
 	}
 
 	salt, err := hex.DecodeString(ss[2])
@@ -330,7 +357,7 @@ func aesGcmDecrypt(cipherBundle string) (string, error) {
 		return "", fmt.Errorf("invalid data: %w", err)
 	}
 
-	dek, err := pbkdf2.Key(sha256.New, dekSeed, salt, keyIter, keyLength)
+	dek, err := pbkdf2.Key(sha256.New, password, salt, iter, keyLength)
 	if err != nil {
 		return "", fmt.Errorf("failed to derive DEK: %w", err)
 	}
@@ -554,7 +581,7 @@ func unmarshal(cloak string, data interface{}, reEncryptRequired *bool, unmarsha
 								}
 							} else {
 								// it's encrypted by variant DEK
-								if s, err = aesGcmDecrypt(strVal); err != nil {
+								if s, err = aesGcmDecrypt(strVal, ""); err != nil {
 									if err != ErrDEKSeedUnavailable && err != ErrEmptyValue {
 										log.WithFields(log.Fields{"error": err, "jsonTag": jsonTag}).Error()
 									}
@@ -698,7 +725,7 @@ func marshal(cloak string, data interface{}, marshalResult tMarshallResult) (int
 					if strVal := val.Interface().(string); strVal != "" {
 						if currentDekSeed.isAvailable() {
 							var err error
-							if m, err = aesGcmEncrypt(strVal); err != nil {
+							if m, err = aesGcmEncrypt(strVal, ""); err != nil {
 								if err != ErrDEKSeedUnavailable && err != ErrEmptyValue {
 									log.WithFields(log.Fields{"err": err, "jsonTag": jsonTag}).Error()
 								}

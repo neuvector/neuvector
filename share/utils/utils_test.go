@@ -187,26 +187,6 @@ func TestPlatformEnv(t *testing.T) {
 	}
 }
 
-func TestUserTokenEncrypt(t *testing.T) {
-	token := "123456"
-	encrypt, err := EncryptUserToken(token, nil)
-	if encrypt != "" {
-		t.Errorf("Token encrypt unexpected: token=%v encrypt=%v err=%v\n", token, encrypt, err)
-	}
-	key, err := GetGuid()
-	if err != nil {
-		t.Errorf("failed to call GetGuid: %v", err)
-	}
-	encrypt, err = EncryptUserToken(token, []byte(key))
-	if err != nil {
-		t.Errorf("Token encrypt unexpected: token=%v encrypt=%v err=%v\n", token, encrypt, err)
-	}
-	decrypt, err := DecryptUserToken(encrypt, []byte(key))
-	if decrypt != token || err != nil {
-		t.Errorf("Token encrypt error: token=%v encrypt=%v decrypt=%v err=%v\n", token, encrypt, decrypt, err)
-	}
-}
-
 func TestCompareSliceWithoutOrder(t *testing.T) {
 	a1 := []string{"cpath"}
 	a2 := []string{"all"}

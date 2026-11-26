@@ -22,6 +22,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const MAX_REQUEST_BODY_SIZE = 2 * 1024 * 1024 // 2MB
+
+func getDefaultReader(r io.Reader) io.Reader {
+	return io.LimitReader(r, MAX_REQUEST_BODY_SIZE)
+}
+
 func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	q := &VulQueryFilter{
 		Filters: &api.VulQueryFilterViewModel{},
@@ -43,7 +49,7 @@ func GetVulnerabilityQuery(r *http.Request) (*VulQueryFilter, error) {
 	}
 
 	if r.Method == http.MethodPatch || r.Method == http.MethodPost {
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(getDefaultReader(r.Body))
 		if err != nil {
 			return nil, err
 		}

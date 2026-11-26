@@ -1,11 +1,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <signal.h>
 #include <string.h>
+#include <strings.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <pthread.h>
@@ -38,6 +40,7 @@ __thread int THREAD_ID;
 __thread char THREAD_NAME[32];
 
 #define DEBUG_FILE "/var/log/agent/dp.log"
+#define DEBUG_JSON_BUF_SIZE 4096
 
 int g_running;
 dp_mnt_shm_t *g_shm;
@@ -53,6 +56,9 @@ pthread_mutex_t g_debug_lock;
 io_callback_t g_callback;
 io_config_t g_config;
 
+/* Set via -l json (monitor passes this from LOG_FORMAT env). Default: text. */
+static int g_log_format_json = 0;
+
 static void dp_signal_dump_policy(int num)
 {
     int thr_id;
@@ -66,7 +72,7 @@ static void dp_signal_exit(int num)
     g_running = false;
 }
 
-static inline int debug_ts(FILE *logfp)
+static void format_debug_time(char *buf, size_t buflen)
 {
     struct timeval now;
     struct tm *tm;
@@ -80,9 +86,131 @@ static inline int debug_ts(FILE *logfp)
         tm = localtime(&now.tv_sec);
     }
 
-    return fprintf(logfp, "%04d-%02d-%02dT%02d:%02d:%02d|DEBU|%s|",
-                   tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                   tm->tm_hour, tm->tm_min, tm->tm_sec, THREAD_NAME);
+    snprintf(buf, buflen, "%04d-%02d-%02dT%02d:%02d:%02d",
+             tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+             tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
+static inline int debug_ts(FILE *logfp)
+{
+    char ts[80];
+
+    format_debug_time(ts, sizeof(ts));
+    return fprintf(logfp, "%s|DEBU|%s|", ts, THREAD_NAME);
+}
+
+static int emit_json_log(FILE *fp, const char *time_str, const char *thread,
+                         const char *log, size_t log_len)
+{
+    // log_body contains "thread|message", room for the full message,
+    // the thread name, the '|' and the trailing NUL
+    char log_body[DEBUG_JSON_BUF_SIZE + MAX_THREAD_NAME_LEN + 2];
+    const char *sep = (thread != NULL && thread[0] != '\0') ? "|" : "";
+    json_t *root;
+    char *out;
+    int len = 0;
+
+    while (log_len > 0 && (log[log_len - 1] == '\n' || log[log_len - 1] == '\r')) {
+        log_len--;
+    }
+
+    snprintf(log_body, sizeof(log_body), "%.*s%s%.*s",
+             MAX_THREAD_NAME_LEN - 1, thread ? thread : "",
+             sep,
+             (int)log_len, log);
+
+    root = json_pack("{s:s,s:s,s:s,s:s}",
+                     "time", time_str,
+                     "level", "DEBU",
+                     "module", "DP",
+                     "log", log_body);
+    if (root == NULL) {
+        // jansson rejects invalid UTF-8
+        return fprintf(fp, "{\"time\":\"%s\",\"level\":\"WARN\",\"module\":\"DP\","
+                           "\"log\":\"dropped a log line containing invalid UTF-8\"}\n", time_str);
+    }
+
+    out = json_dumps(root, JSON_COMPACT);
+    json_decref(root);
+    if (out == NULL) {
+        return fprintf(fp, "{\"time\":\"%s\",\"level\":\"WARN\",\"module\":\"DP\","
+                           "\"log\":\"failed to dump json log\"}\n", time_str);
+    }
+
+    len = fprintf(fp, "%s\n", out);
+    free(out);
+    return len;
+}
+
+/*
+ * DP often builds one debug line from several debug_log() calls:
+ *   print_ts=true  starts the line (timestamp/thread),
+ *   print_ts=false appends more text without a new header.
+ * Text mode streams those chunks as-is. JSON mode buffers them in
+ * per-thread storage until the buffered text ends with '\n'
+ * (or overflow / next print_ts) so we emit one JSON object
+ * per message instead of one per chunk.
+ */
+static int debug_write(FILE *fp, bool print_ts, const char *fmt, va_list args)
+{
+    static __thread char json_time[80];
+    static __thread char json_body[DEBUG_JSON_BUF_SIZE];
+    static __thread size_t json_body_len;
+    static __thread int json_have_header;
+    int len = 0;
+
+    if (!g_log_format_json) {
+        if (print_ts) {
+            len = debug_ts(fp);
+        }
+        len += vfprintf(fp, fmt, args);
+        return len;
+    }
+
+    char msg[DEBUG_JSON_BUF_SIZE];
+    int n = vsnprintf(msg, sizeof(msg), fmt, args);
+
+    if (n < 0) {
+        return 0;
+    }
+    if (n >= (int)sizeof(msg)) {
+        n = (int)sizeof(msg) - 1;
+        // Message too long: cut it here and end with a newline so it gets logged right away
+        msg[n - 1] = '\n';
+    }
+
+    if (print_ts || !json_have_header) {
+        if (json_body_len > 0 && json_have_header) {
+            len += emit_json_log(fp, json_time, THREAD_NAME, json_body, json_body_len);
+            json_body_len = 0;
+        }
+        format_debug_time(json_time, sizeof(json_time));
+        json_have_header = 1;
+    }
+
+    if (json_body_len + (size_t)n >= sizeof(json_body)) {
+        /* Overflow: flush what we have, then keep the latest chunk. */
+        if (json_body_len > 0) {
+            len += emit_json_log(fp, json_time, THREAD_NAME, json_body, json_body_len);
+            json_body_len = 0;
+        }
+        if ((size_t)n >= sizeof(json_body)) {
+            n = (int)sizeof(json_body) - 1;
+        }
+    }
+    memcpy(json_body + json_body_len, msg, (size_t)n);
+    json_body_len += (size_t)n;
+
+    if (json_body_len > 0 && json_body[json_body_len - 1] == '\n') {
+        len += emit_json_log(fp, json_time, THREAD_NAME, json_body, json_body_len);
+        json_body_len = 0;
+    }
+
+    if (json_body_len == 0) {
+        json_have_header = 0;
+    }
+
+    return len;
 }
 
 static int debug_stdout(bool print_ts, const char *fmt, va_list args)
@@ -90,10 +218,7 @@ static int debug_stdout(bool print_ts, const char *fmt, va_list args)
     int len = 0;
 
     pthread_mutex_lock(&g_debug_lock);
-    if (print_ts) {
-        len = debug_ts(stdout);
-    }
-    len += vprintf(fmt, args);
+    len = debug_write(stdout, print_ts, fmt, args);
     pthread_mutex_unlock(&g_debug_lock);
 
     return len;
@@ -121,10 +246,7 @@ int debug_file(bool print_ts, const char *fmt, va_list args)
     int len = 0;
 
     pthread_mutex_lock(&g_debug_lock);
-    if (print_ts) {
-        len = debug_ts(logfp);
-    }
-    len += vfprintf(logfp, fmt, args);
+    len = debug_write(logfp, print_ts, fmt, args);
     fflush(logfp);
     pthread_mutex_unlock(&g_debug_lock);
 
@@ -218,6 +340,7 @@ static void help(const char *prog)
     printf("  m: match proxymesh traffic against parent workload policy\n");
     printf("  p: pcap file or directory\n");
     printf("  s: standalone mode (listen to the control channel)\n");
+    printf("  l: log format (set to json to enable JSON logs)\n");
 }
 
 // -- pcap
@@ -358,7 +481,7 @@ int main(int argc, char *argv[])
 
     memset(&g_config, 0, sizeof(g_config));
     while (arg != -1) {
-        arg = getopt(argc, argv, "hcd:i:j:mn:p:s:v:");
+        arg = getopt(argc, argv, "hcd:i:j:l:mn:p:s:v:");
 
         switch (arg) {
         case -1:
@@ -378,6 +501,9 @@ int main(int argc, char *argv[])
         case 'i':
             g_in_iface = strdup(optarg);
             g_config.promisc = true;
+            break;
+        case 'l':
+            g_log_format_json = (strcasecmp(optarg, "json") == 0) ? 1 : 0;
             break;
         case 'm':
             g_config.match_proxymesh_parent_policy = true;

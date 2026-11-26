@@ -1826,7 +1826,10 @@ func (t *TaskScanner) scanSecretLoop() {
 				}
 				t.lock.Unlock()
 			}
-		case <-t.done:
+		case err := <-t.done:
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("SCRT: scan task failed")
+			}
 			t.lock.Lock()
 			t.curWorkers--
 			t.caseDone++

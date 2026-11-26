@@ -265,12 +265,11 @@ func handlerGetIBMSASetupURL(w http.ResponseWriter, r *http.Request, ps httprout
 	if err != nil {
 		log.WithError(err).Warn("failed to get installation ID")
 	}
-	ticketString, err := jwtGenFedTicket(installID, time.Duration(jwtIbmSaTokenLife))
+	id, err := jwtGenFedTicket(installID, time.Duration(jwtIbmSaTokenLife))
 	if err != nil {
 		restRespErrorMessage(w, http.StatusInternalServerError, api.RESTErrServerError, err.Error())
 		return
 	}
-	id := strings.ReplaceAll(ticketString, "/", "-")
 	resp := api.RESTIBMSASetupUrl{URL: fmt.Sprintf("/v1/partner/ibm_sa/%s/setup", url.QueryEscape(id))}
 
 	restRespSuccess(w, r, &resp, acc, login, nil, "Get IBM SA setup endpoint")
@@ -298,7 +297,7 @@ func handlerGetIBMSAConfig(w http.ResponseWriter, r *http.Request, ps httprouter
 }
 
 func verifyIBMSAEpSetupID(w http.ResponseWriter, ps httprouter.Params, checkTime bool) error {
-	id := strings.ReplaceAll(ps.ByName("id"), "-", "/")
+	id := ps.ByName("id")
 	installID, err := clusHelper.GetInstallationID()
 	if err != nil {
 		log.WithError(err).Warn("failed to get installation ID")
@@ -522,7 +521,7 @@ func handlerPostIBMSAEpSetup(w http.ResponseWriter, r *http.Request, ps httprout
 	var err error
 
 	action := ps.ByName("action")
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -983,7 +982,7 @@ func handlerTestOccurrences(w http.ResponseWriter, r *http.Request, ps httproute
 
 	//accountID := ps.ByName("accountID")
 	//providerID := ps.ByName("providerID")
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

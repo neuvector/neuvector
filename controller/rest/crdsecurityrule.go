@@ -1588,7 +1588,6 @@ func (h *nvCrdHandler) crdHandleAdmCtrlRules(cfgType share.TCfgType, allAdmCtrlR
 					cr.Disable = ruleConf.Disabled
 				}
 				cr.RuleMode = ruleConf.RuleMode
-				cr.Containers = ruleConf.Containers
 				cr.CfgType = cfgType
 				if err := clusHelper.PutAdmissionRuleTxn(txn, admission.NvAdmValidateType, ruleType, cr); err != nil {
 					log.WithFields(log.Fields{"error": err}).Error("PutAdmissionRuleTxn")
@@ -3290,19 +3289,6 @@ func (h *nvCrdHandler) parseCurCrdAdmCtrlContent(admCtrlSecRule *resource.NvAdmC
 					if crdRule.Disabled != nil {
 						ruleCfg.Disabled = *crdRule.Disabled
 					}
-					if crdRule.Containers != nil {
-						if v, err := getAdmCtrlRuleContainers(crdRule.Containers); err != nil {
-							errMsg = fmt.Sprintf("%s Rule format error:   Rule #%d in %s validatation error %s", reviewTypeDisplay, idx, name, err.Error())
-							buffer.WriteString(errMsg)
-							errCount++
-							continue
-						} else {
-							ruleCfg.Containers = v
-						}
-					}
-					if ruleCfg.Containers == 0 {
-						ruleCfg.Containers = share.AdmCtrlRuleContainersN
-					}
 					if crdRule.RuleMode != nil {
 						ruleCfg.RuleMode = *crdRule.RuleMode
 					}
@@ -4218,7 +4204,7 @@ func handlerGroupCfgExport(w http.ResponseWriter, r *http.Request, ps httprouter
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}

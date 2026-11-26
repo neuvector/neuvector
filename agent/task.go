@@ -76,13 +76,8 @@ func taskConfigContainer(id string, newconf *share.CLUSWorkloadConfig) {
 		//but does not really setup datapath correctly, so we need to go through same func
 		//with child whose pid!=0 to setup datapath right
 		if c.pid == 0 {
-			for podID := range c.pods.Iter() {
-				if pod, ok := gInfoReadActiveContainer(podID.(string)); ok {
-					if pod.pid != 0 && pod.hasDatapath {
-						cid = podID.(string)
-						break
-					}
-				}
+			if pc := getPodDatapathChild(c); pc != nil {
+				cid = pc.id
 			}
 			//log.WithFields(log.Fields{"cid": cid}).Debug("")
 			if cid != "" {

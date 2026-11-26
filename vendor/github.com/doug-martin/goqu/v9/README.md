@@ -32,6 +32,12 @@ If you are not using go modules...
 go get -u github.com/doug-martin/goqu
 ```
 
+### Supported Go versions
+
+The `go` directive in the root `go.mod` (currently Go 1.26) is the minimum Go version for using `goqu`. CI tests against that version and the latest Go release.
+
+Raising that minimum is treated as a notable change: it is made deliberately, not as a side effect of a dependency update, and is called out in the release notes.
+
 ### [Migrating Between Versions](./docs/version_migration.md)
 
 ## Features
@@ -70,6 +76,7 @@ We tried a few other sql builders but each was a thin wrapper around sql fragmen
 * [Insert Dataset](./docs/inserting.md) - Docs and examples about creating and executing INSERT sql statements.
 * [Update Dataset](./docs/updating.md) - Docs and examples about creating and executing UPDATE sql statements.
 * [Delete Dataset](./docs/deleting.md) - Docs and examples about creating and executing DELETE sql statements.
+* [Struct Tags](./docs/struct_tags.md) - Reference for the `db` and `goqu` struct tags (`skipinsert`, `skipupdate`, `omitnil`, `omitempty`, `defaultifempty`).
 * [Prepared Statements](./docs/interpolation.md) - Docs about interpolation and prepared statements in `goqu`.
 * [Database](./docs/database.md) - Docs and examples of using a Database to execute queries in `goqu`
 * [Working with time.Time](./docs/time.md) - Docs on how to use alternate time locations.
@@ -294,11 +301,15 @@ The test suite requires a postgres, mysql and sqlserver databases. You can overr
 go test -v -race ./...
 ```
 
-You can also run the tests in a container using [docker-compose](https://docs.docker.com/compose/).
+You can also run the tests in a container using [Docker Compose](https://docs.docker.com/compose/) (v2, the `docker compose` command). These are the versions CI uses:
 
 ```sh
-MYSQL_VERSION=8 POSTGRES_VERSION=13.4 SQLSERVER_VERSION=2017-CU8-ubuntu GO_VERSION=latest docker-compose run goqu
+MYSQL_VERSION=8 POSTGRES_VERSION=15 SQLSERVER_VERSION=2022-latest GO_VERSION=latest docker compose run --rm goqu
 ```
+
+When you are done, stop the databases with `docker compose down`.
+
+**NOTE** The SQL Server image is only published for `amd64`. On Apple Silicon it runs under emulation, which can be slow to start or unstable; in that case run the SQL Server tests on an `amd64` machine or let CI run them.
 
 ## License
 
