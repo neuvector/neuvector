@@ -161,6 +161,30 @@ func TestShouldSkipDir(t *testing.T) {
 			want:      true,
 		},
 		{
+			name:      "ancestor of an allowed dir is not skipped",
+			ldir:      "/usr",
+			allowDirs: []string{"/usr/bin"},
+			want:      false,
+		},
+		{
+			name:      "deep ancestor of an allowed dir is not skipped",
+			ldir:      "/opt",
+			allowDirs: []string{"/opt/app/conf"},
+			want:      false,
+		},
+		{
+			name:      "sibling of an allowed dir is skipped",
+			ldir:      "/usr/lib",
+			allowDirs: []string{"/usr/bin"},
+			want:      true,
+		},
+		{
+			name:      "name prefix is not an ancestor",
+			ldir:      "/us",
+			allowDirs: []string{"/usr/bin"},
+			want:      true,
+		},
+		{
 			name:      "partial prefix still matches (documents HasPrefix boundary)",
 			ldir:      "/usrlocal",
 			allowDirs: []string{"/usr"},
