@@ -648,16 +648,36 @@ int dpi_sig_bld(dpi_dlpbld_t *dlpsig, int flag)
     }
     //build SigList for updated dlp rules
     for (j = 0; j < dlpsig->num_dlp_rules; j ++) {
-        len = sprintf(dlpsig_buf, 
+        bool skip_rule = false;
+
+        len = snprintf(dlpsig_buf, MAX_USER_SIG_LEN,
             "name %s;"
             "sig_id %u;",
             dlpsig->dlp_rule_list[j].rulename,
             dlpsig->dlp_rule_list[j].sigid
             );
+        if (len < 0 || len >= MAX_USER_SIG_LEN) {
+            DEBUG_ERROR(DBG_DETECT,
+                "dlp rule(%s) sig_id(%u) header exceeds max sig len(%d), skip rule\n",
+                dlpsig->dlp_rule_list[j].rulename,
+                dlpsig->dlp_rule_list[j].sigid, MAX_USER_SIG_LEN);
+            continue;
+        }
         for (k = 0; k < dlpsig->dlp_rule_list[j].num_dlp_rule_pats; k ++) {
-            len1 = sprintf(&dlpsig_buf[len], "pcre %s;",
+            len1 = snprintf(&dlpsig_buf[len], MAX_USER_SIG_LEN - len, "pcre %s;",
                 dlpsig->dlp_rule_list[j].dlp_rule_pat_list[k].rule_pattern);
-                len += len1;
+            if (len1 < 0 || len1 >= MAX_USER_SIG_LEN - len) {
+                DEBUG_ERROR(DBG_DETECT,
+                    "dlp rule(%s) sig_id(%u) exceeds max sig len(%d) at pattern(%d), skip rule\n",
+                    dlpsig->dlp_rule_list[j].rulename,
+                    dlpsig->dlp_rule_list[j].sigid, MAX_USER_SIG_LEN, k);
+                skip_rule = true;
+                break;
+            }
+            len += len1;
+        }
+        if (skip_rule) {
+            continue;
         }
         dlpsig_buf[len]='\0';
         //parse each dlp rule and store into SigList

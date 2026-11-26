@@ -991,14 +991,6 @@ func Encrypt(encryptionKey, text []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func EncryptToBase64(encryptionKey, text []byte) (string, error) {
-	if ciphertext, err := Encrypt(encryptionKey, text); err == nil {
-		return base64.StdEncoding.EncodeToString(ciphertext), nil
-	} else {
-		return "", err
-	}
-}
-
 func Decrypt(encryptionKey, text []byte) ([]byte, error) {
 	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
@@ -1028,27 +1020,6 @@ func DecryptFromBase64(encryptionKey []byte, b64 string) (string, error) {
 	}
 }
 
-func EncryptToRawURLBase64(key, text []byte) (string, error) {
-	if ciphertext, err := Encrypt(key, text); err == nil {
-		return base64.RawURLEncoding.EncodeToString(ciphertext), nil
-	} else {
-		return "", err
-	}
-}
-
-func DecryptFromRawURLBase64(key []byte, b64 string) (string, error) {
-	text, err := base64.RawURLEncoding.DecodeString(b64)
-	if err != nil {
-		return "", err
-	}
-
-	if text, err = Decrypt(key, text); err == nil {
-		return string(text), nil
-	} else {
-		return "", err
-	}
-}
-
 func getPasswordSymKey() []byte {
 	return passwordSymKey
 }
@@ -1063,52 +1034,6 @@ func DecryptPassword(encrypted string) string {
 		log.WithError(err).Warn("failed to decrypt password")
 	}
 	return password
-}
-
-func DecryptSensitive(encrypted string, key []byte) (string, error) {
-	if encrypted == "" {
-		return "", nil
-	}
-	return DecryptFromBase64(key, encrypted)
-}
-
-func EncryptSensitive(data string, key []byte) (string, error) {
-	if data == "" {
-		return "", nil
-	}
-
-	return EncryptToBase64(key, []byte(data))
-}
-
-func DecryptUserToken(encrypted string, key []byte) (string, error) {
-	if len(key) == 0 {
-		return "", errors.New("empty encryption key")
-	}
-	if encrypted == "" {
-		return "", nil
-	}
-
-	return DecryptFromRawURLBase64(key, encrypted)
-}
-
-func EncryptUserToken(token string, key []byte) (string, error) {
-	if len(key) == 0 {
-		return "", errors.New("empty encryption key")
-	}
-	if token == "" {
-		return "", nil
-	}
-
-	// Std base64 encoding has + and /, instead of - and _ (url encoding)
-	// encrypted token can be used as part of kv key string, so we replace / with _
-	return EncryptToRawURLBase64(key, []byte(token))
-}
-
-func DecryptURLSafe(encrypted string) (string, error) {
-	if encrypted == "" {
-		return "", nil
-	}
-	return DecryptFromRawURLBase64(getPasswordSymKey(), encrypted)
 }
 
 // Determine if a directory is a mountpoint, by comparing the device for the directory
