@@ -1964,7 +1964,11 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 	// If platform authz enabled, try to get user role from there; if failed, fallback to group role mapping
 	if roles := platformTokenRoleMapping(username); roles != nil {
 		role, roleDomains, _, _, _ = rbac2UserRole(roles, nil)
-	} else {
+		if role == api.UserRoleNone && len(roleDomains) == 0 {
+			log.WithFields(log.Fields{"server": cs.Name, "user": username}).Debug("No valid role from platform, fallback to group role mapping")
+		}
+	}
+	if role == api.UserRoleNone && len(roleDomains) == 0 {
 		if cs.SAML != nil {
 			role, roleDomains = getRoleFromGroupMapping(groups, cs.SAML.GroupMappedRoles, cs.SAML.DefaultRole, true)
 		} else if cs.OIDC != nil {
