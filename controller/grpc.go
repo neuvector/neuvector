@@ -781,6 +781,12 @@ func (sas *ScanAdapterService) GetScanners(context.Context, *share.RPCVoid) (*sh
 		}
 	}
 
+	for _, scanner := range rpc.ScannerAcquisitionMgr.GetClusterHelper().GetAvailableScanners() {
+		if scanner.ScanCredit > 0 {
+			c.AvailableScanCredits += uint32(scanner.ScanCredit)
+		}
+	}
+
 	return &c, nil
 }
 
