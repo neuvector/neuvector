@@ -1,6 +1,8 @@
 package netlink
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -59,6 +61,31 @@ func NewNetlinkSocket(protocol NetlinkProtocol, bufSize uint, groups ...uint) (*
 		buf:      make([]byte, bufSize),
 	}
 	return ns, nil
+}
+
+// MessageError decodes an NLMSG_ERROR message. Its payload starts with
+// struct nlmsgerr, whose first field is the negated errno of the request
+// that failed, or 0 when the kernel is only acknowledging a request. The
+// returned error wraps the errno, so callers can match it with errors.Is.
+func MessageError(msg syscall.NetlinkMessage) error {
+	if msg.Header.Type != syscall.NLMSG_ERROR {
+		return nil
+	}
+	if len(msg.Data) < 4 {
+		return fmt.Errorf("netlink error message with a %d-byte payload", len(msg.Data))
+	}
+	code := int32(binary.NativeEndian.Uint32(msg.Data[:4]))
+	switch {
+	case code == 0:
+		return errors.New("netlink acknowledgement (errno 0)")
+	case code > 0:
+		return fmt.Errorf("netlink error message with a positive code %d", code)
+	}
+	errno := syscall.Errno(-code)
+	if name := unix.ErrnoName(errno); name != "" {
+		return fmt.Errorf("netlink error %s: %w", name, errno)
+	}
+	return fmt.Errorf("netlink error %d: %w", int(errno), errno)
 }
 
 func (ns *NetlinkSocket) Close() {
