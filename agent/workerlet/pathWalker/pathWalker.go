@@ -53,7 +53,10 @@ func shouldSkipDir(ldir string, allowDirs []string) bool {
 		return false
 	}
 	for _, rdir := range allowDirs {
-		if strings.HasPrefix(ldir, rdir) {
+		switch {
+		case strings.HasPrefix(ldir, rdir): // ldir is rdir or below it, e.g. /usr/bin/x for /usr/bin
+			return false
+		case strings.HasPrefix(rdir, ldir+"/"): // ldir is a parent of rdir, e.g. /usr for /usr/bin
 			return false
 		}
 	}

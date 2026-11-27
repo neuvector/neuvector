@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !(linux && (amd64 || arm64 || loong64 || ppc64le || s390x || riscv64 || 386 || arm))
+
 package libc // import "modernc.org/libc"
 
 import (
@@ -114,7 +116,7 @@ flags:
 			break flags
 		}
 	}
-	format, width, hasWidth := parseFieldWidth(format)
+	format, width, hasWidth := parseFieldWidth(format, args)
 	if hasWidth {
 		spec += strconv.Itoa(width)
 	}
@@ -344,6 +346,8 @@ more:
 			arg = uint64(uint8(VaInt32(args)))
 		case mod32:
 			arg = uint64(VaInt32(args))
+		case modZ:
+			arg = uint64(VaInt64(args))
 		default:
 			panic(todo("", mod))
 		}
@@ -506,7 +510,7 @@ more:
 // nonexistent or small field width cause truncation of a field; if the result
 // of a conversion is wider than the field width, the field is expanded to
 // contain the conversion result.
-func parseFieldWidth(format uintptr) (_ uintptr, n int, ok bool) {
+func parseFieldWidth(format uintptr, args *uintptr) (_ uintptr, n int, ok bool) {
 	first := true
 	for {
 		var digit int
@@ -514,7 +518,13 @@ func parseFieldWidth(format uintptr) (_ uintptr, n int, ok bool) {
 		case first && c == '0':
 			return format, n, ok
 		case first && c == '*':
-			panic(todo(""))
+			format++
+			switch c := *(*byte)(unsafe.Pointer(format)); {
+			case c >= '0' && c <= '9':
+				panic(todo(""))
+			default:
+				return format, int(VaInt32(args)), true
+			}
 		case c >= '0' && c <= '9':
 			format++
 			ok = true

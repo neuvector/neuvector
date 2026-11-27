@@ -6,7 +6,6 @@ package libc // import "modernc.org/libc"
 
 import (
 	"strings"
-	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -657,7 +656,7 @@ func Xgetrlimit64(t *TLS, resource int32, rlim uintptr) int32 {
 	return 0
 }
 
-func newFtsent(t *TLS, info int, path string, stat *unix.Stat_t, err syscall.Errno) (r *fts.FTSENT) {
+func newFtsent(t *TLS, info int, path string, stat *unix.Stat_t, err syscallErrno) (r *fts.FTSENT) {
 	var statp uintptr
 	if stat != nil {
 		statp = Xmalloc(t, types.Size_t(unsafe.Sizeof(unix.Stat_t{})))
@@ -708,4 +707,24 @@ func Xopendir(t *TLS, name uintptr) uintptr {
 	(*darwinDir)(unsafe.Pointer(p)).l = 0
 	(*darwinDir)(unsafe.Pointer(p)).eof = false
 	return p
+}
+
+func AtomicLoadPInt8(addr uintptr) (val int8) {
+	return int8(a_load_8(addr))
+}
+
+func AtomicLoadPInt16(addr uintptr) (val int16) {
+	return int16(a_load_16(addr))
+}
+
+func AtomicLoadPUint8(addr uintptr) byte {
+	return byte(a_load_8(addr))
+}
+
+func AtomicLoadPUint16(addr uintptr) uint16 {
+	return uint16(a_load_16(addr))
+}
+
+func AtomicLoadNUint8(ptr uintptr, memorder int32) uint8 {
+	return byte(a_load_8(ptr))
 }

@@ -67,13 +67,8 @@ func updateContainerPolicyMode(id, policyMode string) {
 		//when parent's pid==0, we need to execute func with child first to make sure datapath
 		//is setup correctly
 		if c.pid == 0 {
-			for podID := range c.pods.Iter() {
-				if pod, ok := gInfoReadActiveContainer(podID.(string)); ok {
-					if pod.pid != 0 && pod.hasDatapath {
-						cid = podID.(string)
-						break
-					}
-				}
+			if pc := getPodDatapathChild(c); pc != nil {
+				cid = pc.id
 			}
 			//log.WithFields(log.Fields{"cid": cid}).Debug("")
 			if cid != "" {

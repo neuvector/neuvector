@@ -7,8 +7,10 @@ MAKE = make
 ROOTDIR = $(TOPDIR)/..
 
 CFLAGS = -Wall -Werror -fstrict-aliasing -Wstrict-aliasing -g
+CFLAGS += -fstack-protector-strong -fstack-clash-protection -fPIE
 CFLAGS += -I./ -I$(TOPDIR)/
 CFLAGS += -O3
+CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
 
 CSRCS += $(wildcard *.c)
 OBJS := $(CSRCS:%.c=%.o)

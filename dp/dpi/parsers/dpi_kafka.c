@@ -149,6 +149,9 @@ static int check_produce_request(dpi_packet_t *p, kafka_data_t * data, uint8_t *
             ptr += 4; *pleft -= 4; size_left -= 4;//partition id
 
             size_bytes = get_bytes(ptr, pleft);
+            if (size_bytes < 0 || size_bytes > size_left - 4 || size_bytes > *pleft - 4) {
+                return -1;
+            }
             ptr += 4; *pleft -= 4; size_left -= 4;//byte-length of serialized messages
             ptr += size_bytes; *pleft -= size_bytes; size_left -= size_bytes;//byte-length of serialized messages
             DEBUG_LOG(DBG_PARSER, p, "Kafka size_bytes=%d pleft=%d\n", size_bytes, *pleft);

@@ -1376,7 +1376,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 		tokenString = encryptedToken
 	} else {
 		var err error
-		tokenString, err = utils.DecryptSensitive(encryptedToken, []byte(secret))
+		tokenString, err = common.DecryptSensitive(encryptedToken, secret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt token: %w", err)
 		}
@@ -1446,7 +1446,7 @@ func jwtValidateToken(encryptedToken, secret string, rsaPublicKey *rsa.PublicKey
 }
 
 func validateEncryptedData(encryptedData, secret string, checkTime bool) error {
-	data, err := utils.DecryptSensitive(encryptedData, []byte(secret))
+	data, err := common.DecryptSensitive(encryptedData, secret)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt data: %w", err)
 	}
@@ -1560,7 +1560,7 @@ func jwtGenFedTicket(secret string, duration time.Duration) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return utils.EncryptSensitive(string(tokenBytes), []byte(secret))
+	return common.EncryptSensitive(string(tokenBytes), secret)
 }
 
 func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsaPrivateKey *rsa.PrivateKey) (string, error) {
@@ -1588,7 +1588,7 @@ func _genFedJwtToken(c *tokenClaim, callerFedRole, clusterID, secret string, rsa
 			log.WithFields(log.Fields{"id": clusterID, "err": err}).Error("failed to sign token")
 			return "", err
 		}
-		return utils.EncryptSensitive(tokenString, []byte(secret))
+		return common.EncryptSensitive(tokenString, secret)
 	} else {
 		err = errors.New("empty private key")
 		log.WithFields(log.Fields{"id": clusterID, "err": err}).Error()
@@ -1964,7 +1964,11 @@ func tokenServerAuthz(cs *share.CLUSServer, username, email string, groups []str
 	// If platform authz enabled, try to get user role from there; if failed, fallback to group role mapping
 	if roles := platformTokenRoleMapping(username); roles != nil {
 		role, roleDomains, _, _, _ = rbac2UserRole(roles, nil)
-	} else {
+		if role == api.UserRoleNone && len(roleDomains) == 0 {
+			log.WithFields(log.Fields{"server": cs.Name, "user": username}).Debug("No valid role from platform, fallback to group role mapping")
+		}
+	}
+	if role == api.UserRoleNone && len(roleDomains) == 0 {
 		if cs.SAML != nil {
 			role, roleDomains = getRoleFromGroupMapping(groups, cs.SAML.GroupMappedRoles, cs.SAML.DefaultRole, true)
 		} else if cs.OIDC != nil {
@@ -2445,7 +2449,7 @@ func handlerAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		mainSessionUser = user.Fullname
 	} else {
 		// Read body
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(getDefaultReader(r.Body))
 		if err != nil {
 			log.WithError(err).Warn("failed to read request body")
 		}
@@ -2708,7 +2712,7 @@ func handlerFedAuthLogin(w http.ResponseWriter, r *http.Request, ps httprouter.P
 
 	// Read body
 	var auth api.RESTFedAuthData
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("Failed to read request body")
 	}
@@ -2770,7 +2774,7 @@ func handlerAuthLoginServer(w http.ResponseWriter, r *http.Request, ps httproute
 	defer r.Body.Close()
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("Failed to read request body")
 	}

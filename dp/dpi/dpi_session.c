@@ -515,8 +515,11 @@ void dpi_session_release(dpi_session_t *s)
 {
     DEBUG_LOG(DBG_SESSION, NULL, "id=%u asm:%u/%u\n",
               s->id, asm_gross(&s->client.asm_cache), asm_gross(&s->server.asm_cache));
-    uint8_t *ep_mac = (s->flags & DPI_SESS_FLAG_INGRESS)?s->server.mac:s->client.mac;
-    bool isproxymesh = cmp_mac_prefix(ep_mac, PROXYMESH_MAC_PREFIX);
+    // The insert side (dpi_session_create) decides the map from p->ep_mac, the
+    // endpoint MAC. Recomputing it here from the session's stored wing MAC -- a
+    // MAC that came off the wire -- can disagree with that decision, so use the
+    // flag recorded at create time instead.
+    bool isproxymesh = FLAGS_TEST(s->flags, DPI_SESS_FLAG_PROXYMESH);
 
     if (unlikely(dpi_session_is_tick_running(s))) {
         timer_wheel_entry_remove(&th_timer, &s->tick_entry);
@@ -827,6 +830,10 @@ static dpi_session_t *dpi_session_create(dpi_packet_t *p, bool to_server)
             mac_cpy(s->client.mac, eth->h_dest);
             mac_cpy(s->server.mac, ep_mac);
         }
+    }
+
+    if (isproxymesh) {
+        FLAGS_SET(s->flags, DPI_SESS_FLAG_PROXYMESH);
     }
 
     if (p->ep->tap) {
@@ -1643,7 +1650,7 @@ void dpi_tcp_tracker(dpi_packet_t *p)
         if (clip != NULL) {
             if (clip->len == len) {
                 // Both seq# and length have to be same to be considered as retransmission
-                DEBUG_LOG(DBG_TCP, p, "TCP retransmission: seq=0x%x len=%u", seq, len);
+                DEBUG_LOG(DBG_TCP, p, "TCP retransmission: seq=0x%x len=%u\n", seq, len);
 
                 FLAGS_SET(p->flags, DPI_PKT_FLAG_CACHED |
                                     DPI_PKT_FLAG_SKIP_PARSER |

@@ -25,8 +25,6 @@ import (
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/auth/oidc"
 	"github.com/neuvector/neuvector/share/httpclient"
-
-	"github.com/neuvector/neuvector/share/utils"
 )
 
 var DefaultOIDCScopes []string = []string{oidc.ScopeOpenID, "profile", "email"}
@@ -377,11 +375,7 @@ func (a *remoteAuth) generateState() (string, error) {
 func (a *remoteAuth) verifyState(state string) error {
 	tsStr, err := a.decryptState(state)
 	if err != nil {
-		// fall back to legacy decryption for states generated before this migration
-		tsStr, err = utils.DecryptURLSafe(state)
-		if err != nil {
-			return fmt.Errorf("Invalid state: wrong encryption: %w", err)
-		}
+		return fmt.Errorf("Invalid state: %w", err)
 	}
 	if tsStr == "" {
 		return errors.New("Invalid state: wrong encryption")

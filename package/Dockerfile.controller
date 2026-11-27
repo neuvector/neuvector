@@ -1,15 +1,21 @@
+FROM registry.suse.com/rancher/appco-go:1.27.4 AS golang
+
 #
 # Builder
 #
-FROM registry.suse.com/bci/golang:1.27.3 AS builder
+FROM registry.suse.com/bci/bci-base:15.7 AS builder
 
 ARG VERSION
 
 ENV GOPATH=/go
 ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 
-# Setup build dependencies
-RUN zypper install -y pcre-devel
+COPY --from=golang /usr/local/go /usr/local/go
+ENV GOROOT=/usr/local/go
+ENV GOTOOLCHAIN=local
+
+# Setup build dependencies (gcc/make/git were bundled by bci/golang; bci-base lacks them)
+RUN zypper install -y gcc make git pcre-devel libjansson-devel
 
 # Build controller
 COPY agent/ /src/agent
@@ -45,7 +51,7 @@ RUN zypper --non-interactive install --no-recommends unzip
 
 # Runtime dependencies
 RUN zypper refresh && zypper --non-interactive --installroot /chroot install --no-recommends \
-    ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk pcre-devel && \
+    ca-certificates iproute2 ethtool lsof procps curl jq iptables grep tar awk pcre-devel libjansson-devel && \
     zypper --non-interactive --installroot /chroot clean -a && \
     rm -rf /chroot/var/log/
 

@@ -135,7 +135,7 @@ func handlerConverEndpointConfig(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getDefaultReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
 	}
@@ -257,9 +257,11 @@ func handlerConverShow(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	from := ps.ByName("from")
 	to := ps.ByName("to")
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(getLargeBufferReader(r.Body))
 	if err != nil {
 		log.WithError(err).Warn("failed to read request body")
+		restRespError(w, http.StatusBadRequest, api.RESTErrInvalidRequest)
+		return
 	}
 
 	var data api.RESTConversationQueryData

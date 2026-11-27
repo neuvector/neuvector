@@ -336,7 +336,7 @@ static bool ip6frag_construct(ip6frag_trac_t *trac, dpi_packet_t *p)
         p->l4 = p->l3 + sizeof(*ip6h);
 
         // Remove trac from the map, keep it to send packets
-        rcu_map_del(&th_ip4frag_map, trac);
+        rcu_map_del(&th_ip6frag_map, trac);
         timer_wheel_entry_remove(&th_timer, &trac->ts_entry);
         p->frag_trac = trac;
 
@@ -350,7 +350,7 @@ static void ip6frag_release(timer_entry_t *entry)
 {
     ip6frag_trac_t *trac = STRUCT_OF(entry, ip6frag_trac_t, ts_entry);
 
-    rcu_map_del(&th_ip4frag_map, trac);
+    rcu_map_del(&th_ip6frag_map, trac);
 
     // TODO: should track the sender
     th_counter.tmout_frags ++;

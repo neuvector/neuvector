@@ -70,6 +70,7 @@ type FileAccessCtrl struct {
 	cflag         uint64             // fanotify configuration flags( open-perm or exec-perm)
 	bKubePlatform bool
 	kubeFlavor    string
+	agentPid      int
 }
 
 type FileAccessProbeData struct {
@@ -163,6 +164,7 @@ func NewFileAccessCtrl(p *Probe) (*FileAccessCtrl, bool) {
 		prober:        p,
 		bKubePlatform: p.bKubePlatform,
 		kubeFlavor:    p.kubeFlavor,
+		agentPid:      os.Getpid(),
 	}
 
 	// docker cp (file changes) might change the polling behaviors,
@@ -903,12 +905,19 @@ func (fa *FileAccessCtrl) processEvent(ev *fanotify.EventMetadata) (bool, string
 
 func (fa *FileAccessCtrl) handleEvents() error {
 	for {
-		ev, err := fa.fanfd.GetEvent(os.Getpid())
+		// Do not give a skip PID to GetEvent.
+		// GetEvent closes the events of a skip PID and does not send a response.
+		// Then an open by the agent on a file with a permission mark does not complete.
+		// This loop allows the events of the agent.
+		ev, err := fa.fanfd.GetEvent()
 		if err != nil || ev == nil {
 			return err
 		}
 
-		resp, path := fa.processEvent(ev)
+		resp, path := true, ""
+		if int(ev.Pid) != fa.agentPid {
+			resp, path = fa.processEvent(ev)
+		}
 		if resp {
 			err = fa.fanfd.ResponseAllow(ev)
 		} else {

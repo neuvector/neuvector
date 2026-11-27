@@ -82,6 +82,7 @@ func (sp *SAMLServiceProvider) RetrieveAssertionInfo(encodedResponse string) (*A
 	}
 
 	assertionInfo.NameID = nameID.Value
+	assertionInfo.NameIDFormat = nameID.Format
 
 	//Get the actual assertion attributes
 	attributeStatement := assertion.AttributeStatement

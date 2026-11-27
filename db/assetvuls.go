@@ -1038,7 +1038,7 @@ func GetAssetQuery(r *http.Request) (*AssetQueryFilter, error) {
 	q.Debug = getQueryParamInteger(r, "debug", defaultDebugMode)
 
 	if r.Method == http.MethodPost {
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(getDefaultReader(r.Body))
 		if err != nil {
 			return nil, err
 		}

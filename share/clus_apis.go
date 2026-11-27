@@ -2091,7 +2091,7 @@ type CLUSAdmissionRule struct { // see type RESTAdmissionRule
 	RuleType          string                  `json:"rule_type" yaml:"rule_type"` // "exception", "deny"
 	UseAsRiskyRoleTag bool                    `json:"use_as_risky_role_tag" yaml:"use_as_risky_role_tag"`
 	RuleMode          string                  `json:"rule_mode" yaml:"rule_mode"`   // "", "monitor", "protect"
-	Containers        uint8                   `json:"containers" yaml:"containers"` // 0 for all containers, 1 for containers, 2 for initContainers, 4 for ephemeralContainers (OR of supported types)
+	Containers        uint8                   `json:"containers" yaml:"containers"` // obsolete
 }
 
 type CLUSAdmissionRules struct {
@@ -2108,10 +2108,6 @@ const (
 )
 
 const (
-	AdmCtrlRuleContainersN          = 1 // for containers
-	AdmCtrlRuleInitContainersN      = 2 // for init_containers
-	AdmCtrlRuleEphemeralContainersN = 4 // for ephemeral_containers
-
 	AdmCtrlRuleContainers          = "containers"
 	AdmCtrlRuleInitContainers      = "init_containers"
 	AdmCtrlRuleEphemeralContainers = "ephemeral_containers"
